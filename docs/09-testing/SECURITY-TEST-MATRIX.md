@@ -1,0 +1,24 @@
+# Security Test Matrix
+
+- OIDC issuer confusion
+- wrong tenant/domain
+- expired token
+- replay/nonce failure
+- session fixation
+- CSRF
+- privilege escalation
+- IDOR/BOLA
+- role/site scope bypass
+- step-up bypass
+- action approval replay
+- duplicate action/idempotency
+- SQL injection
+- command injection
+- SSRF through diagnostics
+- malicious URL/host input
+- XSS through device/syslog strings
+- secret leakage in logs
+- oversized flow query/DoS
+- prompt injection in telemetry
+- AI tool parameter abuse
+- upstream TLS verification failure

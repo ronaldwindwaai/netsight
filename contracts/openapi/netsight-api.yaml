@@ -1,0 +1,67 @@
+openapi: 3.1.0
+info:
+  title: Netsight Platform API
+  version: 0.1.0
+servers:
+  - url: /api/v1
+paths:
+  /health:
+    get:
+      summary: Platform health
+      responses:
+        '200':
+          description: Healthy
+  /devices:
+    get:
+      summary: List canonical devices
+      responses:
+        '200':
+          description: Device list
+  /devices/{device_id}:
+    get:
+      summary: Get canonical device
+      parameters:
+        - in: path
+          name: device_id
+          required: true
+          schema: {type: string}
+      responses:
+        '200': {description: Device}
+        '404': {description: Not found}
+  /incidents:
+    get:
+      summary: List incidents
+      responses:
+        '200': {description: Incident list}
+    post:
+      summary: Create incident
+      responses:
+        '201': {description: Created}
+  /diagnostics:
+    post:
+      summary: Start an approved read-only diagnostic workflow
+      responses:
+        '202': {description: Diagnostic accepted}
+  /action-requests:
+    post:
+      summary: Propose a controlled remote action
+      responses:
+        '201': {description: Action request created}
+  /action-requests/{action_id}/approve:
+    post:
+      summary: Approve an action request subject to policy and step-up authentication
+      parameters:
+        - in: path
+          name: action_id
+          required: true
+          schema: {type: string}
+      responses:
+        '200': {description: Approval recorded}
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: netsight_session
+security:
+  - sessionCookie: []

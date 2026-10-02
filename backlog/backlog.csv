@@ -1,0 +1,53 @@
+Epic,ID,Priority,Area,Story,Acceptance
+E00,NS-001,P0,Foundation,Create repository and protected branch policy,Repo boots; branch protections documented; CODEOWNERS set
+E00,NS-002,P0,Foundation,Establish CI build/type/test gates,Required CI runs on PR and main
+E00,NS-003,P0,Foundation,Add SAST/dependency/secret/container scanning,Security gate fails closed for defined severities
+E00,NS-004,P0,Foundation,Create canonical JSON schemas,Device/Alert/Incident/Evidence/Action validated
+E00,NS-005,P0,Foundation,Create platform DB baseline and migrations,DB can migrate up/down in dev
+E01,NS-010,P0,Identity,Implement Microsoft Entra OIDC,Allowed tenant can sign in; wrong tenant denied
+E01,NS-011,P0,Identity,Implement Google Workspace OIDC,Allowed Workspace can sign in; unapproved domain denied
+E01,NS-012,P0,Identity,Server-side secure session,HttpOnly secure session; revocation/test coverage
+E01,NS-013,P0,Identity,RBAC permission engine,Backend denies unauthorised routes
+E01,NS-014,P0,Identity,Step-up authentication state,High-risk route can require fresh assurance
+E01,NS-015,P0,UI,AdminLTE dashboard shell,Responsive light/dark shell with sidebar/topbar
+E02,NS-020,P0,LibreNMS,Implement source-health check,Source freshness visible
+E02,NS-021,P0,LibreNMS,Device adapter,Canonical device list/detail
+E02,NS-022,P0,LibreNMS,Interface adapter,Ports/interfaces and utilisation
+E02,NS-023,P0,LibreNMS,Alert adapter,Alerts mapped to canonical state
+E02,NS-024,P0,UI,Devices table/detail,Search/filter/drilldown/stale states
+E03,NS-030,P0,NetBox,Sites/devices/IPAM adapter,Canonical source-of-truth records
+E03,NS-031,P0,Reconciliation,NetBox vs discovered device reconciliation,Unknown/missing/mismatch findings
+E03,NS-032,P1,Topology,Build topology graph model,Nodes/edges/dependencies canonicalised
+E03,NS-033,P1,Topology,Interactive network map,Pan/zoom/filter/quick drawer
+E04,NS-040,P0,Traffic,Connect read-only ClickHouse flow queries,Bounded query API
+E04,NS-041,P0,Traffic,Top talkers,Device/IP/user top usage
+E04,NS-042,P1,Traffic,Top destinations/apps,Drilldown with time filter
+E04,NS-043,P1,Identity,DHCP/RADIUS/VPN correlation framework,Evidence/confidence identity mapping
+E04,NS-044,P1,Anomaly,Baseline after-hours traffic,Expected-vs-observed feature set
+E05,NS-050,P0,Wazuh,Read-only Wazuh adapter,Agents/security events canonicalised
+E05,NS-051,P0,Suricata,Suricata evidence ingestion,IDS evidence linked to entities
+E05,NS-052,P1,Security,Security centre UI,Prioritised correlated evidence
+E06,NS-060,P0,Alerts,Custom alert-rule domain model,Rule + schedule + exception + severity
+E06,NS-061,P0,Alerts,Email notification routing,Delivery status and retry
+E06,NS-062,P1,Alerts,Maintenance windows,Suppress notification without losing evidence
+E06,NS-063,P1,Alerts,Dependency grouping,Root alert inhibits downstream noise
+E06,NS-064,P0,Incidents,Incident CRUD/assignment/timeline,Audit + evidence links
+E07,NS-070,P0,Diagnostics,Blackbox probe adapter,HTTP/TCP/DNS/ICMP evidence
+E07,NS-071,P0,Diagnostics,Multi-vantage diagnostics model,Internal/external probe comparison
+E07,NS-072,P0,Diagnostics,Server inaccessible workflow,Facts/inference/unknown/recommendation
+E07,NS-073,P1,Diagnostics,Path visualisation,Fault-domain display
+E08,NS-080,P1,Config,Oxidized history/diff adapter,Version/diff display
+E08,NS-081,P1,Config,Change-to-incident correlation,Temporal/topological evidence
+E09,NS-090,P0,AI,AI provider gateway,Provider abstraction + redaction
+E09,NS-091,P0,AI,Read-only tool broker,Policy/typed/audited tools
+E09,NS-092,P0,AI,Ask Netsight evidence answer,Facts/inference/unknowns
+E09,NS-093,P0,AI,Prompt-injection eval suite,Telemetry injection cannot alter authority
+E09,NS-094,P1,AI,Knowledge/RAG,ACL-aware approved docs
+E10,NS-100,P1,PWA,Installable responsive PWA,Mobile dashboard/navigation
+E10,NS-101,P1,PWA,Push notifications,Critical/high push
+E11,NS-110,P0,Actions,Action Request domain,Risk/approval/step-up/idempotency
+E11,NS-111,P0,Actions,Restricted executor framework,"Named actions only, no shell"
+E11,NS-112,P0,Actions,Action audit + verification,Before/after evidence and result
+E11,NS-113,P1,Actions,Disable-port lab action,Lab-only proof with approval
+E12,NS-120,P2,Forecasting,Storage capacity forecast,Uncertainty shown
+E12,NS-121,P2,Optimisation,WAN/AP recommendations,Evidence-backed suggestions

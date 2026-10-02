@@ -1,0 +1,45 @@
+{
+  "project": "Netsight",
+  "tagline": "See everything. Know why. Act securely.",
+  "generated": "2026-10-02",
+  "purpose": "Comprehensive development package for building Netsight with LLM agents and secure software-factory practices.",
+  "ui": "AdminLTE 4 / @adminlte/react + Next.js/React/TypeScript",
+  "auth": [
+    "Microsoft Entra ID / Microsoft 365 OIDC",
+    "Google Workspace OIDC"
+  ],
+  "security_alignment": [
+    "NIST SP 800-218 SSDF",
+    "OWASP ASVS 5.0"
+  ],
+  "core_integrations": [
+    "LibreNMS",
+    "NetBox",
+    "Akvorado",
+    "ClickHouse",
+    "Wazuh",
+    "Suricata",
+    "Grafana",
+    "Oxidized",
+    "Blackbox Exporter"
+  ],
+  "ai_authority_mvp": [
+    "observe/explain/recommend",
+    "approved read-only diagnostics"
+  ],
+  "notes": [
+    "Exact dependency versions must be resolved and pinned during first green bootstrap.",
+    "No production secrets are included."
+  ],
+  "implementation_specs": [
+    "alerts",
+    "incidents",
+    "root-cause",
+    "controlled-actions",
+    "identity-correlation",
+    "traffic-baselines",
+    "notifications",
+    "reporting",
+    "multi-site"
+  ]
+}

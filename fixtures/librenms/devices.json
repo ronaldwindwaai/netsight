@@ -1,0 +1,19 @@
+{
+  "status": "ok",
+  "devices": [
+    {
+      "source_id": "101",
+      "hostname": "core-sw01",
+      "display": "CORE-SW01",
+      "status": 1,
+      "type": "network"
+    },
+    {
+      "source_id": "102",
+      "hostname": "server01",
+      "display": "SERVER01",
+      "status": 1,
+      "type": "server"
+    }
+  ]
+}

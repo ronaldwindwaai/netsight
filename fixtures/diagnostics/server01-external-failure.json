@@ -1,0 +1,32 @@
+{
+  "target": "SERVER01",
+  "evidence": [
+    {
+      "kind": "icmp",
+      "vantage": "server-vlan",
+      "result": "pass"
+    },
+    {
+      "kind": "tcp",
+      "vantage": "server-vlan",
+      "port": 443,
+      "result": "pass"
+    },
+    {
+      "kind": "tcp",
+      "vantage": "internet",
+      "port": 443,
+      "result": "fail"
+    },
+    {
+      "kind": "host_agent",
+      "result": "healthy"
+    },
+    {
+      "kind": "config_change",
+      "device": "FIREWALL01",
+      "minutes_before": 7
+    }
+  ],
+  "expected_inference": "Perimeter/firewall path is the probable fault domain; causality is not proven."
+}

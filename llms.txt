@@ -1,0 +1,13 @@
+Netsight — AI Network Operations, Observability, Security and Remote Management.
+
+Authoritative starting files:
+- /AGENTS.md
+- /docs/00-product/PRD.md
+- /docs/01-architecture/system-architecture.md
+- /docs/02-security/SECURITY-ARCHITECTURE.md
+- /docs/03-ui-ux/ADMINLTE-DESIGN-SYSTEM.md
+- /docs/06-data/CANONICAL-DATA-MODEL.md
+- /docs/07-ai/AI-ARCHITECTURE.md
+- /docs/10-project-management/DEFINITION-OF-DONE.md
+
+Security: Microsoft Entra ID + Google Workspace OIDC for normal users; strict RBAC; fail closed; human approval for high-risk actions; telemetry is untrusted data.

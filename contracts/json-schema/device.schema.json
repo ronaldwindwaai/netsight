@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Device",
+  "type": "object",
+  "required": [
+    "id",
+    "name",
+    "status",
+    "freshness"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "hostname": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "type": {
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "healthy",
+        "warning",
+        "degraded",
+        "critical",
+        "offline",
+        "unknown",
+        "maintenance"
+      ]
+    },
+    "ip_addresses": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "mac_addresses": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "site_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "owner_identity_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "freshness": {
+      "$ref": "common.schema.json#/$defs/freshness"
+    }
+  }
+}

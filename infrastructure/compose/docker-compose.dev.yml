@@ -1,0 +1,32 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: netsight
+      POSTGRES_USER: netsight
+      POSTGRES_PASSWORD: dev-only-change-me
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redisdata:/data
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    profiles: ["traffic-lab"]
+    ports:
+      - "127.0.0.1:8123:8123"
+    volumes:
+      - clickhousedata:/var/lib/clickhouse
+
+volumes:
+  pgdata:
+  redisdata:
+  clickhousedata:

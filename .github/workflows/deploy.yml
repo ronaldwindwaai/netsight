@@ -1,0 +1,73 @@
+name: Deploy
+# Deploys main to the VPS (netsight.sadcpf.org) after CI succeeds on main.
+# Merging to main is the human approval gate: protect main (PR + CI required).
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Commit SHA on main to deploy (default: latest main)
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-vps
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: vps
+      url: https://netsight.sadcpf.org
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || inputs.ref || 'main' }}
+
+      - name: Resolve release SHA
+        id: rel
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Configure SSH
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Upload release
+        env:
+          VPS_HOST: ${{ vars.VPS_HOST }}
+          VPS_USER: ${{ vars.VPS_USER }}
+          SHA: ${{ steps.rel.outputs.sha }}
+        run: |
+          SSH="ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes"
+          $SSH "$VPS_USER@$VPS_HOST" "mkdir -p ~/netsight/releases/$SHA"
+          rsync -az --delete -e "$SSH" \
+            --exclude '.git' --exclude 'node_modules' --exclude '.next' --exclude '.env*' \
+            --exclude '*.zip' --exclude 'Netsight_Development_Package' \
+            ./ "$VPS_USER@$VPS_HOST:netsight/releases/$SHA/"
+
+      - name: Build, switch and health-check on VPS
+        env:
+          VPS_HOST: ${{ vars.VPS_HOST }}
+          VPS_USER: ${{ vars.VPS_USER }}
+          SHA: ${{ steps.rel.outputs.sha }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            "$VPS_USER@$VPS_HOST" "bash -l ~/netsight/releases/$SHA/scripts/deploy-vps.sh $SHA"
+
+      - name: Cleanup SSH material
+        if: always()
+        run: rm -f ~/.ssh/deploy_key

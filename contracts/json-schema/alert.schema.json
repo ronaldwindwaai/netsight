@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Alert",
+  "type": "object",
+  "required": [
+    "id",
+    "severity",
+    "state",
+    "title",
+    "observed_at"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "severity": {
+      "enum": [
+        "info",
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ]
+    },
+    "state": {
+      "enum": [
+        "open",
+        "acknowledged",
+        "investigating",
+        "resolved",
+        "suppressed"
+      ]
+    },
+    "title": {
+      "type": "string"
+    },
+    "observed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "device_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "incident_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  }
+}

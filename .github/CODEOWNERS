@@ -1,0 +1,7 @@
+# Single maintainer for now; replace with real GitHub teams when they exist.
+/docs/02-security/          @ronaldwindwaai
+/apps/api/                  @ronaldwindwaai
+/apps/ai-gateway/           @ronaldwindwaai
+/infrastructure/            @ronaldwindwaai
+/contracts/                 @ronaldwindwaai
+/.github/                   @ronaldwindwaai

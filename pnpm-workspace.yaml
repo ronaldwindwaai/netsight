@@ -1,0 +1,6 @@
+packages:
+  - "apps/web"
+  - "packages/*"
+# unrs-resolver ships prebuilt binaries via optional deps; its postinstall is not needed.
+allowBuilds:
+  unrs-resolver: false

@@ -1,0 +1,10 @@
+:root {
+  --netsight-midnight: #0b1220;
+  --netsight-signal: #168bfa;
+  --netsight-cyan: #19c3d1;
+  --netsight-healthy: #16a36a;
+  --netsight-warning: #e7a11a;
+  --netsight-critical: #d64545;
+  --netsight-cloud: #f4f7fa;
+}
+body { min-height: 100vh; }

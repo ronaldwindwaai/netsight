@@ -1,0 +1,19 @@
+[Unit]
+Description=Netsight web (Next.js)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/netsight/current/apps/web
+Environment=NODE_ENV=production
+Environment=PATH=%h/.local/node/bin:/usr/local/bin:/usr/bin:/bin
+EnvironmentFile=-%h/netsight/shared/web.env
+ExecStart=%h/.local/node/bin/pnpm exec next start -H 127.0.0.1 -p ${NETSIGHT_WEB_PORT}
+Restart=on-failure
+RestartSec=5
+# Hardening (user-level service)
+NoNewPrivileges=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,13 @@
+{
+  "name": "netsight",
+  "private": true,
+  "packageManager": "pnpm@12.8.1",
+  "engines": { "node": ">=24" },
+  "scripts": {
+    "dev:web": "pnpm --dir apps/web dev",
+    "lint:web": "pnpm --dir apps/web lint",
+    "typecheck:web": "pnpm --dir apps/web typecheck",
+    "test": "echo 'Run workspace-specific test suites'",
+    "security:verify": "bash scripts/security-verify.sh"
+  }
+}

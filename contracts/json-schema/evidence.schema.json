@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Evidence",
+  "type": "object",
+  "required": [
+    "id",
+    "source",
+    "observed_at",
+    "kind",
+    "payload"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "source": {
+      "type": "string"
+    },
+    "observed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "kind": {
+      "type": "string"
+    },
+    "entity_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "payload": {
+      "type": "object"
+    },
+    "freshness_state": {
+      "enum": [
+        "fresh",
+        "stale",
+        "unknown"
+      ]
+    }
+  }
+}
