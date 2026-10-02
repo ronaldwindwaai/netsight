@@ -20,3 +20,4 @@ secrets/
 
 *.zip
 .env.local
+*.egg-info/
