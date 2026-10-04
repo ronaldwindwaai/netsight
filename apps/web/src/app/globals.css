@@ -17,8 +17,11 @@ body {
   background: #111827;
 }
 
-/* @adminlte/react 0.7 renders demo user/footer content when those slots are omitted.
-   Hide those stock surfaces until Netsight's federated session profile is connected. */
+/* @adminlte/react 0.7 always renders stock demo user-menu and footer content:
+   the user menu falls back to a DEFAULT_USER avatar and the footer to
+   AdminLTE demo copyright. Neither slot can be omitted via props, so Netsight
+   hides them and supplies its own IdentityMenu in topbarEnd instead.
+   Verified against @adminlte/react 0.7.0 (dist/layout/topbar.js, footer.js). */
 .app-header .user-menu,
 .app-footer {
   display: none !important;

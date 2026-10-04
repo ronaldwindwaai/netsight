@@ -15,6 +15,7 @@ function initials(email: string | null, identityId: string): string {
 export function IdentityMenu({ session }: { session: SessionInfo | null }) {
   const [open, setOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
   if (session === null) {
@@ -26,20 +27,37 @@ export function IdentityMenu({ session }: { session: SessionInfo | null }) {
     );
   }
 
+  async function completeSignOut() {
+    startTransition(() => {
+      window.location.href = '/login';
+    });
+  }
+
   async function signOut() {
     setSigningOut(true);
+    setError(null);
     try {
       const csrfResponse = await fetch('/auth/csrf', { cache: 'no-store' });
-      const csrf = csrfResponse.ok ? ((await csrfResponse.json()) as { csrf_token: string }) : null;
-      await fetch('/auth/logout', {
+      if (!csrfResponse.ok) {
+        throw new Error('Could not obtain a sign-out token.');
+      }
+      const payload = (await csrfResponse.json()) as { csrf_token?: unknown };
+      if (typeof payload.csrf_token !== 'string' || payload.csrf_token.length === 0) {
+        throw new Error('Could not obtain a sign-out token.');
+      }
+
+      const logoutResponse = await fetch('/auth/logout', {
         method: 'POST',
-        headers: csrf ? { 'X-CSRF-Token': csrf.csrf_token } : {},
+        headers: { 'X-CSRF-Token': payload.csrf_token },
         cache: 'no-store',
       });
-    } finally {
-      startTransition(() => {
-        window.location.href = '/login';
-      });
+      if (!logoutResponse.ok) {
+        throw new Error('Sign-out was rejected by the Netsight API.');
+      }
+      await completeSignOut();
+    } catch {
+      setSigningOut(false);
+      setError('Sign-out failed. Reload and try again.');
     }
   }
 
@@ -91,6 +109,13 @@ export function IdentityMenu({ session }: { session: SessionInfo | null }) {
               {signingOut ? 'Signing out…' : 'Sign out'}
             </button>
           </li>
+          {error !== null ? (
+            <li>
+              <span className="dropdown-item-text small text-danger" role="alert">
+                {error}
+              </span>
+            </li>
+          ) : null}
         </ul>
       ) : null}
     </div>
