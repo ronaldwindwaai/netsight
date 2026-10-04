@@ -9,11 +9,11 @@ single place platform code uses to enforce that rule.
 from __future__ import annotations
 
 import json
-from functools import lru_cache
+from functools import cache
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
-import jsonschema
+import jsonschema  # type: ignore[import-untyped]
 from referencing import Registry, Resource
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
@@ -37,19 +37,21 @@ def _read_schema(filename: str) -> dict[str, Any]:
     path = SCHEMA_DIR / filename
     if not path.is_file():
         raise FileNotFoundError(f"canonical schema missing: {path}")
-    return json.loads(path.read_text(encoding="utf-8"))
+    raw_schema: object = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(raw_schema, dict):
+        raise TypeError(f"canonical schema must be an object: {path}")
+    return cast(dict[str, Any], raw_schema)
 
 
 def _registry() -> Registry:
     resources = []
     for path in SCHEMA_DIR.glob("*.schema.json"):
-        resources.append(
-            (path.name, Resource.from_contents(json.loads(path.read_text(encoding="utf-8"))))
-        )
+        schema = _read_schema(path.name)
+        resources.append((path.name, Resource.from_contents(schema)))
     return Registry().with_resources(resources)
 
 
-@lru_cache(maxsize=None)
+@cache
 def _validator(name: str) -> jsonschema.Draft202012Validator:
     if name not in SCHEMA_FILES:
         raise KeyError(f"unknown canonical schema: {name}")

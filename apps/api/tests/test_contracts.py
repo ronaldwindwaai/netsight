@@ -1,11 +1,14 @@
+from typing import Any
+
 import pytest
 
 from netsight_api.contracts import ContractViolation, validate
 
 DEVICE = {
-    "id": "dev-1",
+    "id": "device-dc425b99-786e-50f0-82dc-ebe2d0aa0e38",
     "name": "core-sw-01",
     "status": "healthy",
+    "source_aliases": [{"source": "librenms", "native_id": "1"}],
     "freshness": {"state": "fresh", "observed_at": "2026-10-02T12:00:00Z", "source": "librenms"},
 }
 
@@ -55,7 +58,7 @@ ACTION_REQUEST = {
         ("action_request", ACTION_REQUEST),
     ],
 )
-def test_valid_instances_pass(name: str, instance: dict) -> None:
+def test_valid_instances_pass(name: str, instance: dict[str, Any]) -> None:
     validate(name, instance)
 
 
@@ -63,7 +66,9 @@ def test_valid_instances_pass(name: str, instance: dict) -> None:
     "name,instance",
     [
         ("device", {**DEVICE, "status": "broken"}),
+        ("device", {**DEVICE, "id": "librenms:1"}),
         ("device", {k: v for k, v in DEVICE.items() if k != "freshness"}),
+        ("device", {k: v for k, v in DEVICE.items() if k != "source_aliases"}),
         ("alert", {**ALERT, "severity": "catastrophic"}),
         ("incident", {**INCIDENT, "state": "deleted"}),
         ("evidence", {**EVIDENCE, "payload": "not-an-object"}),
@@ -71,7 +76,7 @@ def test_valid_instances_pass(name: str, instance: dict) -> None:
         ("action_request", {**ACTION_REQUEST, "reason": "ab"}),
     ],
 )
-def test_invalid_instances_fail(name: str, instance: dict) -> None:
+def test_invalid_instances_fail(name: str, instance: dict[str, Any]) -> None:
     with pytest.raises(ContractViolation):
         validate(name, instance)
 

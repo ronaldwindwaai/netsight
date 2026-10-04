@@ -10,16 +10,20 @@ check() { # check <description> <command that prints offending lines on violatio
 }
 
 SRC="apps packages"
+# Virtualenvs and installed dependencies are not first-party source and must not
+# trigger repo-level policy checks (e.g. python site-packages contain many
+# `password = "..."` examples). Exclude them alongside node_modules.
+DEP_EXCLUDES="--exclude-dir=node_modules --exclude-dir=.venv --exclude-dir=site-packages --exclude-dir=.mypy_cache --exclude-dir=.pytest_cache --exclude-dir=.next"
 check "no committed .env files (only .env.example)" \
   "git ls-files 2>/dev/null | grep -E '(^|/)\.env(\..+)?$' | grep -v '\.env\.example$'"
 check "no auth tokens in browser storage" \
-  "grep -rnE '(localStorage|sessionStorage)\.(setItem|getItem)\([^)]*(token|jwt|secret|password)' $SRC --include=*.ts --include=*.tsx --include=*.js"
+  "grep -rnE '(localStorage|sessionStorage)\.(setItem|getItem)\([^)]*(token|jwt|secret|password)' $SRC --include=*.ts --include=*.tsx --include=*.js $DEP_EXCLUDES"
 check "no private keys in source" \
-  "grep -rnE -e '-----BEGIN [A-Z ]*PRIVATE KEY-----' . --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=.next --exclude-dir=Netsight_Development_Package"
+  "grep -rnE -e '-----BEGIN [A-Z ]*PRIVATE KEY-----' . --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=.next --exclude-dir=.venv --exclude-dir=site-packages --exclude-dir=Netsight_Development_Package"
 check "no hard-coded credential assignments in app code" \
-  "grep -rniE '(password|passwd|secret|api_key|apikey|token)[\"'\'']?\s*[:=]\s*[\"'\''][^\"'\'']{8,}[\"'\'']' apps packages --include=*.ts --include=*.tsx --include=*.py --exclude-dir=node_modules --exclude-dir=tests --exclude-dir=.next"
+  "grep -rniE '(password|passwd|secret|api_key|apikey|token)[\"'\'']?\s*[:=]\s*[\"'\''][^\"'\'']{8,}[\"'\'']' $SRC --include=*.ts --include=*.tsx --include=*.py $DEP_EXCLUDES --exclude-dir=tests"
 check "no TLS verification disabled" \
-  "grep -rnE 'rejectUnauthorized\s*:\s*false|verify\s*=\s*False|NODE_TLS_REJECT_UNAUTHORIZED' $SRC --include=*.ts --include=*.tsx --include=*.js --include=*.py --exclude-dir=node_modules"
+  "grep -rnE 'rejectUnauthorized\s*:\s*false|verify\s*=\s*False|NODE_TLS_REJECT_UNAUTHORIZED' $SRC --include=*.ts --include=*.tsx --include=*.js --include=*.py $DEP_EXCLUDES"
 
 if [ "$fail" -ne 0 ]; then echo; echo "Security policy checks FAILED"; exit 1; fi
 echo; echo "Security policy checks passed"

@@ -4,6 +4,7 @@
 node_modules/
 .next/
 dist/
+!.opencode/dist/
 build/
 __pycache__/
 .pytest_cache/
@@ -11,8 +12,10 @@ __pycache__/
 .ruff_cache/
 .venv/
 *.pyc
+*.tsbuildinfo
 *.log
 coverage/
+.artifacts/
 .DS_Store
 .idea/
 .vscode/settings.json

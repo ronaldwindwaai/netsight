@@ -5,8 +5,11 @@
     "freshness": {
       "type": "object",
       "required": [
-        "state"
+        "state",
+        "observed_at",
+        "source"
       ],
+      "additionalProperties": false,
       "properties": {
         "state": {
           "enum": [

@@ -8,45 +8,138 @@ paths:
   /health:
     get:
       summary: Platform health
+      security: []
       responses:
         '200':
           description: Healthy
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+  /sources/librenms/health:
+    get:
+      summary: Get the protected LibreNMS source health state
+      operationId: getLibrenmsSourceHealth
+      responses:
+        '200':
+          description: Current source health observation
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SourceHealthResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '503':
+          $ref: '#/components/responses/SourceUnavailable'
   /devices:
     get:
       summary: List canonical devices
+      operationId: listDevices
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - in: query
+          name: page_size
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 25
       responses:
         '200':
-          description: Device list
+          description: Bounded page of canonical devices
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceListResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '502':
+          $ref: '#/components/responses/InvalidSourceData'
+        '503':
+          $ref: '#/components/responses/SourceUnavailable'
   /devices/{device_id}:
     get:
-      summary: Get canonical device
+      summary: Get a canonical device
+      operationId: getDevice
       parameters:
         - in: path
           name: device_id
           required: true
-          schema: {type: string}
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 128
       responses:
-        '200': {description: Device}
-        '404': {description: Not found}
+        '200':
+          description: Canonical device detail
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceDetailResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '404':
+          $ref: '#/components/responses/DeviceNotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '502':
+          $ref: '#/components/responses/InvalidSourceData'
+        '503':
+          $ref: '#/components/responses/SourceUnavailable'
+  /alerts:
+    get:
+      summary: List canonical alerts
+      responses:
+        '200':
+          description: Alert list
   /incidents:
     get:
       summary: List incidents
       responses:
-        '200': {description: Incident list}
+        '200':
+          description: Incident list
     post:
       summary: Create incident
       responses:
-        '201': {description: Created}
+        '201':
+          description: Created
   /diagnostics:
     post:
       summary: Start an approved read-only diagnostic workflow
       responses:
-        '202': {description: Diagnostic accepted}
+        '202':
+          description: Diagnostic accepted
   /action-requests:
     post:
       summary: Propose a controlled remote action
       responses:
-        '201': {description: Action request created}
+        '201':
+          description: Action request created
   /action-requests/{action_id}/approve:
     post:
       summary: Approve an action request subject to policy and step-up authentication
@@ -54,10 +147,152 @@ paths:
         - in: path
           name: action_id
           required: true
-          schema: {type: string}
+          schema:
+            type: string
       responses:
-        '200': {description: Approval recorded}
+        '200':
+          description: Approval recorded
 components:
+  headers:
+    CorrelationId:
+      description: Correlates the request, response and server-side workflow.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 64
+  schemas:
+    HealthResponse:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status:
+          const: ok
+    Freshness:
+      $ref: '../json-schema/common.schema.json#/$defs/freshness'
+    Device:
+      $ref: '../json-schema/device.schema.json'
+    DeviceListResponse:
+      type: object
+      additionalProperties: false
+      required: [items, page, page_size, total, freshness]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Device'
+        page:
+          type: integer
+          minimum: 1
+        page_size:
+          type: integer
+          minimum: 1
+          maximum: 100
+        total:
+          type: integer
+          minimum: 0
+        freshness:
+          $ref: '#/components/schemas/Freshness'
+    DeviceDetailResponse:
+      type: object
+      additionalProperties: false
+      required: [item]
+      properties:
+        item:
+          $ref: '#/components/schemas/Device'
+    SourceHealthResponse:
+      type: object
+      additionalProperties: false
+      required: [source, status, reachable, latency_ms, checked_at, detail]
+      properties:
+        source:
+          const: librenms
+        status:
+          enum: [success, unavailable, forbidden, invalid-source-data]
+        reachable:
+          type: boolean
+        latency_ms:
+          type: [number, 'null']
+          minimum: 0
+        checked_at:
+          type: string
+          format: date-time
+        detail:
+          enum: [ok, unavailable, forbidden, invalid-source-data]
+    ErrorEnvelope:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          required: [code, message, correlation_id]
+          properties:
+            code:
+              type: string
+              pattern: '^[A-Z0-9_]+$'
+            message:
+              type: string
+            correlation_id:
+              type: string
+              minLength: 1
+              maxLength: 64
+  responses:
+    AuthenticationRequired:
+      description: Authentication required
+      headers:
+        X-Correlation-ID:
+          $ref: '#/components/headers/CorrelationId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    PermissionDenied:
+      description: Permission denied
+      headers:
+        X-Correlation-ID:
+          $ref: '#/components/headers/CorrelationId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    DeviceNotFound:
+      description: Device not found
+      headers:
+        X-Correlation-ID:
+          $ref: '#/components/headers/CorrelationId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    ValidationError:
+      description: Request validation failed
+      headers:
+        X-Correlation-ID:
+          $ref: '#/components/headers/CorrelationId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    InvalidSourceData:
+      description: Source returned invalid data
+      headers:
+        X-Correlation-ID:
+          $ref: '#/components/headers/CorrelationId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    SourceUnavailable:
+      description: Source is unavailable or not configured
+      headers:
+        X-Correlation-ID:
+          $ref: '#/components/headers/CorrelationId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
   securitySchemes:
     sessionCookie:
       type: apiKey

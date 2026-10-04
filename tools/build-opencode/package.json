@@ -1,0 +1,5 @@
+{
+  "name": "netsight-opencode-plugin-build",
+  "private": true,
+  "type": "module"
+}

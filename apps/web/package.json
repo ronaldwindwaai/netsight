@@ -1,11 +1,17 @@
 {
   "name": "@netsight/web",
   "private": true,
+  "files": [
+    "src",
+    "next-env.d.ts",
+    "tsconfig.json"
+  ],
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
+    "test": "node --experimental-strip-types --test src/lib/api-contracts.test.ts src/lib/overview-summary.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

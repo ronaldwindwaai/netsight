@@ -25,6 +25,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm run lint:web
       - run: pnpm run typecheck:web
+      - run: pnpm --dir apps/web test
       - run: pnpm --dir apps/web build
 
   python:

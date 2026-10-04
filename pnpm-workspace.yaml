@@ -2,5 +2,8 @@ packages:
   - "apps/web"
   - "packages/*"
 # unrs-resolver ships prebuilt binaries via optional deps; its postinstall is not needed.
+# msgpackr-extract (transitive via @opencode/plugin -> effect) ships prebuilt
+# binaries via optional platform packages; its native postinstall is not needed here.
 allowBuilds:
   unrs-resolver: false
+  msgpackr-extract: false
