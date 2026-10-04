@@ -8,12 +8,12 @@ enforced explicitly (ADR 0002, docs/02-security/AUTHENTICATION-AUTHORIZATION.md)
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import Field, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
-from netsight_api.auth.providers import GOOGLE, MICROSOFT, ProviderId
+from netsight_api.auth.providers import CLERK, GOOGLE, MICROSOFT, ProviderId
 
 
 class ProviderSettings(BaseSettings):
@@ -28,16 +28,23 @@ class ProviderSettings(BaseSettings):
     # Google: https://accounts.google.com
     authority: str = ""
     # Microsoft only: explicitly allowed tenant IDs (empty = allow none).
-    tenant_ids: list[str] = Field(default_factory=list)
+    tenant_ids: Annotated[list[str], NoDecode] = Field(default_factory=list)
     # Google only: explicitly allowed hosted domains (empty = allow none).
-    hosted_domains: list[str] = Field(default_factory=list)
-    # Approved individual Google identities (sub or email) allowed when the
-    # domain allow-list alone is not sufficient.
-    allowed_identities: list[str] = Field(default_factory=list)
+    hosted_domains: Annotated[list[str], NoDecode] = Field(default_factory=list)
+    # Approved individual identities (sub or email). Used by Google when the
+    # domain allow-list alone is not sufficient, and as the mandatory
+    # allow-list for Clerk (ADR 0009).
+    allowed_identities: Annotated[list[str], NoDecode] = Field(default_factory=list)
 
     @field_validator("tenant_ids", "hosted_domains", "allowed_identities", mode="before")
     @classmethod
     def _split_list(cls, value: object) -> object:
+        """Accept a comma-separated string for allow-list variables.
+
+        ``NoDecode`` stops pydantic-settings from JSON-decoding these fields
+        first, which would otherwise raise SettingsError for a plain
+        ``VAR=a,b`` value before this validator ever ran.
+        """
         if isinstance(value, str):
             return [item.strip() for item in value.split(",") if item.strip()]
         return value
@@ -57,6 +64,10 @@ def microsoft_settings() -> ProviderSettings:
 
 def google_settings() -> ProviderSettings:
     return _provider_settings(GOOGLE)
+
+
+def clerk_settings() -> ProviderSettings:
+    return _provider_settings(CLERK)
 
 
 class SessionPolicy(BaseSettings):

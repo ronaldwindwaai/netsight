@@ -16,7 +16,15 @@ function withApiUrl<T>(value: string | undefined, run: () => T): T {
 }
 
 test('allow-lists only the browser-driven auth paths', () => {
-  for (const path of ['providers', 'csrf', 'session', 'callback', 'login/microsoft', 'login/google']) {
+  for (const path of [
+    'providers',
+    'csrf',
+    'session',
+    'callback',
+    'login/microsoft',
+    'login/google',
+    'login/clerk',
+  ]) {
     assert.notEqual(resolveAuthProxyTarget(path), null, path);
   }
 

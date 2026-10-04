@@ -17,6 +17,7 @@ const DEFAULT_API_URL = 'http://127.0.0.1:8000';
 export const ALLOWED_AUTH_PATHS = new Set([
   'login/microsoft',
   'login/google',
+  'login/clerk',
   'callback',
   'session',
   'csrf',

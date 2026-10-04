@@ -14,7 +14,7 @@ import hmac
 import secrets
 import threading
 import time
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from typing import Literal, TypedDict
 
@@ -57,20 +57,27 @@ class SessionStore:
     Production deployments should back this with a shared store (for example
     Redis) so sessions survive restarts and work across API workers. The
     interface is deliberately narrow to make that swap mechanical.
+
+    ``clock`` is injectable so expiry behaviour is testable deterministically
+    instead of with sleeps (platform timer resolution makes sleeps unreliable).
     """
 
-    def __init__(self) -> None:
+    def __init__(self, clock: Callable[[], float] = _now) -> None:
         self._lock = threading.Lock()
         self._sessions: dict[str, Session] = {}
+        self._clock = clock
 
     def create(self, subject: str, provider: str, roles: Iterable[str], email: str | None = None) -> Session:
         session_id = secrets.token_urlsafe(32)
+        stamped_at = self._clock()
         session = Session(
             id=session_id,
             subject=subject,
             provider=provider,
             roles=frozenset(roles),
             email=email,
+            created_at=stamped_at,
+            last_activity=stamped_at,
         )
         with self._lock:
             self._sessions[session_id] = session
@@ -81,7 +88,7 @@ class SessionStore:
             session = self._sessions.get(session_id)
             if session is None:
                 return None
-            now = _now()
+            now = self._clock()
             if now - session.created_at > policy.absolute_lifetime:
                 del self._sessions[session_id]
                 return None
@@ -103,7 +110,7 @@ class SessionStore:
                 del self._sessions[sid]
 
     def prune(self, policy: SessionPolicy) -> int:
-        now = _now()
+        now = self._clock()
         with self._lock:
             expired = [
                 sid

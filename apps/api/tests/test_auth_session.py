@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import time
-
 import pytest
 from pydantic import ValidationError
 
@@ -59,15 +57,50 @@ def test_store_absolute_expiry() -> None:
 
 
 def test_store_sliding_inactivity_updates_last_activity() -> None:
-    store = SessionStore()
+    # Uses an injected clock: platform timer resolution makes a short sleep
+    # unreliable on some platforms, and session expiry is security-critical.
+    now = [1000.0]
+    store = SessionStore(clock=lambda: now[0])
     policy = SessionPolicy(inactivity_timeout=60, absolute_lifetime=600)
     session = store.create("sub1", "microsoft", ["management"])
     before = session.last_activity
-    time.sleep(0.01)
+    now[0] += 10.0
 
     got = store.get(session.id, policy)
     assert got is not None
     assert got.last_activity > before
+    assert got.last_activity == now[0]
+
+
+def test_store_sliding_inactivity_keeps_active_session_alive() -> None:
+    now = [1000.0]
+    store = SessionStore(clock=lambda: now[0])
+    policy = SessionPolicy(inactivity_timeout=60, absolute_lifetime=600)
+    session = store.create("sub1", "microsoft", ["management"])
+
+    # Advance past the inactivity window but touch the session each step.
+    for _ in range(10):
+        now[0] += 50.0
+        assert store.get(session.id, policy) is not None
+
+    # Once access stops, the same window expires the session.
+    now[0] += 61.0
+    assert store.get(session.id, policy) is None
+
+
+def test_store_absolute_lifetime_ignores_activity() -> None:
+    now = [1000.0]
+    store = SessionStore(clock=lambda: now[0])
+    policy = SessionPolicy(inactivity_timeout=600, absolute_lifetime=100)
+    session = store.create("sub1", "microsoft", ["management"])
+
+    # Continuous access must not extend a session past its absolute lifetime.
+    for _ in range(10):
+        now[0] += 50.0
+        store.get(session.id, policy)
+
+    now[0] += 60.0
+    assert store.get(session.id, policy) is None
 
 
 def test_store_revoke() -> None:

@@ -21,7 +21,7 @@ import httpx
 import jwt
 from jwt.algorithms import ECAlgorithm, OKPAlgorithm, RSAAlgorithm
 
-from netsight_api.auth.providers import GOOGLE, MICROSOFT, ProviderId
+from netsight_api.auth.providers import CLERK, GOOGLE, MICROSOFT, ProviderId
 from netsight_api.auth.settings import ProviderSettings
 
 HTTP_TIMEOUT = httpx.Timeout(15.0, connect=10.0)
@@ -270,7 +270,44 @@ def _validate_issuer(provider: ProviderId, issuer: object, settings: ProviderSet
             raise OidcError("OIDC_ISSUER_INVALID", "Token issuer is not Google Workspace")
         return issuer
 
+    if provider is CLERK:
+        # Each Clerk instance is its own security domain and is the token
+        # issuer. Pin the exact configured authority so a token from any
+        # other Clerk instance (or a look-alike host) is rejected.
+        expected = settings.authority.rstrip("/")
+        if not expected:
+            raise OidcError("OIDC_NOT_CONFIGURED", "Clerk authority is not configured")
+        if issuer.rstrip("/") != expected:
+            raise OidcError(
+                "OIDC_ISSUER_INVALID",
+                "Token issuer is not the approved Clerk instance",
+            )
+        return issuer
+
     raise OidcError("OIDC_PROVIDER_UNKNOWN", "Unknown identity provider")
+
+
+def _validate_clerk_allowlist(claims: dict[str, Any], settings: ProviderSettings) -> None:
+    """Enforce the Netsight identity allow-list for a Clerk instance.
+
+    A Clerk instance may permit self-service sign-up, so membership of the
+    instance is not sufficient. An empty allow-list denies every identity
+    (fail closed), matching the Google hosted-domain rule.
+    """
+    subject = claims.get("sub")
+    email = claims.get("email")
+
+    if not settings.allowed_identities:
+        raise OidcError("OIDC_IDENTITY_NOT_ALLOWED", "Clerk identity is not approved")
+
+    # When the provider asserts verification state, honour it strictly.
+    email_verified = claims.get("email_verified")
+    if email_verified is not None and email_verified is not True:
+        raise OidcError("OIDC_EMAIL_NOT_VERIFIED", "Clerk email address is not verified")
+
+    approved = settings.allowed_identities
+    if subject not in approved and email not in approved:
+        raise OidcError("OIDC_IDENTITY_NOT_ALLOWED", "Clerk identity is not approved")
 
 
 def _validate_google_allowlist(claims: dict[str, Any], settings: ProviderSettings) -> None:
@@ -348,6 +385,8 @@ async def validate_id_token(
 
     if provider is GOOGLE:
         _validate_google_allowlist(claims, settings)
+    elif provider is CLERK:
+        _validate_clerk_allowlist(claims, settings)
 
     token_nonce = claims.get("nonce")
     if not isinstance(token_nonce, str) or token_nonce != expected_nonce:

@@ -30,6 +30,7 @@ from netsight_api.auth.session import session_manager
 from netsight_api.auth.settings import (
     ProviderSettings,
     auth_settings,
+    clerk_settings,
     google_settings,
     microsoft_settings,
 )
@@ -90,12 +91,14 @@ async def providers() -> AuthProvidersResponse:
 
     microsoft = microsoft_settings()
     google = google_settings()
+    clerk = clerk_settings()
     return AuthProvidersResponse(
         providers={
             "microsoft": ProviderState(
                 configured=bool(microsoft.enabled and microsoft.client_id)
             ),
             "google": ProviderState(configured=bool(google.enabled and google.client_id)),
+            "clerk": ProviderState(configured=bool(clerk.enabled and clerk.client_id)),
         }
     )
 
