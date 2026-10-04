@@ -6,7 +6,7 @@ import json
 import logging
 import os
 import re
-from collections.abc import Mapping
+from collections.abc import AsyncIterator, Mapping
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from typing import Annotated, Any, NoReturn
@@ -38,12 +38,17 @@ from netsight_api.schemas import (
     Alert,
     AlertListResponse,
     DeviceDetailResponse,
+    DeviceHealthSummary,
     DeviceListResponse,
+    DeviceStatus,
+    DeviceStatusCount,
     ErrorDetail,
     ErrorEnvelope,
     Freshness,
     HealthResponse,
+    OverviewResponse,
     SourceHealthResponse,
+    SourceState,
 )
 
 API_PREFIX = "/api/v1"
@@ -53,7 +58,7 @@ _LOGGER = logging.getLogger("netsight_api")
 
 
 @asynccontextmanager
-async def lifespan(_app: FastAPI):
+async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     yield
     await oidc_aclose()
 
@@ -391,6 +396,70 @@ async def alerts(
             observed_at=observed_at,
             source="librenms",
         ),
+    )
+
+
+@api.get(
+    "/overview",
+    response_model=OverviewResponse,
+    responses=_STANDARD_ERROR_RESPONSES,
+    tags=["platform"],
+)
+async def overview(
+    _identity: DeviceReader,
+    client: LibrenmsDependency,
+) -> OverviewResponse:
+    """Aggregate operational summary for the network overview page.
+
+    Returns canonical device health counts and per-source state. Panels
+    without a connected source render explicit unknown states in the UI;
+    this endpoint never fabricates values for unavailable sources.
+    """
+    try:
+        collection = await client.devices()
+        for device in collection.items:
+            validate("device", device.model_dump(mode="json"))
+    except AdapterError as exc:
+        _raise_adapter_error(exc)
+    except ContractViolation as exc:
+        raise ApiError(
+            502,
+            "SOURCE_INVALID_DATA",
+            "LibreNMS returned invalid data",
+        ) from exc
+
+    counts: dict[str, int] = {}
+    for device in collection.items:
+        counts[device.status] = counts.get(device.status, 0) + 1
+    ordered_statuses: tuple[DeviceStatus, ...] = (
+        "healthy",
+        "warning",
+        "degraded",
+        "critical",
+        "offline",
+        "unknown",
+        "maintenance",
+    )
+    by_status = [
+        DeviceStatusCount(status=status, count=counts.get(status, 0))
+        for status in ordered_statuses
+    ]
+    return OverviewResponse(
+        devices=DeviceHealthSummary(
+            total=len(collection.items),
+            by_status=by_status,
+            freshness=Freshness(
+                state="fresh",
+                observed_at=collection.observed_at,
+                source="librenms",
+            ),
+        ),
+        sources={
+            "librenms": SourceState(
+                configured=True,
+                status="success",
+            )
+        },
     )
 
 

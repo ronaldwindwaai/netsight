@@ -1,41 +1,38 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import type { Device, DeviceListResponse, DeviceStatus } from './api-contracts.ts';
+import { parseOverviewResponse, type DeviceHealthSummary, type DeviceStatus } from './api-contracts.ts';
 import {
   deviceHealthSummary,
   sourceProvenance,
   type OverviewFetchKind,
 } from './overview-summary.ts';
 
-function device(status: DeviceStatus, index = 1): Device {
+function summary(statuses: DeviceStatus[]): DeviceHealthSummary {
+  const counts = new Map<DeviceStatus, number>();
+  for (const status of statuses) {
+    counts.set(status, (counts.get(status) ?? 0) + 1);
+  }
+  const order: DeviceStatus[] = [
+    'healthy',
+    'warning',
+    'degraded',
+    'critical',
+    'offline',
+    'unknown',
+    'maintenance',
+  ];
   return {
-    id: `device-00000000-0000-4000-8000-${String(index).padStart(12, '0')}`,
-    name: `Device ${index}`,
-    hostname: null,
-    type: 'network',
-    status,
-    ip_addresses: [],
-    mac_addresses: [],
-    site_id: null,
-    owner_identity_id: null,
-    source_aliases: [{ source: 'librenms', native_id: String(index) }],
-    freshness: { state: 'fresh', observed_at: null, source: 'librenms' },
-  };
-}
-
-function inventory(statuses: DeviceStatus[], total = statuses.length): DeviceListResponse {
-  return {
-    items: statuses.map(device),
-    page: 1,
-    page_size: 100,
-    total,
+    total: statuses.length,
+    by_status: order
+      .filter((status) => counts.has(status))
+      .map((status) => ({ status, count: counts.get(status) ?? 0 })),
     freshness: { state: 'fresh', observed_at: null, source: 'librenms' },
   };
 }
 
 test('uses success only for a complete all-healthy inventory', () => {
-  assert.deepEqual(deviceHealthSummary(inventory(['healthy', 'healthy'])), {
+  assert.deepEqual(deviceHealthSummary(summary(['healthy', 'healthy'])), {
     title: '100%',
     detail: '0 need attention · 0 unscored',
     progress: 100,
@@ -45,35 +42,118 @@ test('uses success only for a complete all-healthy inventory', () => {
 
 test('treats every attention status as warning evidence', () => {
   for (const status of ['warning', 'degraded', 'critical', 'offline'] as const) {
-    const summary = deviceHealthSummary(inventory(['healthy', status]));
-    assert.equal(summary.theme, 'warning', status);
-    assert.equal(summary.detail, '1 need attention · 0 unscored', status);
-    assert.equal(summary.progress, 50, status);
+    const result = deviceHealthSummary(summary(['healthy', status]));
+    assert.equal(result.theme, 'warning', status);
+    assert.equal(result.detail, '1 need attention · 0 unscored', status);
+    assert.equal(result.progress, 50, status);
   }
 });
 
 test('keeps unknown and maintenance devices neutral and explicitly unscored', () => {
   for (const status of ['unknown', 'maintenance'] as const) {
-    const summary = deviceHealthSummary(inventory(['healthy', status]));
-    assert.equal(summary.theme, 'secondary', status);
-    assert.equal(summary.title, '1 healthy', status);
-    assert.equal(summary.detail, '0 need attention · 1 unscored', status);
-    assert.equal(summary.progress, undefined, status);
+    const result = deviceHealthSummary(summary(['healthy', status]));
+    assert.equal(result.theme, 'secondary', status);
+    assert.equal(result.title, '1 healthy', status);
+    assert.equal(result.detail, '0 need attention · 1 unscored', status);
+    assert.equal(result.progress, undefined, status);
   }
 });
 
-test('never presents a partial healthy page as complete success', () => {
-  assert.deepEqual(deviceHealthSummary(inventory(['healthy', 'healthy'], 250)), {
-    title: '2 healthy',
-    detail: '2 of 250 devices sampled',
-    progress: undefined,
-    theme: 'secondary',
+test('computes progress from the aggregate counts', () => {
+  assert.deepEqual(deviceHealthSummary(summary(['healthy', 'healthy', 'healthy', 'warning'])), {
+    title: '75%',
+    detail: '1 need attention · 0 unscored',
+    progress: 75,
+    theme: 'warning',
   });
+});
+
+test('parseOverviewResponse accepts a canonical overview aggregate', () => {
+  assert.deepEqual(
+    parseOverviewResponse({
+      devices: {
+        total: 2,
+        by_status: [
+          { status: 'healthy', count: 1 },
+          { status: 'offline', count: 1 },
+        ],
+        freshness: { state: 'fresh', observed_at: '2026-10-04T12:00:00Z', source: 'librenms' },
+      },
+      sources: { librenms: { configured: true, status: 'success' } },
+    }),
+    {
+      devices: {
+        total: 2,
+        by_status: [
+          { status: 'healthy', count: 1 },
+          { status: 'offline', count: 1 },
+        ],
+        freshness: { state: 'fresh', observed_at: '2026-10-04T12:00:00Z', source: 'librenms' },
+      },
+      sources: { librenms: { configured: true, status: 'success' } },
+    },
+  );
+});
+
+test('parseOverviewResponse rejects malformed aggregates', () => {
+  assert.equal(parseOverviewResponse(null), null);
+  assert.equal(parseOverviewResponse({}), null);
+  assert.equal(
+    parseOverviewResponse({
+      devices: { total: -1, by_status: [], freshness: null },
+      sources: { librenms: { configured: true, status: 'success' } },
+    }),
+    null,
+  );
+  assert.equal(
+    parseOverviewResponse({
+      devices: {
+        total: 1,
+        by_status: [{ status: 'healthy', count: -1 }],
+        freshness: { state: 'fresh', observed_at: null, source: 'librenms' },
+      },
+      sources: { librenms: { configured: true, status: 'success' } },
+    }),
+    null,
+  );
+  assert.equal(
+    parseOverviewResponse({
+      devices: {
+        total: 1,
+        by_status: [{ status: 'nonsense', count: 1 }],
+        freshness: { state: 'fresh', observed_at: null, source: 'librenms' },
+      },
+      sources: { librenms: { configured: true, status: 'success' } },
+    }),
+    null,
+  );
+  assert.equal(
+    parseOverviewResponse({
+      devices: {
+        total: 1,
+        by_status: [],
+        freshness: { state: 'fresh', observed_at: null, source: 'librenms' },
+      },
+      sources: { librenms: { configured: 'yes', status: 'success' } },
+    }),
+    null,
+  );
+  assert.equal(
+    parseOverviewResponse({
+      devices: {
+        total: 1,
+        by_status: [],
+        freshness: { state: 'fresh', observed_at: null, source: 'librenms' },
+      },
+      sources: { librenms: { configured: true, status: 'made-up' } },
+    }),
+    null,
+  );
 });
 
 test('distinguishes unavailable, empty, and non-empty inventory states', () => {
   assert.equal(deviceHealthSummary(null).title, 'Unknown');
-  assert.deepEqual(deviceHealthSummary(inventory([])), {
+  assert.deepEqual(deviceHealthSummary(summary([])), {
     title: 'No devices',
     detail: 'Valid empty inventory',
     progress: 0,

@@ -28,12 +28,13 @@ from netsight_api.auth.providers import MICROSOFT, ProviderId
 from netsight_api.auth.rate_limit import rate_limiter
 from netsight_api.auth.session import session_manager
 from netsight_api.auth.settings import (
+    ProviderSettings,
     auth_settings,
     google_settings,
     microsoft_settings,
 )
 from netsight_api.errors import ApiError
-from netsight_api.schemas import AuthProvidersResponse
+from netsight_api.schemas import AuthProvidersResponse, ProviderState
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -47,7 +48,7 @@ def _provider_or_error(raw: str) -> ProviderId:
         raise ApiError(404, "PROVIDER_UNKNOWN", "Identity provider is not supported") from exc
 
 
-def _provider_settings(provider: ProviderId):
+def _provider_settings(provider: ProviderId) -> ProviderSettings:
     return microsoft_settings() if provider is MICROSOFT else google_settings()
 
 
@@ -87,16 +88,14 @@ async def providers() -> AuthProvidersResponse:
     allow-list values are never exposed.
     """
 
+    microsoft = microsoft_settings()
+    google = google_settings()
     return AuthProvidersResponse(
         providers={
-            "microsoft": {
-                "configured": bool(
-                    microsoft_settings().enabled and microsoft_settings().client_id
-                )
-            },
-            "google": {
-                "configured": bool(google_settings().enabled and google_settings().client_id)
-            },
+            "microsoft": ProviderState(
+                configured=bool(microsoft.enabled and microsoft.client_id)
+            ),
+            "google": ProviderState(configured=bool(google.enabled and google.client_id)),
         }
     )
 

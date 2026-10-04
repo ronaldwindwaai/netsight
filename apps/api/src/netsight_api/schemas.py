@@ -109,6 +109,27 @@ class HealthResponse(ApiModel):
     status: Literal["ok"]
 
 
+class DeviceStatusCount(ApiModel):
+    status: DeviceStatus
+    count: int = Field(ge=0)
+
+
+class DeviceHealthSummary(ApiModel):
+    total: int = Field(ge=0)
+    by_status: list[DeviceStatusCount] = Field(max_length=8)
+    freshness: Freshness
+
+
+class SourceState(ApiModel):
+    configured: bool
+    status: Literal["success", "unavailable", "forbidden", "invalid-source-data", "not-configured"]
+
+
+class OverviewResponse(ApiModel):
+    devices: DeviceHealthSummary
+    sources: dict[Literal["librenms"], SourceState]
+
+
 class ProviderState(ApiModel):
     """Public sign-in provider configuration state.
 

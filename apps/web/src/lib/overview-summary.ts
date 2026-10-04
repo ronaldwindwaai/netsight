@@ -1,4 +1,4 @@
-import type { DeviceListResponse, FreshnessState } from '@/lib/api-contracts';
+import type { DeviceHealthSummary, FreshnessState } from '@/lib/api-contracts';
 
 export type OverviewFetchKind =
   | 'ok'
@@ -11,14 +11,14 @@ export type OverviewFetchKind =
   | 'invalid_response'
   | 'error';
 
-export interface DeviceHealthSummary {
+export interface HealthSummary {
   title: string;
   detail: string;
   progress: number | undefined;
   theme: 'success' | 'warning' | 'secondary';
 }
 
-export function deviceHealthSummary(data: DeviceListResponse | null): DeviceHealthSummary {
+export function deviceHealthSummary(data: DeviceHealthSummary | null): HealthSummary {
   if (data === null) {
     return {
       title: 'Unknown',
@@ -37,22 +37,20 @@ export function deviceHealthSummary(data: DeviceListResponse | null): DeviceHeal
     };
   }
 
-  const healthy = data.items.filter((device) => device.status === 'healthy').length;
-  const attention = data.items.filter((device) =>
-    ['warning', 'degraded', 'critical', 'offline'].includes(device.status),
-  ).length;
-  const unscored = data.items.filter((device) =>
-    ['unknown', 'maintenance'].includes(device.status),
-  ).length;
-  const complete = data.items.length === data.total;
-  const fullyScored = complete && unscored === 0;
+  const countByStatus = new Map(data.by_status.map((entry) => [entry.status, entry.count]));
+  const healthy = countByStatus.get('healthy') ?? 0;
+  const attention =
+    (countByStatus.get('warning') ?? 0) +
+    (countByStatus.get('degraded') ?? 0) +
+    (countByStatus.get('critical') ?? 0) +
+    (countByStatus.get('offline') ?? 0);
+  const unscored = (countByStatus.get('unknown') ?? 0) + (countByStatus.get('maintenance') ?? 0);
+  const fullyScored = unscored === 0;
   const progress = fullyScored ? Math.round((healthy / data.total) * 100) : undefined;
 
   return {
     title: progress === undefined ? `${healthy} healthy` : `${progress}%`,
-    detail: complete
-      ? `${attention} need attention · ${unscored} unscored`
-      : `${data.items.length} of ${data.total} devices sampled`,
+    detail: `${attention} need attention · ${unscored} unscored`,
     progress,
     theme: attention > 0 ? 'warning' : fullyScored ? 'success' : 'secondary',
   };

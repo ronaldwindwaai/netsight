@@ -19,6 +19,28 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AuthProvidersResponse'
+  /overview:
+    get:
+      summary: Aggregate operational summary for the network overview page
+      operationId: getOverview
+      responses:
+        '200':
+          description: Canonical device health counts and per-source state
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OverviewResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '502':
+          $ref: '#/components/responses/InvalidSourceData'
+        '503':
+          $ref: '#/components/responses/SourceUnavailable'
   /health:
     get:
       summary: Platform health
@@ -214,6 +236,53 @@ components:
       properties:
         status:
           const: ok
+    DeviceStatusCount:
+      type: object
+      additionalProperties: false
+      required: [status, count]
+      properties:
+        status:
+          enum: [healthy, warning, degraded, critical, offline, unknown, maintenance]
+        count:
+          type: integer
+          minimum: 0
+    DeviceHealthSummary:
+      type: object
+      additionalProperties: false
+      required: [total, by_status, freshness]
+      properties:
+        total:
+          type: integer
+          minimum: 0
+        by_status:
+          type: array
+          items:
+            $ref: '#/components/schemas/DeviceStatusCount'
+        freshness:
+          $ref: '#/components/schemas/Freshness'
+    SourceState:
+      type: object
+      additionalProperties: false
+      required: [configured, status]
+      properties:
+        configured:
+          type: boolean
+        status:
+          enum: [success, unavailable, forbidden, invalid-source-data, not-configured]
+    OverviewResponse:
+      type: object
+      additionalProperties: false
+      required: [devices, sources]
+      properties:
+        devices:
+          $ref: '#/components/schemas/DeviceHealthSummary'
+        sources:
+          type: object
+          additionalProperties: false
+          required: [librenms]
+          properties:
+            librenms:
+              $ref: '#/components/schemas/SourceState'
     ProviderState:
       type: object
       additionalProperties: false

@@ -3,7 +3,7 @@ import { AppContent, Card, InfoBox } from '@adminlte/react';
 
 import { DataFailure, FreshnessNotice } from '@/components/data-state';
 import { apiGet } from '@/lib/api';
-import { parseDeviceList } from '@/lib/api-contracts';
+import { parseOverviewResponse } from '@/lib/api-contracts';
 import { deviceHealthSummary, sourceProvenance } from '@/lib/overview-summary';
 
 function UnavailableSurface({
@@ -29,12 +29,14 @@ function UnavailableSurface({
 }
 
 export default async function OverviewPage() {
-  const state = await apiGet('/api/v1/devices?page=1&page_size=100', parseDeviceList);
-  const inventory = state.kind === 'ok' ? state.data : null;
-  const health = deviceHealthSummary(inventory);
+  const state = await apiGet('/api/v1/overview', parseOverviewResponse);
+  const overview = state.kind === 'ok' ? state.data : null;
+  const health = overview
+    ? deviceHealthSummary(overview.devices)
+    : deviceHealthSummary(null);
   const provenance = sourceProvenance(
     state.kind,
-    state.kind === 'ok' ? state.data.freshness.state : undefined,
+    state.kind === 'ok' ? state.data.devices.freshness.state : undefined,
   );
 
   return (
@@ -55,7 +57,9 @@ export default async function OverviewPage() {
       </div>
 
       {state.kind !== 'ok' ? <DataFailure state={state} /> : null}
-      {state.kind === 'ok' ? <FreshnessNotice freshness={state.data.freshness} /> : null}
+      {state.kind === 'ok' ? (
+        <FreshnessNotice freshness={state.data.devices.freshness} />
+      ) : null}
 
       <section className="overview-kpi-grid" aria-label="Operational summary">
         <Link

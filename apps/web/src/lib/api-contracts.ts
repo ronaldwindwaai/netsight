@@ -117,6 +117,29 @@ export interface SessionInfo {
   roles: string[];
 }
 
+export interface DeviceStatusCount {
+  status: DeviceStatus;
+  count: number;
+}
+
+export interface DeviceHealthSummary {
+  total: number;
+  by_status: DeviceStatusCount[];
+  freshness: Freshness;
+}
+
+export interface SourceState {
+  configured: boolean;
+  status: 'success' | 'unavailable' | 'forbidden' | 'invalid-source-data' | 'not-configured';
+}
+
+export interface OverviewResponse {
+  devices: DeviceHealthSummary;
+  sources: {
+    librenms: SourceState;
+  };
+}
+
 type UnknownRecord = Record<string, unknown>;
 
 const DEVICE_ID_PATTERN =
@@ -501,6 +524,72 @@ export function parseSessionInfo(value: unknown): SessionInfo | null {
     provider: value.provider,
     email: value.email,
     roles: [...value.roles],
+  };
+}
+
+const DEVICE_STATUS_COUNT_KEYS = ['status', 'count'] as const;
+const DEVICE_HEALTH_SUMMARY_KEYS = ['total', 'by_status', 'freshness'] as const;
+const SOURCE_STATE_KEYS = ['configured', 'status'] as const;
+const OVERVIEW_RESPONSE_KEYS = ['devices', 'sources'] as const;
+const OVERVIEW_SOURCE_STATUSES = [
+  'success',
+  'unavailable',
+  'forbidden',
+  'invalid-source-data',
+  'not-configured',
+] as const;
+
+function parseDeviceStatusCount(value: unknown): DeviceStatusCount | null {
+  if (
+    !isRecord(value) ||
+    !hasContractKeys(value, DEVICE_STATUS_COUNT_KEYS) ||
+    typeof value.status !== 'string' ||
+    !DEVICE_STATUSES.includes(value.status as DeviceStatus) ||
+    !isBoundedInteger(value.count, 0)
+  ) {
+    return null;
+  }
+  return { status: value.status as DeviceStatus, count: value.count };
+}
+
+export function parseOverviewResponse(value: unknown): OverviewResponse | null {
+  if (
+    !isRecord(value) ||
+    !hasContractKeys(value, OVERVIEW_RESPONSE_KEYS) ||
+    !isRecord(value.devices) ||
+    !hasContractKeys(value.devices, DEVICE_HEALTH_SUMMARY_KEYS) ||
+    !isBoundedInteger(value.devices.total, 0) ||
+    !Array.isArray(value.devices.by_status) ||
+    value.devices.by_status.length > 8 ||
+    value.devices.by_status.some((item) => parseDeviceStatusCount(item) === null) ||
+    parseFreshness(value.devices.freshness) === null ||
+    !isRecord(value.sources) ||
+    !hasContractKeys(value.sources, ['librenms']) ||
+    !isRecord(value.sources.librenms) ||
+    !hasContractKeys(value.sources.librenms, SOURCE_STATE_KEYS) ||
+    typeof value.sources.librenms.configured !== 'boolean' ||
+    typeof value.sources.librenms.status !== 'string' ||
+    !OVERVIEW_SOURCE_STATUSES.includes(
+      value.sources.librenms.status as (typeof OVERVIEW_SOURCE_STATUSES)[number],
+    )
+  ) {
+    return null;
+  }
+
+  return {
+    devices: {
+      total: value.devices.total,
+      by_status: value.devices.by_status.map(
+        (item) => parseDeviceStatusCount(item) as DeviceStatusCount,
+      ),
+      freshness: parseFreshness(value.devices.freshness) as Freshness,
+    },
+    sources: {
+      librenms: {
+        configured: value.sources.librenms.configured,
+        status: value.sources.librenms.status as SourceState['status'],
+      },
+    },
   };
 }
 
