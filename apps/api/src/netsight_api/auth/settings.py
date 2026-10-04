@@ -70,6 +70,37 @@ def clerk_settings() -> ProviderSettings:
     return _provider_settings(CLERK)
 
 
+_PROVIDER_SETTINGS = {
+    MICROSOFT: microsoft_settings,
+    GOOGLE: google_settings,
+    CLERK: clerk_settings,
+}
+
+
+def provider_settings(provider: ProviderId) -> ProviderSettings:
+    """Return the configuration for ``provider``.
+
+    Keyed by every ``ProviderId`` member and exhaustively checked below, so
+    adding a provider cannot silently fall through to another provider's
+    settings (which previously made /auth/login/<new-provider> report the
+    provider as unconfigured).
+    """
+    factory = _PROVIDER_SETTINGS.get(provider)
+    if factory is None:
+        raise KeyError(f"no settings registered for provider: {provider}")
+    return factory()
+
+
+def assert_all_providers_registered() -> None:
+    """Fail fast at import time if a provider lacks settings wiring."""
+    missing = set(ProviderId) - set(_PROVIDER_SETTINGS)
+    if missing:
+        raise RuntimeError(f"providers without settings wiring: {sorted(str(m) for m in missing)}")
+
+
+assert_all_providers_registered()
+
+
 class SessionPolicy(BaseSettings):
     """Server-side session policy."""
 

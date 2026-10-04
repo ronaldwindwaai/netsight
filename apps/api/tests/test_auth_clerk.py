@@ -20,8 +20,12 @@ from fastapi.testclient import TestClient
 
 from netsight_api.auth import oidc
 from netsight_api.auth.oidc import OidcError, validate_id_token
-from netsight_api.auth.providers import CLERK
-from netsight_api.auth.settings import ProviderSettings
+from netsight_api.auth.providers import CLERK, ProviderId
+from netsight_api.auth.settings import (
+    _PROVIDER_SETTINGS,
+    ProviderSettings,
+    provider_settings,
+)
 from netsight_api.main import app
 
 CLERK_AUTHORITY = "https://netsight-prod-42.clerk.accounts.dev"
@@ -272,6 +276,56 @@ async def test_clerk_rejects_nonce_mismatch(monkeypatch: pytest.MonkeyPatch) -> 
     with pytest.raises(OidcError) as exc:
         await validate_id_token(CLERK, settings, token, "n-1")
     assert exc.value.code == "OIDC_NONCE_INVALID"
+
+
+def test_every_provider_resolves_to_its_own_settings() -> None:
+    """Regression: a two-provider helper made Clerk read Google's settings.
+
+    ``/auth/login/<provider>`` silently fell through to the wrong provider's
+    configuration, so a correctly configured provider reported
+    PROVIDER_NOT_CONFIGURED. Every ProviderId must resolve to itself.
+    """
+    assert set(_PROVIDER_SETTINGS) == set(ProviderId)
+    for provider in ProviderId:
+        prefix = f"NETSIGHT_OIDC_{provider.upper()}_"
+        monkeypatch_values = {
+            f"{prefix}ENABLED": "true",
+            f"{prefix}CLIENT_ID": f"client-{provider.value}",
+        }
+        with pytest.MonkeyPatch.context() as mp:
+            for key, value in monkeypatch_values.items():
+                mp.setenv(key, value)
+            resolved = provider_settings(provider)
+        assert resolved.enabled is True, provider
+        assert resolved.client_id == f"client-{provider.value}", provider
+
+
+def test_provider_settings_rejects_an_unregistered_provider() -> None:
+    with pytest.raises(KeyError):
+        provider_settings("not-a-provider")  # type: ignore[arg-type]
+
+
+def test_clerk_login_uses_clerk_settings_not_another_provider(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The end-to-end symptom of the fall-through bug."""
+    monkeypatch.setenv("NETSIGHT_OIDC_CLERK_ENABLED", "true")
+    monkeypatch.setenv("NETSIGHT_OIDC_CLERK_CLIENT_ID", "clerk-client")
+    monkeypatch.setenv("NETSIGHT_OIDC_CLERK_CLIENT_SECRET", "clerk-secret")
+    monkeypatch.setenv(
+        "NETSIGHT_OIDC_CLERK_AUTHORITY",
+        CLERK_AUTHORITY,
+    )
+    monkeypatch.setenv("NETSIGHT_OIDC_CLERK_ALLOWED_IDENTITIES", "user_2approved")
+    # Google stays unconfigured: Clerk must not borrow its state.
+
+    response = TestClient(app).get("/auth/login/clerk", follow_redirects=False)
+
+    # It must NOT be 409 PROVIDER_NOT_CONFIGURED. A fake instance cannot be
+    # discovered, so discovery fails closed with 502.
+    assert response.status_code != 409, response.text
+    assert response.status_code == 502
+    assert response.json()["error"]["code"] == "OIDC_UNAVAILABLE"
 
 
 # --- HTTP surface ---------------------------------------------------------

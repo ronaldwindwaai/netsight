@@ -24,15 +24,15 @@ from netsight_api.auth.oidc import (
     validate_id_token,
 )
 from netsight_api.auth.pending import pending_auth_store
-from netsight_api.auth.providers import MICROSOFT, ProviderId
+from netsight_api.auth.providers import ProviderId
 from netsight_api.auth.rate_limit import rate_limiter
 from netsight_api.auth.session import session_manager
 from netsight_api.auth.settings import (
-    ProviderSettings,
     auth_settings,
     clerk_settings,
     google_settings,
     microsoft_settings,
+    provider_settings,
 )
 from netsight_api.errors import ApiError
 from netsight_api.schemas import AuthProvidersResponse, ProviderState
@@ -47,10 +47,6 @@ def _provider_or_error(raw: str) -> ProviderId:
         return ProviderId(raw.lower())
     except ValueError as exc:
         raise ApiError(404, "PROVIDER_UNKNOWN", "Identity provider is not supported") from exc
-
-
-def _provider_settings(provider: ProviderId) -> ProviderSettings:
-    return microsoft_settings() if provider is MICROSOFT else google_settings()
 
 
 def _safe_redirect(target: str | None) -> str:
@@ -106,7 +102,7 @@ async def providers() -> AuthProvidersResponse:
 @router.get("/login/{provider}")
 async def login(provider: str, request: Request, redirect_to: str = "/overview") -> Response:
     resolved = _provider_or_error(provider)
-    settings = _provider_settings(resolved)
+    settings = provider_settings(resolved)
     if not settings.enabled or not settings.client_id:
         raise ApiError(
             409,
@@ -161,7 +157,7 @@ async def callback(
     if pending is None:
         raise ApiError(400, "AUTH_STATE_INVALID", "Authentication state was unknown or expired")
 
-    settings = _provider_settings(pending.provider)
+    settings = provider_settings(pending.provider)
 
     try:
         token = await exchange_code(
