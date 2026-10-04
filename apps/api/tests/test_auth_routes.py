@@ -281,3 +281,49 @@ def test_logout_rejects_missing_csrf_token(
     response = client.post("/auth/logout", headers={"X-CSRF-Token": "wrong"})
     assert response.status_code == 403
     assert response.json()["error"]["code"] == "CSRF_VALIDATION_FAILED"
+
+
+def test_providers_reports_unconfigured_by_default() -> None:
+    client = TestClient(app)
+    response = client.get("/auth/providers")
+    assert response.status_code == 200
+    body = response.json()
+    assert body == {
+        "providers": {
+            "microsoft": {"configured": False},
+            "google": {"configured": False},
+        }
+    }
+
+
+def test_providers_reports_configured_state_without_secrets(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _enable_microsoft(monkeypatch)
+    monkeypatch.setenv("NETSIGHT_OIDC_GOOGLE_ENABLED", "true")
+    monkeypatch.setenv("NETSIGHT_OIDC_GOOGLE_CLIENT_ID", "google-client")
+    monkeypatch.setenv("NETSIGHT_OIDC_GOOGLE_CLIENT_SECRET", "google-secret")
+
+    client = TestClient(app)
+    response = client.get("/auth/providers")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["providers"]["microsoft"]["configured"] is True
+    assert body["providers"]["google"]["configured"] is True
+    # Secrets and allow-list values must never appear in the response.
+    assert "secret" not in response.text.lower()
+    assert "netsight-client" not in response.text
+    assert "google-client" not in response.text
+
+
+def test_providers_requires_enabled_flag(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # A client id alone is not enough: the provider must be explicitly enabled.
+    monkeypatch.setenv("NETSIGHT_OIDC_MICROSOFT_CLIENT_ID", "netsight-client")
+    monkeypatch.setenv("NETSIGHT_OIDC_MICROSOFT_CLIENT_SECRET", "super-secret")
+
+    client = TestClient(app)
+    response = client.get("/auth/providers")
+    assert response.status_code == 200
+    assert response.json()["providers"]["microsoft"]["configured"] is False

@@ -20,6 +20,12 @@ export function DataFailure<T>({ state }: { state: Exclude<FetchState<T>, { kind
           Your Netsight session is missing, expired, or was not accepted. Sign in through the
           configured identity provider and try again.
         </span>
+        <div className="mt-2">
+          <a className="btn btn-sm btn-outline-primary" href="/login">
+            <i className="bi bi-box-arrow-in-right me-1" aria-hidden="true" />
+            Sign in
+          </a>
+        </div>
         <Reference correlationId={state.correlationId} />
       </Alert>
     );
@@ -53,7 +59,7 @@ export function DataFailure<T>({ state }: { state: Exclude<FetchState<T>, { kind
       <Alert theme="info" title="Source under maintenance" icon="bi bi-tools">
         {' '}
         <span>
-          Current device data is unavailable while the monitoring source is under maintenance.
+          Current monitoring data is unavailable while the source is under maintenance.
         </span>
         <Reference correlationId={state.correlationId} />
       </Alert>
@@ -65,8 +71,8 @@ export function DataFailure<T>({ state }: { state: Exclude<FetchState<T>, { kind
       <Alert theme="danger" title="Invalid monitoring source data" icon="bi bi-database-x">
         {' '}
         <span>
-          The monitoring source returned data that Netsight could not safely map to the canonical
-          device contract. The data was rejected and is not shown as current telemetry.
+          The monitoring source returned data that Netsight could not safely map to its canonical
+          contract. The data was rejected and is not shown as current telemetry.
         </span>
         <Reference correlationId={state.correlationId} />
       </Alert>
@@ -78,7 +84,7 @@ export function DataFailure<T>({ state }: { state: Exclude<FetchState<T>, { kind
       <Alert theme="warning" title="Monitoring source unavailable" icon="bi bi-cloud-slash">
         {' '}
         <span>
-          Current device data could not be obtained. Netsight will not substitute an empty or
+          Current monitoring data could not be obtained. Netsight will not substitute an empty or
           healthy result.
         </span>
         <Reference correlationId={state.correlationId} />
@@ -91,7 +97,7 @@ export function DataFailure<T>({ state }: { state: Exclude<FetchState<T>, { kind
       <Alert theme="danger" title="Invalid Netsight API response" icon="bi bi-exclamation-octagon">
         {' '}
         <span>
-          The Netsight API response was unreadable or did not match the canonical device contract.
+          The Netsight API response was unreadable or did not match the canonical contract.
         </span>
         <Reference correlationId={state.correlationId} />
       </Alert>
@@ -113,7 +119,7 @@ export function FreshnessNotice({ freshness }: { freshness: Freshness }) {
   return (
     <Alert
       theme={freshness.state === 'stale' ? 'warning' : 'secondary'}
-      title={freshness.state === 'stale' ? 'Stale device data' : 'Freshness unknown'}
+      title={freshness.state === 'stale' ? 'Stale monitoring data' : 'Freshness unknown'}
       icon={freshness.state === 'stale' ? 'bi bi-clock-history' : 'bi bi-question-circle'}
     >
       {' '}

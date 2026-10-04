@@ -33,6 +33,7 @@ from netsight_api.auth.settings import (
     microsoft_settings,
 )
 from netsight_api.errors import ApiError
+from netsight_api.schemas import AuthProvidersResponse
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -72,6 +73,32 @@ def _rate_limit(request: Request, action: str) -> None:
     key = f"auth:{action}:{_client_ip(request)}"
     if not rate_limiter().allow(key, settings.auth_rate_limit_per_minute, RATE_WINDOW_SECONDS):
         raise ApiError(429, "RATE_LIMITED", "Too many authentication requests")
+
+
+@router.get(
+    "/providers",
+    response_model=AuthProvidersResponse,
+    tags=["auth"],
+)
+async def providers() -> AuthProvidersResponse:
+    """Public sign-in provider configuration state for the sign-in UI.
+
+    Reports only whether each provider is connected. Client secrets and
+    allow-list values are never exposed.
+    """
+
+    return AuthProvidersResponse(
+        providers={
+            "microsoft": {
+                "configured": bool(
+                    microsoft_settings().enabled and microsoft_settings().client_id
+                )
+            },
+            "google": {
+                "configured": bool(google_settings().enabled and google_settings().client_id)
+            },
+        }
+    )
 
 
 @router.get("/login/{provider}")

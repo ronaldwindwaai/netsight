@@ -17,6 +17,8 @@ DeviceStatus = Literal[
     "maintenance",
 ]
 FreshnessState = Literal["fresh", "stale", "unknown"]
+AlertSeverity = Literal["info", "low", "medium", "high", "critical"]
+AlertState = Literal["open", "acknowledged", "investigating", "resolved", "suppressed"]
 
 
 class ApiModel(BaseModel):
@@ -66,6 +68,24 @@ class DeviceDetailResponse(ApiModel):
     item: Device
 
 
+class Alert(ApiModel):
+    id: str
+    severity: AlertSeverity
+    state: AlertState
+    title: str
+    observed_at: datetime
+    device_id: str | None = None
+    incident_id: str | None = None
+
+
+class AlertListResponse(ApiModel):
+    items: list[Alert]
+    page: int = Field(ge=1)
+    page_size: int = Field(ge=1, le=100)
+    total: int = Field(ge=0)
+    freshness: Freshness
+
+
 class SourceHealthResponse(ApiModel):
     source: Literal["librenms"]
     status: Literal["success", "unavailable", "forbidden", "invalid-source-data"]
@@ -87,3 +107,17 @@ class ErrorEnvelope(ApiModel):
 
 class HealthResponse(ApiModel):
     status: Literal["ok"]
+
+
+class ProviderState(ApiModel):
+    """Public sign-in provider configuration state.
+
+    Reports only whether a provider is connected. Client secrets and
+    allow-list values are never exposed.
+    """
+
+    configured: bool
+
+
+class AuthProvidersResponse(ApiModel):
+    providers: dict[Literal["microsoft", "google"], ProviderState]

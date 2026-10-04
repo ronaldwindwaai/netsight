@@ -2,10 +2,15 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  parseAlert,
+  parseAlertList,
   parseApiError,
+  parseAuthProviders,
   parseDevice,
   parseDeviceDetail,
   parseDeviceList,
+  parseSessionInfo,
+  parseSourceHealth,
 } from './api-contracts.ts';
 
 const DEVICE = {
@@ -33,6 +38,142 @@ const LIST = {
   total: 1,
   freshness: DEVICE.freshness,
 };
+
+const SOURCE_HEALTH = {
+  source: 'librenms',
+  status: 'success',
+  reachable: true,
+  latency_ms: 12.4,
+  checked_at: '2026-10-04T12:30:00Z',
+  detail: 'ok',
+};
+
+const ALERT = {
+  id: 'librenms:7',
+  severity: 'critical',
+  state: 'open',
+  title: 'Link down on port 12',
+  observed_at: '2026-10-04T10:02:00Z',
+  device_id: DEVICE.id,
+  incident_id: null,
+};
+
+const ALERT_LIST = {
+  items: [ALERT],
+  page: 1,
+  page_size: 50,
+  total: 1,
+  freshness: DEVICE.freshness,
+};
+
+test('parses canonical alerts and normalises optional references', () => {
+  assert.deepEqual(parseAlert(ALERT), ALERT);
+  assert.deepEqual(
+    parseAlert({
+      id: ALERT.id,
+      severity: ALERT.severity,
+      state: ALERT.state,
+      title: ALERT.title,
+      observed_at: ALERT.observed_at,
+    }),
+    { ...ALERT, device_id: null, incident_id: null },
+  );
+  assert.deepEqual(parseAlertList(ALERT_LIST), ALERT_LIST);
+});
+
+test('rejects malformed canonical alerts and alert envelopes', () => {
+  assert.equal(parseAlert({ ...ALERT, severity: 'urgent' }), null);
+  assert.equal(parseAlert({ ...ALERT, state: 'new' }), null);
+  assert.equal(parseAlert({ ...ALERT, observed_at: '2026-02-31T10:02:00Z' }), null);
+  assert.equal(parseAlert({ ...ALERT, device_id: 7 }), null);
+  assert.equal(parseAlert({ ...ALERT, vendor_rule: 9 }), null);
+  assert.equal(parseAlertList({ ...ALERT_LIST, items: [{ ...ALERT, title: 7 }] }), null);
+  assert.equal(parseAlertList({ ...ALERT_LIST, page: 0 }), null);
+  assert.equal(parseAlertList({ ...ALERT_LIST, page_size: 101 }), null);
+  assert.equal(parseAlertList({ ...ALERT_LIST, total: -1 }), null);
+  assert.equal(parseAlertList({ ...ALERT_LIST, vendor_page: 1 }), null);
+});
+
+test('parses the documented LibreNMS source health response', () => {
+  assert.deepEqual(parseSourceHealth(SOURCE_HEALTH), SOURCE_HEALTH);
+});
+
+test('accepts every internally consistent source health failure state', () => {
+  for (const status of ['unavailable', 'forbidden', 'invalid-source-data'] as const) {
+    assert.deepEqual(
+      parseSourceHealth({
+        ...SOURCE_HEALTH,
+        status,
+        reachable: false,
+        latency_ms: null,
+        detail: status,
+      }),
+      {
+        ...SOURCE_HEALTH,
+        status,
+        reachable: false,
+        latency_ms: null,
+        detail: status,
+      },
+    );
+  }
+});
+
+test('rejects malformed and extended source health responses', () => {
+  assert.equal(parseSourceHealth({ ...SOURCE_HEALTH, source: 'other' }), null);
+  assert.equal(parseSourceHealth({ ...SOURCE_HEALTH, status: 'healthy' }), null);
+  assert.equal(parseSourceHealth({ ...SOURCE_HEALTH, reachable: 1 }), null);
+  assert.equal(parseSourceHealth({ ...SOURCE_HEALTH, latency_ms: -0.1 }), null);
+  assert.equal(parseSourceHealth({ ...SOURCE_HEALTH, latency_ms: Number.NaN }), null);
+  assert.equal(parseSourceHealth({ ...SOURCE_HEALTH, latency_ms: Number.POSITIVE_INFINITY }), null);
+  assert.equal(parseSourceHealth({ ...SOURCE_HEALTH, checked_at: 'just now' }), null);
+  assert.equal(
+    parseSourceHealth({ ...SOURCE_HEALTH, checked_at: '2026-02-31T12:30:00Z' }),
+    null,
+  );
+  assert.equal(parseSourceHealth({ ...SOURCE_HEALTH, detail: 'healthy' }), null);
+  assert.equal(parseSourceHealth({ ...SOURCE_HEALTH, debug: true }), null);
+
+  const missingDetail: Partial<typeof SOURCE_HEALTH> = { ...SOURCE_HEALTH };
+  delete missingDetail.detail;
+  assert.equal(parseSourceHealth(missingDetail), null);
+});
+
+test('rejects internally inconsistent source health combinations', () => {
+  assert.equal(parseSourceHealth({ ...SOURCE_HEALTH, reachable: false }), null);
+  assert.equal(parseSourceHealth({ ...SOURCE_HEALTH, latency_ms: null }), null);
+  assert.equal(parseSourceHealth({ ...SOURCE_HEALTH, detail: 'unavailable' }), null);
+  assert.equal(
+    parseSourceHealth({
+      ...SOURCE_HEALTH,
+      status: 'unavailable',
+      reachable: false,
+      latency_ms: null,
+      detail: 'forbidden',
+    }),
+    null,
+  );
+  assert.equal(
+    parseSourceHealth({
+      ...SOURCE_HEALTH,
+      status: 'forbidden',
+      reachable: true,
+      latency_ms: 5,
+      detail: 'forbidden',
+    }),
+    null,
+  );
+  assert.equal(
+    parseSourceHealth({
+      ...SOURCE_HEALTH,
+      status: 'invalid-source-data',
+      reachable: false,
+      latency_ms: 5,
+      detail: 'invalid-source-data',
+    }),
+    null,
+  );
+});
 
 test('parses a canonical device list into a clean browser model', () => {
   assert.deepEqual(parseDeviceList(LIST), LIST);
@@ -290,6 +431,111 @@ test('parses only the documented error envelope', () => {
         correlation_id: 'corr-1',
       },
       debug: true,
+    }),
+    null,
+  );
+});
+
+test('parseAuthProviders accepts a valid provider state response', () => {
+  assert.deepEqual(
+    parseAuthProviders({
+      providers: {
+        microsoft: { configured: true },
+        google: { configured: false },
+      },
+    }),
+    {
+      providers: {
+        microsoft: { configured: true },
+        google: { configured: false },
+      },
+    },
+  );
+});
+
+test('parseAuthProviders rejects malformed provider state', () => {
+  assert.equal(parseAuthProviders(null), null);
+  assert.equal(parseAuthProviders({}), null);
+  assert.equal(parseAuthProviders({ providers: {} }), null);
+  assert.equal(
+    parseAuthProviders({
+      providers: {
+        microsoft: { configured: true },
+      },
+    }),
+    null,
+  );
+  assert.equal(
+    parseAuthProviders({
+      providers: {
+        microsoft: { configured: 'yes' },
+        google: { configured: false },
+      },
+    }),
+    null,
+  );
+  assert.equal(
+    parseAuthProviders({
+      providers: {
+        microsoft: { configured: true },
+        google: { configured: false },
+        extra: { configured: true },
+      },
+    }),
+    null,
+  );
+});
+
+test('parseSessionInfo accepts a valid session response', () => {
+  assert.deepEqual(
+    parseSessionInfo({
+      authenticated: true,
+      identity_id: 'microsoft:subject-1',
+      provider: 'microsoft',
+      email: 'ops@example.test',
+      roles: ['operator'],
+    }),
+    {
+      authenticated: true,
+      identity_id: 'microsoft:subject-1',
+      provider: 'microsoft',
+      email: 'ops@example.test',
+      roles: ['operator'],
+    },
+  );
+});
+
+test('parseSessionInfo rejects malformed session responses', () => {
+  assert.equal(parseSessionInfo(null), null);
+  assert.equal(parseSessionInfo({}), null);
+  assert.equal(
+    parseSessionInfo({
+      authenticated: false,
+      identity_id: 'microsoft:subject-1',
+      provider: 'microsoft',
+      email: null,
+      roles: [],
+    }),
+    null,
+  );
+  assert.equal(
+    parseSessionInfo({
+      authenticated: true,
+      identity_id: 'microsoft:subject-1',
+      provider: 'microsoft',
+      email: null,
+      roles: 'operator',
+    }),
+    null,
+  );
+  assert.equal(
+    parseSessionInfo({
+      authenticated: true,
+      identity_id: 'microsoft:subject-1',
+      provider: 'microsoft',
+      email: null,
+      roles: [],
+      extra: true,
     }),
     null,
   );

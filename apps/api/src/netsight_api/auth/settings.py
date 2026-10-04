@@ -91,7 +91,8 @@ class AuthSettings(BaseSettings):
     public_base_url: str = Field(default="", validation_alias="NETSIGHT_PUBLIC_BASE_URL")
     role_claim: str = Field(default="roles", validation_alias="NETSIGHT_ROLE_CLAIM")
     role_mapping: str = Field(default="", validation_alias="NETSIGHT_ROLE_MAPPING")
-    default_role: str = Field(default="management", validation_alias="NETSIGHT_DEFAULT_ROLE")
+    # Deny unmapped identities unless an operator explicitly configures a fallback role.
+    default_role: str = Field(default="", validation_alias="NETSIGHT_DEFAULT_ROLE")
     enable_dev_identity: bool = Field(
         default=False, validation_alias="NETSIGHT_ENABLE_DEV_IDENTITY"
     )

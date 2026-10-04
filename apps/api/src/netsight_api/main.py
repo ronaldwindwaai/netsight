@@ -8,6 +8,7 @@ import os
 import re
 from collections.abc import Mapping
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 from typing import Annotated, Any, NoReturn
 from urllib.parse import urlsplit
 from uuid import uuid4
@@ -16,6 +17,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from fastapi import APIRouter, Depends, FastAPI, Path, Query, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from pydantic import ValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.base import RequestResponseEndpoint
 from starlette.responses import Response
@@ -33,6 +35,8 @@ from netsight_api.contracts import ContractViolation, validate
 from netsight_api.errors import ApiError
 from netsight_api.rbac import Identity, Permission, is_allowed
 from netsight_api.schemas import (
+    Alert,
+    AlertListResponse,
     DeviceDetailResponse,
     DeviceListResponse,
     ErrorDetail,
@@ -349,27 +353,45 @@ async def device_detail(
     return DeviceDetailResponse(item=device)
 
 
-@api.get("/alerts", responses=_STANDARD_ERROR_RESPONSES, tags=["alerts"])
+@api.get(
+    "/alerts",
+    response_model=AlertListResponse,
+    responses=_STANDARD_ERROR_RESPONSES,
+    tags=["alerts"],
+)
 async def alerts(
     _identity: AlertReader,
     client: LibrenmsDependency,
-) -> dict[str, Any]:
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=100)] = 25,
+) -> AlertListResponse:
     try:
         rows = await client.alerts()
+        observed_at = datetime.now(UTC)
         for row in rows:
             validate("alert", row)
+        typed_rows = [Alert.model_validate(row) for row in rows]
     except AdapterError as exc:
         _raise_adapter_error(exc)
-    except ContractViolation as exc:
+    except (ContractViolation, ValidationError) as exc:
         raise ApiError(
             502,
             "SOURCE_INVALID_DATA",
             "LibreNMS returned invalid data",
         ) from exc
-    return {
-        "items": rows,
-        "freshness": {"state": "fresh", "observed_at": None, "source": "librenms"},
-    }
+
+    offset = (page - 1) * page_size
+    return AlertListResponse(
+        items=typed_rows[offset : offset + page_size],
+        page=page,
+        page_size=page_size,
+        total=len(typed_rows),
+        freshness=Freshness(
+            state="fresh",
+            observed_at=observed_at,
+            source="librenms",
+        ),
+    )
 
 
 app.include_router(api)

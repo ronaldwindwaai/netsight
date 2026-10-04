@@ -261,7 +261,7 @@ def _validate_issuer(provider: ProviderId, issuer: object, settings: ProviderSet
         # issuer shape: .../login.microsoftonline.com/{tenant}/v2.0
         remainder = issuer[len(expected_prefix) :].split("/")
         tenant = remainder[0] if remainder else ""
-        if settings.tenant_ids and tenant not in settings.tenant_ids:
+        if tenant not in settings.tenant_ids:
             raise OidcError("OIDC_TENANT_NOT_ALLOWED", "Token was issued by a non-approved Microsoft tenant")
         return issuer
 
@@ -277,6 +277,9 @@ def _validate_google_allowlist(claims: dict[str, Any], settings: ProviderSetting
     subject = claims.get("sub")
     email = claims.get("email")
     hosted_domain = claims.get("hd")
+
+    if not settings.hosted_domains and not settings.allowed_identities:
+        raise OidcError("OIDC_IDENTITY_NOT_ALLOWED", "Google identity is not approved")
 
     if settings.hosted_domains and hosted_domain not in settings.hosted_domains:
         raise OidcError("OIDC_DOMAIN_NOT_ALLOWED", "Google Workspace domain is not approved")

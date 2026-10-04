@@ -5,6 +5,20 @@ info:
 servers:
   - url: /api/v1
 paths:
+  /auth/providers:
+    get:
+      summary: Public sign-in provider configuration state
+      security: []
+      responses:
+        '200':
+          description: Which identity providers are connected (never exposes secrets)
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthProvidersResponse'
   /health:
     get:
       summary: Platform health
@@ -114,9 +128,41 @@ paths:
   /alerts:
     get:
       summary: List canonical alerts
+      operationId: listAlerts
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - in: query
+          name: page_size
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 25
       responses:
         '200':
-          description: Alert list
+          description: Bounded page of canonical alerts
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertListResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '502':
+          $ref: '#/components/responses/InvalidSourceData'
+        '503':
+          $ref: '#/components/responses/SourceUnavailable'
   /incidents:
     get:
       summary: List incidents
@@ -168,6 +214,27 @@ components:
       properties:
         status:
           const: ok
+    ProviderState:
+      type: object
+      additionalProperties: false
+      required: [configured]
+      properties:
+        configured:
+          type: boolean
+    AuthProvidersResponse:
+      type: object
+      additionalProperties: false
+      required: [providers]
+      properties:
+        providers:
+          type: object
+          additionalProperties: false
+          required: [microsoft, google]
+          properties:
+            microsoft:
+              $ref: '#/components/schemas/ProviderState'
+            google:
+              $ref: '#/components/schemas/ProviderState'
     Freshness:
       $ref: '../json-schema/common.schema.json#/$defs/freshness'
     Device:
@@ -200,6 +267,29 @@ components:
       properties:
         item:
           $ref: '#/components/schemas/Device'
+    Alert:
+      $ref: '../json-schema/alert.schema.json'
+    AlertListResponse:
+      type: object
+      additionalProperties: false
+      required: [items, page, page_size, total, freshness]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Alert'
+        page:
+          type: integer
+          minimum: 1
+        page_size:
+          type: integer
+          minimum: 1
+          maximum: 100
+        total:
+          type: integer
+          minimum: 0
+        freshness:
+          $ref: '#/components/schemas/Freshness'
     SourceHealthResponse:
       type: object
       additionalProperties: false

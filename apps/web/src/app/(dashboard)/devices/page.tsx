@@ -3,8 +3,9 @@ import { AppContent } from '@adminlte/react';
 
 import { DataFailure, EmptyState, FreshnessNotice } from '@/components/data-state';
 import { DeviceTable } from '@/components/device-table';
+import { SourceHealth } from '@/components/source-health';
 import { apiGet } from '@/lib/api';
-import { parseDeviceList } from '@/lib/api-contracts';
+import { parseDeviceList, parseSourceHealth } from '@/lib/api-contracts';
 
 const PAGE_SIZE = 50;
 
@@ -20,10 +21,10 @@ export default async function DevicesPage({
   searchParams: Promise<{ page?: string | string[] }>;
 }) {
   const page = requestedPage((await searchParams).page);
-  const state = await apiGet(
-    `/api/v1/devices?page=${page}&page_size=${PAGE_SIZE}`,
-    parseDeviceList,
-  );
+  const [sourceHealthState, devicesState] = await Promise.all([
+    apiGet('/api/v1/sources/librenms/health', parseSourceHealth),
+    apiGet(`/api/v1/devices?page=${page}&page_size=${PAGE_SIZE}`, parseDeviceList),
+  ]);
 
   return (
     <AppContent
@@ -36,37 +37,49 @@ export default async function DevicesPage({
         </p>
       </div>
 
-      {state.kind !== 'ok' ? (
-        <DataFailure state={state} />
+      <SourceHealth state={sourceHealthState} />
+
+      {devicesState.kind !== 'ok' ? (
+        <DataFailure state={devicesState} />
       ) : (
         <>
-          <FreshnessNotice freshness={state.data.freshness} />
-          {state.data.items.length === 0 && state.data.total === 0 ? (
+          <FreshnessNotice freshness={devicesState.data.freshness} />
+          {devicesState.data.items.length === 0 && devicesState.data.total === 0 ? (
             <EmptyState />
           ) : (
             <>
-              <DeviceTable devices={state.data.items} total={state.data.total} />
+              <DeviceTable devices={devicesState.data.items} total={devicesState.data.total} />
               <nav className="d-flex align-items-center justify-content-between mt-3" aria-label="Device pages">
                 <Link
-                  aria-disabled={state.data.page <= 1}
-                  className={`btn btn-outline-secondary btn-sm ${state.data.page <= 1 ? 'disabled' : ''}`}
-                  href={`/devices?page=${Math.max(1, state.data.page - 1)}`}
-                  tabIndex={state.data.page <= 1 ? -1 : undefined}
+                  aria-disabled={devicesState.data.page <= 1}
+                  className={`btn btn-outline-secondary btn-sm ${devicesState.data.page <= 1 ? 'disabled' : ''}`}
+                  href={`/devices?page=${Math.max(1, devicesState.data.page - 1)}`}
+                  tabIndex={devicesState.data.page <= 1 ? -1 : undefined}
                 >
                   <i className="bi bi-chevron-left me-1" aria-hidden="true" />
                   Previous
                 </Link>
                 <span className="small text-body-secondary">
-                  Page {state.data.page} of {Math.max(1, Math.ceil(state.data.total / state.data.page_size))}
+                  Page {devicesState.data.page} of{' '}
+                  {Math.max(
+                    1,
+                    Math.ceil(devicesState.data.total / devicesState.data.page_size),
+                  )}
                 </span>
                 <Link
-                  aria-disabled={state.data.page * state.data.page_size >= state.data.total}
+                  aria-disabled={
+                    devicesState.data.page * devicesState.data.page_size >= devicesState.data.total
+                  }
                   className={`btn btn-outline-secondary btn-sm ${
-                    state.data.page * state.data.page_size >= state.data.total ? 'disabled' : ''
+                    devicesState.data.page * devicesState.data.page_size >= devicesState.data.total
+                      ? 'disabled'
+                      : ''
                   }`}
-                  href={`/devices?page=${state.data.page + 1}`}
+                  href={`/devices?page=${devicesState.data.page + 1}`}
                   tabIndex={
-                    state.data.page * state.data.page_size >= state.data.total ? -1 : undefined
+                    devicesState.data.page * devicesState.data.page_size >= devicesState.data.total
+                      ? -1
+                      : undefined
                   }
                 >
                   Next

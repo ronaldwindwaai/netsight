@@ -15,7 +15,11 @@ RUNTIME="$RELEASE/runtime"
 SOURCE_WEB="$RELEASE/apps/web"
 SOURCE_ARCHIVE="$RELEASE/apps/web-source"
 KEEP_RELEASES=5
-PORT="${NETSIGHT_WEB_PORT:-4310}"
+# Keep the bootstrap default aligned with the CloudPanel/Nginx upstream for
+# netsight.sadcpf.org. The persisted shared environment remains the runtime
+# source of truth after the first deployment.
+PORT="${NETSIGHT_WEB_PORT:-2000}"
+EXPECTED_PROXY_PORT="${NETSIGHT_EXPECTED_PROXY_PORT:-2000}"
 
 export PATH="$HOME/.local/node/bin:$PATH"
 export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
@@ -28,6 +32,26 @@ export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
 mkdir -p "$BASE/shared" "$HOME/.config/systemd/user"
 [ -f "$BASE/shared/web.env" ] || echo "NETSIGHT_WEB_PORT=$PORT" > "$BASE/shared/web.env"
 set -a; . "$BASE/shared/web.env"; set +a
+[[ "${NETSIGHT_WEB_PORT:-}" =~ ^[0-9]{1,5}$ ]] || {
+  echo "NETSIGHT_WEB_PORT must be a valid TCP port" >&2
+  exit 1
+}
+if [ "$NETSIGHT_WEB_PORT" -lt 1 ] || [ "$NETSIGHT_WEB_PORT" -gt 65535 ]; then
+  echo "NETSIGHT_WEB_PORT must be a valid TCP port" >&2
+  exit 1
+fi
+[[ "$EXPECTED_PROXY_PORT" =~ ^[0-9]{1,5}$ ]] || {
+  echo "NETSIGHT_EXPECTED_PROXY_PORT must be a valid TCP port" >&2
+  exit 1
+}
+if [ "$EXPECTED_PROXY_PORT" -lt 1 ] || [ "$EXPECTED_PROXY_PORT" -gt 65535 ]; then
+  echo "NETSIGHT_EXPECTED_PROXY_PORT must be a valid TCP port" >&2
+  exit 1
+fi
+if [ "$NETSIGHT_WEB_PORT" -ne "$EXPECTED_PROXY_PORT" ]; then
+  echo "web port $NETSIGHT_WEB_PORT does not match the configured reverse-proxy port" >&2
+  exit 1
+fi
 
 cd "$RELEASE"
 # Create an isolated web package so root-only development tooling is not
@@ -45,12 +69,26 @@ mv "$SOURCE_WEB" "$SOURCE_ARCHIVE"
 ln -s ../runtime "$SOURCE_WEB"
 
 install -m 0644 infrastructure/vps/netsight-web.service "$HOME/.config/systemd/user/netsight-web.service"
+install -m 0644 infrastructure/vps/netsight-api.service "$HOME/.config/systemd/user/netsight-api.service"
 systemctl --user daemon-reload
 systemctl --user enable netsight-web.service >/dev/null
+systemctl --user enable netsight-api.service >/dev/null
+
+# Install the API virtualenv into the shared runtime location. The project
+# has no build-system, so uv sync installs dependencies only; the service
+# unit points PYTHONPATH at the release source tree.
+if [ -f "$RELEASE/apps/api/pyproject.toml" ]; then
+  (
+    cd "$RELEASE/apps/api"
+    UV_PROJECT_ENVIRONMENT="$HOME/netsight/shared/api-venv" \
+      "$HOME/.local/bin/uv" sync --frozen --no-dev
+  )
+fi
 
 PREVIOUS="$(readlink -f "$BASE/current" 2>/dev/null || true)"
 ln -sfn "$RELEASE" "$BASE/current"
 systemctl --user restart netsight-web.service
+systemctl --user restart netsight-api.service
 
 healthy=0
 for _ in $(seq 1 30); do

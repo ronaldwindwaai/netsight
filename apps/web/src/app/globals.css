@@ -24,6 +24,18 @@ body {
   display: none !important;
 }
 
+.identity-avatar {
+  display: inline-grid;
+  width: 1.7rem;
+  height: 1.7rem;
+  place-items: center;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--netsight-signal), var(--netsight-cyan));
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
 :focus-visible {
   outline: 3px solid color-mix(in srgb, var(--netsight-signal) 70%, white);
   outline-offset: 2px;
@@ -226,6 +238,273 @@ body {
 @media (min-width: 768px) and (max-width: 1199.98px) {
   .overview-kpi-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ------------------------------------------------------------------
+   Login page (SSO-only, per design 09_03_55 AM-2)
+   ------------------------------------------------------------------ */
+
+.login-page {
+  display: grid;
+  grid-template-columns: 16rem 1fr;
+  min-height: 100vh;
+  background:
+    radial-gradient(60rem 30rem at 85% 10%, color-mix(in srgb, var(--netsight-signal) 7%, transparent), transparent 60%),
+    radial-gradient(50rem 26rem at 70% 90%, color-mix(in srgb, var(--netsight-cyan) 6%, transparent), transparent 60%),
+    var(--netsight-cloud);
+}
+
+.login-sidebar {
+  display: flex;
+  flex-direction: column;
+  padding: 1.5rem 1.25rem;
+  background: var(--netsight-midnight);
+  color: #e5edf7;
+}
+
+.login-sidebar__brand {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.25rem 0.5rem 1.5rem;
+}
+
+.login-sidebar__logo {
+  display: inline-grid;
+  width: 2.1rem;
+  height: 2.1rem;
+  place-items: center;
+  border-radius: 0.55rem;
+  background: linear-gradient(135deg, var(--netsight-signal), var(--netsight-cyan));
+  color: #fff;
+  font-weight: 800;
+  font-size: 1.1rem;
+}
+
+.login-sidebar__brand strong {
+  display: block;
+  font-size: 1.02rem;
+  letter-spacing: 0.02em;
+}
+
+.login-sidebar__brand small {
+  display: block;
+  color: #8fa3bd;
+  font-size: 0.66rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.login-sidebar__nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.login-sidebar__item {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 0.5rem;
+  color: #b8c7dc;
+  font-size: 0.9rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: background 150ms ease, color 150ms ease;
+}
+
+.login-sidebar__item:hover,
+.login-sidebar__item:focus-visible {
+  background: rgb(255 255 255 / 6%);
+  color: #fff;
+}
+
+.login-sidebar__item--active {
+  background: var(--netsight-signal);
+  color: #fff;
+}
+
+.login-sidebar__footer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  margin-top: auto;
+  padding: 1rem 0.5rem 0;
+  border-top: 1px solid rgb(255 255 255 / 8%);
+  color: #7d90ab;
+  font-size: 0.72rem;
+}
+
+.login-main {
+  display: grid;
+  place-items: center;
+  padding: 2rem;
+}
+
+.login-card {
+  width: min(26rem, 100%);
+  padding: 2.5rem 2.5rem 2rem;
+  border: 1px solid var(--bs-border-color);
+  border-radius: 1rem;
+  background: var(--bs-body-bg);
+  box-shadow: 0 1rem 3rem rgb(15 23 42 / 10%);
+}
+
+.login-card__brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.75rem;
+  text-align: center;
+}
+
+.login-card__logo {
+  display: inline-grid;
+  width: 3.4rem;
+  height: 3.4rem;
+  place-items: center;
+  border-radius: 0.9rem;
+  background: linear-gradient(135deg, var(--netsight-signal), var(--netsight-cyan));
+  color: #fff;
+  font-size: 1.7rem;
+  font-weight: 800;
+}
+
+.login-card__wordmark strong {
+  display: block;
+  font-size: 1.25rem;
+  letter-spacing: 0.14em;
+}
+
+.login-card__wordmark small {
+  display: block;
+  margin-top: 0.15rem;
+  color: var(--bs-secondary-color);
+  font-size: 0.78rem;
+}
+
+.login-card__title {
+  margin-bottom: 0.5rem;
+  font-size: 1.35rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.login-card__subtitle {
+  margin-bottom: 1.5rem;
+  color: var(--bs-secondary-color);
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.login-card__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.login-sso-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.8rem 1.1rem;
+  border: 1px solid var(--bs-border-color);
+  border-radius: 0.65rem;
+  color: var(--bs-body-color);
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+}
+
+.login-sso-btn:hover,
+.login-sso-btn:focus-visible {
+  border-color: color-mix(in srgb, var(--netsight-signal) 55%, var(--bs-border-color));
+  box-shadow: 0 0.5rem 1.5rem rgb(15 23 42 / 8%);
+  transform: translateY(-1px);
+}
+
+.login-sso-btn span {
+  flex: 1;
+  text-align: center;
+}
+
+.login-sso-btn .bi-arrow-right {
+  color: var(--bs-secondary-color);
+}
+
+.login-card__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1.5rem 1rem;
+  border: 1px dashed var(--bs-border-color);
+  border-radius: 0.65rem;
+  color: var(--bs-secondary-color);
+  font-size: 0.88rem;
+  text-align: center;
+}
+
+.login-card__empty i {
+  font-size: 1.5rem;
+}
+
+.login-card__assurance {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--bs-border-color);
+  color: var(--bs-secondary-color);
+  font-size: 0.8rem;
+}
+
+.login-card__assurance i {
+  color: var(--netsight-healthy);
+}
+
+.login-card__tagline {
+  margin: 1.25rem 0 0;
+  color: var(--netsight-signal);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+@media (max-width: 767.98px) {
+  .login-page {
+    grid-template-columns: 1fr;
+  }
+
+  .login-sidebar {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.9rem 1rem;
+  }
+
+  .login-sidebar__brand {
+    padding: 0;
+  }
+
+  .login-sidebar__brand small,
+  .login-sidebar__footer {
+    display: none;
+  }
+
+  .login-sidebar__nav {
+    flex-direction: row;
+  }
+
+  .login-sidebar__item {
+    padding: 0.45rem 0.6rem;
+    font-size: 0.8rem;
   }
 }
 

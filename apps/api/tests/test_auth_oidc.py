@@ -67,12 +67,12 @@ def test_validate_issuer_microsoft_wrong_cloud() -> None:
         )
 
 
-def test_validate_issuer_microsoft_missing_tenant_allowlist_is_open() -> None:
-    # An empty allow-list must not silently accept: the issuer prefix is
-    # still enforced, but any Entra tenant is accepted when no list is set.
+def test_validate_issuer_microsoft_missing_tenant_allowlist_is_denied() -> None:
     settings = ProviderSettings(tenant_ids=[])
     issuer = "https://login.microsoftonline.com/any-tenant/v2.0"
-    assert _validate_issuer(MICROSOFT, issuer, settings) == issuer
+    with pytest.raises(OidcError) as exc_info:
+        _validate_issuer(MICROSOFT, issuer, settings)
+    assert exc_info.value.code == "OIDC_TENANT_NOT_ALLOWED"
 
 
 def test_validate_issuer_google_exact() -> None:
@@ -105,6 +105,16 @@ def test_google_identity_allowlist() -> None:
     )
     with pytest.raises(OidcError):
         _validate_google_allowlist({"sub": "2", "email": "other@example.com"}, settings)
+
+
+def test_google_missing_domain_and_identity_allowlists_is_denied() -> None:
+    settings = ProviderSettings(hosted_domains=[], allowed_identities=[])
+    with pytest.raises(OidcError) as exc_info:
+        _validate_google_allowlist(
+            {"hd": "example.com", "sub": "1", "email": "a@example.com"},
+            settings,
+        )
+    assert exc_info.value.code == "OIDC_IDENTITY_NOT_ALLOWED"
 
 
 def _rsa_key_and_jwk() -> tuple[rsa.RSAPrivateKey, dict[str, Any]]:
