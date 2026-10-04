@@ -11,7 +11,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "test": "node --experimental-strip-types --test src/lib/api-contracts.test.ts src/lib/overview-summary.test.ts",
+    "test": "node --experimental-strip-types --test src/lib/api-contracts.test.ts src/lib/overview-summary.test.ts src/lib/auth-proxy-target.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
