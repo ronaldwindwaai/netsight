@@ -6,10 +6,15 @@ deployment host, which is a control the platform already relies on.
 
 Usage:
     python -m netsight_api.localauth.cli list
-    python -m netsight_api.localauth.cli add <username> --roles operator
+    python -m netsight_api.localauth.cli add <username> --roles network_engineer
     python -m netsight_api.localauth.cli set-password <username>
     python -m netsight_api.localauth.cli enable <username> | disable <username>
     python -m netsight_api.localauth.cli delete <username>
+
+``add`` completes MFA enrolment and prints the TOTP secret, provisioning URI
+and recovery codes once. This is deliberate: MFA is mandatory, enrolment needs
+a session, and a session needs MFA, so provisioning is the only place the
+factor can be bound to an account.
 """
 
 from __future__ import annotations
@@ -19,6 +24,7 @@ import getpass
 import json
 import sys
 from collections.abc import Sequence
+from typing import Any
 
 from netsight_api.localauth import account_store
 from netsight_api.localauth.passwords import check_password_policy, hash_password
@@ -35,14 +41,54 @@ def _prompt_password(prompt: str = "Password: ") -> str:
 
 
 def _read_passwords(confirm: bool = True) -> str:
+    """Prompt for a password twice, without echoing it.
+
+    Callers apply the policy separately so the reason for a rejection can be
+    shown to the operator.
+    """
     password = _prompt_password()
-    if check_password_policy(password).ok:
-        # The policy check is advisory here: the password is never stored
-        # unless it passes, and the operator sees the reason if it does not.
-        pass
     if confirm and password != _prompt_password("Confirm password: "):
         raise SystemExit("passwords did not match")
     return password
+
+
+def _session_secret() -> str:
+    """Read the secret used to encrypt the TOTP envelope at rest."""
+    from netsight_api.auth.settings import session_policy
+
+    secret = session_policy().secret
+    if not secret:
+        raise SystemExit(
+            "NETSIGHT_SESSION_SECRET must be set to enrol MFA, because the TOTP "
+            "secret is encrypted with a key derived from it."
+        )
+    return secret
+
+
+def _enrol(account: Any) -> dict[str, Any]:
+    """Enrol TOTP and mint recovery codes, returning them to print once.
+
+    MFA is mandatory (ADR 0010) but enrolment requires a session, and a
+    session requires MFA. Provisioning therefore has to complete enrolment,
+    otherwise a new account could never sign in.
+    """
+    from netsight_api.localauth import totp
+    from netsight_api.localauth.crypto import encrypt_secret
+    from netsight_api.localauth.recovery import generate_recovery_codes, hash_recovery_codes
+
+    secret = totp.generate_secret()
+    codes = generate_recovery_codes()
+    updated = account.with_totp_enrolled(
+        encrypted_totp=encrypt_secret(secret, _session_secret()),
+        recovery_code_hashes=hash_recovery_codes(codes),
+        now=0.0,
+    )
+    account_store().save(updated)
+    return {
+        "totp_secret": secret,
+        "provisioning_uri": totp.provisioning_uri(secret, account.username),
+        "recovery_codes": codes,
+    }
 
 
 def _add(args: argparse.Namespace) -> int:
@@ -52,7 +98,7 @@ def _add(args: argparse.Namespace) -> int:
         print(f"rejected: {check.message}", file=sys.stderr)
         return 2
 
-    roles = args.roles or [Role.OPERATOR.value if hasattr(Role, "OPERATOR") else "technician"]
+    roles = args.roles or ["technician"]
     try:
         account = account_store().create(
             args.username,
@@ -64,13 +110,27 @@ def _add(args: argparse.Namespace) -> int:
         print(f"rejected: {exc}", file=sys.stderr)
         return 2
 
+    enrolled: dict[str, Any] = {}
+    if not args.no_mfa:
+        try:
+            enrolled = _enrol(account)
+        except SystemExit as exc:
+            account_store().delete(account.username)
+            print(f"rejected: {exc}", file=sys.stderr)
+            return 2
+
     print(
         json.dumps(
             {
                 "created": account.username,
                 "roles": sorted(account.roles),
                 "mfa_required": account.mfa_required,
-                "next_step": "Sign in and enrol an authenticator; MFA is required.",
+                "next_step": (
+                    "Add the provisioning URI to an authenticator app, then sign in."
+                    if enrolled
+                    else "MFA is disabled for this account."
+                ),
+                **enrolled,
             },
             indent=2,
         )
@@ -106,7 +166,17 @@ def _set_password(args: argparse.Namespace) -> int:
     account.password_hash = hash_password(password)
     account.record_success()
     store.save(account)
-    print(json.dumps({"password_changed": account.username}, indent=2))
+    result: dict[str, Any] = {"password_changed": account.username}
+
+    # MFA is mandatory, so a new password must not be issued without a way to
+    # satisfy the second factor.
+    if account.mfa_required and not account.is_mfa_active():
+        try:
+            result.update(_enrol(account))
+        except SystemExit as exc:
+            print(f"rejected: {exc}", file=sys.stderr)
+            return 2
+    print(json.dumps(result, indent=2))
     return 0
 
 
