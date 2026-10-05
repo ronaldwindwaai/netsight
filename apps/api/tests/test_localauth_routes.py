@@ -201,6 +201,53 @@ def test_locked_account_is_indistinguishable() -> None:
 # --- second-factor enforcement --------------------------------------------
 
 
+def test_mistyped_second_factor_does_not_lock_the_account() -> None:
+    """An honest user who fumbles their code must not be locked out.
+
+    The account lockout models password guessing. Second-factor attempts are
+    bounded by the MFA rate limiter and the single-use challenge instead, so a
+    couple of typos must leave the account usable.
+    """
+    secret = _create_account()
+    assert secret
+    client = _client()
+
+    # A wrong code, then a correct password must still be accepted.
+    first = client.post(
+        "/auth/local/login",
+        json={"username": USERNAME, "password": PASSWORD},
+    )
+    assert (
+        client.post(
+            "/auth/local/mfa/verify",
+            json={"challenge_id": _challenge_id(first), "code": "000000"},
+        ).status_code
+        == 401
+    )
+
+    account = account_store().get(USERNAME)
+    assert account is not None
+    assert account.consecutive_failures == 0, "MFA failure must not advance the lockout counter"
+    assert account.is_locked(0.0) is False
+
+    # And a full, correct login still works.
+    second = client.post(
+        "/auth/local/login",
+        json={"username": USERNAME, "password": PASSWORD},
+    )
+    assert second.status_code == 202
+    assert (
+        client.post(
+            "/auth/local/mfa/verify",
+            json={
+                "challenge_id": _challenge_id(second),
+                "code": totp.generate_code(secret),
+            },
+        ).status_code
+        == 200
+    )
+
+
 def test_missing_or_wrong_second_factor_is_refused() -> None:
     secret = _create_account()
     assert secret

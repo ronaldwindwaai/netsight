@@ -183,7 +183,11 @@ async def verify_second_factor(
 
     verified = _verify_second_factor(account, body.code)
     if not verified:
-        store.register_failure(username)
+        # Deliberately does NOT advance the account's password lockout counter:
+        # that counter models password guessing. A mistyped second factor is
+        # already bounded by the per-account and per-client MFA rate limit and
+        # by the single-use challenge, and charging it to the lockout would
+        # lock an honest user out after two typos.
         audit("mfa", outcome="failure", correlation_id=correlation_id, username=username)
         raise ApiError(*_INVALID_SECOND_FACTOR)
 
