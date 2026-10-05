@@ -84,6 +84,12 @@ export function buildResponseHeaders(upstream: Headers): Headers {
   const retryAfter = upstream.get('retry-after');
   if (retryAfter !== null) headers.set('Retry-After', retryAfter);
 
+  // Relay the caching directive. The password step returns a challenge under
+  // `Cache-Control: no-store`; dropping it here would let an intermediary
+  // cache a response that must never be stored.
+  const cacheControl = upstream.get('cache-control');
+  if (cacheControl !== null) headers.set('Cache-Control', cacheControl);
+
   return headers;
 }
 

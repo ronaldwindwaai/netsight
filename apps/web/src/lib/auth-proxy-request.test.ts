@@ -142,6 +142,13 @@ describe('buildResponseHeaders', () => {
     assert.equal(headers.get('Location'), 'https://login.example/x');
   });
 
+  test('relays the no-store directive so a challenge is never cached', () => {
+    // The password step returns a challenge under `Cache-Control: no-store`.
+    // Dropping it would let an intermediary store it.
+    const headers = buildResponseHeaders(new Headers({ 'Cache-Control': 'no-store' }));
+    assert.equal(headers.get('Cache-Control'), 'no-store');
+  });
+
   test('does not relay upstream headers that are not part of the flow', () => {
     const headers = buildResponseHeaders(
       new Headers({
