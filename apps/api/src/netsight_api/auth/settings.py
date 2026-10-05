@@ -122,7 +122,12 @@ class AuthSettings(BaseSettings):
     ``NETSIGHT_ENABLE_DEV_IDENTITY``).
     """
 
-    model_config = SettingsConfigDict(extra="ignore")
+    # populate_by_name is required: with `validation_alias` set, pydantic
+    # otherwise ignores constructor keywords and populates the field ONLY from
+    # the environment variable. That silently discarded role_claim /
+    # role_mapping / default_role whenever AuthSettings was constructed in
+    # code, misconfiguring role assignment. Both sources now work.
+    model_config = SettingsConfigDict(extra="ignore", populate_by_name=True)
 
     public_base_url: str = Field(default="", validation_alias="NETSIGHT_PUBLIC_BASE_URL")
     role_claim: str = Field(default="roles", validation_alias="NETSIGHT_ROLE_CLAIM")
