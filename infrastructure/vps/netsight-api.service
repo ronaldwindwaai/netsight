@@ -6,8 +6,9 @@ After=network.target
 Type=simple
 WorkingDirectory=%h/netsight/current/apps/api
 Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
-Environment=PYTHONPATH=%h/netsight/current/apps/api/src
 EnvironmentFile=-%h/netsight/shared/api.env
+# netsight-api is installed into the shared venv as a real package, so no
+# PYTHONPATH side-channel is required.
 ExecStart=%h/netsight/shared/api-venv/bin/uvicorn netsight_api.main:app --host 127.0.0.1 --port 8000
 Restart=on-failure
 RestartSec=5

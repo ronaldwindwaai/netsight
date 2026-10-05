@@ -33,6 +33,7 @@ from netsight_api.auth.oidc import aclose as oidc_aclose
 from netsight_api.auth.routes import router as auth_router
 from netsight_api.contracts import ContractViolation, validate
 from netsight_api.errors import ApiError
+from netsight_api.localauth.routes import router as localauth_router
 from netsight_api.rbac import Identity, Permission, is_allowed
 from netsight_api.schemas import (
     Alert,
@@ -517,3 +518,4 @@ async def overview(
 
 app.include_router(api)
 app.include_router(auth_router)
+app.include_router(localauth_router)

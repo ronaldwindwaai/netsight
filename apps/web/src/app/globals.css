@@ -480,6 +480,46 @@ body {
   text-align: center;
 }
 
+.login-card__divider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 1.25rem 0 0.5rem;
+  color: var(--bs-secondary-color);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.login-card__divider::before,
+.login-card__divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--bs-border-color);
+}
+
+.login-card__local {
+  padding: 1.25rem 0 0.5rem;
+}
+
+.login-card__local .form-control-lg {
+  font-size: 1rem;
+}
+
+.local-signin__lede {
+  margin-bottom: 1rem;
+  color: var(--bs-secondary-color);
+  font-size: 0.88rem;
+}
+
+.local-signin__note {
+  margin: 0.9rem 0 0;
+  color: var(--bs-secondary-color);
+  font-size: 0.78rem;
+  text-align: center;
+}
+
 @media (max-width: 767.98px) {
   .login-page {
     grid-template-columns: 1fr;

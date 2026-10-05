@@ -23,6 +23,11 @@ test('allow-lists only the browser-driven auth paths', () => {
     'callback',
     'login/microsoft',
     'login/google',
+    'local/login',
+    'local/mfa/verify',
+    'local/mfa/enroll',
+    'local/mfa/activate',
+    'local/password/change',
   ]) {
     assert.notEqual(resolveAuthProxyTarget(path), null, path);
   }

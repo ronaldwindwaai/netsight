@@ -21,6 +21,12 @@ export const ALLOWED_AUTH_PATHS = new Set([
   'session',
   'csrf',
   'providers',
+  // Netsight-managed local credentials (ADR 0010).
+  'local/login',
+  'local/mfa/verify',
+  'local/mfa/enroll',
+  'local/mfa/activate',
+  'local/password/change',
 ]);
 
 export function resolveAuthProxyTarget(path: string): URL | null {

@@ -1,5 +1,6 @@
 import Link from 'next/link';
 
+import { LocalSignIn } from '@/components/local-signin';
 import { apiGet } from '@/lib/api';
 import { parseAuthProviders } from '@/lib/api-contracts';
 
@@ -89,15 +90,30 @@ export default async function LoginPage() {
                 </a>
               ))}
             </div>
-          ) : (
+          ) : null}
+
+          {/* Netsight-managed credentials (ADR 0010). A password alone never
+              grants a session: a verification code is always required. */}
+          {configured.length > 0 ? (
+            <div className="login-card__divider">
+              <span>or use a Netsight account</span>
+            </div>
+          ) : null}
+
+          <div className="login-card__local">
+            <LocalSignIn />
+          </div>
+
+          {configured.length === 0 ? (
             <div className="login-card__empty" role="status">
-              <i className="bi bi-shield-lock" aria-hidden="true" />
+              <i className="bi bi-info-circle" aria-hidden="true" />
               <p>
-                No identity provider is connected on this deployment. Ask your Netsight administrator
-                to configure Microsoft 365 or Google Workspace sign-in.
+                No organisation identity provider is connected to this deployment. Sign in with a
+                Netsight account below, or ask an administrator to configure Microsoft 365 or Google
+                Workspace sign-in.
               </p>
             </div>
-          )}
+          ) : null}
 
           <div className="login-card__assurance">
             <i className="bi bi-shield-check" aria-hidden="true" />
