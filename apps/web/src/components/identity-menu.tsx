@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 
 import type { SessionInfo } from '@/lib/api-contracts';
 
@@ -17,6 +18,7 @@ export function IdentityMenu({ session }: { session: SessionInfo | null }) {
   const [signingOut, setSigningOut] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
+  const router = useRouter();
 
   if (session === null) {
     return (
@@ -29,7 +31,7 @@ export function IdentityMenu({ session }: { session: SessionInfo | null }) {
 
   async function completeSignOut() {
     startTransition(() => {
-      window.location.href = '/login';
+      router.push('/login');
     });
   }
 
