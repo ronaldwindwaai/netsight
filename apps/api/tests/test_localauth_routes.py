@@ -7,6 +7,7 @@ session. Every login path must pass through a second factor.
 from __future__ import annotations
 
 from collections.abc import Iterator
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -17,7 +18,7 @@ from netsight_api.localauth.enrolment import reset_pending_enrolment_store
 from netsight_api.localauth.passwords import hash_password
 from netsight_api.localauth.ratelimit import reset_local_auth_limiter
 from netsight_api.localauth.recovery import generate_recovery_codes, hash_recovery_codes
-from netsight_api.localauth.store import LocalAccountStore
+from netsight_api.localauth.store import LocalAccountStore as _InMemoryStore  # noqa: F401
 from netsight_api.main import app
 
 USERNAME = "ops.user"
@@ -25,12 +26,16 @@ PASSWORD = "a-strong-unique-passphrase"
 
 
 @pytest.fixture(autouse=True)
-def _clean(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+def _clean(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> Iterator[None]:
     import netsight_api.auth.session as session_module
 
     for name in ("NETSIGHT_ENV", "NETSIGHT_ENABLE_DEV_IDENTITY", "NETSIGHT_SESSION_SECRET"):
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setenv("NETSIGHT_SESSION_SECRET", "x" * 48)
+    # Isolate the durable account store from the real deployment file.
+    monkeypatch.setenv("NETSIGHT_LOCAL_ACCOUNT_FILE", str(tmp_path / "accounts.json"))
 
     # session_policy() is lru_cached, so a value cached by another test module
     # with no secret set would silently win over the environment set above.
@@ -568,6 +573,8 @@ def test_challenge_id_is_unguessable() -> None:
     assert PASSWORD not in challenge
 
 
-def test_account_store_is_typed() -> None:
-    """Guard the store used by the CLI and routes."""
-    assert isinstance(account_store(), LocalAccountStore)
+def test_account_store_is_durable_and_type_guarded() -> None:
+    """The store must be file-backed so the CLI and the API agree."""
+    from netsight_api.localauth.filestore import FileAccountStore
+
+    assert isinstance(account_store(), FileAccountStore)
