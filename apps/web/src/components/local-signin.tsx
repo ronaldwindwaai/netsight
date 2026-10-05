@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 /**
@@ -60,6 +61,7 @@ function messageFor(status: number, data: Record<string, unknown>): string {
 }
 
 export function LocalSignIn() {
+  const router = useRouter();
   const [step, setStep] = useState<Step>('credentials');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -105,7 +107,8 @@ export function LocalSignIn() {
 
     if (status === 200) {
       writeChallenge('');
-      window.location.href = '/overview';
+      router.push('/overview');
+      router.refresh();
       return;
     }
     // The challenge is consumed on any attempt, so start again.
