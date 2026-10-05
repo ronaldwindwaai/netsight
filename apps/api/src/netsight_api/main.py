@@ -28,6 +28,18 @@ from netsight_api.adapters.librenms import (
     DeviceNotFoundError,
     LibrenmsClient,
 )
+from netsight_api.adapters.netbox import (
+    AdapterError as NetboxAdapterError,
+)
+from netsight_api.adapters.netbox import (
+    AdapterStatus as NetboxAdapterStatus,
+)
+from netsight_api.adapters.netbox import (
+    DeviceNotFoundError as NetboxDeviceNotFoundError,
+)
+from netsight_api.adapters.netbox import (
+    NetboxClient,
+)
 from netsight_api.auth.deps import get_current_identity
 from netsight_api.auth.oidc import aclose as oidc_aclose
 from netsight_api.auth.routes import router as auth_router
@@ -218,8 +230,33 @@ def get_client() -> LibrenmsClient:
     )
 
 
+def get_netbox_client() -> NetboxClient:
+    base_url = os.environ.get("NETBOX_BASE_URL", "").strip()
+    token = os.environ.get("NETBOX_TOKEN", "").strip()
+    try:
+        parsed_url = urlsplit(base_url)
+        valid_url = (
+            parsed_url.scheme in {"http", "https"}
+            and parsed_url.hostname is not None
+            and parsed_url.username is None
+            and parsed_url.password is None
+            and not parsed_url.query
+            and not parsed_url.fragment
+        )
+    except ValueError:
+        valid_url = False
+    if not valid_url or not token:
+        raise ApiError(
+            503,
+            "SOURCE_UNAVAILABLE",
+            "NetBox source is not configured",
+        )
+    return NetboxClient(base_url=base_url, token=token)
+
+
 CurrentIdentity = Annotated[Identity, Depends(get_current_identity)]
 LibrenmsDependency = Annotated[LibrenmsClient, Depends(get_client)]
+NetboxDependency = Annotated[NetboxClient, Depends(get_netbox_client)]
 
 
 def require_device_reader(identity: CurrentIdentity) -> Identity:
@@ -259,6 +296,22 @@ def _raise_adapter_error(exc: AdapterError) -> NoReturn:
         502,
         "SOURCE_INVALID_DATA",
         "LibreNMS returned invalid data",
+    ) from exc
+
+
+def _raise_netbox_adapter_error(exc: NetboxAdapterError) -> NoReturn:
+    if exc.status is NetboxAdapterStatus.UNAVAILABLE:
+        raise ApiError(503, "SOURCE_UNAVAILABLE", "NetBox source is unavailable") from exc
+    if exc.status is NetboxAdapterStatus.FORBIDDEN:
+        raise ApiError(
+            502,
+            "SOURCE_FORBIDDEN",
+            "NetBox source rejected the service request",
+        ) from exc
+    raise ApiError(
+        502,
+        "SOURCE_INVALID_DATA",
+        "NetBox returned invalid data",
     ) from exc
 
 
@@ -356,6 +409,99 @@ async def device_detail(
             502,
             "SOURCE_INVALID_DATA",
             "LibreNMS returned invalid data",
+        ) from exc
+    return DeviceDetailResponse(item=device)
+
+
+@api.get(
+    "/sources/netbox/health",
+    response_model=SourceHealthResponse,
+    responses=_STANDARD_ERROR_RESPONSES,
+    tags=["sources"],
+)
+async def netbox_health(
+    _identity: DeviceReader,
+    client: NetboxDependency,
+) -> SourceHealthResponse:
+    result = await client.health()
+    return SourceHealthResponse.model_validate(
+        {
+            "source": result.source,
+            "status": result.status.value,
+            "reachable": result.reachable,
+            "latency_ms": result.latency_ms,
+            "checked_at": result.checked_at,
+            "detail": result.detail,
+        }
+    )
+
+
+@api.get(
+    "/netbox/devices",
+    response_model=DeviceListResponse,
+    responses=_STANDARD_ERROR_RESPONSES,
+    tags=["devices"],
+)
+async def netbox_devices(
+    _identity: DeviceReader,
+    client: NetboxDependency,
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=100)] = 25,
+) -> DeviceListResponse:
+    try:
+        collection = await client.devices()
+        for device in collection.items:
+            validate("device", device.model_dump(mode="json"))
+    except NetboxAdapterError as exc:
+        _raise_netbox_adapter_error(exc)
+    except ContractViolation as exc:
+        raise ApiError(
+            502,
+            "SOURCE_INVALID_DATA",
+            "NetBox returned invalid data",
+        ) from exc
+
+    offset = (page - 1) * page_size
+    selected_items = list(collection.items[offset : offset + page_size])
+    return DeviceListResponse(
+        items=selected_items,
+        page=page,
+        page_size=page_size,
+        total=len(collection.items),
+        freshness=Freshness(
+            state="fresh",
+            observed_at=collection.observed_at,
+            source="netbox",
+        ),
+    )
+
+
+@api.get(
+    "/netbox/devices/{device_id}",
+    response_model=DeviceDetailResponse,
+    responses={
+        **_STANDARD_ERROR_RESPONSES,
+        404: {"model": ErrorEnvelope, "description": "Device not found"},
+    },
+    tags=["devices"],
+)
+async def netbox_device_detail(
+    device_id: Annotated[str, Path(min_length=1, max_length=128)],
+    _identity: DeviceReader,
+    client: NetboxDependency,
+) -> DeviceDetailResponse:
+    try:
+        device = await client.device(device_id)
+        validate("device", device.model_dump(mode="json"))
+    except NetboxDeviceNotFoundError as exc:
+        raise ApiError(404, "DEVICE_NOT_FOUND", "Device was not found") from exc
+    except NetboxAdapterError as exc:
+        _raise_netbox_adapter_error(exc)
+    except ContractViolation as exc:
+        raise ApiError(
+            502,
+            "SOURCE_INVALID_DATA",
+            "NetBox returned invalid data",
         ) from exc
     return DeviceDetailResponse(item=device)
 

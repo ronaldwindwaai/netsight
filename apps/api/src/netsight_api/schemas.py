@@ -145,7 +145,7 @@ class AlertListResponse(ApiModel):
 
 
 class SourceHealthResponse(ApiModel):
-    source: Literal["librenms"]
+    source: Literal["librenms", "netbox"]
     status: Literal["success", "unavailable", "forbidden", "invalid-source-data"]
     reachable: bool
     latency_ms: float | None = Field(default=None, ge=0)
