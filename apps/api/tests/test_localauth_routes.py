@@ -101,7 +101,7 @@ def test_correct_password_alone_never_sets_a_session() -> None:
 
     client = _client()
     response = client.post(
-        "/auth/local/login",
+        "/api/v1/auth/local/login",
         json={"username": USERNAME, "password": PASSWORD},
     )
 
@@ -120,11 +120,11 @@ def test_full_login_requires_and_accepts_the_second_factor() -> None:
 
     client = _client()
     first = client.post(
-        "/auth/local/login",
+        "/api/v1/auth/local/login",
         json={"username": USERNAME, "password": PASSWORD},
     )
     second = client.post(
-        "/auth/local/mfa/verify",
+        "/api/v1/auth/local/mfa/verify",
         json={
             "challenge_id": _challenge_id(first),
             "code": totp.generate_code(secret),
@@ -157,7 +157,7 @@ def test_failures_are_indistinguishable(username: str, password: str) -> None:
     client = _client()
 
     response = client.post(
-        "/auth/local/login",
+        "/api/v1/auth/local/login",
         json={"username": username, "password": password},
     )
 
@@ -172,7 +172,7 @@ def test_disabled_account_is_indistinguishable_from_wrong_password() -> None:
     account = store.create(USERNAME, hash_password(PASSWORD), ["technician"], enabled=False)
 
     response = _client().post(
-        "/auth/local/login",
+        "/api/v1/auth/local/login",
         json={"username": USERNAME, "password": PASSWORD},
     )
     assert response.status_code == 401
@@ -186,12 +186,12 @@ def test_locked_account_is_indistinguishable() -> None:
 
     for _ in range(2):
         client.post(
-            "/auth/local/login",
+            "/api/v1/auth/local/login",
             json={"username": USERNAME, "password": "wrong-password-here"},
         )
 
     response = client.post(
-        "/auth/local/login",
+        "/api/v1/auth/local/login",
         json={"username": USERNAME, "password": PASSWORD},
     )
     assert response.status_code == 401
@@ -214,12 +214,12 @@ def test_mistyped_second_factor_does_not_lock_the_account() -> None:
 
     # A wrong code, then a correct password must still be accepted.
     first = client.post(
-        "/auth/local/login",
+        "/api/v1/auth/local/login",
         json={"username": USERNAME, "password": PASSWORD},
     )
     assert (
         client.post(
-            "/auth/local/mfa/verify",
+            "/api/v1/auth/local/mfa/verify",
             json={"challenge_id": _challenge_id(first), "code": "000000"},
         ).status_code
         == 401
@@ -232,13 +232,13 @@ def test_mistyped_second_factor_does_not_lock_the_account() -> None:
 
     # And a full, correct login still works.
     second = client.post(
-        "/auth/local/login",
+        "/api/v1/auth/local/login",
         json={"username": USERNAME, "password": PASSWORD},
     )
     assert second.status_code == 202
     assert (
         client.post(
-            "/auth/local/mfa/verify",
+            "/api/v1/auth/local/mfa/verify",
             json={
                 "challenge_id": _challenge_id(second),
                 "code": totp.generate_code(secret),
@@ -254,11 +254,11 @@ def test_missing_or_wrong_second_factor_is_refused() -> None:
     client = _client()
 
     first = client.post(
-        "/auth/local/login",
+        "/api/v1/auth/local/login",
         json={"username": USERNAME, "password": PASSWORD},
     )
     wrong = client.post(
-        "/auth/local/mfa/verify",
+        "/api/v1/auth/local/mfa/verify",
         json={"challenge_id": _challenge_id(first), "code": "000000"},
     )
     assert wrong.status_code == 401
@@ -273,19 +273,19 @@ def test_challenge_is_single_use() -> None:
     client = _client()
 
     first = client.post(
-        "/auth/local/login",
+        "/api/v1/auth/local/login",
         json={"username": USERNAME, "password": PASSWORD},
     )
     challenge = _challenge_id(first)
 
     # A wrong code consumes the challenge.
     client.post(
-        "/auth/local/mfa/verify",
+        "/api/v1/auth/local/mfa/verify",
         json={"challenge_id": challenge, "code": "000000"},
     )
     # The correct code is now worthless.
     replay = client.post(
-        "/auth/local/mfa/verify",
+        "/api/v1/auth/local/mfa/verify",
         json={"challenge_id": challenge, "code": totp.generate_code(secret)},
     )
     assert replay.status_code == 401
@@ -309,7 +309,7 @@ def test_challenge_cannot_be_redeemed_from_another_address() -> None:
 
     # The test client presents as 127.0.0.1, so the mismatch must deny.
     response = client.post(
-        "/auth/local/mfa/verify",
+        "/api/v1/auth/local/mfa/verify",
         json={
             "challenge_id": pending.id,
             "code": totp.generate_code(secret),
@@ -323,7 +323,7 @@ def test_challenge_cannot_be_redeemed_from_another_address() -> None:
 
 def test_unknown_challenge_is_refused() -> None:
     response = _client().post(
-        "/auth/local/mfa/verify",
+        "/api/v1/auth/local/mfa/verify",
         json={"challenge_id": "never-issued", "code": "123456"},
     )
     assert response.status_code == 401
@@ -340,33 +340,33 @@ def test_recovery_code_can_replace_a_lost_authenticator() -> None:
 
     client = _client()
     first = client.post(
-        "/auth/local/login",
+        "/api/v1/auth/local/login",
         json={"username": USERNAME, "password": PASSWORD},
     )
     second = client.post(
-        "/auth/local/mfa/verify",
+        "/api/v1/auth/local/mfa/verify",
         json={"challenge_id": _challenge_id(first), "code": codes[0]},
     )
     assert second.status_code == 200
 
     # The used code cannot be used again.
     first_again = client.post(
-        "/auth/local/login",
+        "/api/v1/auth/local/login",
         json={"username": USERNAME, "password": PASSWORD},
     )
     reused = client.post(
-        "/auth/local/mfa/verify",
+        "/api/v1/auth/local/mfa/verify",
         json={"challenge_id": _challenge_id(first_again), "code": codes[0]},
     )
     assert reused.status_code == 401
 
     # The unused one still works.
     second_again = client.post(
-        "/auth/local/login",
+        "/api/v1/auth/local/login",
         json={"username": USERNAME, "password": PASSWORD},
     )
     still_good = client.post(
-        "/auth/local/mfa/verify",
+        "/api/v1/auth/local/mfa/verify",
         json={"challenge_id": _challenge_id(second_again), "code": codes[1]},
     )
     assert still_good.status_code == 200
@@ -380,20 +380,20 @@ def test_totp_replay_inside_a_step_is_refused() -> None:
     code = totp.generate_code(secret)
     for _ in range(2):
         first = client.post(
-            "/auth/local/login",
+            "/api/v1/auth/local/login",
             json={"username": USERNAME, "password": PASSWORD},
         )
         if _ == 0:
             assert (
                 client.post(
-                    "/auth/local/mfa/verify",
+                    "/api/v1/auth/local/mfa/verify",
                     json={"challenge_id": _challenge_id(first), "code": code},
                 ).status_code
                 == 200
             )
         else:
             replay = client.post(
-                "/auth/local/mfa/verify",
+                "/api/v1/auth/local/mfa/verify",
                 json={"challenge_id": _challenge_id(first), "code": code},
             )
             assert replay.status_code == 401
@@ -409,7 +409,7 @@ def test_password_attempts_are_rate_limited_per_client() -> None:
 
     statuses = [
         client.post(
-            "/auth/local/login",
+            "/api/v1/auth/local/login",
             json={"username": USERNAME, "password": "wrong-password-here"},
         ).status_code
         for _ in range(8)
@@ -417,7 +417,7 @@ def test_password_attempts_are_rate_limited_per_client() -> None:
 
     assert 429 in statuses
     limited = client.post(
-        "/auth/local/login",
+        "/api/v1/auth/local/login",
         json={"username": USERNAME, "password": PASSWORD},
     )
     assert limited.status_code == 429
@@ -437,7 +437,7 @@ def test_second_factor_attempts_never_bypass_the_flow() -> None:
     client = _client()
 
     first = client.post(
-        "/auth/local/login",
+        "/api/v1/auth/local/login",
         json={"username": USERNAME, "password": PASSWORD},
     )
     challenge = _challenge_id(first)
@@ -445,7 +445,7 @@ def test_second_factor_attempts_never_bypass_the_flow() -> None:
     statuses = []
     for index in range(12):
         response = client.post(
-            "/auth/local/mfa/verify",
+            "/api/v1/auth/local/mfa/verify",
             json={"challenge_id": challenge, "code": f"{index:06d}"},
         )
         statuses.append(response.status_code)
@@ -505,7 +505,7 @@ def test_password_limiter_blocks_spraying_from_one_host() -> None:
 
 
 def test_enrolment_requires_authentication() -> None:
-    assert _client().post("/auth/local/mfa/enroll").status_code == 401
+    assert _client().post("/api/v1/auth/local/mfa/enroll").status_code == 401
 
 
 def test_enrolment_secret_is_never_returned_twice() -> None:
@@ -517,20 +517,20 @@ def test_enrolment_secret_is_never_returned_twice() -> None:
     # so the challenge cannot be completed; assert the endpoint refuses
     # instead of silently returning a secret.
     first = client.post(
-        "/auth/local/login",
+        "/api/v1/auth/local/login",
         json={"username": USERNAME, "password": PASSWORD},
     )
     assert first.status_code == 202
 
     client.cookies.clear()
     # Without a session the enrolment endpoint must refuse.
-    assert client.post("/auth/local/mfa/enroll").status_code == 401
+    assert client.post("/api/v1/auth/local/mfa/enroll").status_code == 401
 
 
 def test_password_change_requires_a_session() -> None:
     _create_account()
     response = _client().post(
-        "/auth/local/password/change",
+        "/api/v1/auth/local/password/change",
         json={"current_password": PASSWORD, "new_password": "another-strong-passphrase"},
     )
     assert response.status_code == 401
@@ -551,14 +551,14 @@ def test_password_change_requires_a_session() -> None:
     ],
 )
 def test_login_rejects_malformed_bodies(payload: dict[str, str]) -> None:
-    response = _client().post("/auth/local/login", json=payload)
+    response = _client().post("/api/v1/auth/local/login", json=payload)
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "VALIDATION_ERROR"
 
 
 def test_absurdly_long_password_is_rejected_before_hashing() -> None:
     response = _client().post(
-        "/auth/local/login",
+        "/api/v1/auth/local/login",
         json={"username": USERNAME, "password": "x" * 5000},
     )
     assert response.status_code == 422
@@ -571,7 +571,7 @@ def test_a_privileged_role_cannot_be_smuggled_in_at_sign_in() -> None:
     client = _client()
 
     response = client.post(
-        "/auth/local/login",
+        "/api/v1/auth/local/login",
         json={
             "username": USERNAME,
             "password": PASSWORD,
@@ -588,7 +588,7 @@ def test_a_privileged_role_cannot_be_smuggled_in_at_sign_in() -> None:
 def test_correlation_id_is_echoed() -> None:
     _create_account()
     response = _client().post(
-        "/auth/local/login",
+        "/api/v1/auth/local/login",
         json={"username": USERNAME, "password": "wrong-password-here"},
         headers={"X-Correlation-ID": "localauth-test-1"},
     )
@@ -598,7 +598,7 @@ def test_correlation_id_is_echoed() -> None:
 def test_error_bodies_disclose_nothing_sensitive() -> None:
     _create_account()
     response = _client().post(
-        "/auth/local/login",
+        "/api/v1/auth/local/login",
         json={"username": USERNAME, "password": "wrong-password-here"},
     )
     body = response.text
@@ -610,7 +610,7 @@ def test_challenge_id_is_unguessable() -> None:
     _create_account()
     client = _client()
     first = client.post(
-        "/auth/local/login",
+        "/api/v1/auth/local/login",
         json={"username": USERNAME, "password": PASSWORD},
     )
     challenge = _challenge_id(first)

@@ -48,7 +48,7 @@ export function resolveAuthProxyTarget(path: string): URL | null {
     return null;
   }
 
-  const target = new URL(`/auth/${key}`, base);
+  const target = new URL(`/api/v1/auth/${key}`, base);
   if (target.origin !== base.origin) return null;
   return target;
 }

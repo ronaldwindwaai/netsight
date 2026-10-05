@@ -332,7 +332,7 @@ def test_provider_discovery_state_never_exposes_secret_material(
     monkeypatch.setenv("NETSIGHT_OIDC_GOOGLE_CLIENT_SECRET", "super-secret-value")
     monkeypatch.setenv("NETSIGHT_OIDC_GOOGLE_HOSTED_DOMAINS", "example.test")
 
-    body = TestClient(app).get("/auth/providers").text
+    body = TestClient(app).get("/api/v1/auth/providers").text
 
     assert "super-secret-value" not in body
     assert "example.test" not in body
@@ -541,7 +541,7 @@ def test_callback_refuses_unissued_state(monkeypatch: pytest.MonkeyPatch) -> Non
     monkeypatch.setenv("NETSIGHT_OIDC_GOOGLE_HOSTED_DOMAINS", "example.test")
 
     response = TestClient(app, follow_redirects=False).get(
-        "/auth/callback", params={"code": "c", "state": "never-issued"}
+        "/api/v1/auth/callback", params={"code": "c", "state": "never-issued"}
     )
 
     assert response.status_code == 400
@@ -595,7 +595,7 @@ def test_login_does_not_leak_state_or_nonce(monkeypatch: pytest.MonkeyPatch) -> 
     monkeypatch.setenv("NETSIGHT_OIDC_GOOGLE_HOSTED_DOMAINS", "example.test")
     monkeypatch.setenv("NETSIGHT_PUBLIC_BASE_URL", "https://netsight.test")
 
-    response = TestClient(app, follow_redirects=False).get("/auth/login/google")
+    response = TestClient(app, follow_redirects=False).get("/api/v1/auth/login/google")
 
     body = response.text + (response.headers.get("location") or "")
     assert "super-secret-value" not in body

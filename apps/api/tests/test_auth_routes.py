@@ -67,7 +67,7 @@ def _enable_microsoft(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_login_rejects_unknown_provider() -> None:
     client = TestClient(app)
-    response = client.get("/auth/login/weird", follow_redirects=False)
+    response = client.get("/api/v1/auth/login/weird", follow_redirects=False)
     assert response.status_code == 404
     assert response.json()["error"]["code"] == "PROVIDER_UNKNOWN"
 
@@ -76,7 +76,7 @@ def test_login_fails_closed_when_unconfigured(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     client = TestClient(app)
-    response = client.get("/auth/login/microsoft", follow_redirects=False)
+    response = client.get("/api/v1/auth/login/microsoft", follow_redirects=False)
     assert response.status_code == 409
     assert response.json()["error"]["code"] == "PROVIDER_NOT_CONFIGURED"
 
@@ -95,7 +95,7 @@ def test_login_redirects_to_provider(
 
     client = TestClient(app, follow_redirects=False)
     response = client.get(
-        "/auth/login/microsoft", params={"redirect_to": "/devices"}
+        "/api/v1/auth/login/microsoft", params={"redirect_to": "/devices"}
     )
     assert response.status_code == 302
     assert response.headers["location"] == "https://provider.example/authorize?state=xyz"
@@ -103,7 +103,7 @@ def test_login_redirects_to_provider(
 
 def test_callback_requires_code_and_state() -> None:
     client = TestClient(app)
-    response = client.get("/auth/callback", follow_redirects=False)
+    response = client.get("/api/v1/auth/callback", follow_redirects=False)
     assert response.status_code == 400
     assert response.json()["error"]["code"] == "AUTH_CALLBACK_INVALID"
 
@@ -111,7 +111,7 @@ def test_callback_requires_code_and_state() -> None:
 def test_callback_rejects_unknown_state() -> None:
     client = TestClient(app)
     response = client.get(
-        "/auth/callback",
+        "/api/v1/auth/callback",
         params={"code": "c", "state": "unknown"},
         follow_redirects=False,
     )
@@ -121,13 +121,13 @@ def test_callback_rejects_unknown_state() -> None:
 
 def test_session_and_csrf_require_authentication() -> None:
     client = TestClient(app)
-    assert client.get("/auth/session").status_code == 401
-    assert client.get("/auth/csrf").status_code == 401
+    assert client.get("/api/v1/auth/session").status_code == 401
+    assert client.get("/api/v1/auth/csrf").status_code == 401
 
 
 def test_logout_without_session_clears_cookie() -> None:
     client = TestClient(app, follow_redirects=False)
-    response = client.post("/auth/logout")
+    response = client.post("/api/v1/auth/logout")
     assert response.status_code == 302
     assert response.headers["location"] == "/login"
 
@@ -198,11 +198,11 @@ def test_full_login_session_logout_roundtrip(
         follow_redirects=False,
     )
 
-    login = client.get("/auth/login/microsoft")
+    login = client.get("/api/v1/auth/login/microsoft")
     assert login.status_code == 302
 
     callback = client.get(
-        "/auth/callback",
+        "/api/v1/auth/callback",
         params={"code": "auth-code", "state": captured["state"]},
     )
     assert callback.status_code == 302
@@ -210,20 +210,20 @@ def test_full_login_session_logout_roundtrip(
     assert callback.cookies.get("netsight_session")
     assert "Secure" in callback.headers["set-cookie"]
 
-    session_response = client.get("/auth/session")
+    session_response = client.get("/api/v1/auth/session")
     assert session_response.status_code == 200
     session_body = session_response.json()
     assert session_body["authenticated"] is True
     assert session_body["identity_id"] == "microsoft:user-1"
     assert "administrator" in session_body["roles"]
 
-    csrf_token = client.get("/auth/csrf").json()["csrf_token"]
+    csrf_token = client.get("/api/v1/auth/csrf").json()["csrf_token"]
 
-    logout = client.post("/auth/logout", headers={"X-CSRF-Token": csrf_token})
+    logout = client.post("/api/v1/auth/logout", headers={"X-CSRF-Token": csrf_token})
     assert logout.status_code == 302
     assert logout.headers["location"] == "/login"
 
-    assert client.get("/auth/session").status_code == 401
+    assert client.get("/api/v1/auth/session").status_code == 401
 
 
 def test_logout_rejects_missing_csrf_token(
@@ -272,20 +272,34 @@ def test_logout_rejects_missing_csrf_token(
         base_url="https://netsight.test",
         follow_redirects=False,
     )
-    client.get("/auth/login/microsoft")
+    client.get("/api/v1/auth/login/microsoft")
     client.get(
-        "/auth/callback",
+        "/api/v1/auth/callback",
         params={"code": "c", "state": captured["state"]},
     )
 
-    response = client.post("/auth/logout", headers={"X-CSRF-Token": "wrong"})
+    response = client.post("/api/v1/auth/logout", headers={"X-CSRF-Token": "wrong"})
     assert response.status_code == 403
     assert response.json()["error"]["code"] == "CSRF_VALIDATION_FAILED"
 
 
+def test_auth_is_served_only_under_the_versioned_prefix() -> None:
+    """Guard the mount point the web server components depend on.
+
+    The dashboard layout and landing page read the session through
+    `/api/v1/auth/session`. Authentication was briefly mounted unversioned,
+    which returned 404 and left the UI signed out after a successful sign-in.
+    """
+
+    client = TestClient(app)
+
+    assert client.get("/api/v1/auth/providers").status_code == 200
+    assert client.get("/auth/providers").status_code == 404
+
+
 def test_providers_reports_unconfigured_by_default() -> None:
     client = TestClient(app)
-    response = client.get("/auth/providers")
+    response = client.get("/api/v1/auth/providers")
     assert response.status_code == 200
     body = response.json()
     assert body == {
@@ -305,7 +319,7 @@ def test_providers_reports_configured_state_without_secrets(
     monkeypatch.setenv("NETSIGHT_OIDC_GOOGLE_CLIENT_SECRET", "google-secret")
 
     client = TestClient(app)
-    response = client.get("/auth/providers")
+    response = client.get("/api/v1/auth/providers")
     assert response.status_code == 200
     body = response.json()
     assert body["providers"]["microsoft"]["configured"] is True
@@ -324,6 +338,6 @@ def test_providers_requires_enabled_flag(
     monkeypatch.setenv("NETSIGHT_OIDC_MICROSOFT_CLIENT_SECRET", "super-secret")
 
     client = TestClient(app)
-    response = client.get("/auth/providers")
+    response = client.get("/api/v1/auth/providers")
     assert response.status_code == 200
     assert response.json()["providers"]["microsoft"]["configured"] is False

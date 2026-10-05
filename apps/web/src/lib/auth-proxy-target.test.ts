@@ -51,7 +51,7 @@ test('defaults to a loopback upstream', () => {
     const target = resolveAuthProxyTarget('providers');
     assert.equal(target?.protocol, 'http:');
     assert.equal(target?.host, '127.0.0.1:8000');
-    assert.equal(target?.pathname, '/auth/providers');
+    assert.equal(target?.pathname, '/api/v1/auth/providers');
   });
 });
 
@@ -75,7 +75,7 @@ test('rejects plain-HTTP non-loopback upstreams and embedded credentials', () =>
   withApiUrl('https://api.example.test', () => {
     const target = resolveAuthProxyTarget('csrf');
     assert.equal(target?.origin, 'https://api.example.test');
-    assert.equal(target?.pathname, '/auth/csrf');
+    assert.equal(target?.pathname, '/api/v1/auth/csrf');
     assert.equal(target?.username, '');
     assert.equal(target?.password, '');
   });

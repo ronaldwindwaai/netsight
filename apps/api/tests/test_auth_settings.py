@@ -74,8 +74,8 @@ def test_allow_list_env_does_not_break_auth_endpoints(monkeypatch: pytest.Monkey
     monkeypatch.setenv("NETSIGHT_OIDC_GOOGLE_HOSTED_DOMAINS", "example.test,example.org")
 
     client = TestClient(app, raise_server_exceptions=False)
-    assert client.get("/auth/providers").status_code == 200
-    assert client.get("/auth/session").status_code == 401
+    assert client.get("/api/v1/auth/providers").status_code == 200
+    assert client.get("/api/v1/auth/session").status_code == 401
     assert client.get("/api/v1/devices").status_code == 401
 
 

@@ -517,5 +517,9 @@ async def overview(
 
 
 app.include_router(api)
-app.include_router(auth_router)
-app.include_router(localauth_router)
+# Authentication lives under the same versioned prefix as every other platform
+# route (contracts/openapi/netsight-api.yaml declares `servers: /api/v1` with
+# `/auth/providers` relative to it). Serving it unversioned broke the server
+# components, which read the session through the versioned prefix.
+app.include_router(auth_router, prefix=API_PREFIX)
+app.include_router(localauth_router, prefix=API_PREFIX)
