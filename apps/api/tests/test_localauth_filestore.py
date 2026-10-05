@@ -181,6 +181,18 @@ def test_malformed_file_is_refused_not_ignored(account_file: Path) -> None:
         FileAccountStore(account_file).load()
 
 
+def test_store_accepts_a_plain_string_path(tmp_path: Path) -> None:
+    """Callers routinely pass an environment value, which is a str."""
+    target = tmp_path / "nested" / "accounts.json"
+    store = FileAccountStore(str(target))
+    store.load()
+    store.create("ops.user", hash_password(PASSWORD), ["technician"])
+
+    assert target.exists()
+    assert FileAccountStore(str(target)).load() is None
+    assert FileAccountStore(str(target)).get("ops.user") is not None
+
+
 def test_missing_file_is_treated_as_empty(account_file: Path) -> None:
     store = FileAccountStore(account_file)
     store.load()

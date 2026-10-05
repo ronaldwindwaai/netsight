@@ -113,10 +113,11 @@ class FileAccountStore:
 
     def __init__(
         self,
-        path: Path | None = None,
+        path: str | Path | None = None,
         clock: Callable[[], float] = time.time,
     ) -> None:
-        self._path = path or account_file_path()
+        # Accept a plain string: callers routinely pass environment values.
+        self._path = Path(path).expanduser() if path is not None else account_file_path()
         # Lockout timestamps are wall-clock so they survive a restart.
         self._clock = clock
         self._lock = threading.RLock()
