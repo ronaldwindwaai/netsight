@@ -20,8 +20,14 @@ check "no auth tokens in browser storage" \
   "grep -rnE '(localStorage|sessionStorage)\.(setItem|getItem)\([^)]*(token|jwt|secret|password)' $SRC --include=*.ts --include=*.tsx --include=*.js $DEP_EXCLUDES"
 check "no private keys in source" \
   "grep -rnE -e '-----BEGIN [A-Z ]*PRIVATE KEY-----' . --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=.next --exclude-dir=.venv --exclude-dir=site-packages --exclude-dir=Netsight_Development_Package"
+# Test files legitimately contain dummy credentials and placeholder tokens, and
+# first-party tests live beside the code (src/lib/*.test.ts) as well as under
+# tests/ directories. Exclude them by naming convention as well as by directory,
+# so the check targets shipped code instead of failing closed on fixtures.
+# gitleaks and trivy (security.yml) still scan the whole tree, including tests.
+TEST_EXCLUDES="--exclude-dir=tests --exclude-dir=e2e --exclude=*.test.ts --exclude=*.test.tsx --exclude=*.spec.ts --exclude=test_*.py --exclude=*_test.py"
 check "no hard-coded credential assignments in app code" \
-  "grep -rniE '(password|passwd|secret|api_key|apikey|token)[\"'\'']?\s*[:=]\s*[\"'\''][^\"'\'']{8,}[\"'\'']' $SRC --include=*.ts --include=*.tsx --include=*.py $DEP_EXCLUDES --exclude-dir=tests"
+  "grep -rniE '(password|passwd|secret|api_key|apikey|token)[\"'\'']?\s*[:=]\s*[\"'\''][^\"'\'']{8,}[\"'\'']' $SRC --include=*.ts --include=*.tsx --include=*.py $DEP_EXCLUDES $TEST_EXCLUDES"
 check "no TLS verification disabled" \
   "grep -rnE 'rejectUnauthorized\s*:\s*false|verify\s*=\s*False|NODE_TLS_REJECT_UNAUTHORIZED' $SRC --include=*.ts --include=*.tsx --include=*.js --include=*.py $DEP_EXCLUDES"
 
