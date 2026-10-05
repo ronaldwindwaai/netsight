@@ -13,7 +13,7 @@ from typing import Annotated, Literal
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
-from netsight_api.auth.providers import CLERK, GOOGLE, MICROSOFT, ProviderId
+from netsight_api.auth.providers import GOOGLE, MICROSOFT, ProviderId
 
 
 class ProviderSettings(BaseSettings):
@@ -31,9 +31,8 @@ class ProviderSettings(BaseSettings):
     tenant_ids: Annotated[list[str], NoDecode] = Field(default_factory=list)
     # Google only: explicitly allowed hosted domains (empty = allow none).
     hosted_domains: Annotated[list[str], NoDecode] = Field(default_factory=list)
-    # Approved individual identities (sub or email). Used by Google when the
-    # domain allow-list alone is not sufficient, and as the mandatory
-    # allow-list for Clerk (ADR 0009).
+    # Approved individual identities (sub or email) allowed when the Google
+    # hosted-domain allow-list alone is not sufficient.
     allowed_identities: Annotated[list[str], NoDecode] = Field(default_factory=list)
 
     @field_validator("tenant_ids", "hosted_domains", "allowed_identities", mode="before")
@@ -66,24 +65,19 @@ def google_settings() -> ProviderSettings:
     return _provider_settings(GOOGLE)
 
 
-def clerk_settings() -> ProviderSettings:
-    return _provider_settings(CLERK)
-
-
 _PROVIDER_SETTINGS = {
     MICROSOFT: microsoft_settings,
     GOOGLE: google_settings,
-    CLERK: clerk_settings,
 }
 
 
 def provider_settings(provider: ProviderId) -> ProviderSettings:
     """Return the configuration for ``provider``.
 
-    Keyed by every ``ProviderId`` member and exhaustively checked below, so
-    adding a provider cannot silently fall through to another provider's
-    settings (which previously made /auth/login/<new-provider> report the
-    provider as unconfigured).
+    Keyed by every ``ProviderId`` member and looked up rather than branched on,
+    so a provider can never silently inherit another provider's configuration
+    (an earlier two-branch helper mapped every non-Microsoft provider to
+    Google, which made a configured provider report itself unconfigured).
     """
     factory = _PROVIDER_SETTINGS.get(provider)
     if factory is None:

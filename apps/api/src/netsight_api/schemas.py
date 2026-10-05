@@ -141,7 +141,4 @@ class ProviderState(ApiModel):
 
 
 class AuthProvidersResponse(ApiModel):
-    providers: dict[
-        Literal["microsoft", "google", "clerk"],
-        ProviderState,
-    ]
+    providers: dict[Literal["microsoft", "google"], ProviderState]

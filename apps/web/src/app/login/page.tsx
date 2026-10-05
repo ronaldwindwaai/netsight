@@ -16,12 +16,6 @@ const PROVIDERS = [
     icon: 'bi bi-google',
     href: '/auth/login/google',
   },
-  {
-    id: 'clerk',
-    name: 'Clerk',
-    icon: 'bi bi-shield-check',
-    href: '/auth/login/clerk',
-  },
 ] as const;
 
 function LoginSidebar() {

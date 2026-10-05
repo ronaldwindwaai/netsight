@@ -292,7 +292,6 @@ def test_providers_reports_unconfigured_by_default() -> None:
         "providers": {
             "microsoft": {"configured": False},
             "google": {"configured": False},
-            "clerk": {"configured": False},
         }
     }
 

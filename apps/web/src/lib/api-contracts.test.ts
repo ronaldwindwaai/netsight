@@ -442,14 +442,12 @@ test('parseAuthProviders accepts a valid provider state response', () => {
       providers: {
         microsoft: { configured: true },
         google: { configured: false },
-        clerk: { configured: true },
       },
     }),
     {
       providers: {
         microsoft: { configured: true },
         google: { configured: false },
-        clerk: { configured: true },
       },
     },
   );
@@ -470,9 +468,8 @@ test('parseAuthProviders rejects malformed provider state', () => {
   assert.equal(
     parseAuthProviders({
       providers: {
-        microsoft: { configured: true },
-        google: { configured: 'yes' },
-        clerk: { configured: false },
+        microsoft: { configured: 'yes' },
+        google: { configured: false },
       },
     }),
     null,
@@ -482,7 +479,6 @@ test('parseAuthProviders rejects malformed provider state', () => {
       providers: {
         microsoft: { configured: true },
         google: { configured: false },
-        clerk: { configured: false },
         extra: { configured: true },
       },
     }),

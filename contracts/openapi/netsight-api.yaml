@@ -298,13 +298,11 @@ components:
         providers:
           type: object
           additionalProperties: false
-          required: [microsoft, google, clerk]
+          required: [microsoft, google]
           properties:
             microsoft:
               $ref: '#/components/schemas/ProviderState'
             google:
-              $ref: '#/components/schemas/ProviderState'
-            clerk:
               $ref: '#/components/schemas/ProviderState'
     Freshness:
       $ref: '../json-schema/common.schema.json#/$defs/freshness'

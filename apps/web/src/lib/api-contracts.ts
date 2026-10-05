@@ -106,7 +106,6 @@ export interface AuthProvidersResponse {
   providers: {
     microsoft: ProviderState;
     google: ProviderState;
-    clerk: ProviderState;
   };
 }
 
@@ -480,7 +479,7 @@ export function parseAlertList(value: unknown): AlertListResponse | null {
 }
 
 export function parseAuthProviders(value: unknown): AuthProvidersResponse | null {
-  const PROVIDER_KEYS = ['microsoft', 'google', 'clerk'];
+  const PROVIDER_KEYS = ['microsoft', 'google'];
   if (
     !isRecord(value) ||
     !hasContractKeys(value, AUTH_PROVIDERS_KEYS) ||
@@ -488,13 +487,10 @@ export function parseAuthProviders(value: unknown): AuthProvidersResponse | null
     !hasContractKeys(value.providers, PROVIDER_KEYS) ||
     !isRecord(value.providers.microsoft) ||
     !isRecord(value.providers.google) ||
-    !isRecord(value.providers.clerk) ||
     !hasContractKeys(value.providers.microsoft, PROVIDER_STATE_KEYS) ||
     !hasContractKeys(value.providers.google, PROVIDER_STATE_KEYS) ||
-    !hasContractKeys(value.providers.clerk, PROVIDER_STATE_KEYS) ||
     typeof value.providers.microsoft.configured !== 'boolean' ||
-    typeof value.providers.google.configured !== 'boolean' ||
-    typeof value.providers.clerk.configured !== 'boolean'
+    typeof value.providers.google.configured !== 'boolean'
   ) {
     return null;
   }
@@ -503,7 +499,6 @@ export function parseAuthProviders(value: unknown): AuthProvidersResponse | null
     providers: {
       microsoft: { configured: value.providers.microsoft.configured },
       google: { configured: value.providers.google.configured },
-      clerk: { configured: value.providers.clerk.configured },
     },
   };
 }

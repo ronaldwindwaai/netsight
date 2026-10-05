@@ -23,7 +23,6 @@ test('allow-lists only the browser-driven auth paths', () => {
     'callback',
     'login/microsoft',
     'login/google',
-    'login/clerk',
   ]) {
     assert.notEqual(resolveAuthProxyTarget(path), null, path);
   }
