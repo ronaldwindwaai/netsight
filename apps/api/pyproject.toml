@@ -1,3 +1,10 @@
+[build-system]
+# Required so the package is a real installable distribution rather than a
+# "virtual" project: without it `uv sync` cannot install netsight_api and both
+# the test suite and the production service need a PYTHONPATH side-channel.
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
 [project]
 name = "netsight-api"
 version = "0.1.0"
@@ -12,11 +19,16 @@ dependencies = [
   "psycopg[binary]>=3.2,<4",
   "alembic>=1.13,<2",
   "jsonschema>=4.23,<5",
-  "pyjwt[crypto]>=2.10,<3"
+  "pyjwt[crypto]>=2.10,<3",
+  "argon2-cffi>=23.1,<26",
+  "qrcode>=8,<9",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8,<9", "pytest-asyncio>=0.24,<1", "ruff>=0.8,<1", "mypy>=1.13,<2"]
+dev = ["pytest>=8,<9", "pytest-asyncio>=0.24,<1", "ruff>=0.8,<1", "mypy>=1.13,<2", "types-qrcode>=7.4,<9"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/netsight_api"]
 
 [tool.ruff]
 line-length = 100

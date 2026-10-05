@@ -147,6 +147,40 @@ paths:
           $ref: '#/components/responses/InvalidSourceData'
         '503':
           $ref: '#/components/responses/SourceUnavailable'
+  /devices/{device_id}/interfaces:
+    get:
+      summary: List canonical interfaces for a device
+      operationId: listDeviceInterfaces
+      parameters:
+        - in: path
+          name: device_id
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 128
+      responses:
+        '200':
+          description: Canonical interface records
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InterfaceListResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '404':
+          $ref: '#/components/responses/DeviceNotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '502':
+          $ref: '#/components/responses/InvalidSourceData'
+        '503':
+          $ref: '#/components/responses/SourceUnavailable'
   /alerts:
     get:
       summary: List canonical alerts
@@ -338,6 +372,22 @@ components:
           $ref: '#/components/schemas/Device'
     Alert:
       $ref: '../json-schema/alert.schema.json'
+    Interface:
+      $ref: '../json-schema/interface.schema.json'
+    InterfaceListResponse:
+      type: object
+      additionalProperties: false
+      required: [items, total, freshness]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Interface'
+        total:
+          type: integer
+          minimum: 0
+        freshness:
+          $ref: '#/components/schemas/Freshness'
     AlertListResponse:
       type: object
       additionalProperties: false

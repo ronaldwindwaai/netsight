@@ -20,7 +20,16 @@ from zoneinfo import ZoneInfo
 import httpx
 from pydantic import ValidationError
 
-from netsight_api.schemas import Device, DeviceSourceAlias, DeviceStatus, Freshness
+from netsight_api.schemas import (
+    Device,
+    DeviceSourceAlias,
+    DeviceStatus,
+    Freshness,
+    InterfaceAdminStatus,
+    InterfaceOperStatus,
+    InterfaceSourceAlias,
+    NetworkInterface,
+)
 
 ADAPTER_VERSION = "librenms/1"
 SOURCE_NAME = "librenms"
@@ -81,11 +90,31 @@ class DeviceCollection:
     observed_at: datetime
 
 
+@dataclass(frozen=True)
+class InterfaceCollection:
+    items: tuple[NetworkInterface, ...]
+    observed_at: datetime
+
+
 def canonical_device_id(native_id: str) -> str:
     """Return a stable, opaque platform ID while retaining the source alias."""
 
     value = uuid5(NAMESPACE_URL, f"urn:netsight:{SOURCE_NAME}:device:{native_id}")
     return f"device-{value}"
+
+
+def canonical_interface_id(native_device_id: str, native_interface_id: str) -> str:
+    """Return a stable, opaque platform ID scoped to its device.
+
+    Interface identifiers are only unique within a device, so the device
+    native ID is part of the UUID5 namespace input.
+    """
+
+    value = uuid5(
+        NAMESPACE_URL,
+        f"urn:netsight:{SOURCE_NAME}:interface:{native_device_id}:{native_interface_id}",
+    )
+    return f"interface-{value}"
 
 
 def _source_boolean(value: object) -> bool:
@@ -227,6 +256,165 @@ def _map_device(row: dict[str, Any], observed_at: datetime) -> Device:
         ) from exc
 
 
+def _interface_native_id(row: dict[str, Any]) -> str:
+    """Return the source-native interface identifier.
+
+    Interfaces are keyed by ``port_id``; ``device_id`` identifies the parent
+    and must not be used here or every interface on a device would collide.
+    """
+    value = row.get("port_id")
+    if isinstance(value, bool) or not isinstance(value, (int, str)):
+        raise AdapterError(AdapterStatus.INVALID_SOURCE_DATA, "invalid interface id")
+    native_id = str(value).strip()
+    if not native_id or len(native_id) > 64:
+        raise AdapterError(AdapterStatus.INVALID_SOURCE_DATA, "invalid interface id")
+    return native_id
+
+
+def _require_path_safe_native_id(native_id: str) -> str:
+    """Reject identifiers that could escape the intended source path.
+
+    Native identifiers arrive from the monitoring source, so a compromised or
+    malformed source must not be able to steer requests at other endpoints.
+    URL quoting alone is insufficient: percent-encoded separators are decoded
+    during URL normalisation.
+    """
+    if "/" in native_id or "\\" in native_id or native_id in {".", ".."}:
+        raise AdapterError(AdapterStatus.INVALID_SOURCE_DATA, "invalid native identifier")
+    if native_id.startswith(".") or ".." in native_id:
+        raise AdapterError(AdapterStatus.INVALID_SOURCE_DATA, "invalid native identifier")
+    return native_id
+
+
+def _interface_rows(body: dict[str, Any]) -> list[dict[str, Any]]:
+    if body.get("status") != "ok":
+        raise AdapterError(AdapterStatus.INVALID_SOURCE_DATA, "invalid source status")
+    raw_rows = body.get("ports")
+    if not isinstance(raw_rows, list):
+        raise AdapterError(AdapterStatus.INVALID_SOURCE_DATA, "missing ports list")
+    rows: list[dict[str, Any]] = []
+    for raw_row in raw_rows:
+        if not isinstance(raw_row, dict):
+            raise AdapterError(AdapterStatus.INVALID_SOURCE_DATA, "invalid interface row")
+        rows.append(cast(dict[str, Any], raw_row))
+    return rows
+
+
+# Source vocabulary mapped to the canonical contract. Anything unrecognised
+# becomes "unknown" rather than being guessed as healthy.
+_INTERFACE_ADMIN_STATUS = {
+    "up": "up",
+    "down": "down",
+    "testing": "testing",
+}
+
+_INTERFACE_OPER_STATUS = {
+    "up": "up",
+    "down": "down",
+    "testing": "testing",
+    "dormant": "dormant",
+    "notpresent": "notPresent",
+    "lowerlayerdown": "lowerLayerDown",
+}
+
+
+def _interface_admin_status(value: object) -> InterfaceAdminStatus:
+    if isinstance(value, str):
+        mapped = _INTERFACE_ADMIN_STATUS.get(value.strip().lower())
+        if mapped is not None:
+            return cast(InterfaceAdminStatus, mapped)
+    return "unknown"
+
+
+def _interface_oper_status(value: object) -> InterfaceOperStatus:
+    if isinstance(value, str):
+        mapped = _INTERFACE_OPER_STATUS.get(value.strip().lower())
+        if mapped is not None:
+            return cast(InterfaceOperStatus, mapped)
+    return "unknown"
+
+
+def _interface_speed_bps(row: dict[str, Any]) -> int | None:
+    """Resolve link speed, preferring the explicit Mbps field.
+
+    LibreNMS reports ``ifSpeed`` in bits per second and ``ifHighSpeed`` in
+    megabits per second. Both are omitted or zero for virtual and
+    unmonitored interfaces, which is reported as unknown rather than 0.
+    """
+    for key in ("ifSpeed", "ifHighSpeed"):
+        raw = row.get(key)
+        if isinstance(raw, bool) or not isinstance(raw, (int, float)):
+            continue
+        if raw <= 0:
+            continue
+        speed = int(raw) if key == "ifSpeed" else int(raw) * 1_000_000
+        return speed
+    return None
+
+
+def _interface_status(row: dict[str, Any], admin: str, oper: str) -> DeviceStatus:
+    """Derive Netsight health from the source's own admin/oper state.
+
+    An interface the operator has deliberately shut down is not an incident,
+    so it is reported as maintenance rather than offline.
+    """
+    if admin == "down":
+        return "maintenance"
+    if oper == "up":
+        return "healthy"
+    if oper == "down":
+        return "offline"
+    if oper in ("dormant", "lowerLayerDown"):
+        return "degraded"
+    return "unknown"
+
+
+def _map_interface(
+    row: dict[str, Any],
+    native_device_id: str,
+    observed_at: datetime,
+) -> NetworkInterface:
+    native_interface_id = _interface_native_id(row)
+    name = _required_text(
+        row.get("ifName") or row.get("ifDescr"),
+        "interface name",
+    )
+    admin_status = _interface_admin_status(row.get("ifAdminStatus"))
+    oper_status = _interface_oper_status(row.get("ifOperStatus"))
+    index = row.get("ifIndex")
+    if isinstance(index, bool) or not isinstance(index, int) or index < 0:
+        index = None
+
+    try:
+        return NetworkInterface(
+            id=canonical_interface_id(native_device_id, native_interface_id),
+            device_id=canonical_device_id(native_device_id),
+            index=index,
+            name=name,
+            description=_optional_text(row.get("ifDescr")),
+            alias=_optional_text(row.get("ifAlias")),
+            hardware_type=_optional_text(row.get("ifType")),
+            mac_address=_optional_text(row.get("ifPhysAddress") or row.get("snmpmac")),
+            admin_status=admin_status,
+            oper_status=oper_status,
+            status=_interface_status(row, admin_status, oper_status),
+            speed_bps=_interface_speed_bps(row),
+            source_aliases=[
+                InterfaceSourceAlias(source=SOURCE_NAME, native_id=native_interface_id)
+            ],
+            freshness=Freshness(
+                state="fresh",
+                observed_at=observed_at,
+                source=SOURCE_NAME,
+            ),
+        )
+    except ValidationError as exc:
+        raise AdapterError(
+            AdapterStatus.INVALID_SOURCE_DATA,
+            "interface does not satisfy canonical contract",
+        ) from exc
+
+
 def _device_rows(body: dict[str, Any]) -> list[dict[str, Any]]:
     if body.get("status") != "ok":
         raise AdapterError(AdapterStatus.INVALID_SOURCE_DATA, "invalid source status")
@@ -357,6 +545,17 @@ class LibrenmsClient:
             if device.id == canonical_id:
                 return await self.get_device(device.source_aliases[0].native_id)
         raise DeviceNotFoundError
+
+    async def interfaces(self, native_device_id: str) -> InterfaceCollection:
+        """Return canonical interface records for one source device."""
+        encoded = quote(_require_path_safe_native_id(native_device_id), safe="")
+        body = await self._get(f"/api/v0/devices/{encoded}/ports")
+        observed_at = datetime.now(UTC)
+        rows = _interface_rows(body)
+        return InterfaceCollection(
+            items=tuple(_map_interface(row, native_device_id, observed_at) for row in rows),
+            observed_at=observed_at,
+        )
 
     async def alerts(self) -> list[dict[str, Any]]:
         body = await self._get("/api/v0/alerts")

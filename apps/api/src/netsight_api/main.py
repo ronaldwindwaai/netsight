@@ -46,6 +46,7 @@ from netsight_api.schemas import (
     ErrorEnvelope,
     Freshness,
     HealthResponse,
+    InterfaceListResponse,
     OverviewResponse,
     SourceHealthResponse,
     SourceState,
@@ -394,6 +395,57 @@ async def alerts(
         freshness=Freshness(
             state="fresh",
             observed_at=observed_at,
+            source="librenms",
+        ),
+    )
+
+
+@api.get(
+    "/devices/{device_id}/interfaces",
+    response_model=InterfaceListResponse,
+    responses={
+        **_STANDARD_ERROR_RESPONSES,
+        404: {"model": ErrorEnvelope, "description": "Device not found"},
+    },
+    tags=["interfaces"],
+)
+async def device_interfaces(
+    device_id: Annotated[str, Path(min_length=1, max_length=128)],
+    _identity: DeviceReader,
+    client: LibrenmsDependency,
+) -> InterfaceListResponse:
+    """Canonical interface records for one device (NS-022).
+
+    Interfaces the source does not report keep an explicit ``unknown`` state;
+    Netsight does not infer a healthy link from missing data.
+    """
+    try:
+        device = await client.device(device_id)
+    except DeviceNotFoundError as exc:
+        raise ApiError(404, "DEVICE_NOT_FOUND", "Device was not found") from exc
+    except AdapterError as exc:
+        _raise_adapter_error(exc)
+
+    native_device_id = device.source_aliases[0].native_id
+    try:
+        collection = await client.interfaces(native_device_id)
+        for interface in collection.items:
+            validate("interface", interface.model_dump(mode="json"))
+    except AdapterError as exc:
+        _raise_adapter_error(exc)
+    except ContractViolation as exc:
+        raise ApiError(
+            502,
+            "SOURCE_INVALID_DATA",
+            "LibreNMS returned invalid data",
+        ) from exc
+
+    return InterfaceListResponse(
+        items=list(collection.items),
+        total=len(collection.items),
+        freshness=Freshness(
+            state="fresh",
+            observed_at=collection.observed_at,
             source="librenms",
         ),
     )

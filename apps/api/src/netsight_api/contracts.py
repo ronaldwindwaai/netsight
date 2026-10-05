@@ -21,6 +21,7 @@ SCHEMA_DIR = REPO_ROOT / "contracts" / "json-schema"
 
 SCHEMA_FILES = {
     "device": "device.schema.json",
+    "interface": "interface.schema.json",
     "alert": "alert.schema.json",
     "incident": "incident.schema.json",
     "evidence": "evidence.schema.json",

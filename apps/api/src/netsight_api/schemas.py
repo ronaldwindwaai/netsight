@@ -64,6 +64,64 @@ class DeviceListResponse(ApiModel):
     freshness: Freshness
 
 
+InterfaceAdminStatus = Literal["up", "down", "testing", "unknown"]
+InterfaceOperStatus = Literal[
+    "up",
+    "down",
+    "testing",
+    "dormant",
+    "notPresent",
+    "lowerLayerDown",
+    "unknown",
+]
+
+
+class InterfaceSourceAlias(ApiModel):
+    source: str = Field(min_length=1, max_length=64)
+    native_id: str = Field(min_length=1, max_length=255)
+
+
+class NetworkInterface(ApiModel):
+    """Canonical interface record.
+
+    ``admin_status`` and ``oper_status`` keep the source's own vocabulary
+    because operators act on them directly. ``status`` is the derived
+    Netsight health state and is never inferred when the source is silent:
+    an unreported link state becomes ``unknown``, not ``healthy``.
+    """
+
+    id: str = Field(
+        min_length=46,
+        max_length=46,
+        pattern=(
+            r"^interface-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        ),
+    )
+    device_id: str = Field(
+        min_length=43,
+        max_length=43,
+        pattern=r"^device-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+    )
+    index: int | None = Field(default=None, ge=0)
+    name: str = Field(min_length=1, max_length=255)
+    description: str | None = Field(default=None, max_length=255)
+    alias: str | None = Field(default=None, max_length=255)
+    hardware_type: str | None = Field(default=None, max_length=128)
+    mac_address: str | None = Field(default=None, max_length=64)
+    admin_status: InterfaceAdminStatus
+    oper_status: InterfaceOperStatus
+    status: DeviceStatus
+    speed_bps: int | None = Field(default=None, ge=0)
+    source_aliases: list[InterfaceSourceAlias] = Field(min_length=1, max_length=32)
+    freshness: Freshness
+
+
+class InterfaceListResponse(ApiModel):
+    items: list[NetworkInterface] = Field(max_length=2048)
+    total: int = Field(ge=0)
+    freshness: Freshness
+
+
 class DeviceDetailResponse(ApiModel):
     item: Device
 

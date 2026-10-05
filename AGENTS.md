@@ -21,7 +21,9 @@ If documents conflict, stop the affected implementation, identify the conflict a
 An agent MUST NOT:
 - disable security checks to get a green build;
 - weaken an acceptance criterion because implementation is difficult;
-- add a local password login for ordinary users;
+- add a local password login for ordinary users **unless every control in
+  ADR 0010 is implemented** (Argon2id, mandatory MFA, lockout, no user
+  enumeration, audit). A password alone must never grant a session;
 - place OAuth, SNMP, Wazuh, firewall, database or other secrets in source;
 - log secrets/tokens;
 - expose backend monitoring UIs to the public Internet by default;

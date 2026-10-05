@@ -4,7 +4,7 @@ import { AppContent, Card } from '@adminlte/react';
 import { DataFailure, FreshnessNotice } from '@/components/data-state';
 import { DeviceDetailTabs } from '@/components/device-detail-tabs';
 import { apiGet } from '@/lib/api';
-import { parseDeviceDetail } from '@/lib/api-contracts';
+import { parseDeviceDetail, parseInterfaceList } from '@/lib/api-contracts';
 
 export default async function DeviceDetailPage({
   params,
@@ -12,10 +12,14 @@ export default async function DeviceDetailPage({
   params: Promise<{ deviceId: string }>;
 }) {
   const { deviceId } = await params;
-  const state = await apiGet(
-    `/api/v1/devices/${encodeURIComponent(deviceId.slice(0, 256))}`,
-    parseDeviceDetail,
-  );
+  const boundedDeviceId = deviceId.slice(0, 256);
+  const [state, interfaces] = await Promise.all([
+    apiGet(`/api/v1/devices/${encodeURIComponent(boundedDeviceId)}`, parseDeviceDetail),
+    apiGet(
+      `/api/v1/devices/${encodeURIComponent(boundedDeviceId)}/interfaces`,
+      parseInterfaceList,
+    ),
+  ]);
 
   return (
     <AppContent
@@ -47,7 +51,7 @@ export default async function DeviceDetailPage({
             variant="outline"
             theme="primary"
           >
-            <DeviceDetailTabs device={state.data.item} />
+            <DeviceDetailTabs device={state.data.item} interfaces={interfaces} />
           </Card>
         </>
       )}

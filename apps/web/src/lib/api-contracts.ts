@@ -39,6 +39,39 @@ export interface SourceAlias {
   native_id: string;
 }
 
+export type InterfaceAdminStatus = 'up' | 'down' | 'testing' | 'unknown';
+export type InterfaceOperStatus =
+  | 'up'
+  | 'down'
+  | 'testing'
+  | 'dormant'
+  | 'notPresent'
+  | 'lowerLayerDown'
+  | 'unknown';
+
+export interface NetworkInterface {
+  id: string;
+  device_id: string;
+  index: number | null;
+  name: string;
+  description: string | null;
+  alias: string | null;
+  hardware_type: string | null;
+  mac_address: string | null;
+  admin_status: InterfaceAdminStatus;
+  oper_status: InterfaceOperStatus;
+  status: DeviceStatus;
+  speed_bps: number | null;
+  source_aliases: SourceAlias[];
+  freshness: Freshness;
+}
+
+export interface InterfaceListResponse {
+  items: NetworkInterface[];
+  total: number;
+  freshness: Freshness;
+}
+
 export interface Device {
   id: string;
   name: string;
@@ -144,6 +177,8 @@ type UnknownRecord = Record<string, unknown>;
 
 const DEVICE_ID_PATTERN =
   /^device-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const INTERFACE_ID_PATTERN =
+  /^interface-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const ERROR_CODE_PATTERN = /^[A-Z0-9_]+$/;
 
 const FRESHNESS_KEYS = ['state', 'observed_at', 'source'] as const;
@@ -422,6 +457,139 @@ export function parseDeviceDetail(value: unknown): DeviceDetailResponse | null {
   if (!isRecord(value) || !hasContractKeys(value, DEVICE_DETAIL_KEYS)) return null;
   const item = parseDevice(value.item);
   return item ? { item } : null;
+}
+
+const INTERFACE_REQUIRED_KEYS = [
+  'id',
+  'device_id',
+  'name',
+  'admin_status',
+  'oper_status',
+  'status',
+  'source_aliases',
+  'freshness',
+] as const;
+const INTERFACE_KEYS = [
+  ...INTERFACE_REQUIRED_KEYS,
+  'index',
+  'description',
+  'alias',
+  'hardware_type',
+  'mac_address',
+  'speed_bps',
+] as const;
+const INTERFACE_LIST_KEYS = ['items', 'total', 'freshness'] as const;
+const INTERFACE_ADMIN_STATUSES: readonly InterfaceAdminStatus[] = [
+  'up',
+  'down',
+  'testing',
+  'unknown',
+];
+const INTERFACE_OPER_STATUSES: readonly InterfaceOperStatus[] = [
+  'up',
+  'down',
+  'testing',
+  'dormant',
+  'notPresent',
+  'lowerLayerDown',
+  'unknown',
+];
+
+export function parseInterface(value: unknown): NetworkInterface | null {
+  if (
+    !isRecord(value) ||
+    !hasContractKeys(value, INTERFACE_REQUIRED_KEYS, INTERFACE_KEYS) ||
+    typeof value.id !== 'string' ||
+    !INTERFACE_ID_PATTERN.test(value.id) ||
+    typeof value.device_id !== 'string' ||
+    !DEVICE_ID_PATTERN.test(value.device_id) ||
+    typeof value.name !== 'string' ||
+    value.name.length < 1 ||
+    value.name.length > 255 ||
+    typeof value.admin_status !== 'string' ||
+    !INTERFACE_ADMIN_STATUSES.includes(value.admin_status as InterfaceAdminStatus) ||
+    typeof value.oper_status !== 'string' ||
+    !INTERFACE_OPER_STATUSES.includes(value.oper_status as InterfaceOperStatus) ||
+    typeof value.status !== 'string' ||
+    !DEVICE_STATUSES.includes(value.status as DeviceStatus)
+  ) {
+    return null;
+  }
+
+  if (
+    ('index' in value &&
+      value.index !== null &&
+      (typeof value.index !== 'number' ||
+        !Number.isInteger(value.index) ||
+        value.index < 0)) ||
+    ('speed_bps' in value &&
+      value.speed_bps !== null &&
+      (typeof value.speed_bps !== 'number' ||
+        !Number.isFinite(value.speed_bps) ||
+        value.speed_bps < 0))
+  ) {
+    return null;
+  }
+
+  for (const key of ['description', 'alias', 'hardware_type', 'mac_address'] as const) {
+    if (key in value && value[key] !== null && typeof value[key] !== 'string') return null;
+  }
+  if (
+    'description' in value &&
+    typeof value.description === 'string' &&
+    value.description.length > 255
+  ) {
+    return null;
+  }
+
+  const index =
+    value.index === undefined || value.index === null ? null : (value.index as number);
+  const speedBps =
+    value.speed_bps === undefined || value.speed_bps === null
+      ? null
+      : (value.speed_bps as number);
+  const sourceAliases = parseSourceAliases(value.source_aliases);
+  const freshness = parseFreshness(value.freshness);
+  if (sourceAliases === null || freshness === null) return null;
+
+  return {
+    id: value.id,
+    device_id: value.device_id,
+    index,
+    name: value.name,
+    description: value.description === undefined ? null : (value.description as string | null),
+    alias: value.alias === undefined ? null : (value.alias as string | null),
+    hardware_type:
+      value.hardware_type === undefined ? null : (value.hardware_type as string | null),
+    mac_address: value.mac_address === undefined ? null : (value.mac_address as string | null),
+    admin_status: value.admin_status as InterfaceAdminStatus,
+    oper_status: value.oper_status as InterfaceOperStatus,
+    status: value.status as DeviceStatus,
+    speed_bps: speedBps,
+    source_aliases: sourceAliases,
+    freshness,
+  };
+}
+
+export function parseInterfaceList(value: unknown): InterfaceListResponse | null {
+  if (
+    !isRecord(value) ||
+    !hasContractKeys(value, INTERFACE_LIST_KEYS) ||
+    !Array.isArray(value.items) ||
+    !isBoundedInteger(value.total, 0)
+  ) {
+    return null;
+  }
+
+  const items = value.items.map(parseInterface);
+  const freshness = parseFreshness(value.freshness);
+  if (items.some((item) => item === null) || freshness === null) return null;
+
+  return {
+    items: items as NetworkInterface[],
+    total: value.total,
+    freshness,
+  };
 }
 
 export function parseAlert(value: unknown): Alert | null {
