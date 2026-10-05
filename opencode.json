@@ -1,4 +1,1 @@
-{
-  "$schema": "https://opencode.ai/config.json",
-  "plugins": ["./.opencode/dist"]
-}
+{"$schema":"https://opencode.ai/config.json","plugin":["./.opencode/dist"]}

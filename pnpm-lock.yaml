@@ -187,13 +187,16 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  ecc-universal: fa76ceeb5dfeae0203cd4cda89012fbf8c0f860450344313798567bf6e614ce0
+
 importers:
 
   .:
     dependencies:
       ecc-universal:
         specifier: ^2.2.3
-        version: 2.2.3
+        version: 2.2.3(patch_hash=fa76ceeb5dfeae0203cd4cda89012fbf8c0f860450344313798567bf6e614ce0)
     devDependencies:
       '@opencode/plugin':
         specifier: 2.0.22
@@ -4762,7 +4765,7 @@ snapshots:
 
   eastasianwidth@0.2.0: {}
 
-  ecc-universal@2.2.3:
+  ecc-universal@2.2.3(patch_hash=fa76ceeb5dfeae0203cd4cda89012fbf8c0f860450344313798567bf6e614ce0):
     dependencies:
       '@iarna/toml': 2.2.5
       ajv: 8.20.0

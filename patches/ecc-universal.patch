@@ -1,0 +1,1378 @@
+diff --git a/.opencode/dist/index.js b/.opencode/dist/index.js
+index 50bda7f1026f6304a52bbc3b8616bdd22278f648..1cb89d0280c6d8cc7eca33d4e41b6ba705949069 100644
+--- a/.opencode/dist/index.js
++++ b/.opencode/dist/index.js
+@@ -1,40 +1,7 @@
+ /**
+- * ECC Plugin for OpenCode
++ * OpenCode V2 plugin entrypoint (Netsight).
+  *
+- * This package provides the published ECC OpenCode plugin module:
+- * - Plugin hooks (auto-format, TypeScript check, console.log warning, env injection, etc.)
+- * - Custom tools (run-tests, check-coverage, security-audit, format-code, lint-check, git-summary)
+- * - Bundled reference config/assets for the wider ECC OpenCode setup
+- *
+- * Usage:
+- *
+- * Option 1: Install via npm
+- * ```bash
+- * npm install ecc-universal
+- * ```
+- *
+- * Then add to your opencode.json:
+- * ```json
+- * {
+- *   "plugin": ["ecc-universal"]
+- * }
+- * ```
+- *
+- * That enables the published plugin module only. For ECC commands, agents,
+- * prompts, and instructions, use this repository's `.opencode/opencode.json`
+- * as a base or copy the bundled `.opencode/` assets into your project.
+- *
+- * Option 2: Clone and use directly
+- * ```bash
+- * git clone https://github.com/affaan-m/ECC
+- * cd ECC
+- * opencode
+- * ```
+- *
+- * @packageDocumentation
++ * OpenCode's plugin loader iterates module exports; only the default export
++ * must be a plugin definition. Re-export the ECC plugin as the default.
+  */
+-// Export the main plugin
+-// opencode's legacy plugin loader iterates every module export and throws if
+-// any is not a plugin function, so only the plugin function may be exported.
+-export { default } from "./plugins/index.js";
+-//# sourceMappingURL=index.js.map
+\ No newline at end of file
++export { ECCHooksPlugin as default } from "./plugins/ecc-hooks.js";
+diff --git a/.opencode/dist/plugins/ecc-hooks.js b/.opencode/dist/plugins/ecc-hooks.js
+index 54bac9e60a07cc9812d4bbad12e7b5141597469f..b3419c281c29011c96d56734a1fb1fc3e4c45ef3 100644
+--- a/.opencode/dist/plugins/ecc-hooks.js
++++ b/.opencode/dist/plugins/ecc-hooks.js
+@@ -1,393 +1,191 @@
+ /**
+- * ECC Plugin Hooks for OpenCode
++ * ECC OpenCode plugin (V2 port) for Netsight.
+  *
+- * This plugin translates Claude Code hooks to OpenCode's plugin system.
+- * OpenCode's plugin system is MORE sophisticated than Claude Code with 20+ events
+- * compared to Claude Code's 3 phases (PreToolUse, PostToolUse, Stop).
++ * Ported from `ecc-universal@2.2.3` `.opencode/plugins/ecc-hooks.ts`, which
++ * targets OpenCode V1 (Bun `$` shell + the V1 `Hooks` object keyed by string).
++ * This port targets OpenCode V2's `@opencode/plugin` API:
+  *
+- * Hook Event Mapping:
+- * - PreToolUse → tool.execute.before
+- * - PostToolUse → tool.execute.after
+- * - Stop → session.idle / session.status
+- * - SessionStart → session.created
+- * - SessionEnd → session.deleted
+- */
+-import * as fs from "fs";
+-import * as path from "path";
+-import changedFilesTool from "../tools/changed-files.js";
+-import dependencyAnalyzerTool from "../tools/dependency-analyzer.js";
+-/**
+- * Read ECC version from package.json
+- * Falls back to a default if package.json cannot be read
++ *   - V1 returned a hook map; V2 registers hooks on their owning domain.
++ *   - V1 `tool.execute.before/after` -> `ctx.tool.hook("execute.before"/"execute.after")`.
++ *   - V1 `shell.env`                -> `ctx.shell.hook("create.before")`.
++ *   - V1 `permission.ask`           -> `ctx.permission.hook("evaluate")`.
++ *   - V1 `experimental.session.compacting` -> `ctx.session.hook("compaction")`.
++ *   - V1 `event` callback           -> `ctx.event.subscribe()`.
++ *   - V1 `tool` map                 -> `ctx.tool.transform(...)`.
++ *   - V1 Bun `$`                    -> `node:child_process.execFile` (no shell).
++ *
++ * Deliberate deviations from the original:
++ *   - Desktop notifications on `session.idle` are omitted. The Windows variant
++ *     used a blocking `MessageBox`, which would stall an agent harness; ECC's
++ *     own guidance is against noisy, harness-blocking behaviour.
++ *   - Auto-format on `file.edited` resolves a *locally installed* Prettier and
++ *     runs it via `process.execPath` (no shell, no `npx`/network fetch). It is a
++ *     strict-profile hook and is a no-op when Prettier is not installed.
++ *   - `tool.execute.after` now receives the call input directly as `event.input`
++ *     (V2 shape) instead of a nested `{ tool, args }` object.
++ *
++ * Runtime controls are preserved: `ECC_HOOK_PROFILE` and `ECC_DISABLED_HOOKS`.
+  */
+-function getECCVersion() {
+-    try {
+-        const packageJsonPath = path.resolve(__dirname, "../../package.json");
+-        const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf-8"));
+-        return packageJson.version || "2.0.0";
+-    }
+-    catch {
+-        return "2.0.0";
+-    }
++import { Plugin } from "@opencode/plugin";
++import * as fs from "node:fs";
++import * as path from "node:path";
++import { initStore, recordChange, clearChanges, } from "./lib/changed-files-store.js";
++import { createLogger, countMatchesInFile, detectProjectVersion, execFileResult, resolvePrettierScript, } from "./hook-support.js";
++import { changedFilesTool } from "../tools/changed-files.js";
++import { dependencyAnalyzerTool } from "../tools/dependency-analyzer.js";
++function getFilePath(args) {
++    if (!args)
++        return null;
++    const p = (args.filePath ?? args.file_path ?? args.path);
++    return typeof p === "string" && p.trim() ? p : null;
+ }
+-export const ECCHooksPlugin = async ({ client, $, directory, worktree, }) => {
+-    const worktreePath = worktree || directory;
+-    const editedFiles = new Set();
+-    function resolvePath(p) {
+-        if (path.isAbsolute(p))
+-            return p;
+-        return path.join(worktreePath, p);
++function getCommand(args) {
++    if (typeof args === "string")
++        return args;
++    if (args && typeof args === "object") {
++        const command = args.command;
++        if (typeof command === "string")
++            return command;
+     }
+-    function hasProjectFile(relativePath) {
+-        try {
+-            return fs.statSync(resolvePath(relativePath)).isFile();
+-        }
+-        catch {
+-            return false;
+-        }
+-    }
+-    const pendingToolChanges = new Map();
+-    let writeCounter = 0;
+-    function getFilePath(args) {
+-        if (!args)
+-            return null;
+-        const p = (args.filePath ?? args.file_path ?? args.path);
+-        return typeof p === "string" && p.trim() ? p : null;
+-    }
+-    // Helper to call the SDK's log API with correct signature
+-    const log = (level, message) => client.app.log({ body: { service: "ecc", level, message } });
+-    // Loaded lazily (instead of via a top-level import) so that a missing or
+-    // partially-installed `~/.opencode/plugins/lib` directory (e.g. an
+-    // interrupted or partial ECC install on Termux/Android) only disables
+-    // changed-files tracking, rather than throwing during module evaluation.
+-    // This plugin is OpenCode's startup entry point, so a static import
+-    // failure here previously crashed the whole plugin -- and with it, the
+-    // entire OpenCode session -- before any hooks could load (see #2530).
+-    let changedFilesStore;
+-    try {
+-        const store = await import("./lib/changed-files-store.js");
+-        store.initStore(worktreePath);
+-        changedFilesStore = store;
+-    }
+-    catch {
+-        // Best-effort diagnostic only: deferred via .then() (rather than
+-        // Promise.resolve(log(...))) so that even a *synchronous* throw inside
+-        // log() -- not just an async rejection -- is caught here instead of
+-        // escaping this catch block. The raw loader error is intentionally not
+-        // included in the message since it can contain absolute filesystem
+-        // paths; this whole block exists to guarantee startup resilience even
+-        // when things go wrong.
+-        Promise.resolve()
+-            .then(() => log("warn", "[ECC] changed-files tracking disabled: could not load the changed-files store. " +
+-            "Run `ecc repair --target opencode` to restore the missing files. Other ECC hooks are unaffected."))
+-            .catch(() => { });
+-    }
+-    const normalizeProfile = (value) => {
+-        if (value === "minimal" || value === "strict")
+-            return value;
+-        return "standard";
+-    };
+-    const currentProfile = normalizeProfile(process.env.ECC_HOOK_PROFILE);
+-    const disabledHooks = new Set((process.env.ECC_DISABLED_HOOKS || "")
+-        .split(",")
+-        .map((item) => item.trim())
+-        .filter(Boolean));
+-    const profileOrder = {
+-        minimal: 0,
+-        standard: 1,
+-        strict: 2,
+-    };
+-    const profileAllowed = (required) => {
+-        if (Array.isArray(required)) {
+-            return required.some((entry) => profileOrder[currentProfile] >= profileOrder[entry]);
+-        }
+-        return profileOrder[currentProfile] >= profileOrder[required];
+-    };
+-    const hookEnabled = (hookId, requiredProfile = "standard") => {
+-        if (disabledHooks.has(hookId))
+-            return false;
+-        return profileAllowed(requiredProfile);
+-    };
+-    return {
+-        /**
+-         * Prettier Auto-Format Hook
+-         * Equivalent to Claude Code PostToolUse hook for prettier
+-         *
+-         * Triggers: After any JS/TS/JSX/TSX file is edited
+-         * Action: Runs prettier --write on the file
+-         */
+-        "file.edited": async (event) => {
+-            editedFiles.add(event.path);
+-            changedFilesStore?.recordChange(event.path, "modified");
+-            // Auto-format JS/TS files
+-            if (hookEnabled("post:edit:format", ["strict"]) && event.path.match(/\.(ts|tsx|js|jsx)$/)) {
+-                try {
+-                    await $ `prettier --write ${event.path} 2>/dev/null`;
+-                    log("info", `[ECC] Formatted: ${event.path}`);
+-                }
+-                catch (error) {
+-                    // Prettier not installed or failed - log but continue
+-                    const errorMessage = error instanceof Error ? error.message : String(error);
+-                    log("debug", `[ECC] Prettier formatting failed for ${event.path}: ${errorMessage}`);
+-                }
++    return "";
++}
++const profileOrder = { minimal: 0, standard: 1, strict: 2 };
++const IS_JS_TS = /\.(ts|tsx|js|jsx)$/;
++export const ECCHooksPlugin = Plugin.define({
++    id: "ecc",
++    async setup(context) {
++        const worktreePath = context.location.project?.canonical || context.location.directory || process.cwd();
++        const log = createLogger(context);
++        initStore(worktreePath);
++        const editedFiles = new Set();
++        const pendingToolChanges = new Map();
++        let writeCounter = 0;
++        const currentProfile = (() => {
++            const value = process.env.ECC_HOOK_PROFILE;
++            return value === "minimal" || value === "strict" ? value : "standard";
++        })();
++        const disabledHooks = new Set((process.env.ECC_DISABLED_HOOKS || "")
++            .split(",")
++            .map((item) => item.trim())
++            .filter(Boolean));
++        const profileAllowed = (required) => {
++            if (Array.isArray(required)) {
++                return required.some((entry) => profileOrder[currentProfile] >= profileOrder[entry]);
+             }
+-            // Console.log warning check
+-            if (hookEnabled("post:edit:console-warn", ["standard", "strict"]) && event.path.match(/\.(ts|tsx|js|jsx)$/)) {
+-                try {
+-                    const result = await $ `grep -n "console\\.log" ${event.path} 2>/dev/null`.text();
+-                    if (result.trim()) {
+-                        const lines = result.trim().split("\n").length;
+-                        log("warn", `[ECC] console.log found in ${event.path} (${lines} occurrence${lines > 1 ? "s" : ""})`);
+-                    }
+-                }
+-                catch {
+-                    // No console.log found (grep returns non-zero) - this is good
+-                }
++            return profileOrder[currentProfile] >= profileOrder[required];
++        };
++        const hookEnabled = (hookId, requiredProfile = "standard") => {
++            if (disabledHooks.has(hookId))
++                return false;
++            return profileAllowed(requiredProfile);
++        };
++        const resolvePath = (p) => path.isAbsolute(p) ? p : path.join(worktreePath, p);
++        const hasProjectFile = (relativePath) => {
++            try {
++                return fs.statSync(resolvePath(relativePath)).isFile();
++            }
++            catch {
++                return false;
+             }
+-        },
+-        /**
+-         * TypeScript Check Hook
+-         * Equivalent to Claude Code PostToolUse hook for tsc
+-         *
+-         * Triggers: After edit tool completes on .ts/.tsx files
+-         * Action: Runs tsc --noEmit to check for type errors
+-         */
+-        "tool.execute.after": async (input, output) => {
+-            const filePath = getFilePath(input.args);
+-            if (input.tool === "edit" && filePath) {
+-                changedFilesStore?.recordChange(filePath, "modified");
++        };
++        // ---------------------------------------------------------------------
++        // Tool hooks
++        // ---------------------------------------------------------------------
++        await context.tool.hook("execute.after", async (event) => {
++            const args = event.input;
++            const filePath = getFilePath(args);
++            if (event.tool === "edit" && filePath) {
++                recordChange(filePath, "modified");
+             }
+-            if (input.tool === "write" && filePath) {
+-                const key = input.callID ?? `write-${++writeCounter}-${filePath}`;
++            if (event.tool === "write" && filePath) {
++                const key = event.id ?? `write-${++writeCounter}-${filePath}`;
+                 const pending = pendingToolChanges.get(key);
+                 if (pending) {
+-                    changedFilesStore?.recordChange(pending.path, pending.type);
++                    recordChange(pending.path, pending.type);
+                     pendingToolChanges.delete(key);
+                 }
+                 else {
+-                    changedFilesStore?.recordChange(filePath, "modified");
++                    recordChange(filePath, "modified");
+                 }
+             }
+-            // Check if a TypeScript file was edited
+             if (hookEnabled("post:edit:typecheck", ["strict"]) &&
+-                input.tool === "edit" &&
+-                input.args?.filePath?.match(/\.tsx?$/)) {
+-                try {
+-                    await $ `npx tsc --noEmit 2>&1`;
+-                    log("info", "[ECC] TypeScript check passed");
+-                }
+-                catch (error) {
+-                    const err = error;
++                event.tool === "edit" &&
++                typeof args?.filePath === "string" &&
++                /\.tsx?$/.test(args.filePath)) {
++                const result = await execFileResult("npx", ["tsc", "--noEmit"], {
++                    cwd: worktreePath,
++                });
++                if (result.failed) {
+                     log("warn", "[ECC] TypeScript errors detected:");
+-                    if (err.stdout) {
+-                        // Log first few errors
+-                        const errors = err.stdout.split("\n").slice(0, 5);
+-                        errors.forEach((line) => log("warn", `  ${line}`));
+-                    }
++                    result.stdout
++                        .split(/\r?\n/)
++                        .slice(0, 5)
++                        .forEach((line) => {
++                        if (line.trim())
++                            log("warn", `  ${line}`);
++                    });
++                }
++                else {
++                    log("info", "[ECC] TypeScript check passed");
+                 }
+             }
+-            // PR creation logging
+             if (hookEnabled("post:bash:pr-created", ["standard", "strict"]) &&
+-                input.tool === "bash" &&
+-                input.args?.toString().includes("gh pr create")) {
++                event.tool === "bash" &&
++                getCommand(args).includes("gh pr create")) {
+                 log("info", "[ECC] PR created - check GitHub Actions status");
+             }
+-        },
+-        /**
+-         * Pre-Tool Security Check
+-         * Equivalent to Claude Code PreToolUse hook
+-         *
+-         * Triggers: Before tool execution
+-         * Action: Warns about potential security issues
+-         */
+-        "tool.execute.before": async (input) => {
+-            if (input.tool === "write") {
+-                const filePath = getFilePath(input.args);
++        });
++        await context.tool.hook("execute.before", async (event) => {
++            const args = event.input;
++            if (event.tool === "write") {
++                const filePath = getFilePath(args);
+                 if (filePath) {
+                     const absPath = resolvePath(filePath);
+                     let type = "modified";
+                     try {
+-                        if (typeof fs.existsSync === "function") {
+-                            type = fs.existsSync(absPath) ? "modified" : "added";
+-                        }
++                        type = fs.existsSync(absPath) ? "modified" : "added";
+                     }
+                     catch {
+                         type = "modified";
+                     }
+-                    const key = input.callID ?? `write-${++writeCounter}-${filePath}`;
++                    const key = event.id ?? `write-${++writeCounter}-${filePath}`;
+                     pendingToolChanges.set(key, { path: filePath, type });
+                 }
+             }
+-            // Git push review reminder
+             if (hookEnabled("pre:bash:git-push-reminder", "strict") &&
+-                input.tool === "bash" &&
+-                input.args?.toString().includes("git push")) {
++                event.tool === "bash" &&
++                getCommand(args).includes("git push")) {
+                 log("info", "[ECC] Remember to review changes before pushing: git diff origin/main...HEAD");
+             }
+-            // Block creation of unnecessary documentation files
+             if (hookEnabled("pre:write:doc-file-warning", ["standard", "strict"]) &&
+-                input.tool === "write" &&
+-                input.args?.filePath &&
+-                typeof input.args.filePath === "string") {
+-                const filePath = input.args.filePath;
+-                if (filePath.match(/\.(md|txt)$/i) &&
+-                    !filePath.includes("README") &&
+-                    !filePath.includes("CHANGELOG") &&
+-                    !filePath.includes("LICENSE") &&
+-                    !filePath.includes("CONTRIBUTING")) {
++                event.tool === "write" &&
++                typeof args?.filePath === "string") {
++                const filePath = args.filePath;
++                if (/\.(md|txt)$/i.test(filePath) &&
++                    !/README|CHANGELOG|LICENSE|CONTRIBUTING/.test(filePath)) {
+                     log("warn", `[ECC] Creating ${filePath} - consider if this documentation is necessary`);
+                 }
+             }
+-            // Long-running command reminder
+-            if (hookEnabled("pre:bash:tmux-reminder", "strict") && input.tool === "bash") {
+-                const cmd = String(input.args?.command || input.args || "");
+-                if (cmd.match(/^(npm|pnpm|yarn|bun)\s+(install|build|test|run)/) ||
+-                    cmd.match(/^cargo\s+(build|test|run)/) ||
+-                    cmd.match(/^go\s+(build|test|run)/)) {
+-                    log("info", "[ECC] Long-running command detected - consider using background execution");
+-                }
+-            }
+-        },
+-        /**
+-         * Session Created Hook
+-         * Equivalent to Claude Code SessionStart hook
+-         *
+-         * Triggers: When a new session starts
+-         * Action: Loads context and displays welcome message
+-         */
+-        "session.created": async () => {
+-            if (!hookEnabled("session:start", ["minimal", "standard", "strict"]))
+-                return;
+-            log("info", `[ECC] Session started - profile=${currentProfile}`);
+-            // Check for project-specific context files
+-            if (hasProjectFile("CLAUDE.md")) {
+-                log("info", "[ECC] Found CLAUDE.md - loading project context");
+-            }
+-        },
+-        /**
+-         * Session Idle Hook
+-         * Equivalent to Claude Code Stop hook
+-         *
+-         * Triggers: When session becomes idle (task completed)
+-         * Action: Runs console.log audit on all edited files
+-         */
+-        "session.idle": async () => {
+-            if (!hookEnabled("stop:check-console-log", ["minimal", "standard", "strict"]))
+-                return;
+-            if (editedFiles.size === 0)
+-                return;
+-            log("info", "[ECC] Session idle - running console.log audit");
+-            let totalConsoleLogCount = 0;
+-            const filesWithConsoleLogs = [];
+-            for (const file of editedFiles) {
+-                if (!file.match(/\.(ts|tsx|js|jsx)$/))
+-                    continue;
+-                try {
+-                    const result = await $ `grep -c "console\\.log" ${file} 2>/dev/null`.text();
+-                    const count = parseInt(result.trim(), 10);
+-                    if (count > 0) {
+-                        totalConsoleLogCount += count;
+-                        filesWithConsoleLogs.push(file);
+-                    }
+-                }
+-                catch {
+-                    // No console.log found
+-                }
+-            }
+-            if (totalConsoleLogCount > 0) {
+-                log("warn", `[ECC] Audit: ${totalConsoleLogCount} console.log statement(s) in ${filesWithConsoleLogs.length} file(s)`);
+-                filesWithConsoleLogs.forEach((f) => log("warn", `  - ${f}`));
+-                log("warn", "[ECC] Remove console.log statements before committing");
+-            }
+-            else {
+-                log("info", "[ECC] Audit passed: No console.log statements found");
+-            }
+-            // Desktop notification (cross-platform)
+-            try {
+-                if (process.platform === "darwin") {
+-                    // macOS
+-                    await $ `osascript -e 'display notification "Task completed!" with title "OpenCode ECC"' 2>/dev/null`;
+-                }
+-                else if (process.platform === "win32") {
+-                    // Windows - PowerShell notification
+-                    await $ `powershell -Command "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.MessageBox]::Show('Task completed!', 'OpenCode ECC', 'OK', 'Information')" 2>/dev/null`;
++            if (hookEnabled("pre:bash:tmux-reminder", "strict") && event.tool === "bash") {
++                const cmd = getCommand(args);
++                if (/^(npm|pnpm|yarn|bun)\s+(install|build|test|run)/.test(cmd) ||
++                    /^cargo\s+(build|test|run)/.test(cmd) ||
++                    /^go\s+(build|test|run)/.test(cmd)) {
++                    log("info", "[ECC] Long-running command detected - consider background execution");
+                 }
+-                else if (process.platform === "linux") {
+-                    // Linux - notify-send (requires libnotify)
+-                    await $ `notify-send "OpenCode ECC" "Task completed!" 2>/dev/null`;
+-                }
+-            }
+-            catch (error) {
+-                // Notification not supported or failed - log but continue
+-                const errorMessage = error instanceof Error ? error.message : String(error);
+-                log("debug", `[ECC] Desktop notification failed: ${errorMessage}`);
+             }
+-            // Clear tracked files for next task
+-            editedFiles.clear();
+-        },
+-        /**
+-         * Session Deleted Hook
+-         * Equivalent to Claude Code SessionEnd hook
+-         *
+-         * Triggers: When session ends
+-         * Action: Final cleanup and state saving
+-         */
+-        "session.deleted": async () => {
+-            if (!hookEnabled("session:end-marker", ["minimal", "standard", "strict"]))
+-                return;
+-            log("info", "[ECC] Session ended - cleaning up");
+-            editedFiles.clear();
+-            changedFilesStore?.clearChanges();
+-            pendingToolChanges.clear();
+-        },
+-        /**
+-         * File Watcher Hook
+-         * OpenCode-only feature
+-         *
+-         * Triggers: When file system changes are detected
+-         * Action: Updates tracking
+-         */
+-        "file.watcher.updated": async (event) => {
+-            let changeType = "modified";
+-            if (event.type === "create" || event.type === "add")
+-                changeType = "added";
+-            else if (event.type === "delete" || event.type === "remove")
+-                changeType = "deleted";
+-            changedFilesStore?.recordChange(event.path, changeType);
+-            if (event.type === "change" && event.path.match(/\.(ts|tsx|js|jsx)$/)) {
+-                editedFiles.add(event.path);
+-            }
+-        },
+-        /**
+-         * Todo Updated Hook
+-         * OpenCode-only feature
+-         *
+-         * Triggers: When todo list is updated
+-         * Action: Logs progress
+-         */
+-        "todo.updated": async (event) => {
+-            const completed = event.todos.filter((t) => t.done).length;
+-            const total = event.todos.length;
+-            if (total > 0) {
+-                log("info", `[ECC] Progress: ${completed}/${total} tasks completed`);
+-            }
+-        },
+-        /**
+-         * Shell Environment Hook
+-         * OpenCode-specific: Inject environment variables into shell commands
+-         *
+-         * Triggers: Before shell command execution
+-         * Action: Sets PROJECT_ROOT, PACKAGE_MANAGER, DETECTED_LANGUAGES, ECC_VERSION
+-         */
+-        "shell.env": async (_input, output) => {
++        });
++        // ---------------------------------------------------------------------
++        // Shell environment hook
++        // ---------------------------------------------------------------------
++        await context.shell.hook("create.before", (event) => {
+             const env = {
+-                ECC_VERSION: getECCVersion(),
++                ECC_VERSION: detectProjectVersion(worktreePath),
+                 ECC_PLUGIN: "true",
+                 ECC_HOOK_PROFILE: currentProfile,
+                 ECC_DISABLED_HOOKS: process.env.ECC_DISABLED_HOOKS || "",
+                 PROJECT_ROOT: worktreePath,
+             };
+-            // Detect package manager
+             const lockfiles = {
+                 "bun.lockb": "bun",
+                 "pnpm-lock.yaml": "pnpm",
+@@ -400,7 +198,6 @@ export const ECCHooksPlugin = async ({ client, $, directory, worktree, }) => {
+                     break;
+                 }
+             }
+-            // Detect languages
+             const langDetectors = {
+                 "tsconfig.json": "typescript",
+                 "go.mod": "go",
+@@ -410,32 +207,59 @@ export const ECCHooksPlugin = async ({ client, $, directory, worktree, }) => {
+             };
+             const detected = [];
+             for (const [file, lang] of Object.entries(langDetectors)) {
+-                if (hasProjectFile(file)) {
++                if (hasProjectFile(file))
+                     detected.push(lang);
+-                }
+             }
+             if (detected.length > 0) {
+                 env.DETECTED_LANGUAGES = detected.join(",");
+                 env.PRIMARY_LANGUAGE = detected[0];
+             }
+-            // OpenCode reads the supplied output object and ignores callback return values.
+-            output.env = { ...output.env, ...env };
+-        },
+-        /**
+-         * Session Compacting Hook
+-         * OpenCode-specific: Control context compaction behavior
+-         *
+-         * Triggers: Before context compaction
+-         * Action: Push ECC context block and compaction guidance
+-         */
+-        "experimental.session.compacting": async (_input, output) => {
++            event.env = { ...event.env, ...env };
++        });
++        // ---------------------------------------------------------------------
++        // Permission hook
++        // ---------------------------------------------------------------------
++        const READ_ONLY_TOOLS = new Set(["read", "glob", "grep", "search", "list", "webfetch"]);
++        const FORMATTER_CMD = /^(npx )?(@biomejs\/biome|prettier|black|gofmt|rustfmt|swift-format)/;
++        const TEST_CMD = /^(npm test|npx vitest|npx jest|pytest|go test|cargo test)/;
++        await context.permission.hook("evaluate", (event) => {
++            log("info", `[ECC] Permission requested for: ${event.action}`);
++            try {
++                const cmd = typeof event.metadata?.command === "string" ? String(event.metadata.command) : "";
++                if (READ_ONLY_TOOLS.has(event.action)) {
++                    event.effect = "allow";
++                    event.message = "Read-only operation";
++                    return;
++                }
++                if (event.action === "bash" && FORMATTER_CMD.test(cmd)) {
++                    event.effect = "allow";
++                    event.message = "Formatter execution";
++                    return;
++                }
++                if (event.action === "bash" && TEST_CMD.test(cmd)) {
++                    event.effect = "allow";
++                    event.message = "Test execution";
++                    return;
++                }
++                // Everything else: leave the harness's proposed effect untouched.
++            }
++            catch (error) {
++                const message = error instanceof Error ? error.message : String(error);
++                log("error", `[ECC] Permission handling error for ${event.action}: ${message}`);
++                event.effect = "deny";
++                event.message = `Error: ${message}`;
++            }
++        });
++        // ---------------------------------------------------------------------
++        // Session compaction hook
++        // ---------------------------------------------------------------------
++        await context.session.hook("compaction", (event) => {
+             const contextBlock = [
+                 "# ECC Context (preserve across compaction)",
+                 "",
+-                "## Active Plugin: ECC v2.2.3",
+-                "- Hooks: file.edited, tool.execute.before/after, session.created/idle/deleted, shell.env, compacting, permission.ask",
+-                "- Tools: run-tests, check-coverage, security-audit, format-code, lint-check, git-summary, changed-files",
+-                "- Agents: 13 specialized (planner, architect, tdd-guide, code-reviewer, security-reviewer, build-error-resolver, e2e-runner, refactor-cleaner, doc-updater, go-reviewer, go-build-resolver, database-reviewer, python-reviewer)",
++                "## Active Plugin: ECC (OpenCode V2 port)",
++                "- Hooks: file.edited, tool.execute.before/after, session lifecycle, shell.env, compaction, permission.evaluate",
++                "- Tools: changed-files, dependency-analyzer",
+                 "",
+                 "## Key Principles",
+                 "- TDD: write tests first, 80%+ coverage",
+@@ -443,78 +267,139 @@ export const ECCHooksPlugin = async ({ client, $, directory, worktree, }) => {
+                 "- Security: validate inputs, no hardcoded secrets",
+                 "",
+             ];
+-            // Include recently edited files
+             if (editedFiles.size > 0) {
+                 contextBlock.push("## Recently Edited Files");
+-                for (const f of editedFiles) {
+-                    contextBlock.push(`- ${f}`);
+-                }
++                for (const file of editedFiles)
++                    contextBlock.push(`- ${file}`);
+                 contextBlock.push("");
+             }
+-            const eccContext = [
+-                contextBlock.join("\n"),
+-                "Focus on preserving: 1) Current task status and progress, 2) Key decisions made, 3) Files created/modified, 4) Remaining work items, 5) Any security concerns flagged. Discard: verbose tool outputs, intermediate exploration, redundant file listings.",
+-            ];
+-            // OpenCode requires output assignment and skips context when a prompt is set.
+-            if (output.prompt !== undefined) {
+-                output.prompt = [output.prompt, ...eccContext].join("\n\n");
++            contextBlock.push("Focus on preserving: 1) Current task status and progress, 2) Key decisions made, " +
++                "3) Files created/modified, 4) Remaining work items, 5) Any security concerns flagged. " +
++                "Discard: verbose tool outputs, intermediate exploration, redundant file listings.");
++            event.system.push({ type: "text", text: contextBlock.join("\n") });
++        });
++        // ---------------------------------------------------------------------
++        // Event subscription (session lifecycle, file edits)
++        // ---------------------------------------------------------------------
++        const controller = new AbortController();
++        const runConsoleAudit = () => {
++            if (editedFiles.size === 0)
++                return;
++            let total = 0;
++            const filesWithConsoleLogs = [];
++            for (const file of editedFiles) {
++                if (!IS_JS_TS.test(file))
++                    continue;
++                const count = countMatchesInFile(file, /console\.log/);
++                if (count > 0) {
++                    total += count;
++                    filesWithConsoleLogs.push(file);
++                }
++            }
++            if (total > 0) {
++                log("warn", `[ECC] Audit: ${total} console.log statement(s) in ${filesWithConsoleLogs.length} file(s)`);
++                filesWithConsoleLogs.forEach((file) => log("warn", `  - ${file}`));
++                log("warn", "[ECC] Remove console.log statements before committing");
+             }
+             else {
+-                output.context = [...output.context, ...eccContext];
++                log("info", "[ECC] Audit passed: No console.log statements found");
+             }
+-        },
+-        /**
+-         * Permission Auto-Approve Hook
+-         * OpenCode-specific: Auto-approve safe operations
+-         *
+-         * Triggers: When permission is requested
+-         * Action: Auto-approve reads, formatters, and test commands; log all for audit
+-         */
+-        "permission.ask": async (event) => {
+-            log("info", `[ECC] Permission requested for: ${event.tool}`);
+-            try {
+-                // Handle both string args and object args with command property
+-                let cmd;
+-                if (typeof event.args === "string") {
+-                    cmd = event.args;
++        };
++        const formatEditedFile = async (file) => {
++            if (!hookEnabled("post:edit:format", ["strict"]) || !IS_JS_TS.test(file))
++                return;
++            const script = resolvePrettierScript(worktreePath);
++            // Formatter not installed: skip quietly (never fetch it at edit time).
++            if (!script)
++                return;
++            const result = await execFileResult(process.execPath, [script, "--write", resolvePath(file)], { cwd: worktreePath });
++            if (result.failed) {
++                log("debug", `[ECC] Prettier formatting failed for ${file}: ${result.stderr.trim()}`);
++            }
++            else {
++                log("info", `[ECC] Formatted: ${file}`);
++            }
++        };
++        const handleEvent = (event) => {
++            const data = event.data ?? {};
++            switch (event.type) {
++                case "session.created": {
++                    if (!hookEnabled("session:start", ["minimal", "standard", "strict"]))
++                        return;
++                    log("info", `[ECC] Session started - profile=${currentProfile}`);
++                    if (hasProjectFile("CLAUDE.md")) {
++                        log("info", "[ECC] Found CLAUDE.md - loading project context");
++                    }
++                    return;
+                 }
+-                else if (event.args && typeof event.args === "object") {
+-                    cmd = String(event.args.command || "");
++                case "session.idle": {
++                    if (!hookEnabled("stop:check-console-log", ["minimal", "standard", "strict"]))
++                        return;
++                    log("info", "[ECC] Session idle - running console.log audit");
++                    runConsoleAudit();
++                    editedFiles.clear();
++                    return;
+                 }
+-                else {
+-                    cmd = String(event.args || "");
++                case "session.deleted": {
++                    if (!hookEnabled("session:end-marker", ["minimal", "standard", "strict"]))
++                        return;
++                    log("info", "[ECC] Session ended - cleaning up");
++                    editedFiles.clear();
++                    clearChanges();
++                    pendingToolChanges.clear();
++                    return;
+                 }
+-                // Auto-approve: read/search tools
+-                if (["read", "glob", "grep", "search", "list"].includes(event.tool)) {
+-                    log("debug", `[ECC] Auto-approved read-only tool: ${event.tool}`);
+-                    return { approved: true, reason: "Read-only operation" };
++                case "file.edited": {
++                    const file = typeof data.file === "string" ? data.file : undefined;
++                    if (file) {
++                        editedFiles.add(file);
++                        recordChange(file, "modified");
++                        void formatEditedFile(file);
++                    }
++                    return;
+                 }
+-                // Auto-approve: formatters
+-                if (event.tool === "bash" && /^(npx )?(@biomejs\/biome|prettier|black|gofmt|rustfmt|swift-format)/.test(cmd)) {
+-                    log("debug", `[ECC] Auto-approved formatter: ${cmd}`);
+-                    return { approved: true, reason: "Formatter execution" };
++                case "filesystem.changed": {
++                    const file = typeof data.file === "string" ? data.file : undefined;
++                    if (!file)
++                        return;
++                    const rawEvent = typeof data.event === "string" ? data.event : "change";
++                    const changeType = rawEvent === "add" ? "added" : rawEvent === "unlink" ? "deleted" : "modified";
++                    recordChange(file, changeType);
++                    if (changeType === "modified" && IS_JS_TS.test(file))
++                        editedFiles.add(file);
++                    return;
+                 }
+-                // Auto-approve: test execution
+-                if (event.tool === "bash" && /^(npm test|npx vitest|npx jest|pytest|go test|cargo test)/.test(cmd)) {
+-                    log("debug", `[ECC] Auto-approved test execution: ${cmd}`);
+-                    return { approved: true, reason: "Test execution" };
++                default:
++                    return;
++            }
++        };
++        void (async () => {
++            try {
++                // `subscribe` shape differs between SDK builds; iterate defensively.
++                const stream = context.event.subscribe({ signal: controller.signal });
++                const iterable = (await Promise.resolve(stream));
++                for await (const raw of iterable) {
++                    if (raw && typeof raw === "object" && typeof raw.type === "string") {
++                        handleEvent(raw);
++                    }
+                 }
+-                // Everything else: let user decide
+-                log("debug", `[ECC] Permission requires user approval: ${event.tool}`);
+-                return { approved: undefined };
+             }
+             catch (error) {
+-                // Error in permission handling - log and deny for safety
+-                const errorMessage = error instanceof Error ? error.message : String(error);
+-                log("error", `[ECC] Permission handling error for ${event.tool}: ${errorMessage}`);
+-                return { approved: false, reason: `Error: ${errorMessage}` };
++                // Aborting on unload is expected; anything else is a best-effort diagnostic.
++                const message = error instanceof Error ? error.message : String(error);
++                log("debug", `[ECC] event subscription ended: ${message}`);
+             }
+-        },
+-        tool: {
+-            "changed-files": changedFilesTool,
+-            "dependency-analyzer": dependencyAnalyzerTool,
+-        },
+-    };
+-};
++        })();
++        // ---------------------------------------------------------------------
++        // Custom tools
++        // ---------------------------------------------------------------------
++        context.tool.transform((editor) => {
++            editor.add(changedFilesTool);
++            editor.add(dependencyAnalyzerTool);
++        });
++        return () => {
++            controller.abort();
++        };
++    },
++});
+ export default ECCHooksPlugin;
+-//# sourceMappingURL=ecc-hooks.js.map
+\ No newline at end of file
+diff --git a/.opencode/dist/plugins/hook-support.js b/.opencode/dist/plugins/hook-support.js
+new file mode 100644
+index 0000000000000000000000000000000000000000..bc847300ff9a389c4e35069c01e54d1b108b9f34
+--- /dev/null
++++ b/.opencode/dist/plugins/hook-support.js
+@@ -0,0 +1,99 @@
++/**
++ * Shared helpers for the Netsight ECC OpenCode plugin (V2 port).
++ *
++ * The original ECC 2.2.3 plugin used OpenCode V1's Bun `$` shell helper. V2
++ * plugins do not receive `$`; native helpers here use `node:child_process` with
++ * `execFile` (no shell), so arguments are never interpreted as shell syntax.
++ * Command detection still scans the raw command string, which is data, not
++ * executable input.
++ */
++import { execFile } from "node:child_process";
++import * as fs from "node:fs";
++import * as path from "node:path";
++export function createLogger(context) {
++    return (level, message) => {
++        // OpenCode V2's plugin `App` has no log method; write to stderr so plugin
++        // diagnostics never pollute any stdout protocol stream.
++        void context;
++        console.error(`[ecc:${level}] ${message}`);
++    };
++}
++/** Read the project's ECC/version marker without throwing if it is absent. */
++export function detectProjectVersion(worktreePath) {
++    try {
++        const packageJsonPath = path.join(worktreePath, "package.json");
++        const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf-8"));
++        return typeof packageJson.version === "string" ? packageJson.version : "2.2.3";
++    }
++    catch {
++        return "2.2.3";
++    }
++}
++/** Run an executable with an argument array. Never invokes a shell. */
++export function execFileResult(file, args, options = {}) {
++    return new Promise((resolve) => {
++        execFile(file, args, {
++            cwd: options.cwd,
++            timeout: options.timeoutMs ?? 120_000,
++            windowsHide: true,
++            maxBuffer: 16 * 1024 * 1024,
++        }, (error, stdout, stderr) => {
++            const out = stdout?.toString() ?? "";
++            const err = stderr?.toString() ?? "";
++            if (error) {
++                resolve({
++                    code: typeof error.code === "number" ? error.code : 1,
++                    stdout: out,
++                    stderr: err || error.message,
++                    failed: true,
++                });
++                return;
++            }
++            resolve({ code: 0, stdout: out, stderr: err, failed: false });
++        });
++    });
++}
++/** Count lines containing `needle` in a file without spawning a shell. */
++export function countMatchesInFile(file, needle) {
++    try {
++        const content = fs.readFileSync(file, "utf-8");
++        let count = 0;
++        for (const line of content.split(/\r?\n/)) {
++            if (needle.test(line))
++                count += 1;
++        }
++        return count;
++    }
++    catch {
++        return 0;
++    }
++}
++/**
++ * Resolve a locally-installed formatter's JS entrypoint (e.g. Prettier) without
++ * invoking a shell or a package manager. Returns `null` when the formatter is
++ * not installed, so callers skip quietly instead of triggering a network fetch
++ * (e.g. `npx`). Returning the JS script lets the caller run it with
++ * `process.execPath`, which avoids Windows `.cmd` shim limitations.
++ */
++export function resolvePrettierScript(projectRoot) {
++    const candidates = [
++        path.join(projectRoot, "node_modules", "prettier", "package.json"),
++        path.join(projectRoot, "apps", "web", "node_modules", "prettier", "package.json"),
++    ];
++    for (const pkgPath of candidates) {
++        try {
++            const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
++            const bin = pkg.bin;
++            const rel = typeof bin === "string" ? bin : bin?.prettier;
++            if (typeof rel === "string") {
++                const script = path.resolve(path.dirname(pkgPath), rel);
++                if (fs.statSync(script).isFile())
++                    return script;
++            }
++        }
++        catch {
++            // not present; try the next candidate
++        }
++    }
++    return null;
++}
+diff --git a/.opencode/dist/plugins/lib/changed-files-store.js b/.opencode/dist/plugins/lib/changed-files-store.js
+index 2914a1c6982e419f8241abac650c5c9dd46cf2cf..3bda9a74d61e53ef58ccefc25bd1f429db2838ee 100644
+--- a/.opencode/dist/plugins/lib/changed-files-store.js
++++ b/.opencode/dist/plugins/lib/changed-files-store.js
+@@ -1,9 +1,20 @@
+-import * as path from "path";
++/**
++ * Changed-files session store (Netsight V2 port).
++ *
++ * Pure in-memory state shared between the ECC plugin hooks and the
++ * `changed-files` custom tool. Originally lived in
++ * `ecc-universal/.opencode/plugins/lib/changed-files-store.ts`; ported to the
++ * Netsight project so it compiles against `@opencode/plugin` v2.
++ */
++import * as path from "node:path";
+ const changes = new Map();
+ let worktreeRoot = "";
+ export function initStore(worktree) {
+     worktreeRoot = worktree || process.cwd();
+ }
++export function getWorktreeRoot() {
++    return worktreeRoot || process.cwd();
++}
+ function toRelative(p) {
+     if (!p)
+         return "";
+@@ -59,13 +70,15 @@ export function buildTree(filter) {
+         addToTree(root, segs, relPath, changeType);
+     }
+     function sortNodes(nodes) {
+-        return [...nodes].sort((a, b) => {
++        return [...nodes]
++            .sort((a, b) => {
+             const aIsFile = a.changeType !== undefined;
+             const bIsFile = b.changeType !== undefined;
+             if (aIsFile !== bIsFile)
+                 return aIsFile ? 1 : -1;
+             return a.name.localeCompare(b.name);
+-        }).map((n) => ({ ...n, children: sortNodes(n.children) }));
++        })
++            .map((n) => ({ ...n, children: sortNodes(n.children) }));
+     }
+     return sortNodes(root);
+ }
+@@ -82,4 +95,3 @@ export function getChangedPaths(filter) {
+ export function hasChanges() {
+     return changes.size > 0;
+ }
+-//# sourceMappingURL=changed-files-store.js.map
+\ No newline at end of file
+diff --git a/.opencode/dist/tools/changed-files.js b/.opencode/dist/tools/changed-files.js
+index 7790a5a418d81764b85bb92a16fb78fbc1921b16..b81f817f910087aaa220f814611f9b5036630a02 100644
+--- a/.opencode/dist/tools/changed-files.js
++++ b/.opencode/dist/tools/changed-files.js
+@@ -1,4 +1,12 @@
+-import { tool } from "@opencode-ai/plugin/tool";
++/**
++ * ECC custom tool: `changed-files` (V2 port).
++ *
++ * Ported from `ecc-universal@2.2.3` to the OpenCode V2 tool API. V1 used the
++ * `tool()` helper from `@opencode-ai/plugin/tool` with a Zod schema; V2 tools
++ * are plain definitions registered through `ctx.tool.transform`, with JSON
++ * Schema inputs.
++ */
++import { buildTree, getChangedPaths, hasChanges, } from "../plugins/lib/changed-files-store.js";
+ const INDICATORS = {
+     added: "+",
+     modified: "~",
+@@ -16,49 +24,46 @@ function renderTree(nodes, indent) {
+     }
+     return lines.join("\n");
+ }
+-let changedFilesStorePromise;
+-async function loadChangedFilesStore() {
+-    if (!changedFilesStorePromise) {
+-        changedFilesStorePromise = import("../plugins/lib/changed-files-store.js").catch(() => {
+-            changedFilesStorePromise = undefined;
+-            throw new Error("changed-files tool: could not load the changed-files store. " +
+-                "This usually means the ~/.opencode/plugins directory is missing or incomplete " +
+-                "(an interrupted or partial ECC install can leave tools/ populated without plugins/). " +
+-                "Run `node scripts/repair.js --target opencode` (or `ecc repair --target opencode`) " +
+-                "from the ECC repo to restore the missing files.");
+-        });
+-    }
+-    return changedFilesStorePromise;
+-}
+-const changedFilesTool = tool({
+-    description: "List files changed by agents in this session as a navigable tree. Shows added (+), modified (~), and deleted (-) indicators. Use filter to show only specific change types. Returns paths for git diff.",
+-    args: {
+-        filter: tool.schema
+-            .enum(["all", "added", "modified", "deleted"])
+-            .optional()
+-            .describe("Filter by change type (default: all)"),
+-        format: tool.schema
+-            .enum(["tree", "json"])
+-            .optional()
+-            .describe("Output format: tree for terminal display, json for structured data (default: tree)"),
++export const changedFilesTool = {
++    name: "changed-files",
++    description: "List files changed by agents in this session as a navigable tree. Shows added (+), " +
++        "modified (~), and deleted (-) indicators. Use filter to show only specific change types. " +
++        "Returns paths for git diff.",
++    input: {
++        type: "object",
++        properties: {
++            filter: {
++                type: "string",
++                enum: ["all", "added", "modified", "deleted"],
++                description: "Filter by change type (default: all)",
++            },
++            format: {
++                type: "string",
++                enum: ["tree", "json"],
++                description: "Output format: tree for display, json for structured data (default: tree)",
++            },
++        },
++        additionalProperties: false,
+     },
+-    async execute(args, context) {
+-        const { buildTree, getChangedPaths, hasChanges } = await loadChangedFilesStore();
+-        const filter = args.filter === "all" || !args.filter ? undefined : args.filter;
++    async execute(input) {
++        const args = (input ?? {});
++        const filter = args.filter && args.filter !== "all" ? args.filter : undefined;
+         const format = args.format ?? "tree";
+         if (!hasChanges()) {
+-            return JSON.stringify({ changed: false, message: "No files changed in this session" });
++            return { content: JSON.stringify({ changed: false, message: "No files changed in this session" }) };
+         }
+         const paths = getChangedPaths(filter);
+         if (format === "json") {
+-            return JSON.stringify({
+-                changed: true,
+-                filter: filter ?? "all",
+-                files: paths.map((p) => ({ path: p.path, changeType: p.changeType })),
+-                diffCommands: paths
+-                    .filter((p) => p.changeType !== "added")
+-                    .map((p) => `git diff ${p.path}`),
+-            }, null, 2);
++            return {
++                content: JSON.stringify({
++                    changed: true,
++                    filter: filter ?? "all",
++                    files: paths.map((p) => ({ path: p.path, changeType: p.changeType })),
++                    diffCommands: paths
++                        .filter((p) => p.changeType !== "added")
++                        .map((p) => `git diff ${p.path}`),
++                }, null, 2),
++            };
+         }
+         const tree = buildTree(filter);
+         const treeStr = renderTree(tree, "");
+@@ -71,8 +76,6 @@ const changedFilesTool = tool({
+         if (diffHint) {
+             output += `\n\nTo view diff for a file:\n${diffHint}`;
+         }
+-        return output;
++        return { content: output };
+     },
+-});
+-export default changedFilesTool;
+-//# sourceMappingURL=changed-files.js.map
+\ No newline at end of file
++};
+diff --git a/.opencode/dist/tools/dependency-analyzer.js b/.opencode/dist/tools/dependency-analyzer.js
+index 2eedc0268baa3f2acf23e1c9410812d270c9eae1..1ac3b5f0986cc40ffa29a81b4615538ff61e11bb 100644
+--- a/.opencode/dist/tools/dependency-analyzer.js
++++ b/.opencode/dist/tools/dependency-analyzer.js
+@@ -1,64 +1,11 @@
+ /**
+- * ECC Custom Tool: Dependency Analyzer
++ * ECC custom tool: `dependency-analyzer` (V2 port).
+  *
+- * Analyzes project dependencies for outdated packages, security vulnerabilities,
+- * and unused dependencies. Supports multiple package managers.
++ * Ported from `ecc-universal@2.2.3` to the OpenCode V2 tool API.
+  */
+-import { tool } from "@opencode-ai/plugin/tool";
+-import * as path from "path";
+-import * as fs from "fs";
+-const dependencyAnalyzerTool = tool({
+-    description: "Analyze project dependencies for outdated packages, security vulnerabilities, and unused dependencies. Supports npm, pnpm, yarn, and bun.",
+-    args: {
+-        type: tool.schema
+-            .enum(["all", "outdated", "security", "unused"])
+-            .optional()
+-            .describe("Type of analysis to run (default: all)"),
+-        fix: tool.schema
+-            .boolean()
+-            .optional()
+-            .describe("Attempt to fix issues automatically (default: false)"),
+-        depth: tool.schema
+-            .number()
+-            .optional()
+-            .describe("Depth of dependency analysis (default: 1)"),
+-    },
+-    async execute(args, context) {
+-        try {
+-            const cwd = context.worktree || context.directory;
+-            const analysisType = args.type ?? "all";
+-            const fix = args.fix ?? false;
+-            const depth = args.depth ?? 1;
+-            // Detect package manager
+-            const packageManager = detectPackageManager(cwd);
+-            // Analyze dependencies
+-            const dependencies = await analyzeDependencies(cwd, packageManager, depth);
+-            // Generate summary
+-            const summary = generateSummary(dependencies);
+-            // Generate recommendations
+-            const recommendations = generateRecommendations(dependencies, summary, analysisType);
+-            return JSON.stringify({
+-                success: true,
+-                packageManager,
+-                dependencies: dependencies.slice(0, 50), // Limit output
+-                summary,
+-                recommendations,
+-                analysisType,
+-                fixMode: fix,
+-                platform: process.platform,
+-            });
+-        }
+-        catch (error) {
+-            const errorMessage = error instanceof Error ? error.message : String(error);
+-            return JSON.stringify({
+-                success: false,
+-                error: `Failed to analyze dependencies: ${errorMessage}`,
+-                type: args.type,
+-            });
+-        }
+-    },
+-});
+-export default dependencyAnalyzerTool;
++import * as path from "node:path";
++import * as fs from "node:fs";
++import { getWorktreeRoot } from "../plugins/lib/changed-files-store.js";
+ function detectPackageManager(cwd) {
+     if (fs.existsSync(path.join(cwd, "bun.lockb")))
+         return "bun";
+@@ -70,66 +17,37 @@ function detectPackageManager(cwd) {
+         return "npm";
+     return "npm";
+ }
+-async function analyzeDependencies(cwd, packageManager, depth) {
++function analyzeDependencies(cwd) {
+     const dependencies = [];
+-    try {
+-        // Read package.json
+-        const packageJsonPath = path.join(cwd, "package.json");
+-        if (!fs.existsSync(packageJsonPath)) {
+-            throw new Error("package.json not found");
+-        }
+-        const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf-8"));
+-        // Analyze production dependencies
+-        if (packageJson.dependencies) {
+-            for (const [name, version] of Object.entries(packageJson.dependencies)) {
+-                dependencies.push({
+-                    name,
+-                    current: version,
+-                    type: "production",
+-                    outdated: false, // Would need npm outdated to check
+-                });
+-            }
+-        }
+-        // Analyze development dependencies
+-        if (packageJson.devDependencies) {
+-            for (const [name, version] of Object.entries(packageJson.devDependencies)) {
+-                dependencies.push({
+-                    name,
+-                    current: version,
+-                    type: "development",
+-                    outdated: false,
+-                });
+-            }
+-        }
+-        // Analyze peer dependencies
+-        if (packageJson.peerDependencies) {
+-            for (const [name, version] of Object.entries(packageJson.peerDependencies)) {
+-                dependencies.push({
+-                    name,
+-                    current: version,
+-                    type: "peer",
+-                    outdated: false,
+-                });
+-            }
+-        }
+-    }
+-    catch (error) {
+-        throw new Error(`Failed to read package.json: ${error}`);
++    const packageJsonPath = path.join(cwd, "package.json");
++    if (!fs.existsSync(packageJsonPath)) {
++        throw new Error("package.json not found");
+     }
++    const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf-8"));
++    const pushAll = (record, type) => {
++        if (!record)
++            return;
++        for (const [name, version] of Object.entries(record)) {
++            dependencies.push({ name, current: version, type, outdated: false });
++        }
++    };
++    pushAll(packageJson.dependencies, "production");
++    pushAll(packageJson.devDependencies, "development");
++    pushAll(packageJson.peerDependencies, "peer");
+     return dependencies;
+ }
+ function generateSummary(dependencies) {
+     return {
+         total: dependencies.length,
+-        outdated: dependencies.filter(d => d.outdated).length,
+-        vulnerable: dependencies.filter(d => d.security?.vulnerable).length,
+-        unused: 0, // Would need additional analysis
++        outdated: dependencies.filter((d) => d.outdated).length,
++        vulnerable: dependencies.filter((d) => d.security?.vulnerable).length,
++        unused: 0,
+     };
+ }
+-function generateRecommendations(dependencies, summary, analysisType) {
++function generateRecommendations(dependencies, summary) {
+     const recommendations = [];
+     if (summary.outdated > 0) {
+-        recommendations.push(`${summary.outdated} outdated dependencies found. Consider updating with: npm update`);
++        recommendations.push(`${summary.outdated} outdated dependencies found. Consider updating.`);
+     }
+     if (summary.vulnerable > 0) {
+         recommendations.push(`${summary.vulnerable} vulnerable dependencies found. Run: npm audit fix`);
+@@ -137,10 +55,9 @@ function generateRecommendations(dependencies, summary, analysisType) {
+     if (summary.total > 100) {
+         recommendations.push("Large number of dependencies detected. Consider removing unused packages.");
+     }
+-    // Check for common issues
+-    const hasTypeScript = dependencies.some(d => d.name === "typescript");
+-    const hasEslint = dependencies.some(d => d.name === "eslint");
+-    const hasPrettier = dependencies.some(d => d.name === "prettier");
++    const hasTypeScript = dependencies.some((d) => d.name === "typescript");
++    const hasEslint = dependencies.some((d) => d.name === "eslint");
++    const hasPrettier = dependencies.some((d) => d.name === "prettier");
+     if (hasTypeScript && !hasEslint) {
+         recommendations.push("TypeScript project without ESLint detected. Consider adding linting.");
+     }
+@@ -152,4 +69,57 @@ function generateRecommendations(dependencies, summary, analysisType) {
+     }
+     return recommendations;
+ }
+-//# sourceMappingURL=dependency-analyzer.js.map
+\ No newline at end of file
++export const dependencyAnalyzerTool = {
++    name: "dependency-analyzer",
++    description: "Analyze project dependencies for outdated packages, security vulnerabilities, and unused " +
++        "dependencies. Supports npm, pnpm, yarn, and bun.",
++    input: {
++        type: "object",
++        properties: {
++            type: {
++                type: "string",
++                enum: ["all", "outdated", "security", "unused"],
++                description: "Type of analysis to run (default: all)",
++            },
++            fix: { type: "boolean", description: "Attempt to fix issues automatically (default: false)" },
++            depth: { type: "number", description: "Depth of dependency analysis (default: 1)" },
++        },
++        additionalProperties: false,
++    },
++    async execute(input) {
++        const args = (input ?? {});
++        try {
++            const cwd = getWorktreeRoot();
++            const analysisType = args.type ?? "all";
++            const fix = args.fix ?? false;
++            const depth = args.depth ?? 1;
++            const packageManager = detectPackageManager(cwd);
++            const dependencies = analyzeDependencies(cwd);
++            const summary = generateSummary(dependencies);
++            const recommendations = generateRecommendations(dependencies, summary);
++            return {
++                content: JSON.stringify({
++                    success: true,
++                    packageManager,
++                    dependencies: dependencies.slice(0, 50),
++                    summary,
++                    recommendations,
++                    analysisType,
++                    fixMode: fix,
++                    depth,
++                    platform: process.platform,
++                }),
++            };
++        }
++        catch (error) {
++            const message = error instanceof Error ? error.message : String(error);
++            return {
++                content: JSON.stringify({
++                    success: false,
++                    error: `Failed to analyze dependencies: ${message}`,
++                    type: args.type,
++                }),
++            };
++        }
++    },
++};
+diff --git a/.opencode/package-lock.json b/.opencode/package-lock.json
+deleted file mode 100644
+index 11f80e210a7ca6afdad6c140b92b8bd09ae45f16..0000000000000000000000000000000000000000
