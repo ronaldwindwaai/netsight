@@ -194,6 +194,24 @@ class ReconciliationFindingsResponse(ApiModel):
     items: list[ReconciliationFinding]
 
 
+class TopologyNode(ApiModel):
+    device_id: str
+
+
+class TopologyEdge(ApiModel):
+    source_device_id: str
+    target_device_id: str
+    source: Literal["lldp", "cdp", "routing", "switching", "netbox", "manual"]
+    observed_at: datetime | None = None
+
+
+class TopologyResponse(ApiModel):
+    state: Literal["not-connected", "ok", "unknown"]
+    nodes: list[TopologyNode]
+    edges: list[TopologyEdge]
+    freshness: Freshness
+
+
 class OverviewResponse(ApiModel):
     devices: DeviceHealthSummary
     sources: dict[Literal["librenms", "netbox"], SourceState]

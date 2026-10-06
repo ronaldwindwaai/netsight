@@ -9,7 +9,7 @@ import re
 from collections.abc import AsyncIterator, Mapping
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
-from typing import Annotated, Any, Literal, NoReturn
+from typing import Annotated, Any, NoReturn
 from urllib.parse import urlsplit
 from uuid import uuid4
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -66,6 +66,7 @@ from netsight_api.schemas import (
     ReconciliationFindingsResponse,
     SourceHealthResponse,
     SourceState,
+    TopologyResponse,
 )
 
 API_PREFIX = "/api/v1"
@@ -510,6 +511,22 @@ async def netbox_device_detail(
 
 
 @api.get(
+    "/topology",
+    response_model=TopologyResponse,
+    responses=_STANDARD_ERROR_RESPONSES,
+    tags=["topology"],
+)
+async def topology(_identity: DeviceReader) -> TopologyResponse:
+    """Explicit topology state. Never fabricates a graph until a source is wired."""
+    return TopologyResponse(
+        state="not-connected",
+        nodes=[],
+        edges=[],
+        freshness=Freshness(state="unknown", observed_at=None, source=None),
+    )
+
+
+@api.get(
     "/reconcile/findings",
     response_model=ReconciliationFindingsResponse,
     responses=_STANDARD_ERROR_RESPONSES,
@@ -634,18 +651,21 @@ async def device_interfaces(
     )
 
 
-async def _netbox_source_state() -> dict[str, SourceState]:
+async def _netbox_source_state() -> SourceState:
     """NetBox may be unconfigured in dev; report that rather than failing the page."""
     base_url = os.environ.get("NETBOX_BASE_URL", "").strip()
     token = os.environ.get("NETBOX_TOKEN", "").strip()
     if not base_url or not token:
-        return {"netbox": SourceState(configured=False, status="not-configured")}
+        return SourceState(configured=False, status="not-configured")
     client = NetboxClient(base_url=base_url, token=token)
     health = await client.health()
-    mapped_status: Literal["success", "unavailable", "forbidden", "invalid-source-data"] = (
-        health.status.value if health.status.value in {"success", "unavailable", "forbidden", "invalid-source-data"} else "unavailable"
-    )
-    return {"netbox": SourceState(configured=True, status=mapped_status)}
+    if health.status is NetboxAdapterStatus.SUCCESS:
+        return SourceState(configured=True, status="success")
+    if health.status is NetboxAdapterStatus.FORBIDDEN:
+        return SourceState(configured=True, status="forbidden")
+    if health.status is NetboxAdapterStatus.INVALID_SOURCE_DATA:
+        return SourceState(configured=True, status="invalid-source-data")
+    return SourceState(configured=True, status="unavailable")
 
 
 @api.get(
@@ -708,7 +728,7 @@ async def overview(
                 configured=True,
                 status="success",
             ),
-            **(await _netbox_source_state()),
+            "netbox": await _netbox_source_state(),
         },
     )
 
