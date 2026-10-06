@@ -211,6 +211,55 @@ body {
   font-size: 1.25rem;
 }
 
+/* ------------------------------------------------------------------
+   Traffic intelligence (per design 09_03_59 AM-5)
+   ------------------------------------------------------------------ */
+
+.traffic-state {
+  display: flex;
+  min-height: 8rem;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.traffic-bars__row + .traffic-bars__row {
+  margin-top: 0.85rem;
+}
+
+.traffic-bars__meta {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-bottom: 0.3rem;
+}
+
+.traffic-bars__rank {
+  flex: 0 0 1.5rem;
+  color: var(--bs-secondary-color);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.traffic-bars__label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.traffic-bars__value {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.traffic-bars__progress {
+  height: 0.5rem;
+}
+
 .device-filters {
   display: grid;
   grid-template-columns: minmax(14rem, 2fr) minmax(10rem, 1fr);
