@@ -55,9 +55,15 @@ fi
 
 cd "$RELEASE"
 # Create an isolated web package so root-only development tooling is not
-# installed in the production release. The legacy deploy mode is required
-# because this workspace does not use injected workspace dependencies.
-pnpm --filter @netsight/web deploy --legacy --frozen-lockfile "$RUNTIME"
+# installed in the production release.
+#
+# The modern deploy implementation is used deliberately. `--legacy` forces the
+# old copy-based path, which rejects the workspace-level `patchedDependencies`
+# (ecc-universal, used by the OpenCode tooling and unrelated to the web app)
+# with ERR_PNPM_UNUSED_PATCH because the filtered web package does not depend
+# on them. The modern path carries the patch config through instead. The web
+# package declares no `workspace:` dependencies, so nothing needs injecting.
+pnpm --filter @netsight/web deploy --frozen-lockfile "$RUNTIME"
 (
   cd "$RUNTIME"
   ./node_modules/.bin/next build
@@ -74,9 +80,9 @@ systemctl --user daemon-reload
 systemctl --user enable netsight-web.service >/dev/null
 systemctl --user enable netsight-api.service >/dev/null
 
-# Install the API virtualenv into the shared runtime location. The project
-# has no build-system, so uv sync installs dependencies only; the service
-# unit points PYTHONPATH at the release source tree.
+# Install the API virtualenv into the shared runtime location. netsight-api is
+# a real installable package (hatchling), so the service resolves it from the
+# venv and needs no PYTHONPATH side-channel.
 if [ -f "$RELEASE/apps/api/pyproject.toml" ]; then
   (
     cd "$RELEASE/apps/api"
