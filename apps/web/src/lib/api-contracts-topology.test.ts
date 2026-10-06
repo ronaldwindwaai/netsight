@@ -19,6 +19,14 @@ const NOT_CONNECTED = {
   freshness: UNKNOWN_FRESHNESS,
 };
 
+/** Canonical node payload: always carries reconciled + finding keys. */
+const node = (
+  device_id: string,
+  name: string | null,
+  reconciled = false,
+  finding: { kind: string; detail: string } | null = null,
+) => ({ device_id, name, reconciled, finding });
+
 test('parseTopologyResponse accepts explicit not-connected state', () => {
   assert.deepEqual(parseTopologyResponse(NOT_CONNECTED), NOT_CONNECTED);
 });
@@ -32,8 +40,11 @@ test('parseTopologyResponse accepts a valid graph', () => {
   const payload = {
     state: 'ok',
     nodes: [
-      { device_id: DEVICE_A, name: 'core-sw-01' },
-      { device_id: DEVICE_B, name: 'edge-sw-02' },
+      node(DEVICE_A, 'core-sw-01', true),
+      node(DEVICE_B, 'edge-sw-02', true, {
+        kind: 'missing-discovered',
+        detail: 'Intended device not seen by LibreNMS discovery',
+      }),
     ],
     edges: [
       {
@@ -55,7 +66,7 @@ test('parseTopologyResponse accepts a valid graph', () => {
 test('parseTopologyResponse accepts edge without observed_at', () => {
   const payload = {
     state: 'ok',
-    nodes: [{ device_id: DEVICE_A, name: 'core-sw-01' }],
+    nodes: [node(DEVICE_A, 'core-sw-01')],
     edges: [],
     freshness: {
       state: 'stale',
@@ -90,7 +101,7 @@ test('parseTopologyResponse rejects not-connected state carrying data', () => {
   assert.equal(
     parseTopologyResponse({
       ...NOT_CONNECTED,
-      nodes: [{ device_id: DEVICE_A, name: 'core-sw-01' }],
+      nodes: [node(DEVICE_A, 'core-sw-01')],
     }),
     null,
   );
@@ -102,7 +113,19 @@ test('parseTopologyResponse rejects a node without an explicit name key', () => 
     parseTopologyResponse({
       ...NOT_CONNECTED,
       state: 'ok',
-      nodes: [{ device_id: DEVICE_A }],
+      nodes: [{ device_id: DEVICE_A, reconciled: false, finding: null }],
+    }),
+    null,
+  );
+});
+
+test('parseTopologyResponse rejects a node missing reconciled/finding keys', () => {
+  // Both keys are required: "not checked" must never be inferred as in-sync.
+  assert.equal(
+    parseTopologyResponse({
+      ...NOT_CONNECTED,
+      state: 'ok',
+      nodes: [{ device_id: DEVICE_A, name: null }],
     }),
     null,
   );
@@ -113,7 +136,7 @@ test('parseTopologyResponse rejects non-canonical node ids', () => {
     parseTopologyResponse({
       ...NOT_CONNECTED,
       state: 'ok',
-      nodes: [{ device_id: 'librenms:1', name: null }],
+      nodes: [node('librenms:1', null)],
     }),
     null,
   );
@@ -123,7 +146,7 @@ test('parseTopologyResponse rejects edges referencing unknown nodes', () => {
   assert.equal(
     parseTopologyResponse({
       state: 'ok',
-      nodes: [{ device_id: DEVICE_A, name: 'core-sw-01' }],
+      nodes: [node(DEVICE_A, 'core-sw-01', true)],
       edges: [
         {
           source_device_id: DEVICE_A,
@@ -146,7 +169,7 @@ test('parseTopologyResponse rejects unknown edge sources', () => {
   assert.equal(
     parseTopologyResponse({
       state: 'ok',
-      nodes: [{ device_id: DEVICE_A, name: 'core-sw-01' }],
+      nodes: [node(DEVICE_A, 'core-sw-01', true)],
       edges: [
         {
           source_device_id: DEVICE_A,
@@ -159,6 +182,63 @@ test('parseTopologyResponse rejects unknown edge sources', () => {
         state: 'fresh',
         observed_at: '2026-10-06T08:00:00Z',
         source: 'lldp',
+      },
+    }),
+    null,
+  );
+});
+
+test('parseTopologyResponse accepts a reconciliation finding on a checked node', () => {
+  const payload = {
+    state: 'ok',
+    nodes: [
+      node(DEVICE_A, 'core-sw-01', true, {
+        kind: 'status-mismatch',
+        detail: 'NetBox status=offline; discovered status=healthy',
+      }),
+    ],
+    edges: [],
+    freshness: {
+      state: 'fresh',
+      observed_at: '2026-10-06T08:00:00Z',
+      source: 'netbox',
+    },
+  };
+  assert.deepEqual(parseTopologyResponse(payload), payload);
+});
+
+test('parseTopologyResponse rejects a finding when reconciliation did not run', () => {
+  // A finding implies reconciliation ran; otherwise it is not evidence.
+  assert.equal(
+    parseTopologyResponse({
+      state: 'ok',
+      nodes: [
+        node(DEVICE_A, null, false, {
+          kind: 'missing-discovered',
+          detail: 'Intended device not seen by LibreNMS discovery',
+        }),
+      ],
+      edges: [],
+      freshness: {
+        state: 'fresh',
+        observed_at: '2026-10-06T08:00:00Z',
+        source: 'netbox',
+      },
+    }),
+    null,
+  );
+});
+
+test('parseTopologyResponse rejects finding kinds outside the reconciliation vocabulary', () => {
+  assert.equal(
+    parseTopologyResponse({
+      state: 'ok',
+      nodes: [node(DEVICE_A, null, true, { kind: 'unknown-discovered', detail: 'rogue' })],
+      edges: [],
+      freshness: {
+        state: 'fresh',
+        observed_at: '2026-10-06T08:00:00Z',
+        source: 'netbox',
       },
     }),
     null,

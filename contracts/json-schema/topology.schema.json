@@ -64,7 +64,9 @@
       "type": "object",
       "required": [
         "device_id",
-        "name"
+        "name",
+        "reconciled",
+        "finding"
       ],
       "additionalProperties": false,
       "properties": {
@@ -77,6 +79,61 @@
             "string",
             "null"
           ],
+          "maxLength": 255
+        },
+        "reconciled": {
+          "type": "boolean"
+        },
+        "finding": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/nodeFinding"
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "reconciled": {
+                "const": false
+              }
+            },
+            "required": [
+              "reconciled"
+            ]
+          },
+          "then": {
+            "properties": {
+              "finding": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "nodeFinding": {
+      "type": "object",
+      "required": [
+        "kind",
+        "detail"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "missing-discovered",
+            "status-mismatch"
+          ]
+        },
+        "detail": {
+          "type": "string",
+          "minLength": 1,
           "maxLength": 255
         }
       }

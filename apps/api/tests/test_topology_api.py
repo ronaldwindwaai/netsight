@@ -28,6 +28,8 @@ def _clean_app_state(monkeypatch: pytest.MonkeyPatch):
         "NETSIGHT_ENABLE_DEV_IDENTITY",
         "NETBOX_BASE_URL",
         "NETBOX_TOKEN",
+        "LIBRENMS_BASE_URL",
+        "LIBRENMS_TOKEN",
     ):
         monkeypatch.delenv(name, raising=False)
     app.dependency_overrides.clear()
@@ -74,8 +76,21 @@ def test_valid_graph_contract() -> None:
     instance = {
         "state": "ok",
         "nodes": [
-            {"device_id": DEVICE_A, "name": "core-sw-01"},
-            {"device_id": DEVICE_B, "name": "edge-sw-02"},
+            {
+                "device_id": DEVICE_A,
+                "name": "core-sw-01",
+                "reconciled": True,
+                "finding": None,
+            },
+            {
+                "device_id": DEVICE_B,
+                "name": "edge-sw-02",
+                "reconciled": True,
+                "finding": {
+                    "kind": "missing-discovered",
+                    "detail": "Intended device not seen by LibreNMS discovery",
+                },
+            },
         ],
         "edges": [
             {
@@ -107,35 +122,94 @@ def test_connected_source_may_report_an_explicitly_empty_graph() -> None:
         # not-connected must not carry data
         {
             "state": "not-connected",
-            "nodes": [{"device_id": DEVICE_A, "name": None}],
+            "nodes": [
+                {
+                    "device_id": DEVICE_A,
+                    "name": None,
+                    "reconciled": False,
+                    "finding": None,
+                }
+            ],
             "edges": [],
             "freshness": {"state": "unknown", "observed_at": None, "source": None},
         },
         # unknown must not carry data — nothing is drawn from a failed source
         {
             "state": "unknown",
-            "nodes": [{"device_id": DEVICE_A, "name": None}],
+            "nodes": [
+                {
+                    "device_id": DEVICE_A,
+                    "name": None,
+                    "reconciled": False,
+                    "finding": None,
+                }
+            ],
             "edges": [],
             "freshness": {"state": "unknown", "observed_at": None, "source": "netbox"},
         },
         # non-canonical device id
         {
             "state": "ok",
-            "nodes": [{"device_id": "librenms:1", "name": None}],
+            "nodes": [
+                {
+                    "device_id": "librenms:1",
+                    "name": None,
+                    "reconciled": False,
+                    "finding": None,
+                }
+            ],
             "edges": [],
             "freshness": {"state": "fresh", "observed_at": None, "source": "lldp"},
         },
         # node without a name key is not canonical
         {
             "state": "ok",
-            "nodes": [{"device_id": DEVICE_A}],
+            "nodes": [{"device_id": DEVICE_A, "reconciled": False, "finding": None}],
+            "edges": [],
+            "freshness": {"state": "fresh", "observed_at": None, "source": "lldp"},
+        },
+        # a finding must never appear when reconciliation did not run
+        {
+            "state": "ok",
+            "nodes": [
+                {
+                    "device_id": DEVICE_A,
+                    "name": None,
+                    "reconciled": False,
+                    "finding": {
+                        "kind": "status-mismatch",
+                        "detail": "NetBox status=offline; discovered status=healthy",
+                    },
+                }
+            ],
+            "edges": [],
+            "freshness": {"state": "fresh", "observed_at": None, "source": "lldp"},
+        },
+        # finding kinds outside the reconciliation vocabulary
+        {
+            "state": "ok",
+            "nodes": [
+                {
+                    "device_id": DEVICE_A,
+                    "name": None,
+                    "reconciled": True,
+                    "finding": {"kind": "unknown-discovered", "detail": "rogue"},
+                }
+            ],
             "edges": [],
             "freshness": {"state": "fresh", "observed_at": None, "source": "lldp"},
         },
         # unknown edge source
         {
             "state": "ok",
-            "nodes": [{"device_id": DEVICE_A, "name": None}],
+            "nodes": [
+                {
+                    "device_id": DEVICE_A,
+                    "name": None,
+                    "reconciled": False,
+                    "finding": None,
+                }
+            ],
             "edges": [
                 {
                     "source_device_id": DEVICE_A,
@@ -237,6 +311,11 @@ def test_topology_builds_explicit_graph_from_active_cables(
     assert {
         edge["observed_at"] for edge in body["edges"]
     } == {"2026-10-05T10:00:00Z"}
+    # Discovery source not configured: reconciliation is explicitly NOT checked.
+    assert all(
+        node["reconciled"] is False and node["finding"] is None
+        for node in body["nodes"]
+    )
     assert body["freshness"] == {
         "state": "fresh",
         "observed_at": body["freshness"]["observed_at"],
@@ -332,5 +411,101 @@ def test_topology_keeps_graph_when_name_lookup_fails(
     assert body["state"] == "ok"
     assert len(body["nodes"]) == 2
     assert all(node["name"] is None for node in body["nodes"])
+    assert all(node["reconciled"] is False for node in body["nodes"])
     assert len(body["edges"]) == 1
+    validate("topology", body)
+
+
+def _wire_librenms(
+    rows: list[dict[str, Any]] | None, *, fail: bool = False
+) -> None:
+    """Wire the optional discovery source; rows=None means not configured."""
+    from netsight_api.main import get_optional_librenms_client
+
+    if rows is None:
+        app.dependency_overrides[get_optional_librenms_client] = lambda: None
+        return
+
+    import httpx
+
+    from netsight_api.adapters.librenms import LibrenmsClient
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        if fail:
+            return httpx.Response(500, json={"message": "boom"})
+        return httpx.Response(200, json={"status": "ok", "devices": rows})
+
+    client = LibrenmsClient(
+        base_url="http://librenms.test",
+        token="test-token",
+        _transport=httpx.MockTransport(handler),
+    )
+    app.dependency_overrides[get_optional_librenms_client] = lambda: client
+
+
+def test_topology_attaches_reconciliation_findings_in_edge_context(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Intent-vs-discovery drift is surfaced on the node it belongs to.
+
+    Findings annotate the graph; they never replace source data, and
+    `unknown-discovered` findings have no NetBox node to attach to.
+    """
+    _dev_identity(monkeypatch)
+    _wire_netbox(
+        [_cable(1, device_a=1, device_b=2), _cable(2, device_a=2, device_b=3)],
+        devices=[
+            {"id": 1, "name": "core-sw-01", "display": "core-sw-01"},
+            {
+                "id": 2,
+                "name": "edge-sw-02",
+                "display": "edge-sw-02",
+                "status": {"value": "offline", "label": "Offline"},
+            },
+            {"id": 3, "name": "dist-sw-03", "display": "dist-sw-03"},
+        ],
+    )
+    _wire_librenms(
+        [
+            {"device_id": 10, "hostname": "core-sw-01", "status": 1},
+            {"device_id": 11, "hostname": "edge-sw-02", "status": 1},
+            {"device_id": 12, "hostname": "rogue-sw", "status": 1},
+        ]
+    )
+
+    response = TestClient(app).get("/api/v1/topology")
+
+    assert response.status_code == 200
+    body: dict[str, Any] = response.json()
+    assert body["state"] == "ok"
+    from netsight_api.adapters.netbox import canonical_device_id as netbox_id
+
+    findings = {node["device_id"]: node["finding"] for node in body["nodes"]}
+    assert all(node["reconciled"] is True for node in body["nodes"])
+    assert findings[netbox_id("1")] is None
+    assert findings[netbox_id("2")] is not None
+    assert findings[netbox_id("2")]["kind"] == "status-mismatch"
+    assert findings[netbox_id("3")] is not None
+    assert findings[netbox_id("3")]["kind"] == "missing-discovered"
+    validate("topology", body)
+
+
+def test_topology_discovery_failure_leaves_reconciliation_not_checked(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A failed discovery read must not be presented as 'in sync'."""
+    _dev_identity(monkeypatch)
+    _wire_netbox([_cable(1)])
+    _wire_librenms([], fail=True)
+
+    response = TestClient(app).get("/api/v1/topology")
+
+    assert response.status_code == 200
+    body: dict[str, Any] = response.json()
+    assert body["state"] == "ok"
+    assert len(body["nodes"]) == 2
+    assert all(
+        node["reconciled"] is False and node["finding"] is None
+        for node in body["nodes"]
+    )
     validate("topology", body)

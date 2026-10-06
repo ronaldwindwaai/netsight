@@ -28,6 +28,12 @@ function GraphEvidence({ topology }: { topology: TopologyResponse }) {
     topology.nodes.map((node) => [node.device_id, node.name ?? node.device_id]),
   );
   const label = (deviceId: string) => labels.get(deviceId) ?? deviceId;
+  const reconciled = topology.nodes.every((node) => node.reconciled);
+  const findings = topology.nodes.filter((node) => node.finding !== null);
+  const reconciliationNote = (node: (typeof topology.nodes)[number]) => {
+    if (node.finding) return `reconciliation: ${node.finding.kind}`;
+    return reconciled ? 'reconciliation: checked, no findings' : 'reconciliation: not checked';
+  };
   return (
     <>
       <TopologyGraph topology={topology} />
@@ -37,13 +43,44 @@ function GraphEvidence({ topology }: { topology: TopologyResponse }) {
             key={node.device_id}
             role="listitem"
             className="badge bg-secondary-subtle text-body border"
-            title={node.device_id}
+            title={`${node.device_id} — ${reconciliationNote(node)}`}
           >
             <i className="bi bi-hdd-network me-1" aria-hidden="true" />
             {node.name ?? node.device_id}
+            {node.finding ? (
+              <i
+                className="bi bi-exclamation-triangle text-warning ms-1"
+                aria-hidden="true"
+              />
+            ) : null}
           </span>
         ))}
       </div>
+      {!reconciled ? (
+        <p className="small text-body-secondary">
+          <i className="bi bi-info-circle me-1" aria-hidden="true" />
+          Reconciliation not checked: the discovery source was unavailable, so no
+          intent-vs-discovery findings are shown for this graph.
+        </p>
+      ) : findings.length > 0 ? (
+        <div className="mb-3" role="status" aria-label="Reconciliation findings">
+          <p className="small text-warning mb-1">
+            <i className="bi bi-exclamation-triangle me-1" aria-hidden="true" />
+            Reconciliation findings on this graph:
+          </p>
+          <ul className="list-unstyled small mb-0">
+            {findings.map((node) => (
+              <li key={node.device_id} className="mb-1">
+                <span title={node.device_id} className="fw-semibold">
+                  {node.name ?? node.device_id}
+                </span>
+                {': '}
+                <span className="text-body-secondary">{node.finding?.detail}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
       <Card title="Explicit links" icon="bi bi-diagram-3" variant="outline" theme="primary" bodyClass="p-0">
         <div className="table-responsive">
           <table className="table table-sm mb-0">

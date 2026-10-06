@@ -176,10 +176,19 @@ export interface OverviewResponse {
 
 export type TopologyState = 'not-connected' | 'ok' | 'unknown';
 export type TopologyEdgeSource = 'lldp' | 'cdp' | 'routing' | 'switching' | 'netbox' | 'manual';
+export type TopologyFindingKind = 'missing-discovered' | 'status-mismatch';
+
+export interface TopologyNodeFinding {
+  kind: TopologyFindingKind;
+  detail: string;
+}
 
 export interface TopologyNode {
   device_id: string;
   name: string | null;
+  /** False means reconciliation was NOT run — not the same as 'in sync'. */
+  reconciled: boolean;
+  finding: TopologyNodeFinding | null;
 }
 
 export interface TopologyEdge {
@@ -802,9 +811,11 @@ export function parseOverviewResponse(value: unknown): OverviewResponse | null {
 }
 
 const TOPOLOGY_RESPONSE_KEYS = ['state', 'nodes', 'edges', 'freshness'] as const;
-const TOPOLOGY_NODE_KEYS = ['device_id', 'name'] as const;
+const TOPOLOGY_NODE_KEYS = ['device_id', 'name', 'reconciled', 'finding'] as const;
+const TOPOLOGY_FINDING_KEYS = ['kind', 'detail'] as const;
 const TOPOLOGY_EDGE_KEYS = ['source_device_id', 'target_device_id', 'source'] as const;
 const TOPOLOGY_STATES = ['not-connected', 'ok', 'unknown'] as const;
+const TOPOLOGY_FINDING_KINDS = ['missing-discovered', 'status-mismatch'] as const;
 const TOPOLOGY_EDGE_SOURCES = [
   'lldp',
   'cdp',
@@ -835,11 +846,34 @@ export function parseTopologyResponse(value: unknown): TopologyResponse | null {
       !hasContractKeys(node, TOPOLOGY_NODE_KEYS) ||
       typeof node.device_id !== 'string' ||
       !DEVICE_ID_PATTERN.test(node.device_id) ||
-      !isNullableString(node.name)
+      !isNullableString(node.name) ||
+      (node.name !== null && !isBoundedString(node.name, 0, 255)) ||
+      typeof node.reconciled !== 'boolean'
     ) {
       return null;
     }
-    nodes.push({ device_id: node.device_id, name: node.name });
+    let finding: TopologyNodeFinding | null = null;
+    if (node.finding !== null) {
+      const raw = node.finding;
+      if (
+        !isRecord(raw) ||
+        !hasContractKeys(raw, TOPOLOGY_FINDING_KEYS) ||
+        typeof raw.kind !== 'string' ||
+        !TOPOLOGY_FINDING_KINDS.includes(raw.kind as TopologyFindingKind) ||
+        !isBoundedString(raw.detail, 1, 255)
+      ) {
+        return null;
+      }
+      finding = { kind: raw.kind as TopologyFindingKind, detail: raw.detail };
+    }
+    // A finding is only evidence when reconciliation actually ran.
+    if (finding !== null && !node.reconciled) return null;
+    nodes.push({
+      device_id: node.device_id,
+      name: node.name,
+      reconciled: node.reconciled,
+      finding,
+    });
   }
 
   const edges: TopologyEdge[] = [];

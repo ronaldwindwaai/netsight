@@ -59,8 +59,8 @@ it leaves the boundary. Regression tests: `test_security_matrix.py`
 ### Denial of service
 Risk: expensive flow queries, diagnostics floods, upstream failures.
 Mitigation: rate limits, query budgets, timeouts, async jobs, caching, degradation.
-Topology specifics: one request fans out to at most 11 upstream calls (≤10
-cable pages × `limit=1000` + 1 devices page), each bounded by a 10s timeout;
+Topology specifics: one request fans out to at most 12 upstream calls (≤10
+cable pages × `limit=1000` + 1 NetBox devices page + 1 LibreNMS devices page), each bounded by a 10s timeout;
 graphs are capped at 10,000 nodes/edges and fail closed to `unknown`.
 Open follow-up: per-IP rate limiting and response caching for `/api/v1/topology`.
 

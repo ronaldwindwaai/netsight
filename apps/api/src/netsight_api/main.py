@@ -7,10 +7,10 @@ import json
 import logging
 import os
 import re
-from collections.abc import AsyncIterator, Mapping
+from collections.abc import AsyncIterator, Awaitable, Mapping
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
-from typing import Annotated, Any, NoReturn
+from typing import Annotated, Any, NoReturn, cast
 from urllib.parse import urlsplit
 from uuid import uuid4
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -36,10 +36,11 @@ from netsight_api.adapters.netbox import (
     AdapterStatus as NetboxAdapterStatus,
 )
 from netsight_api.adapters.netbox import (
-    DeviceNotFoundError as NetboxDeviceNotFoundError,
+    DeviceCollection,
+    NetboxClient,
 )
 from netsight_api.adapters.netbox import (
-    NetboxClient,
+    DeviceNotFoundError as NetboxDeviceNotFoundError,
 )
 from netsight_api.adapters.netbox import (
     canonical_device_id as netbox_canonical_device_id,
@@ -72,6 +73,7 @@ from netsight_api.schemas import (
     SourceState,
     TopologyEdge,
     TopologyNode,
+    TopologyNodeFinding,
     TopologyResponse,
 )
 
@@ -280,6 +282,37 @@ def get_optional_netbox_client() -> NetboxClient | None:
 OptionalNetboxDependency = Annotated[
     NetboxClient | None, Depends(get_optional_netbox_client)
 ]
+
+
+def get_optional_librenms_client() -> LibrenmsClient | None:
+    """LibreNMS client when configured, else None (reconciliation not checked)."""
+    try:
+        return get_client()
+    except ApiError:
+        return None
+
+
+OptionalLibrenmsDependency = Annotated[
+    LibrenmsClient | None, Depends(get_optional_librenms_client)
+]
+
+
+async def _capture[T](operation: Awaitable[T]) -> T | Exception:
+    """Await a source read, returning the error instead of raising it.
+
+    Cancellation (`CancelledError`) is a `BaseException` and is therefore
+    never captured — it must propagate.
+    """
+
+    try:
+        return await operation
+    except Exception as exc:  # noqa: BLE001 — deliberate source-read boundary
+        return exc
+
+
+async def _absent() -> None:
+    """Awaitable placeholder for a source that is not configured."""
+    return
 
 
 def require_device_reader(identity: CurrentIdentity) -> Identity:
@@ -539,12 +572,14 @@ async def topology(
     request: Request,
     _identity: DeviceReader,
     netbox: OptionalNetboxDependency,
+    librenms: OptionalLibrenmsDependency,
 ) -> TopologyResponse:
     """Explicit topology state.
 
     NetBox active cables are the only edge source today. No source means
     not-connected; a configured source that cannot be read means unknown.
-    The graph is never inferred from anything else.
+    The graph is never inferred from anything else. Reconciliation findings
+    are attached to nodes (edge context) but never modify source data.
     """
     correlation_id = _request_correlation_id(request)
     if netbox is None:
@@ -554,10 +589,10 @@ async def topology(
             edges=[],
             freshness=Freshness(state="unknown", observed_at=None, source=None),
         )
-    cables_result, devices_result = await asyncio.gather(
-        netbox.cables(),
-        netbox.devices(),
-        return_exceptions=True,
+    cables_result, devices_result, discovery_result = await asyncio.gather(
+        _capture(netbox.cables()),
+        _capture(netbox.devices()),
+        _capture(librenms.devices()) if librenms is not None else _capture(_absent()),
     )
     if isinstance(cables_result, Exception):
         # Source configured but not confirmable: report unknown, never guess.
@@ -577,13 +612,11 @@ async def topology(
             edges=[],
             freshness=Freshness(state="unknown", observed_at=None, source="netbox"),
         )
-    if isinstance(cables_result, BaseException):
-        # Cancellation and other BaseExceptions must propagate, not degrade.
-        raise cables_result
     collection = cables_result
     # Device names are cosmetic: if the name lookup fails, nodes keep
     # name=None rather than the graph being dropped.
     names: dict[str, str] = {}
+    netbox_devices: DeviceCollection | None
     if isinstance(devices_result, Exception):
         _LOGGER.warning(
             "topology node name lookup failed; nodes will carry no names",
@@ -595,11 +628,44 @@ async def topology(
                 ),
             },
         )
-    elif isinstance(devices_result, BaseException):
-        raise devices_result
+        netbox_devices = None
     else:
-        for device in devices_result.items:
+        netbox_devices = devices_result
+        for device in netbox_devices.items:
             names[device.source_aliases[0].native_id] = device.name
+
+    # Reconciliation: only reported when both sides were actually read, so
+    # "not checked" is never presented as "in sync".
+    discovered: DeviceCollection | None
+    if isinstance(discovery_result, Exception):
+        _LOGGER.warning(
+            "topology reconciliation skipped; discovery source unavailable",
+            extra={
+                "correlation_id": correlation_id,
+                "source": "librenms",
+                "adapter_status": str(
+                    getattr(discovery_result, "status", "unknown")
+                ),
+            },
+        )
+        discovered = None
+    else:
+        discovered = cast(DeviceCollection | None, discovery_result)
+
+    reconciled = netbox_devices is not None and discovered is not None
+    findings: dict[str, TopologyNodeFinding] = {}
+    if netbox_devices is not None and discovered is not None:
+        for finding in reconcile(
+            list(netbox_devices.items), list(discovered.items)
+        ):
+            if finding.netbox_device_id is None:
+                continue
+            if finding.kind == "unknown-discovered":
+                continue  # no NetBox node to attach it to
+            findings[finding.netbox_device_id] = TopologyNodeFinding(
+                kind=finding.kind,
+                detail=finding.detail,
+            )
 
     nodes_by_id: dict[str, str | None] = {}
     edges: list[TopologyEdge] = []
@@ -622,7 +688,12 @@ async def topology(
         response = TopologyResponse(
             state="ok",
             nodes=[
-                TopologyNode(device_id=node_id, name=nodes_by_id[node_id])
+                TopologyNode(
+                    device_id=node_id,
+                    name=nodes_by_id[node_id],
+                    reconciled=reconciled,
+                    finding=findings.get(node_id),
+                )
                 for node_id in sorted(nodes_by_id)
             ],
             edges=edges,

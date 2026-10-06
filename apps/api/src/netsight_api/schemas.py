@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 DeviceStatus = Literal[
     "healthy",
@@ -197,12 +197,36 @@ class ReconciliationFindingsResponse(ApiModel):
 _DEVICE_ID_PATTERN = r"^device-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
 
 
+class TopologyNodeFinding(ApiModel):
+    """Reconciliation finding attached to a topology node (edge context).
+
+    Reconciliation output never overwrites source-of-truth records; it is
+    only surfaced alongside the graph so operators see intent-vs-discovery
+    drift exactly where the device sits in the topology.
+    """
+
+    kind: Literal["missing-discovered", "status-mismatch"]
+    detail: str = Field(min_length=1, max_length=255)
+
+
 class TopologyNode(ApiModel):
     device_id: str = Field(pattern=_DEVICE_ID_PATTERN, min_length=43, max_length=43)
     # Source-reported name; None when the source did not report one (never
     # inferred). Required (nullable) so the OpenAPI contract, canonical JSON
     # schema and browser parser all agree on presence.
     name: str | None = Field(..., max_length=255)
+    # Whether reconciliation ran for this graph: False means "not checked"
+    # (discovery source unavailable), which is not the same as "in sync".
+    reconciled: bool
+    # None = checked and in sync (when reconciled) or not checked.
+    finding: TopologyNodeFinding | None
+
+    @model_validator(mode="after")
+    def _finding_requires_reconciliation(self) -> TopologyNode:
+        """A finding is only evidence when reconciliation actually ran."""
+        if self.finding is not None and not self.reconciled:
+            raise ValueError("finding requires reconciled=true")
+        return self
 
 
 class TopologyEdge(ApiModel):

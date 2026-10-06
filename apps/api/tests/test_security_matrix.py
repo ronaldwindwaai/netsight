@@ -259,7 +259,7 @@ def test_hostile_device_name_is_carried_as_data_not_markup(
 def _override_netbox(handler: Any) -> None:
     """Serve NetBox from a hostile/mock handler with a leak-prone token."""
     from netsight_api.adapters.netbox import NetboxClient
-    from netsight_api.main import get_optional_netbox_client
+    from netsight_api.main import get_optional_librenms_client, get_optional_netbox_client
 
     client = NetboxClient(
         base_url="https://netbox.test",
@@ -267,6 +267,8 @@ def _override_netbox(handler: Any) -> None:
         _transport=httpx.MockTransport(handler),
     )
     app.dependency_overrides[get_optional_netbox_client] = lambda: client
+    # Deterministic: reconciliation is out of scope for these negative tests.
+    app.dependency_overrides[get_optional_librenms_client] = lambda: None
 
 
 def _active_cable() -> dict[str, Any]:
