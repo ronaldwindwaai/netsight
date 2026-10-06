@@ -19,6 +19,24 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AuthProvidersResponse'
+  /topology:
+    get:
+      summary: Explicit topology state (not connected until a topology source is configured)
+      operationId: getTopology
+      responses:
+        '200':
+          description: Topology state without fabricated nodes/edges
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TopologyResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
   /overview:
     get:
       summary: Aggregate operational summary for the network overview page
@@ -456,6 +474,45 @@ components:
       $ref: '../json-schema/common.schema.json#/$defs/freshness'
     Device:
       $ref: '../json-schema/device.schema.json'
+    TopologyNode:
+      type: object
+      additionalProperties: false
+      required: [device_id]
+      properties:
+        device_id:
+          type: string
+          minLength: 1
+    TopologyEdge:
+      type: object
+      additionalProperties: false
+      required: [source_device_id, target_device_id, source]
+      properties:
+        source_device_id:
+          type: string
+        target_device_id:
+          type: string
+        source:
+          enum: [lldp, cdp, routing, switching, netbox, manual]
+        observed_at:
+          type: [string, 'null']
+          format: date-time
+    TopologyResponse:
+      type: object
+      additionalProperties: false
+      required: [state, nodes, edges, freshness]
+      properties:
+        state:
+          enum: [not-connected, ok, unknown]
+        nodes:
+          type: array
+          items:
+            $ref: '#/components/schemas/TopologyNode'
+        edges:
+          type: array
+          items:
+            $ref: '#/components/schemas/TopologyEdge'
+        freshness:
+          $ref: '#/components/schemas/Freshness'
     ReconciliationFinding:
       type: object
       additionalProperties: false
