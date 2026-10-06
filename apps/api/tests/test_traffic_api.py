@@ -556,6 +556,65 @@ def test_flows_source_failure_degrades_to_unknown(
     validate("traffic_flows", body)
 
 
+def test_contract_invalid_top_row_degrades_to_unknown_not_500(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A source row that fails model construction must be explicit unknown.
+
+    The boundary guard catches pydantic ValidationError alongside
+    ContractViolation, so a non-conforming TrafficSource can never turn a
+    traffic read into a 5xx (it degrades exactly like a failed read).
+    """
+    _dev_identity(monkeypatch)
+    bad_item: dict[str, Any] = {
+        "rank": 1,
+        "subject_kind": "ip",
+        "subject_id": None,
+        "label": "10.0.0.1",
+        "bytes": -1,  # negative byte counts are contract-invalid
+        "packets": None,
+        "share": None,
+    }
+    _override_source(_FakeTrafficSource(items=[bad_item]))  # type: ignore[list-item]
+
+    response = TestClient(app).get("/api/v1/traffic/top-talkers")
+
+    assert response.status_code == 200
+    body: dict[str, Any] = response.json()
+    assert body["state"] == "unknown"
+    assert body["items"] == []
+    validate("traffic_top", body)
+
+
+def test_contract_invalid_flow_row_degrades_to_unknown_not_500(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _dev_identity(monkeypatch)
+    bad_flow: dict[str, Any] = {
+        "observed_at": "2026-10-06T07:59:00Z",
+        "source_ip": "10.1.2.3",
+        "source_device_id": None,
+        "destination_ip": "203.0.113.9",
+        "destination_host": None,
+        "protocol": "tcp",
+        "destination_port": 70000,  # outside the valid port range
+        "bytes": 100,
+        "packets": None,
+        "direction": "unknown",
+        "application": "https",
+        "user": None,
+    }
+    _override_source(_FakeTrafficSource(flows=[bad_flow]))  # type: ignore[list-item]
+
+    response = TestClient(app).get("/api/v1/traffic/flows")
+
+    assert response.status_code == 200
+    body: dict[str, Any] = response.json()
+    assert body["state"] == "unknown"
+    assert body["flows"] == []
+    validate("traffic_flows", body)
+
+
 # --- bounded window / query budget ------------------------------------------
 
 
