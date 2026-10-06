@@ -183,6 +183,17 @@ class SourceState(ApiModel):
     status: Literal["success", "unavailable", "forbidden", "invalid-source-data", "not-configured"]
 
 
+class ReconciliationFinding(ApiModel):
+    kind: Literal["missing-discovered", "unknown-discovered", "status-mismatch"]
+    netbox_device_id: str | None = None
+    discovered_device_id: str | None = None
+    detail: str
+
+
+class ReconciliationFindingsResponse(ApiModel):
+    items: list[ReconciliationFinding]
+
+
 class OverviewResponse(ApiModel):
     devices: DeviceHealthSummary
     sources: dict[Literal["librenms"], SourceState]

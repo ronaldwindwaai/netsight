@@ -7,13 +7,14 @@ overwrite source-of-truth records; they are compared and mismatches surfaced.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Literal
 
 from netsight_api.schemas import Device
 
 
 @dataclass(frozen=True)
 class Finding:
-    kind: str  # "missing-discovered", "unknown-discovered", "status-mismatch"
+    kind: Literal["missing-discovered", "unknown-discovered", "status-mismatch"]
     netbox_device_id: str | None
     discovered_device_id: str | None
     detail: str

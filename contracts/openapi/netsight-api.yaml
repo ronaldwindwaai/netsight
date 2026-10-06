@@ -165,6 +165,28 @@ paths:
           $ref: '#/components/responses/InvalidSourceData'
         '503':
           $ref: '#/components/responses/SourceUnavailable'
+  /reconcile/findings:
+    get:
+      summary: NetBox vs discovered LibreNMS reconciliation findings
+      operationId: listReconciliationFindings
+      responses:
+        '200':
+          description: Reconciliation findings between intended NetBox state and discovered LibreNMS devices
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReconciliationFindingsResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '502':
+          $ref: '#/components/responses/InvalidSourceData'
+        '503':
+          $ref: '#/components/responses/SourceUnavailable'
   /devices:
     get:
       summary: List canonical devices
@@ -432,6 +454,28 @@ components:
       $ref: '../json-schema/common.schema.json#/$defs/freshness'
     Device:
       $ref: '../json-schema/device.schema.json'
+    ReconciliationFinding:
+      type: object
+      additionalProperties: false
+      required: [kind, netbox_device_id, discovered_device_id, detail]
+      properties:
+        kind:
+          enum: [missing-discovered, unknown-discovered, status-mismatch]
+        netbox_device_id:
+          type: [string, 'null']
+        discovered_device_id:
+          type: [string, 'null']
+        detail:
+          type: string
+    ReconciliationFindingsResponse:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReconciliationFinding'
     DeviceListResponse:
       type: object
       additionalProperties: false

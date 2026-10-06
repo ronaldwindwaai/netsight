@@ -47,6 +47,7 @@ from netsight_api.contracts import ContractViolation, validate
 from netsight_api.errors import ApiError
 from netsight_api.localauth.routes import router as localauth_router
 from netsight_api.rbac import Identity, Permission, is_allowed
+from netsight_api.reconcile import reconcile
 from netsight_api.schemas import (
     Alert,
     AlertListResponse,
@@ -61,6 +62,8 @@ from netsight_api.schemas import (
     HealthResponse,
     InterfaceListResponse,
     OverviewResponse,
+    ReconciliationFinding,
+    ReconciliationFindingsResponse,
     SourceHealthResponse,
     SourceState,
 )
@@ -504,6 +507,39 @@ async def netbox_device_detail(
             "NetBox returned invalid data",
         ) from exc
     return DeviceDetailResponse(item=device)
+
+
+@api.get(
+    "/reconcile/findings",
+    response_model=ReconciliationFindingsResponse,
+    responses=_STANDARD_ERROR_RESPONSES,
+    tags=["reconciliation"],
+)
+async def reconcile_findings(
+    _identity: DeviceReader,
+    netbox: NetboxDependency,
+    librenms: LibrenmsDependency,
+) -> ReconciliationFindingsResponse:
+    try:
+        netbox_collection = await netbox.devices()
+    except NetboxAdapterError as exc:
+        _raise_netbox_adapter_error(exc)
+    try:
+        discovered_collection = await librenms.devices()
+    except AdapterError as exc:
+        _raise_adapter_error(exc)
+    findings = reconcile(list(netbox_collection.items), list(discovered_collection.items))
+    return ReconciliationFindingsResponse(
+        items=[
+            ReconciliationFinding(
+                kind=f.kind,
+                netbox_device_id=f.netbox_device_id,
+                discovered_device_id=f.discovered_device_id,
+                detail=f.detail,
+            )
+            for f in findings
+        ]
+    )
 
 
 @api.get(
