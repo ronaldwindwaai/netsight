@@ -23,6 +23,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.base import RequestResponseEndpoint
 from starlette.responses import Response
 
+from netsight_api.adapters.clickhouse import ClickhouseClient
 from netsight_api.adapters.librenms import (
     AdapterError,
     AdapterStatus,
@@ -305,7 +306,7 @@ OptionalLibrenmsDependency = Annotated[
 
 
 class TrafficSource(Protocol):
-    """Read-only, bounded flow-aggregate source (ClickHouse lands in S4-2).
+    """Read-only, bounded flow-aggregate source (implemented by S4-2).
 
     Implementations must run parameterised queries with explicit time
     bounds and a row limit; they never receive unbounded requests.
@@ -318,8 +319,12 @@ class TrafficSource(Protocol):
         start: datetime,
         end: datetime,
         limit: int,
-    ) -> tuple[list[TrafficItem], datetime]:
-        """Return ranked items and the newest flow timestamp included."""
+    ) -> tuple[list[TrafficItem], datetime | None]:
+        """Return ranked items and the newest flow timestamp included.
+
+        ``None`` means the window carried no rows: the read succeeded but
+        reports no data currency.
+        """
         ...
 
     async def flows(
@@ -328,18 +333,31 @@ class TrafficSource(Protocol):
         start: datetime,
         end: datetime,
         limit: int,
-    ) -> tuple[list[TrafficFlow], datetime]:
-        """Return high-volume flows and the newest flow timestamp included."""
+    ) -> tuple[list[TrafficFlow], datetime | None]:
+        """Return high-volume flows and the newest flow timestamp included.
+
+        ``None`` means the window carried no rows: the read succeeded but
+        reports no data currency.
+        """
         ...
 
 
 def get_optional_traffic_source() -> TrafficSource | None:
-    """Flow source when configured; None means explicit not-connected.
+    """ClickHouse-backed flow source when configured; None = not-connected.
 
-    S4-1 defines the protocol only — the ClickHouse adapter arrives in
-    S4-2, so this returns None rather than any fabricated sample data.
+    A configured-but-invalid DSN still yields a client: its queries then
+    fail and the endpoints degrade to explicit ``unknown`` — configured
+    does not imply connected (same rule as the S3 NetBox decision).
     """
-    return None
+    dsn = os.environ.get("CLICKHOUSE_DSN", "").strip()
+    if not dsn:
+        return None
+    return ClickhouseClient(
+        dsn=dsn,
+        user=os.environ.get("CLICKHOUSE_USER", "").strip(),
+        password=os.environ.get("CLICKHOUSE_PASSWORD", ""),
+        flows_table=os.environ.get("CLICKHOUSE_FLOWS_TABLE", "").strip() or "flows",
+    )
 
 
 OptionalTrafficDependency = Annotated[
@@ -816,6 +834,29 @@ def _resolve_traffic_window(
     return now - duration, now, preset
 
 
+_TRAFFIC_FRESH_THRESHOLD = timedelta(hours=1)
+
+
+def _traffic_freshness(window_end: datetime, observed_at: datetime | None) -> Freshness:
+    """Source-reported recency for an ``ok`` read.
+
+    ``fresh`` when the newest flow is within an hour of the window end,
+    ``stale`` when the source lags the window, ``unknown`` when no row
+    carried a timestamp (the read succeeded but reports no currency).
+    """
+    if observed_at is None:
+        return Freshness(state="unknown", observed_at=None, source="clickhouse")
+    return Freshness(
+        state=(
+            "fresh"
+            if observed_at >= window_end - _TRAFFIC_FRESH_THRESHOLD
+            else "stale"
+        ),
+        observed_at=observed_at,
+        source="clickhouse",
+    )
+
+
 async def _traffic_top(
     request: Request,
     source: TrafficSource | None,
@@ -871,7 +912,7 @@ async def _traffic_top(
         dimension=dimension,
         time_range=time_range,
         items=items,
-        freshness=Freshness(state="fresh", observed_at=observed_at, source="clickhouse"),
+        freshness=_traffic_freshness(window_end, observed_at),
     )
     try:
         validate("traffic_top", response.model_dump(mode="json", by_alias=True))
@@ -989,7 +1030,7 @@ async def traffic_flows(
         state="ok",
         time_range=time_range,
         flows=flows,
-        freshness=Freshness(state="fresh", observed_at=observed_at, source="clickhouse"),
+        freshness=_traffic_freshness(window_end, observed_at),
     )
     try:
         validate("traffic_flows", response.model_dump(mode="json", by_alias=True))

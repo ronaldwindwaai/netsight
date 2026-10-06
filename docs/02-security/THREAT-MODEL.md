@@ -55,6 +55,13 @@ degrade to an explicit `unknown` state with static error data, and the
 `/api/v1/topology` response is validated against the canonical schema before
 it leaves the boundary. Regression tests: `test_security_matrix.py`
 (hostile pagination origin, hostile node name, token echo).
+Traffic specifics: the ClickHouse DSN, user and password are read from the
+environment only and excluded from client `repr`, so credentials cannot leak
+through logs; flow labels/hostnames are treated as untrusted source text
+(passed through as data, never interpreted as markup or instructions); a
+failed or schema-invalid flow read degrades to an explicit `unknown` state
+with static error data; and the `/api/v1/traffic/*` responses are validated
+against the canonical schema before leaving the boundary.
 
 ### Denial of service
 Risk: expensive flow queries, diagnostics floods, upstream failures.
@@ -63,6 +70,13 @@ Topology specifics: one request fans out to at most 12 upstream calls (≤10
 cable pages × `limit=1000` + 1 NetBox devices page + 1 LibreNMS devices page), each bounded by a 10s timeout;
 graphs are capped at 10,000 nodes/edges and fail closed to `unknown`.
 Open follow-up: per-IP rate limiting and response caching for `/api/v1/topology`.
+Traffic specifics: each traffic request fans out to at most 2 upstream
+ClickHouse calls (1 cached `system.columns` discovery + 1 data query; ≤3 when a
+readonly identity forbids settings and forces one settings-free retry), each
+bounded by a read timeout and an explicit window (≤31 days) plus a row limit
+(≤100 for top-talker/destination, ≤500 for flows). When the identity permits
+`max_execution_time` it is sent as a server-side query budget. A source failure
+never becomes a 5xx and never returns partial data as if complete.
 
 ### Elevation of privilege
 Risk: AI/tool or user obtains write capability.

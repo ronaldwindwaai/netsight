@@ -5,9 +5,11 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 
+from netsight_api.adapters.clickhouse import ClickhouseClient
 from netsight_api.auth.deps import get_current_identity
 from netsight_api.contracts import ContractViolation, validate
 from netsight_api.main import app, get_optional_traffic_source
@@ -26,7 +28,11 @@ def _dev_identity(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.fixture(autouse=True)
 def _clean_app_state(monkeypatch: pytest.MonkeyPatch):
-    for name in ("NETSIGHT_ENV", "NETSIGHT_ENABLE_DEV_IDENTITY"):
+    for name in (
+        "NETSIGHT_ENV",
+        "NETSIGHT_ENABLE_DEV_IDENTITY",
+        "CLICKHOUSE_DSN",
+    ):
         monkeypatch.delenv(name, raising=False)
     app.dependency_overrides.clear()
     yield
@@ -265,29 +271,38 @@ class _FakeTrafficSource:
         items: list[TrafficItem] | None = None,
         flows: list[TrafficFlow] | None = None,
         error: Exception | None = None,
+        observed_lag: timedelta = timedelta(0),
+        no_observed: bool = False,
     ) -> None:
         self._items = items
         self._flows = flows
         self._error = error
+        self._observed_lag = observed_lag
+        self._no_observed = no_observed
         self.calls: list[dict[str, Any]] = []
+
+    def _observed(self, end: datetime) -> datetime | None:
+        if self._no_observed:
+            return None
+        return end - self._observed_lag
 
     async def top(
         self, *, dimension: str, start: datetime, end: datetime, limit: int
-    ) -> tuple[list[TrafficItem], datetime]:
+    ) -> tuple[list[TrafficItem], datetime | None]:
         self.calls.append(
             {"method": "top", "dimension": dimension, "start": start, "end": end, "limit": limit}
         )
         if self._error is not None:
             raise self._error
-        return list(self._items or []), _OBSERVED_AT
+        return list(self._items or []), self._observed(end)
 
     async def flows(
         self, *, start: datetime, end: datetime, limit: int
-    ) -> tuple[list[TrafficFlow], datetime]:
+    ) -> tuple[list[TrafficFlow], datetime | None]:
         self.calls.append({"method": "flows", "start": start, "end": end, "limit": limit})
         if self._error is not None:
             raise self._error
-        return list(self._flows or []), _OBSERVED_AT
+        return list(self._flows or []), self._observed(end)
 
 
 def _override_source(source: _FakeTrafficSource) -> None:
@@ -392,7 +407,7 @@ def test_top_talkers_returns_source_reported_items(
     assert body["items"][0]["label"] == "<script>alert('xss')</script>"
     assert body["freshness"] == {
         "state": "fresh",
-        "observed_at": "2026-10-06T08:00:00Z",
+        "observed_at": body["time_range"]["to"],
         "source": "clickhouse",
     }
     validate("traffic_top", body)
@@ -528,3 +543,172 @@ def test_flows_rejects_unbounded_or_invalid_requests(
     _dev_identity(monkeypatch)
     response = TestClient(app).get(f"/api/v1/traffic/flows?{query}")
     assert response.status_code == 422
+
+
+# --- freshness semantics ----------------------------------------------------
+
+
+def _fresh_item() -> TrafficItem:
+    return TrafficItem(
+        rank=1,
+        subject_kind="ip",
+        subject_id=None,
+        label="10.1.2.3",
+        bytes=1000,
+        packets=10,
+        share=None,
+    )
+
+
+def test_top_talkers_marks_stale_when_source_lags_window(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _dev_identity(monkeypatch)
+    _override_source(
+        _FakeTrafficSource(items=[_fresh_item()], observed_lag=timedelta(hours=3))
+    )
+
+    response = TestClient(app).get(
+        "/api/v1/traffic/top-talkers"
+        "?from=2026-10-05T00:00:00Z&to=2026-10-06T00:00:00Z"
+    )
+
+    assert response.status_code == 200
+    body: dict[str, Any] = response.json()
+    assert body["state"] == "ok"
+    assert body["freshness"] == {
+        "state": "stale",
+        "observed_at": "2026-10-05T21:00:00Z",
+        "source": "clickhouse",
+    }
+    validate("traffic_top", body)
+
+
+def test_top_talkers_reports_unknown_freshness_without_rows(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """ok + no rows: the read succeeded but carries no data currency."""
+    _dev_identity(monkeypatch)
+    _override_source(_FakeTrafficSource(items=[], no_observed=True))
+
+    response = TestClient(app).get(
+        "/api/v1/traffic/top-talkers"
+        "?from=2026-10-05T00:00:00Z&to=2026-10-06T00:00:00Z"
+    )
+
+    assert response.status_code == 200
+    body: dict[str, Any] = response.json()
+    assert body["state"] == "ok"
+    assert body["items"] == []
+    assert body["freshness"] == {
+        "state": "unknown",
+        "observed_at": None,
+        "source": "clickhouse",
+    }
+    validate("traffic_top", body)
+
+
+# --- ClickHouse adapter wired through the endpoint ---------------------------
+
+
+def _clickhouse_transport(
+    record: list[dict[str, Any]],
+) -> httpx.MockTransport:
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = request.content.decode()
+        record.append({"sql": body, "params": dict(request.url.params)})
+        if "system.columns" in body:
+            return httpx.Response(
+                200,
+                json={
+                    "data": [
+                        {"name": name}
+                        for name in (
+                            "TimeReceived",
+                            "SrcAddr",
+                            "DstAddr",
+                            "Proto",
+                            "Bytes",
+                            "Packets",
+                        )
+                    ],
+                    "rows": 6,
+                },
+            )
+        return httpx.Response(
+            200,
+            json={
+                "data": [
+                    {
+                        "label": "::ffff:10.1.2.3",
+                        "agg_bytes": "6000",
+                        "agg_packets": "12",
+                        "agg_seen": int(
+                            datetime(2026, 10, 6, 7, 30, tzinfo=UTC).timestamp()
+                        ),
+                    }
+                ],
+                "totals": {
+                    "label": "",
+                    "agg_bytes": "12000",
+                    "agg_packets": "24",
+                    "agg_seen": 0,
+                },
+                "rows": 1,
+            },
+        )
+
+    return httpx.MockTransport(handler)
+
+
+def test_top_talkers_reads_clickhouse_adapter_end_to_end(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _dev_identity(monkeypatch)
+    record: list[dict[str, Any]] = []
+    source = ClickhouseClient(
+        dsn="http://clickhouse.test:8123",
+        flows_table="flows",
+        _transport=_clickhouse_transport(record),
+    )
+    app.dependency_overrides[get_optional_traffic_source] = lambda: source
+
+    response = TestClient(app).get(
+        "/api/v1/traffic/top-talkers"
+        "?limit=2&from=2026-10-06T00:00:00Z&to=2026-10-06T08:00:00Z"
+    )
+
+    assert response.status_code == 200
+    body: dict[str, Any] = response.json()
+    assert body["state"] == "ok"
+    assert body["items"] == [
+        {
+            "rank": 1,
+            "subject_kind": "ip",
+            "subject_id": None,
+            "label": "10.1.2.3",
+            "bytes": 6000,
+            "packets": 12,
+            "share": 0.5,
+        }
+    ]
+    assert body["freshness"] == {
+        "state": "fresh",
+        "observed_at": "2026-10-06T07:30:00Z",
+        "source": "clickhouse",
+    }
+    validate("traffic_top", body)
+
+    discovery, data = record
+    assert "system.columns" in discovery["sql"]
+    assert discovery["params"]["param_db"] == "default"
+    assert discovery["params"]["param_table"] == "flows"
+    assert "FROM `default`.`flows`" in data["sql"]
+    assert "WITH TOTALS" in data["sql"]
+    assert "LIMIT 2" in data["sql"]
+    assert data["params"]["param_start"] == str(
+        int(datetime(2026, 10, 6, 0, 0, tzinfo=UTC).timestamp())
+    )
+    assert data["params"]["param_end"] == str(
+        int(datetime(2026, 10, 6, 8, 0, tzinfo=UTC).timestamp())
+    )
