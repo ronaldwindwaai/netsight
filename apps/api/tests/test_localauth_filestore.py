@@ -181,6 +181,85 @@ def test_malformed_file_is_refused_not_ignored(account_file: Path) -> None:
         FileAccountStore(account_file).load()
 
 
+def test_changes_from_another_process_are_seen_without_a_restart(
+    account_file: Path,
+) -> None:
+    """The regression: the API cached the file forever and ignored the CLI.
+
+    A recovery code or reset password written by the operator CLI was silently
+    rejected by the running service until it restarted, because the store read
+    the file once at first use and never again.
+    """
+    api = FileAccountStore(account_file)
+    api.load()
+    api.create("ops.user", hash_password(PASSWORD), ["technician"])
+
+    # The operator CLI, in its own process, issues fresh recovery codes.
+    cli = FileAccountStore(account_file)
+    cli.load()
+    codes = generate_recovery_codes(2)
+    account = cli.get("ops.user")
+    assert account is not None
+    account.recovery_code_hashes = hash_recovery_codes(codes)
+    cli.save(account)
+
+    # The API process must now accept them, with no restart.
+    from netsight_api.localauth.recovery import consume_recovery_code
+
+    assert consume_recovery_code(api.get("ops.user").recovery_code_hashes, codes[0]) is not None  # type: ignore[union-attr]
+
+    # A password reset by the CLI must be honoured immediately too.
+    cli = FileAccountStore(account_file)
+    cli.load()
+    reset = cli.get("ops.user")
+    assert reset is not None
+    reset.password_hash = hash_password("another-strong-passphrase")
+    cli.save(reset)
+
+    assert api.authenticate_password("ops.user", "another-strong-passphrase").ok is True
+    assert api.authenticate_password("ops.user", PASSWORD).ok is False
+
+
+def test_an_account_created_elsewhere_appears(account_file: Path) -> None:
+    api = FileAccountStore(account_file)
+    api.load()
+
+    cli = FileAccountStore(account_file)
+    cli.load()
+    cli.create("ops.user", hash_password(PASSWORD), ["technician"])
+
+    # No restart, and no reload() call.
+    assert api.get("ops.user") is not None
+    assert api.list_usernames() == ["ops.user"]
+
+
+def test_a_deletion_elsewhere_is_seen(account_file: Path) -> None:
+    api = FileAccountStore(account_file)
+    api.load()
+    api.create("ops.user", hash_password(PASSWORD), ["technician"])
+
+    cli = FileAccountStore(account_file)
+    cli.load()
+    assert cli.delete("ops.user") is True
+
+    assert api.get("ops.user") is None
+
+
+def test_our_own_write_is_not_mistaken_for_an_external_change(
+    account_file: Path,
+) -> None:
+    """A local mutation must not trigger a pointless reload."""
+    store = FileAccountStore(account_file)
+    store.load()
+    store.create("ops.user", hash_password(PASSWORD), ["technician"])
+
+    assert store._stamp == store._source_stamp()
+
+    # No exception and state intact after further reads.
+    store.register_success("ops.user")
+    assert store.get("ops.user") is not None
+
+
 def test_store_accepts_a_plain_string_path(tmp_path: Path) -> None:
     """Callers routinely pass an environment value, which is a str."""
     target = tmp_path / "nested" / "accounts.json"

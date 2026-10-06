@@ -123,14 +123,25 @@ class FileAccountStore:
         self._lock = threading.RLock()
         self._accounts: dict[str, LocalAccount] = {}
         self._loaded = False
+        # (mtime_ns, size) of the file this state was read from, used to notice
+        # that another process rewrote it.
+        self._stamp: tuple[int, int] | None = None
 
     # -- persistence --------------------------------------------------------
+
+    def _source_stamp(self) -> tuple[int, int] | None:
+        try:
+            status = self._path.stat()
+        except OSError:
+            return None
+        return (status.st_mtime_ns, status.st_size)
 
     def load(self) -> None:
         """Load accounts from disk. Safe to call repeatedly."""
         with self._lock:
             self._accounts = {}
             self._loaded = True
+            self._stamp = self._source_stamp()
             if not self._path.exists():
                 return
             try:
@@ -155,7 +166,18 @@ class FileAccountStore:
                 self._accounts[account.username] = account
 
     def _require_loaded(self) -> None:
+        """Load once, then reload whenever another process rewrites the file.
+
+        The API and the operator CLI are separate processes sharing this file.
+        Caching forever meant a recovery code or reset password written by the
+        CLI was silently rejected by the running service until it restarted.
+        The file is small and the auth path is rate limited, so re-reading on
+        change is cheap; the stamp avoids re-parsing when nothing changed.
+        """
         if not self._loaded:
+            self.load()
+            return
+        if self._source_stamp() != self._stamp:
             self.load()
 
     def flush(self) -> None:
@@ -180,6 +202,9 @@ class FileAccountStore:
             # Re-assert the mode: os.replace preserves the temp file's mode, but
             # an existing destination may predate this call.
             os.chmod(self._path, 0o600)
+            # Record what we just wrote, so our own write is not mistaken for
+            # another process's change on the next read.
+            self._stamp = self._source_stamp()
 
     # -- CRUD ---------------------------------------------------------------
 
