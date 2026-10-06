@@ -174,6 +174,27 @@ export interface OverviewResponse {
   };
 }
 
+export type TopologyState = 'not-connected' | 'ok' | 'unknown';
+export type TopologyEdgeSource = 'lldp' | 'cdp' | 'routing' | 'switching' | 'netbox' | 'manual';
+
+export interface TopologyNode {
+  device_id: string;
+}
+
+export interface TopologyEdge {
+  source_device_id: string;
+  target_device_id: string;
+  source: TopologyEdgeSource;
+  observed_at: string | null;
+}
+
+export interface TopologyResponse {
+  state: TopologyState;
+  nodes: TopologyNode[];
+  edges: TopologyEdge[];
+  freshness: Freshness;
+}
+
 type UnknownRecord = Record<string, unknown>;
 
 const DEVICE_ID_PATTERN =
@@ -777,6 +798,86 @@ export function parseOverviewResponse(value: unknown): OverviewResponse | null {
           }),
     },
   };
+}
+
+const TOPOLOGY_RESPONSE_KEYS = ['state', 'nodes', 'edges', 'freshness'] as const;
+const TOPOLOGY_NODE_KEYS = ['device_id'] as const;
+const TOPOLOGY_EDGE_KEYS = ['source_device_id', 'target_device_id', 'source'] as const;
+const TOPOLOGY_STATES = ['not-connected', 'ok', 'unknown'] as const;
+const TOPOLOGY_EDGE_SOURCES = [
+  'lldp',
+  'cdp',
+  'routing',
+  'switching',
+  'netbox',
+  'manual',
+] as const;
+
+export function parseTopologyResponse(value: unknown): TopologyResponse | null {
+  if (
+    !isRecord(value) ||
+    !hasContractKeys(value, TOPOLOGY_RESPONSE_KEYS) ||
+    typeof value.state !== 'string' ||
+    !TOPOLOGY_STATES.includes(value.state as TopologyState) ||
+    !Array.isArray(value.nodes) ||
+    !Array.isArray(value.edges)
+  ) {
+    return null;
+  }
+
+  const nodes: TopologyNode[] = [];
+  for (const node of value.nodes) {
+    if (
+      !isRecord(node) ||
+      !hasContractKeys(node, TOPOLOGY_NODE_KEYS) ||
+      typeof node.device_id !== 'string' ||
+      !DEVICE_ID_PATTERN.test(node.device_id)
+    ) {
+      return null;
+    }
+    nodes.push({ device_id: node.device_id });
+  }
+
+  const edges: TopologyEdge[] = [];
+  const nodeIds = new Set(nodes.map((node) => node.device_id));
+  for (const edge of value.edges) {
+    if (
+      !isRecord(edge) ||
+      !hasContractKeys(edge, TOPOLOGY_EDGE_KEYS, [...TOPOLOGY_EDGE_KEYS, 'observed_at']) ||
+      typeof edge.source_device_id !== 'string' ||
+      !DEVICE_ID_PATTERN.test(edge.source_device_id) ||
+      typeof edge.target_device_id !== 'string' ||
+      !DEVICE_ID_PATTERN.test(edge.target_device_id) ||
+      !TOPOLOGY_EDGE_SOURCES.includes(edge.source as TopologyEdgeSource) ||
+      !nodeIds.has(edge.source_device_id) ||
+      !nodeIds.has(edge.target_device_id)
+    ) {
+      return null;
+    }
+    const observedAt = edge.observed_at;
+    if (
+      observedAt !== undefined &&
+      observedAt !== null &&
+      (typeof observedAt !== 'string' || !isRfc3339(observedAt))
+    ) {
+      return null;
+    }
+    edges.push({
+      source_device_id: edge.source_device_id,
+      target_device_id: edge.target_device_id,
+      source: edge.source as TopologyEdgeSource,
+      observed_at: observedAt === undefined ? null : (observedAt as string | null),
+    });
+  }
+
+  const state = value.state as TopologyState;
+  if (state === 'ok' && nodes.length < 1) return null;
+  if (state !== 'ok' && (nodes.length > 0 || edges.length > 0)) return null;
+
+  const freshness = parseFreshness(value.freshness);
+  if (freshness === null) return null;
+
+  return { state, nodes, edges, freshness };
 }
 
 export function parseApiError(value: unknown): ApiError | null {
