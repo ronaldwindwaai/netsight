@@ -38,22 +38,6 @@
       "if": {
         "properties": {
           "state": {
-            "const": "ok"
-          }
-        }
-      },
-      "then": {
-        "properties": {
-          "nodes": {
-            "minItems": 1
-          }
-        }
-      }
-    },
-    {
-      "if": {
-        "properties": {
-          "state": {
             "enum": [
               "not-connected",
               "unknown"

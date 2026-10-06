@@ -14,7 +14,7 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from time import perf_counter
 from typing import Any, cast
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 from uuid import NAMESPACE_URL, uuid5
 
 import httpx
@@ -29,6 +29,7 @@ from netsight_api.schemas import (
 
 ADAPTER_VERSION = "netbox/1"
 SOURCE_NAME = "netbox"
+_MAX_CABLE_PAGES = 10
 
 
 class AdapterStatus(StrEnum):
@@ -66,6 +67,25 @@ class SourceHealth:
 @dataclass(frozen=True)
 class DeviceCollection:
     items: tuple[Device, ...]
+    observed_at: datetime
+
+
+@dataclass(frozen=True)
+class CableLink:
+    """One explicit physical link between two NetBox devices.
+
+    Only cables whose terminations resolve to devices on both ends are ever
+    reported; anything else is dropped rather than guessed.
+    """
+
+    device_a_native_id: str
+    device_b_native_id: str
+    observed_at: datetime | None
+
+
+@dataclass(frozen=True)
+class CableCollection:
+    links: tuple[CableLink, ...]
     observed_at: datetime
 
 
@@ -119,6 +139,66 @@ def _device_rows(body: dict[str, Any]) -> list[dict[str, Any]]:
             raise AdapterError(AdapterStatus.INVALID_SOURCE_DATA, "invalid device row")
         rows.append(cast(dict[str, Any], item))
     return rows
+
+
+def _cable_rows(body: dict[str, Any]) -> list[dict[str, Any]]:
+    raw = body.get("results")
+    if not isinstance(raw, list):
+        raise AdapterError(AdapterStatus.INVALID_SOURCE_DATA, "missing cable list")
+    rows: list[dict[str, Any]] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            raise AdapterError(AdapterStatus.INVALID_SOURCE_DATA, "invalid cable row")
+        rows.append(cast(dict[str, Any], item))
+    return rows
+
+
+def _cable_is_active(row: dict[str, Any]) -> bool:
+    """Only explicitly active cables count as evidence of a link."""
+    status = row.get("status")
+    if isinstance(status, dict):
+        value = status.get("value") or status.get("label")
+    elif isinstance(status, str):
+        value = status
+    else:
+        return False
+    return isinstance(value, str) and value.strip().lower() == "active"
+
+
+def _termination_device_native_id(row: dict[str, Any], key: str) -> str | None:
+    """Resolve a cable termination to its device native ID, or None.
+
+    Never guesses: a termination without a nested device ID yields None and
+    the cable is skipped by the caller.
+    """
+    termination = row.get(key)
+    if not isinstance(termination, dict):
+        return None
+    obj = termination.get("object")
+    if not isinstance(obj, dict):
+        return None
+    device = obj.get("device")
+    if not isinstance(device, dict):
+        return None
+    value = device.get("id")
+    if isinstance(value, bool) or not isinstance(value, (int, str)):
+        return None
+    native_id = str(value).strip()
+    return native_id or None
+
+
+def _cable_timestamp(row: dict[str, Any]) -> datetime | None:
+    for key in ("last_updated", "created"):
+        raw = row.get(key)
+        if isinstance(raw, str) and raw.strip():
+            try:
+                parsed = datetime.fromisoformat(raw.strip())
+            except ValueError:
+                continue
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=UTC)
+            return parsed.astimezone(UTC)
+    return None
 
 
 def _netbox_status(row: dict[str, Any]) -> DeviceStatus:
@@ -269,6 +349,50 @@ class NetboxClient:
         observed_at = datetime.now(UTC)
         devices = tuple(_map_device(row, observed_at) for row in _device_rows(body))
         return DeviceCollection(items=devices, observed_at=observed_at)
+
+    def _next_path(self, body: dict[str, Any]) -> str | None:
+        """Return the path of the next pagination page, validated to same origin."""
+        raw_next = body.get("next")
+        if raw_next is None:
+            return None
+        if not isinstance(raw_next, str) or not raw_next.strip():
+            raise AdapterError(AdapterStatus.INVALID_SOURCE_DATA, "invalid pagination url")
+        base = urlsplit(self.base_url)
+        candidate = urlsplit(raw_next.strip())
+        if (candidate.scheme, candidate.netloc) != (base.scheme, base.netloc):
+            raise AdapterError(AdapterStatus.UNAVAILABLE, "unexpected pagination origin")
+        return f"{candidate.path}?{candidate.query}" if candidate.query else candidate.path
+
+    async def cables(self) -> CableCollection:
+        """Explicit physical links from NetBox cables (topology edge source).
+
+        Bounded pagination: a runaway cable list is treated as a source
+        failure rather than silently truncated into a partial graph.
+        """
+        links: list[CableLink] = []
+        path: str | None = "/api/dcim/cables/?limit=1000"
+        pages = 0
+        while path is not None:
+            if pages >= _MAX_CABLE_PAGES:
+                raise AdapterError(AdapterStatus.UNAVAILABLE, "cable pagination exceeded")
+            body = await self._get(path)
+            for row in _cable_rows(body):
+                if not _cable_is_active(row):
+                    continue
+                native_a = _termination_device_native_id(row, "termination_a")
+                native_b = _termination_device_native_id(row, "termination_b")
+                if native_a is None or native_b is None or native_a == native_b:
+                    continue
+                links.append(
+                    CableLink(
+                        device_a_native_id=native_a,
+                        device_b_native_id=native_b,
+                        observed_at=_cable_timestamp(row),
+                    )
+                )
+            path = self._next_path(body)
+            pages += 1
+        return CableCollection(links=tuple(links), observed_at=datetime.now(UTC))
 
     async def get_device(self, native_id: str) -> Device:
         encoded_native_id = quote(native_id, safe="")

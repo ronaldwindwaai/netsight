@@ -40,6 +40,9 @@ from netsight_api.adapters.netbox import (
 from netsight_api.adapters.netbox import (
     NetboxClient,
 )
+from netsight_api.adapters.netbox import (
+    canonical_device_id as netbox_canonical_device_id,
+)
 from netsight_api.auth.deps import get_current_identity
 from netsight_api.auth.oidc import aclose as oidc_aclose
 from netsight_api.auth.routes import router as auth_router
@@ -66,6 +69,8 @@ from netsight_api.schemas import (
     ReconciliationFindingsResponse,
     SourceHealthResponse,
     SourceState,
+    TopologyEdge,
+    TopologyNode,
     TopologyResponse,
 )
 
@@ -261,6 +266,19 @@ def get_netbox_client() -> NetboxClient:
 CurrentIdentity = Annotated[Identity, Depends(get_current_identity)]
 LibrenmsDependency = Annotated[LibrenmsClient, Depends(get_client)]
 NetboxDependency = Annotated[NetboxClient, Depends(get_netbox_client)]
+
+
+def get_optional_netbox_client() -> NetboxClient | None:
+    """NetBox client when configured, else None (topology: not-connected)."""
+    try:
+        return get_netbox_client()
+    except ApiError:
+        return None
+
+
+OptionalNetboxDependency = Annotated[
+    NetboxClient | None, Depends(get_optional_netbox_client)
+]
 
 
 def require_device_reader(identity: CurrentIdentity) -> Identity:
@@ -516,13 +534,59 @@ async def netbox_device_detail(
     responses=_STANDARD_ERROR_RESPONSES,
     tags=["topology"],
 )
-async def topology(_identity: DeviceReader) -> TopologyResponse:
-    """Explicit topology state. Never fabricates a graph until a source is wired."""
+async def topology(
+    _identity: DeviceReader,
+    netbox: OptionalNetboxDependency,
+) -> TopologyResponse:
+    """Explicit topology state.
+
+    NetBox active cables are the only edge source today. No source means
+    not-connected; a configured source that cannot be read means unknown.
+    The graph is never inferred from anything else.
+    """
+    if netbox is None:
+        return TopologyResponse(
+            state="not-connected",
+            nodes=[],
+            edges=[],
+            freshness=Freshness(state="unknown", observed_at=None, source=None),
+        )
+    try:
+        collection = await netbox.cables()
+    except NetboxAdapterError:
+        # Source configured but not confirmable: report unknown, never guess.
+        return TopologyResponse(
+            state="unknown",
+            nodes=[],
+            edges=[],
+            freshness=Freshness(state="unknown", observed_at=None, source="netbox"),
+        )
+
+    node_ids: set[str] = set()
+    edges: list[TopologyEdge] = []
+    for link in collection.links:
+        source_id = netbox_canonical_device_id(link.device_a_native_id)
+        target_id = netbox_canonical_device_id(link.device_b_native_id)
+        if source_id == target_id:
+            continue
+        node_ids.update((source_id, target_id))
+        edges.append(
+            TopologyEdge(
+                source_device_id=source_id,
+                target_device_id=target_id,
+                source="netbox",
+                observed_at=link.observed_at,
+            )
+        )
     return TopologyResponse(
-        state="not-connected",
-        nodes=[],
-        edges=[],
-        freshness=Freshness(state="unknown", observed_at=None, source=None),
+        state="ok",
+        nodes=[TopologyNode(device_id=node_id) for node_id in sorted(node_ids)],
+        edges=edges,
+        freshness=Freshness(
+            state="fresh",
+            observed_at=collection.observed_at,
+            source="netbox",
+        ),
     )
 
 

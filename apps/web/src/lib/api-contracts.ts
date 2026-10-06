@@ -871,7 +871,6 @@ export function parseTopologyResponse(value: unknown): TopologyResponse | null {
   }
 
   const state = value.state as TopologyState;
-  if (state === 'ok' && nodes.length < 1) return null;
   if (state !== 'ok' && (nodes.length > 0 || edges.length > 0)) return null;
 
   const freshness = parseFreshness(value.freshness);

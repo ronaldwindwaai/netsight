@@ -9,10 +9,11 @@ Status: living plan. Sources consumed in order: `AGENTS.md`, `docs/00-product/PR
 - Secure by default, least privilege, fail closed.
 - Contracts under `contracts/**` are authoritative; changes require matching OpenAPI/JSON-schema updates.
 
-## Current state (through `cd2497e`)
+## Current state (through build order steps 1–3)
 - Foundation, CI, security gates, contracts base, canonical API path `/api/v1`.
 - S1 slice implemented: OIDC login + local credentials with MFA (ADR 0010), sessions, RBAC, AdminLTE shell, overview aggregate, LibreNMS devices/interfaces/alerts, device table/detail, interface table, source-health states, E2E harness + security matrix tests.
 - NetBox (NS-030): read-only adapter + `/api/v1/sources/netbox/health`, `/api/v1/netbox/devices`, `/api/v1/netbox/devices/{id}`, `/api/v1/reconcile/findings`. Contract + parser contract surfaces updated for overview source state.
+- Topology (S3 steps 1–3): canonical `topology.schema.json`, `/api/v1/topology` endpoint, NetBox active cables as the only edge source (states `not-connected` / `unknown` / `ok`; only terminations that resolve to devices on both ends become edges), `/map` UI with explicit states, contract + parser tests (no-source/empty/valid graph).
 - Web overview placeholders: topology, incidents, traffic, applications, users, internet, security are explicitly "not connected" surfaces; no fabricated metrics.
 
 ## Build plan (next slices, DoD-gated)
@@ -50,6 +51,7 @@ Steps: tool broker (read-only diagnostics), evidence bundles, RAG, evals; no dir
 - Docs updated; no secrets; rollback notes.
 
 ## Build order (for this loop)
-1. Topology contracts + `/api/v1/topology` not-connected/unknown endpoint (S3 foundation, contract-first).
-2. Topology UI surface wiring placeholder states (empty-state already exists).
-3. Real topology only when an LLDP/CDP/NetBox explicit edge source is configured; otherwise explicit not-connected state.
+1. ✅ Topology contracts + `/api/v1/topology` not-connected/unknown endpoint (S3 foundation, contract-first).
+2. ✅ Topology UI surface wiring placeholder states (empty-state already exists).
+3. ✅ Real topology only when an LLDP/CDP/NetBox explicit edge source is configured; otherwise explicit not-connected state (NetBox active cables wired).
+4. Remaining for S3: interactive graph component (pan/zoom, site filter), reconciliation findings in edge context, independent + security review.

@@ -69,8 +69,18 @@ test('parseTopologyResponse rejects unknown keys', () => {
   assert.equal(parseTopologyResponse({ ...NOT_CONNECTED, extra: 1 }), null);
 });
 
-test('parseTopologyResponse rejects ok state without nodes', () => {
-  assert.equal(parseTopologyResponse({ ...NOT_CONNECTED, state: 'ok' }), null);
+test('parseTopologyResponse accepts an explicitly empty connected graph', () => {
+  // A configured source with zero cables: ok + empty is honest, not a failure.
+  const payload = {
+    ...NOT_CONNECTED,
+    state: 'ok',
+    freshness: {
+      state: 'fresh',
+      observed_at: '2026-10-06T08:00:00Z',
+      source: 'netbox',
+    },
+  };
+  assert.deepEqual(parseTopologyResponse(payload), payload);
 });
 
 test('parseTopologyResponse rejects not-connected state carrying data', () => {
