@@ -29,10 +29,11 @@ function GraphEvidence({ topology }: { topology: TopologyResponse }) {
   const label = (deviceId: string) => labels.get(deviceId) ?? deviceId;
   return (
     <>
-      <div className="d-flex flex-wrap gap-2 mb-3" aria-label="Topology nodes">
+      <div className="d-flex flex-wrap gap-2 mb-3" role="list" aria-label="Topology nodes">
         {topology.nodes.map((node) => (
           <span
             key={node.device_id}
+            role="listitem"
             className="badge bg-secondary-subtle text-body border"
             title={node.device_id}
           >
@@ -60,8 +61,8 @@ function GraphEvidence({ topology }: { topology: TopologyResponse }) {
                   </td>
                 </tr>
               ) : (
-                topology.edges.map((edge) => (
-                  <tr key={`${edge.source_device_id}->${edge.target_device_id}:${edge.source}`}>
+                topology.edges.map((edge, index) => (
+                  <tr key={`${index}:${edge.source_device_id}->${edge.target_device_id}:${edge.source}`}>
                     <td>
                       <span title={edge.source_device_id}>{label(edge.source_device_id)}</span>
                     </td>

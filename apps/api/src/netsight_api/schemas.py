@@ -199,8 +199,10 @@ _DEVICE_ID_PATTERN = r"^device-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[
 
 class TopologyNode(ApiModel):
     device_id: str = Field(pattern=_DEVICE_ID_PATTERN, min_length=43, max_length=43)
-    # Source-reported name; None when the source did not report one (never inferred).
-    name: str | None = Field(default=None, max_length=255)
+    # Source-reported name; None when the source did not report one (never
+    # inferred). Required (nullable) so the OpenAPI contract, canonical JSON
+    # schema and browser parser all agree on presence.
+    name: str | None = Field(..., max_length=255)
 
 
 class TopologyEdge(ApiModel):
@@ -212,8 +214,8 @@ class TopologyEdge(ApiModel):
 
 class TopologyResponse(ApiModel):
     state: Literal["not-connected", "ok", "unknown"]
-    nodes: list[TopologyNode]
-    edges: list[TopologyEdge]
+    nodes: list[TopologyNode] = Field(max_length=10_000)
+    edges: list[TopologyEdge] = Field(max_length=10_000)
     freshness: Freshness
 
 

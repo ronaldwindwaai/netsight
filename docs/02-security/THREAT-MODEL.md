@@ -26,6 +26,12 @@
 ## Trust boundaries
 See system architecture.
 
+Additional boundary added with the topology surface (S3): the NetBox
+pagination URL (`next`) is source-controlled and is followed by the service
+with the NetBox token attached — it is validated to the exact configured
+origin before use (`adapters/netbox.py:_next_path`). Source-reported device
+names cross a second boundary into the browser as inert text.
+
 ## Threats and mitigations
 
 ### Spoofing
@@ -43,10 +49,20 @@ Mitigation: authenticated action requests, timestamps, correlation IDs, approval
 ### Information disclosure
 Risk: traffic metadata/topology/security logs exposed.
 Mitigation: least privilege, encrypted transport/storage, field masking, management summaries, secret redaction.
+Topology specifics: cross-origin pagination URLs are rejected (SSRF/credential
+leak guard), adapter tokens are `repr=False` and never logged, source failures
+degrade to an explicit `unknown` state with static error data, and the
+`/api/v1/topology` response is validated against the canonical schema before
+it leaves the boundary. Regression tests: `test_security_matrix.py`
+(hostile pagination origin, hostile node name, token echo).
 
 ### Denial of service
 Risk: expensive flow queries, diagnostics floods, upstream failures.
 Mitigation: rate limits, query budgets, timeouts, async jobs, caching, degradation.
+Topology specifics: one request fans out to at most 11 upstream calls (≤10
+cable pages × `limit=1000` + 1 devices page), each bounded by a 10s timeout;
+graphs are capped at 10,000 nodes/edges and fail closed to `unknown`.
+Open follow-up: per-IP rate limiting and response caching for `/api/v1/topology`.
 
 ### Elevation of privilege
 Risk: AI/tool or user obtains write capability.

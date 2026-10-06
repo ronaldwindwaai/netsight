@@ -19,12 +19,14 @@
     },
     "nodes": {
       "type": "array",
+      "maxItems": 10000,
       "items": {
         "$ref": "#/$defs/node"
       }
     },
     "edges": {
       "type": "array",
+      "maxItems": 10000,
       "items": {
         "$ref": "#/$defs/edge"
       }

@@ -536,6 +536,7 @@ async def netbox_device_detail(
     tags=["topology"],
 )
 async def topology(
+    request: Request,
     _identity: DeviceReader,
     netbox: OptionalNetboxDependency,
 ) -> TopologyResponse:
@@ -545,6 +546,7 @@ async def topology(
     not-connected; a configured source that cannot be read means unknown.
     The graph is never inferred from anything else.
     """
+    correlation_id = _request_correlation_id(request)
     if netbox is None:
         return TopologyResponse(
             state="not-connected",
@@ -557,19 +559,45 @@ async def topology(
         netbox.devices(),
         return_exceptions=True,
     )
-    if isinstance(cables_result, BaseException):
+    if isinstance(cables_result, Exception):
         # Source configured but not confirmable: report unknown, never guess.
+        _LOGGER.warning(
+            "topology source read failed",
+            extra={
+                "correlation_id": correlation_id,
+                "source": "netbox",
+                "adapter_status": str(
+                    getattr(cables_result, "status", "unknown")
+                ),
+            },
+        )
         return TopologyResponse(
             state="unknown",
             nodes=[],
             edges=[],
             freshness=Freshness(state="unknown", observed_at=None, source="netbox"),
         )
+    if isinstance(cables_result, BaseException):
+        # Cancellation and other BaseExceptions must propagate, not degrade.
+        raise cables_result
     collection = cables_result
     # Device names are cosmetic: if the name lookup fails, nodes keep
     # name=None rather than the graph being dropped.
     names: dict[str, str] = {}
-    if not isinstance(devices_result, BaseException):
+    if isinstance(devices_result, Exception):
+        _LOGGER.warning(
+            "topology node name lookup failed; nodes will carry no names",
+            extra={
+                "correlation_id": correlation_id,
+                "source": "netbox",
+                "adapter_status": str(
+                    getattr(devices_result, "status", "unknown")
+                ),
+            },
+        )
+    elif isinstance(devices_result, BaseException):
+        raise devices_result
+    else:
         for device in devices_result.items:
             names[device.source_aliases[0].native_id] = device.name
 
@@ -590,19 +618,38 @@ async def topology(
                 observed_at=link.observed_at,
             )
         )
-    return TopologyResponse(
-        state="ok",
-        nodes=[
-            TopologyNode(device_id=node_id, name=nodes_by_id[node_id])
-            for node_id in sorted(nodes_by_id)
-        ],
-        edges=edges,
-        freshness=Freshness(
-            state="fresh",
-            observed_at=collection.observed_at,
-            source="netbox",
-        ),
-    )
+    try:
+        response = TopologyResponse(
+            state="ok",
+            nodes=[
+                TopologyNode(device_id=node_id, name=nodes_by_id[node_id])
+                for node_id in sorted(nodes_by_id)
+            ],
+            edges=edges,
+            freshness=Freshness(
+                state="fresh",
+                observed_at=collection.observed_at,
+                source="netbox",
+            ),
+        )
+        # Canonical contract enforced at the boundary, like every other endpoint.
+        validate("topology", response.model_dump(mode="json"))
+    except (ValidationError, ContractViolation) as exc:
+        _LOGGER.warning(
+            "topology graph rejected by canonical contract",
+            extra={
+                "correlation_id": correlation_id,
+                "source": "netbox",
+                "error_type": type(exc).__name__,
+            },
+        )
+        return TopologyResponse(
+            state="unknown",
+            nodes=[],
+            edges=[],
+            freshness=Freshness(state="unknown", observed_at=None, source="netbox"),
+        )
+    return response
 
 
 @api.get(

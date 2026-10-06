@@ -821,7 +821,9 @@ export function parseTopologyResponse(value: unknown): TopologyResponse | null {
     typeof value.state !== 'string' ||
     !TOPOLOGY_STATES.includes(value.state as TopologyState) ||
     !Array.isArray(value.nodes) ||
-    !Array.isArray(value.edges)
+    !Array.isArray(value.edges) ||
+    value.nodes.length > 10_000 ||
+    value.edges.length > 10_000
   ) {
     return null;
   }

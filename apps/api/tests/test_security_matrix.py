@@ -43,6 +43,8 @@ def _reset(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
         "NETSIGHT_ROLE_CLAIM",
         "NETSIGHT_ROLE_MAPPING",
         "NETSIGHT_DEFAULT_ROLE",
+        "NETBOX_BASE_URL",
+        "NETBOX_TOKEN",
     ):
         monkeypatch.delenv(name, raising=False)
     app.dependency_overrides.clear()
@@ -252,6 +254,100 @@ def test_hostile_device_name_is_carried_as_data_not_markup(
     assert response.headers["content-type"].startswith("application/json")
     body = response.json()
     assert body["items"][0]["name"] == XSS_DEVICE_NAME
+
+
+def _override_netbox(handler: Any) -> None:
+    """Serve NetBox from a hostile/mock handler with a leak-prone token."""
+    from netsight_api.adapters.netbox import NetboxClient
+    from netsight_api.main import get_optional_netbox_client
+
+    client = NetboxClient(
+        base_url="https://netbox.test",
+        token="adapter-secret-do-not-leak",
+        _transport=httpx.MockTransport(handler),
+    )
+    app.dependency_overrides[get_optional_netbox_client] = lambda: client
+
+
+def _active_cable() -> dict[str, Any]:
+    return {
+        "id": 1,
+        "status": {"value": "active", "label": "Active"},
+        "termination_a": {"object": {"name": "Ethernet1", "device": {"id": 1}}},
+        "termination_b": {"object": {"name": "Ethernet1", "device": {"id": 2}}},
+        "last_updated": "2026-10-05T10:00:00Z",
+    }
+
+
+def test_topology_rejects_hostile_pagination_origin(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The vendor-controlled `next` URL must never be followed off-origin.
+
+    SSRF guard: the request carries the NetBox token, so a hostile origin
+    would leak the credential. Failure must fail closed to `unknown` with no
+    origin, base URL or token in the response.
+    """
+    _enable_dev_identity(monkeypatch)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/api/dcim/cables/":
+            return httpx.Response(
+                200,
+                json={
+                    "count": 1,
+                    "results": [_active_cable()],
+                    "next": "https://evil.test/steal?token=1",
+                },
+            )
+        return httpx.Response(200, json={"count": 0, "results": []})
+
+    _override_netbox(handler)
+    response = TestClient(app).get("/api/v1/topology")
+
+    assert response.status_code == 200
+    assert response.json()["state"] == "unknown"
+    for secret in ("evil.test", "adapter-secret-do-not-leak", "netbox.test"):
+        assert secret not in response.text
+
+
+def test_topology_device_name_is_carried_as_data_not_markup(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Source-reported node names must round-trip as inert JSON text."""
+    _enable_dev_identity(monkeypatch)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/api/dcim/cables/":
+            return httpx.Response(200, json={"count": 1, "results": [_active_cable()]})
+        return httpx.Response(
+            200,
+            json={
+                "count": 2,
+                "results": [
+                    {"id": 1, "name": XSS_DEVICE_NAME, "display": XSS_DEVICE_NAME},
+                    {"id": 2, "name": "sw-b", "display": "sw-b"},
+                ],
+            },
+        )
+
+    _override_netbox(handler)
+    response = TestClient(app).get("/api/v1/topology")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("application/json")
+    body = response.json()
+    assert body["state"] == "ok"
+    assert XSS_DEVICE_NAME in [node["name"] for node in body["nodes"]]
+
+
+def test_topology_never_echoes_the_netbox_token(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _enable_dev_identity(monkeypatch)
+    _override_netbox(lambda request: httpx.Response(500, json={"detail": "boom"}))
+    body = TestClient(app).get("/api/v1/topology").text
+    assert "adapter-secret-do-not-leak" not in body
 
 
 def test_web_layer_never_uses_raw_html_injection() -> None:

@@ -7,8 +7,10 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
+from netsight_api.auth.deps import get_current_identity
 from netsight_api.contracts import ContractViolation, validate
 from netsight_api.main import app
+from netsight_api.rbac import Identity
 
 DEVICE_A = "device-a7f3d9e1-1c2b-4a8e-9f0d-5b6c7d8e9f01"
 DEVICE_B = "device-b1c2d3e4-5f6a-4b7c-8d9e-0a1b2c3d4e56"
@@ -21,7 +23,12 @@ def _dev_identity(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.fixture(autouse=True)
 def _clean_app_state(monkeypatch: pytest.MonkeyPatch):
-    for name in ("NETSIGHT_ENV", "NETSIGHT_ENABLE_DEV_IDENTITY"):
+    for name in (
+        "NETSIGHT_ENV",
+        "NETSIGHT_ENABLE_DEV_IDENTITY",
+        "NETBOX_BASE_URL",
+        "NETBOX_TOKEN",
+    ):
         monkeypatch.delenv(name, raising=False)
     app.dependency_overrides.clear()
     yield
@@ -31,6 +38,18 @@ def _clean_app_state(monkeypatch: pytest.MonkeyPatch):
 def test_topology_requires_authentication() -> None:
     response = TestClient(app).get("/api/v1/topology")
     assert response.status_code == 401
+
+
+def test_topology_forbidden_without_devices_read() -> None:
+    """An authenticated identity lacking DEVICES_READ must be denied."""
+    app.dependency_overrides[get_current_identity] = lambda: Identity(
+        "limited-user", frozenset({"unknown-role"})
+    )
+
+    response = TestClient(app).get("/api/v1/topology")
+
+    assert response.status_code == 403
+    assert response.json()["error"]["code"] == "FORBIDDEN"
 
 
 def test_topology_default_state_is_not_connected(monkeypatch: pytest.MonkeyPatch) -> None:
