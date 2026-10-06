@@ -27,6 +27,7 @@ SCHEMA_FILES = {
     "evidence": "evidence.schema.json",
     "action_request": "action-request.schema.json",
     "ai_answer": "ai-answer.schema.json",
+    "topology": "topology.schema.json",
 }
 
 

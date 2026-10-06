@@ -194,13 +194,16 @@ class ReconciliationFindingsResponse(ApiModel):
     items: list[ReconciliationFinding]
 
 
+_DEVICE_ID_PATTERN = r"^device-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+
+
 class TopologyNode(ApiModel):
-    device_id: str
+    device_id: str = Field(pattern=_DEVICE_ID_PATTERN, min_length=43, max_length=43)
 
 
 class TopologyEdge(ApiModel):
-    source_device_id: str
-    target_device_id: str
+    source_device_id: str = Field(pattern=_DEVICE_ID_PATTERN, min_length=43, max_length=43)
+    target_device_id: str = Field(pattern=_DEVICE_ID_PATTERN, min_length=43, max_length=43)
     source: Literal["lldp", "cdp", "routing", "switching", "netbox", "manual"]
     observed_at: datetime | None = None
 

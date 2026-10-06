@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TopologyResponse",
+  "type": "object",
+  "required": [
+    "state",
+    "nodes",
+    "edges",
+    "freshness"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "state": {
+      "enum": [
+        "not-connected",
+        "ok",
+        "unknown"
+      ]
+    },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/node"
+      }
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/edge"
+      }
+    },
+    "freshness": {
+      "$ref": "common.schema.json#/$defs/freshness"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "const": "ok"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "nodes": {
+            "minItems": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "enum": [
+              "not-connected",
+              "unknown"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "nodes": {
+            "maxItems": 0
+          },
+          "edges": {
+            "maxItems": 0
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "node": {
+      "type": "object",
+      "required": [
+        "device_id"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "device_id": {
+          "type": "string",
+          "pattern": "^device-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        }
+      }
+    },
+    "edge": {
+      "type": "object",
+      "required": [
+        "source_device_id",
+        "target_device_id",
+        "source"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "source_device_id": {
+          "type": "string",
+          "pattern": "^device-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "target_device_id": {
+          "type": "string",
+          "pattern": "^device-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "source": {
+          "enum": [
+            "lldp",
+            "cdp",
+            "routing",
+            "switching",
+            "netbox",
+            "manual"
+          ]
+        },
+        "observed_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        }
+      }
+    }
+  }
+}
