@@ -9,7 +9,7 @@ import re
 from collections.abc import AsyncIterator, Mapping
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
-from typing import Annotated, Any, NoReturn
+from typing import Annotated, Any, Literal, NoReturn
 from urllib.parse import urlsplit
 from uuid import uuid4
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -634,6 +634,20 @@ async def device_interfaces(
     )
 
 
+async def _netbox_source_state() -> dict[str, SourceState]:
+    """NetBox may be unconfigured in dev; report that rather than failing the page."""
+    base_url = os.environ.get("NETBOX_BASE_URL", "").strip()
+    token = os.environ.get("NETBOX_TOKEN", "").strip()
+    if not base_url or not token:
+        return {"netbox": SourceState(configured=False, status="not-configured")}
+    client = NetboxClient(base_url=base_url, token=token)
+    health = await client.health()
+    mapped_status: Literal["success", "unavailable", "forbidden", "invalid-source-data"] = (
+        health.status.value if health.status.value in {"success", "unavailable", "forbidden", "invalid-source-data"} else "unavailable"
+    )
+    return {"netbox": SourceState(configured=True, status=mapped_status)}
+
+
 @api.get(
     "/overview",
     response_model=OverviewResponse,
@@ -693,7 +707,8 @@ async def overview(
             "librenms": SourceState(
                 configured=True,
                 status="success",
-            )
+            ),
+            **(await _netbox_source_state()),
         },
     )
 

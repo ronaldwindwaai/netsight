@@ -196,7 +196,7 @@ class ReconciliationFindingsResponse(ApiModel):
 
 class OverviewResponse(ApiModel):
     devices: DeviceHealthSummary
-    sources: dict[Literal["librenms"], SourceState]
+    sources: dict[Literal["librenms", "netbox"], SourceState]
 
 
 class ProviderState(ApiModel):

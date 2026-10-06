@@ -425,9 +425,11 @@ components:
         sources:
           type: object
           additionalProperties: false
-          required: [librenms]
+          required: [librenms, netbox]
           properties:
             librenms:
+              $ref: '#/components/schemas/SourceState'
+            netbox:
               $ref: '#/components/schemas/SourceState'
     ProviderState:
       type: object

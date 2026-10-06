@@ -170,6 +170,7 @@ export interface OverviewResponse {
   devices: DeviceHealthSummary;
   sources: {
     librenms: SourceState;
+    netbox?: SourceState;
   };
 }
 
@@ -740,7 +741,15 @@ export function parseOverviewResponse(value: unknown): OverviewResponse | null {
     typeof value.sources.librenms.status !== 'string' ||
     !OVERVIEW_SOURCE_STATUSES.includes(
       value.sources.librenms.status as (typeof OVERVIEW_SOURCE_STATUSES)[number],
-    )
+    ) ||
+    (value.sources.netbox !== undefined &&
+      (!isRecord(value.sources.netbox) ||
+        !hasContractKeys(value.sources.netbox, SOURCE_STATE_KEYS) ||
+        typeof (value.sources.netbox as Record<string, unknown>).configured !== 'boolean' ||
+        typeof (value.sources.netbox as Record<string, unknown>).status !== 'string' ||
+        !OVERVIEW_SOURCE_STATUSES.includes(
+          (value.sources.netbox as Record<string, unknown>).status as (typeof OVERVIEW_SOURCE_STATUSES)[number],
+        )))
   ) {
     return null;
   }
@@ -758,6 +767,14 @@ export function parseOverviewResponse(value: unknown): OverviewResponse | null {
         configured: value.sources.librenms.configured,
         status: value.sources.librenms.status as SourceState['status'],
       },
+      ...(value.sources.netbox === undefined
+        ? {}
+        : {
+            netbox: {
+              configured: (value.sources.netbox as { configured: boolean }).configured,
+              status: (value.sources.netbox as { status: SourceState['status'] }).status,
+            },
+          }),
     },
   };
 }
