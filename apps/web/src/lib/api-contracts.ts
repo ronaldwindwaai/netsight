@@ -179,6 +179,7 @@ export type TopologyEdgeSource = 'lldp' | 'cdp' | 'routing' | 'switching' | 'net
 
 export interface TopologyNode {
   device_id: string;
+  name: string | null;
 }
 
 export interface TopologyEdge {
@@ -801,7 +802,7 @@ export function parseOverviewResponse(value: unknown): OverviewResponse | null {
 }
 
 const TOPOLOGY_RESPONSE_KEYS = ['state', 'nodes', 'edges', 'freshness'] as const;
-const TOPOLOGY_NODE_KEYS = ['device_id'] as const;
+const TOPOLOGY_NODE_KEYS = ['device_id', 'name'] as const;
 const TOPOLOGY_EDGE_KEYS = ['source_device_id', 'target_device_id', 'source'] as const;
 const TOPOLOGY_STATES = ['not-connected', 'ok', 'unknown'] as const;
 const TOPOLOGY_EDGE_SOURCES = [
@@ -831,11 +832,12 @@ export function parseTopologyResponse(value: unknown): TopologyResponse | null {
       !isRecord(node) ||
       !hasContractKeys(node, TOPOLOGY_NODE_KEYS) ||
       typeof node.device_id !== 'string' ||
-      !DEVICE_ID_PATTERN.test(node.device_id)
+      !DEVICE_ID_PATTERN.test(node.device_id) ||
+      !isNullableString(node.name)
     ) {
       return null;
     }
-    nodes.push({ device_id: node.device_id });
+    nodes.push({ device_id: node.device_id, name: node.name });
   }
 
   const edges: TopologyEdge[] = [];

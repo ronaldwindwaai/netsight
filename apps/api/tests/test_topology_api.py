@@ -54,7 +54,10 @@ def test_topology_openapi_route_versioned() -> None:
 def test_valid_graph_contract() -> None:
     instance = {
         "state": "ok",
-        "nodes": [{"device_id": DEVICE_A}, {"device_id": DEVICE_B}],
+        "nodes": [
+            {"device_id": DEVICE_A, "name": "core-sw-01"},
+            {"device_id": DEVICE_B, "name": "edge-sw-02"},
+        ],
         "edges": [
             {
                 "source_device_id": DEVICE_A,
@@ -85,28 +88,35 @@ def test_connected_source_may_report_an_explicitly_empty_graph() -> None:
         # not-connected must not carry data
         {
             "state": "not-connected",
-            "nodes": [{"device_id": DEVICE_A}],
+            "nodes": [{"device_id": DEVICE_A, "name": None}],
             "edges": [],
             "freshness": {"state": "unknown", "observed_at": None, "source": None},
         },
         # unknown must not carry data — nothing is drawn from a failed source
         {
             "state": "unknown",
-            "nodes": [{"device_id": DEVICE_A}],
+            "nodes": [{"device_id": DEVICE_A, "name": None}],
             "edges": [],
             "freshness": {"state": "unknown", "observed_at": None, "source": "netbox"},
         },
         # non-canonical device id
         {
             "state": "ok",
-            "nodes": [{"device_id": "librenms:1"}],
+            "nodes": [{"device_id": "librenms:1", "name": None}],
+            "edges": [],
+            "freshness": {"state": "fresh", "observed_at": None, "source": "lldp"},
+        },
+        # node without a name key is not canonical
+        {
+            "state": "ok",
+            "nodes": [{"device_id": DEVICE_A}],
             "edges": [],
             "freshness": {"state": "fresh", "observed_at": None, "source": "lldp"},
         },
         # unknown edge source
         {
             "state": "ok",
-            "nodes": [{"device_id": DEVICE_A}],
+            "nodes": [{"device_id": DEVICE_A, "name": None}],
             "edges": [
                 {
                     "source_device_id": DEVICE_A,
@@ -154,15 +164,27 @@ def _cable(
     }
 
 
-def _wire_netbox(cables: list[dict[str, Any]]) -> None:
+def _wire_netbox(
+    cables: list[dict[str, Any]],
+    devices: list[dict[str, Any]] | None = None,
+) -> None:
     import httpx
 
     from netsight_api.adapters.netbox import NetboxClient
     from netsight_api.main import get_optional_netbox_client
 
+    device_rows = devices if devices is not None else [
+        {"id": 1, "name": "core-sw-01", "display": "core-sw-01"},
+        {"id": 2, "name": "edge-sw-02", "display": "edge-sw-02"},
+        {"id": 3, "name": "dist-sw-03", "display": "dist-sw-03"},
+    ]
+
     def handler(request: httpx.Request) -> httpx.Response:
-        assert request.url.path == "/api/dcim/cables/"
-        return httpx.Response(200, json={"count": len(cables), "results": cables})
+        if request.url.path == "/api/dcim/cables/":
+            return httpx.Response(200, json={"count": len(cables), "results": cables})
+        if request.url.path == "/api/dcim/devices/":
+            return httpx.Response(200, json={"count": len(device_rows), "results": device_rows})
+        raise AssertionError(f"unexpected source path: {request.url.path}")
 
     client = NetboxClient(
         base_url="http://netbox.test",
@@ -185,6 +207,13 @@ def test_topology_builds_explicit_graph_from_active_cables(
     assert body["state"] == "ok"
     assert len(body["nodes"]) == 3
     assert len(body["edges"]) == 2
+    from netsight_api.adapters.netbox import canonical_device_id as netbox_id
+
+    assert {node["device_id"]: node["name"] for node in body["nodes"]} == {
+        netbox_id("1"): "core-sw-01",
+        netbox_id("2"): "edge-sw-02",
+        netbox_id("3"): "dist-sw-03",
+    }
     assert {edge["source"] for edge in body["edges"]} == {"netbox"}
     assert {
         edge["observed_at"] for edge in body["edges"]
@@ -251,4 +280,38 @@ def test_topology_source_failure_reports_unknown(
         "observed_at": None,
         "source": "netbox",
     }
+    validate("topology", body)
+
+
+def test_topology_keeps_graph_when_name_lookup_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Names are cosmetic: a failed device lookup must not drop the graph."""
+    _dev_identity(monkeypatch)
+
+    import httpx
+
+    from netsight_api.adapters.netbox import NetboxClient
+    from netsight_api.main import get_optional_netbox_client
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/api/dcim/cables/":
+            return httpx.Response(200, json={"count": 1, "results": [_cable(1)]})
+        return httpx.Response(500, json={"detail": "boom"})
+
+    client = NetboxClient(
+        base_url="http://netbox.test",
+        token="test-token",
+        _transport=httpx.MockTransport(handler),
+    )
+    app.dependency_overrides[get_optional_netbox_client] = lambda: client
+
+    response = TestClient(app).get("/api/v1/topology")
+
+    assert response.status_code == 200
+    body: dict[str, Any] = response.json()
+    assert body["state"] == "ok"
+    assert len(body["nodes"]) == 2
+    assert all(node["name"] is None for node in body["nodes"])
+    assert len(body["edges"]) == 1
     validate("topology", body)

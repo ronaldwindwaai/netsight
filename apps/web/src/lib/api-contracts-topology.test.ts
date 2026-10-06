@@ -31,7 +31,10 @@ test('parseTopologyResponse accepts explicit unknown state', () => {
 test('parseTopologyResponse accepts a valid graph', () => {
   const payload = {
     state: 'ok',
-    nodes: [{ device_id: DEVICE_A }, { device_id: DEVICE_B }],
+    nodes: [
+      { device_id: DEVICE_A, name: 'core-sw-01' },
+      { device_id: DEVICE_B, name: 'edge-sw-02' },
+    ],
     edges: [
       {
         source_device_id: DEVICE_A,
@@ -52,7 +55,7 @@ test('parseTopologyResponse accepts a valid graph', () => {
 test('parseTopologyResponse accepts edge without observed_at', () => {
   const payload = {
     state: 'ok',
-    nodes: [{ device_id: DEVICE_A }],
+    nodes: [{ device_id: DEVICE_A, name: 'core-sw-01' }],
     edges: [],
     freshness: {
       state: 'stale',
@@ -87,6 +90,18 @@ test('parseTopologyResponse rejects not-connected state carrying data', () => {
   assert.equal(
     parseTopologyResponse({
       ...NOT_CONNECTED,
+      nodes: [{ device_id: DEVICE_A, name: 'core-sw-01' }],
+    }),
+    null,
+  );
+});
+
+test('parseTopologyResponse rejects a node without an explicit name key', () => {
+  // name is required (nullable) so a missing key never renders as blank.
+  assert.equal(
+    parseTopologyResponse({
+      ...NOT_CONNECTED,
+      state: 'ok',
       nodes: [{ device_id: DEVICE_A }],
     }),
     null,
@@ -98,7 +113,7 @@ test('parseTopologyResponse rejects non-canonical node ids', () => {
     parseTopologyResponse({
       ...NOT_CONNECTED,
       state: 'ok',
-      nodes: [{ device_id: 'librenms:1' }],
+      nodes: [{ device_id: 'librenms:1', name: null }],
     }),
     null,
   );
@@ -108,7 +123,7 @@ test('parseTopologyResponse rejects edges referencing unknown nodes', () => {
   assert.equal(
     parseTopologyResponse({
       state: 'ok',
-      nodes: [{ device_id: DEVICE_A }],
+      nodes: [{ device_id: DEVICE_A, name: 'core-sw-01' }],
       edges: [
         {
           source_device_id: DEVICE_A,
@@ -131,7 +146,7 @@ test('parseTopologyResponse rejects unknown edge sources', () => {
   assert.equal(
     parseTopologyResponse({
       state: 'ok',
-      nodes: [{ device_id: DEVICE_A }],
+      nodes: [{ device_id: DEVICE_A, name: 'core-sw-01' }],
       edges: [
         {
           source_device_id: DEVICE_A,

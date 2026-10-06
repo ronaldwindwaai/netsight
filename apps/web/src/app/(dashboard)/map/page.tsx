@@ -23,13 +23,21 @@ function EmptySurface({
 }
 
 function GraphEvidence({ topology }: { topology: TopologyResponse }) {
+  const labels = new Map(
+    topology.nodes.map((node) => [node.device_id, node.name ?? node.device_id]),
+  );
+  const label = (deviceId: string) => labels.get(deviceId) ?? deviceId;
   return (
     <>
       <div className="d-flex flex-wrap gap-2 mb-3" aria-label="Topology nodes">
         {topology.nodes.map((node) => (
-          <span key={node.device_id} className="badge bg-secondary-subtle text-body border">
+          <span
+            key={node.device_id}
+            className="badge bg-secondary-subtle text-body border"
+            title={node.device_id}
+          >
             <i className="bi bi-hdd-network me-1" aria-hidden="true" />
-            {node.device_id}
+            {node.name ?? node.device_id}
           </span>
         ))}
       </div>
@@ -54,8 +62,12 @@ function GraphEvidence({ topology }: { topology: TopologyResponse }) {
               ) : (
                 topology.edges.map((edge) => (
                   <tr key={`${edge.source_device_id}->${edge.target_device_id}:${edge.source}`}>
-                    <td>{edge.source_device_id}</td>
-                    <td>{edge.target_device_id}</td>
+                    <td>
+                      <span title={edge.source_device_id}>{label(edge.source_device_id)}</span>
+                    </td>
+                    <td>
+                      <span title={edge.target_device_id}>{label(edge.target_device_id)}</span>
+                    </td>
                     <td>
                       <span className="badge bg-info-subtle text-info-emphasis border">
                         {edge.source.toUpperCase()}

@@ -199,6 +199,8 @@ _DEVICE_ID_PATTERN = r"^device-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[
 
 class TopologyNode(ApiModel):
     device_id: str = Field(pattern=_DEVICE_ID_PATTERN, min_length=43, max_length=43)
+    # Source-reported name; None when the source did not report one (never inferred).
+    name: str | None = Field(default=None, max_length=255)
 
 
 class TopologyEdge(ApiModel):

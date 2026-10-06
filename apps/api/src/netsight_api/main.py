@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -551,9 +552,12 @@ async def topology(
             edges=[],
             freshness=Freshness(state="unknown", observed_at=None, source=None),
         )
-    try:
-        collection = await netbox.cables()
-    except NetboxAdapterError:
+    cables_result, devices_result = await asyncio.gather(
+        netbox.cables(),
+        netbox.devices(),
+        return_exceptions=True,
+    )
+    if isinstance(cables_result, BaseException):
         # Source configured but not confirmable: report unknown, never guess.
         return TopologyResponse(
             state="unknown",
@@ -561,15 +565,23 @@ async def topology(
             edges=[],
             freshness=Freshness(state="unknown", observed_at=None, source="netbox"),
         )
+    collection = cables_result
+    # Device names are cosmetic: if the name lookup fails, nodes keep
+    # name=None rather than the graph being dropped.
+    names: dict[str, str] = {}
+    if not isinstance(devices_result, BaseException):
+        for device in devices_result.items:
+            names[device.source_aliases[0].native_id] = device.name
 
-    node_ids: set[str] = set()
+    nodes_by_id: dict[str, str | None] = {}
     edges: list[TopologyEdge] = []
     for link in collection.links:
         source_id = netbox_canonical_device_id(link.device_a_native_id)
         target_id = netbox_canonical_device_id(link.device_b_native_id)
         if source_id == target_id:
             continue
-        node_ids.update((source_id, target_id))
+        nodes_by_id.setdefault(source_id, names.get(link.device_a_native_id))
+        nodes_by_id.setdefault(target_id, names.get(link.device_b_native_id))
         edges.append(
             TopologyEdge(
                 source_device_id=source_id,
@@ -580,7 +592,10 @@ async def topology(
         )
     return TopologyResponse(
         state="ok",
-        nodes=[TopologyNode(device_id=node_id) for node_id in sorted(node_ids)],
+        nodes=[
+            TopologyNode(device_id=node_id, name=nodes_by_id[node_id])
+            for node_id in sorted(nodes_by_id)
+        ],
         edges=edges,
         freshness=Freshness(
             state="fresh",

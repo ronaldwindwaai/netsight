@@ -61,13 +61,21 @@
     "node": {
       "type": "object",
       "required": [
-        "device_id"
+        "device_id",
+        "name"
       ],
       "additionalProperties": false,
       "properties": {
         "device_id": {
           "type": "string",
           "pattern": "^device-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 255
         }
       }
     },
