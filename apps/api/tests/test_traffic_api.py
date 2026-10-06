@@ -8,13 +8,21 @@ from typing import Any
 import httpx
 import pytest
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 
 from netsight_api.adapters.clickhouse import ClickhouseClient
 from netsight_api.auth.deps import get_current_identity
 from netsight_api.contracts import ContractViolation, validate
 from netsight_api.main import app, get_optional_traffic_source
 from netsight_api.rbac import Identity
-from netsight_api.schemas import TrafficFlow, TrafficItem
+from netsight_api.schemas import (
+    Freshness,
+    TrafficFlow,
+    TrafficFlowsResponse,
+    TrafficItem,
+    TrafficTimeRange,
+    TrafficTopResponse,
+)
 
 DEVICE_A = "device-a7f3d9e1-1c2b-4a8e-9f0d-5b6c7d8e9f01"
 
@@ -259,6 +267,30 @@ def test_invalid_flows_contract(instance: dict[str, Any]) -> None:
         validate("traffic_flows", instance)
 
 
+def test_top_model_rejects_non_ok_with_items() -> None:
+    """The pydantic boundary enforces the same invariant as schema + parser."""
+    with pytest.raises(ValidationError):
+        TrafficTopResponse(
+            state="unknown",
+            dimension="talkers",
+            time_range=TrafficTimeRange.model_validate(_time_range()),
+            items=[TrafficItem.model_validate(_item())],
+            freshness=Freshness.model_validate(_freshness()),
+        )
+
+
+def test_flows_model_rejects_non_ok_with_rows() -> None:
+    with pytest.raises(ValidationError):
+        TrafficFlowsResponse(
+            state="not-connected",
+            time_range=TrafficTimeRange.model_validate(_time_range()),
+            flows=[TrafficFlow.model_validate(_flow())],
+            freshness=Freshness.model_validate(
+                {"state": "unknown", "observed_at": None, "source": None}
+            ),
+        )
+
+
 # --- source test double -----------------------------------------------------
 
 
@@ -338,6 +370,18 @@ def test_traffic_forbidden_for_technician_role() -> None:
     response = TestClient(app).get("/api/v1/traffic/flows")
 
     assert response.status_code == 403
+
+
+def test_traffic_forbidden_for_top_destinations() -> None:
+    """Every traffic route shares the same deny-by-default dependency."""
+    app.dependency_overrides[get_current_identity] = lambda: Identity(
+        "limited-user", frozenset({"unknown-role"})
+    )
+
+    response = TestClient(app).get("/api/v1/traffic/top-destinations")
+
+    assert response.status_code == 403
+    assert response.json()["error"]["code"] == "FORBIDDEN"
 
 
 def test_top_talkers_default_state_is_not_connected(

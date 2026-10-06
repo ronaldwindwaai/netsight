@@ -164,7 +164,7 @@ function ApplicationsCard({ state }: { state: FetchState<TrafficFlowsResponse> }
       rank: index + 1,
       subject_kind: 'application',
       subject_id: null,
-      label: entry.application,
+      label: entry.application ?? 'Unattributed (no application reported)',
       bytes: entry.bytes,
       packets: null,
       share: entry.share,
@@ -181,7 +181,7 @@ function ApplicationsCard({ state }: { state: FetchState<TrafficFlowsResponse> }
         <>
           <p className="small text-body-secondary mb-2">
             Share of bytes across the {state.data.flows.length} listed high-volume flows, not the
-            full window.
+            full window. Flows without application metadata are shown as unattributed.
           </p>
           <TrafficBars items={items} />
         </>
@@ -284,7 +284,7 @@ export default async function TrafficPage({
         <>
           <div className="row g-3">
             <div className="col-xl-6">
-              <TopPanel title="Top users / devices" icon="bi bi-people" state={talkersState} />
+              <TopPanel title="Top talkers (source IP)" icon="bi bi-people" state={talkersState} />
             </div>
             <div className="col-xl-6">
               <TopPanel title="Top destinations" icon="bi bi-globe2" state={destinationsState} />

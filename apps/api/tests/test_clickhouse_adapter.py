@@ -435,7 +435,7 @@ async def test_dsn_userinfo_supplies_basic_auth() -> None:
     assert seen[0] == expected
 
 
-def test_repr_masks_dsn_and_password() -> None:
+def test_repr_masks_dsn_user_and_password() -> None:
     client = ClickhouseClient(
         dsn="http://alice:s3cret@clickhouse.test:8123",
         user="alice",
@@ -444,6 +444,37 @@ def test_repr_masks_dsn_and_password() -> None:
     text = repr(client)
     assert "hunter2" not in text
     assert "s3cret" not in text
+    assert "alice" not in text
+
+
+@pytest.mark.asyncio
+async def test_redirect_is_not_followed_and_degrades_to_unavailable() -> None:
+    """A 3xx from the flow store is never followed (no credential re-send)."""
+    calls: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request)
+        return httpx.Response(302, headers={"Location": "https://evil.test/"})
+
+    with pytest.raises(AdapterError) as excinfo:
+        await _client(handler).top(dimension="talkers", start=_START, end=_END, limit=5)
+
+    assert excinfo.value.status is AdapterStatus.UNAVAILABLE
+    # Exactly one request: the redirect target was never contacted.
+    assert len(calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_transport_failure_degrades_to_unavailable() -> None:
+    """A TLS/transport error becomes a typed UNAVAILABLE, never an unhandled raise."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("TLS certificate verify failed", request=request)
+
+    with pytest.raises(AdapterError) as excinfo:
+        await _client(handler).top(dimension="talkers", start=_START, end=_END, limit=5)
+
+    assert excinfo.value.status is AdapterStatus.UNAVAILABLE
 
 
 @pytest.mark.asyncio

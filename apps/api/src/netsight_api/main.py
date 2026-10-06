@@ -413,6 +413,15 @@ _STANDARD_ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {
     503: {"model": ErrorEnvelope, "description": "Source unavailable"},
 }
 
+# Traffic reads never 5xx: a source failure degrades to an explicit 200
+# `unknown`. Documenting 502/503 (and their LibreNMS/NetBox wording) would be
+# inaccurate, so traffic routes advertise only the generation errors.
+_TRAFFIC_ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {
+    401: {"model": ErrorEnvelope, "description": "Authentication required"},
+    403: {"model": ErrorEnvelope, "description": "Permission denied"},
+    422: {"model": ErrorEnvelope, "description": "Invalid request"},
+}
+
 
 def _raise_adapter_error(exc: AdapterError) -> NoReturn:
     if exc.status is AdapterStatus.UNAVAILABLE:
@@ -857,6 +866,22 @@ def _traffic_freshness(window_end: datetime, observed_at: datetime | None) -> Fr
     )
 
 
+def _validate_top(body: TrafficTopResponse) -> TrafficTopResponse:
+    """Canonical boundary validation applied on every return path.
+
+    Non-ok bodies are static, but validating them too keeps the contract
+    enforced uniformly rather than only on the source-backed branch.
+    """
+    validate("traffic_top", body.model_dump(mode="json", by_alias=True))
+    return body
+
+
+def _validate_flows(body: TrafficFlowsResponse) -> TrafficFlowsResponse:
+    """Canonical boundary validation for every traffic-flows return path."""
+    validate("traffic_flows", body.model_dump(mode="json", by_alias=True))
+    return body
+
+
 async def _traffic_top(
     request: Request,
     source: TrafficSource | None,
@@ -876,21 +901,27 @@ async def _traffic_top(
     correlation_id = _request_correlation_id(request)
 
     def _degraded() -> TrafficTopResponse:
-        return TrafficTopResponse(
-            state="unknown",
-            dimension=dimension,
-            time_range=time_range,
-            items=[],
-            freshness=Freshness(state="unknown", observed_at=None, source="clickhouse"),
+        return _validate_top(
+            TrafficTopResponse(
+                state="unknown",
+                dimension=dimension,
+                time_range=time_range,
+                items=[],
+                freshness=Freshness(
+                    state="unknown", observed_at=None, source="clickhouse"
+                ),
+            )
         )
 
     if source is None:
-        return TrafficTopResponse(
-            state="not-connected",
-            dimension=dimension,
-            time_range=time_range,
-            items=[],
-            freshness=Freshness(state="unknown", observed_at=None, source=None),
+        return _validate_top(
+            TrafficTopResponse(
+                state="not-connected",
+                dimension=dimension,
+                time_range=time_range,
+                items=[],
+                freshness=Freshness(state="unknown", observed_at=None, source=None),
+            )
         )
     result = await _capture(
         source.top(dimension=dimension, start=window_start, end=window_end, limit=limit)
@@ -907,22 +938,23 @@ async def _traffic_top(
         )
         return _degraded()
     items, observed_at = result
-    response = TrafficTopResponse(
-        state="ok",
-        dimension=dimension,
-        time_range=time_range,
-        items=items,
-        freshness=_traffic_freshness(window_end, observed_at),
-    )
     try:
-        validate("traffic_top", response.model_dump(mode="json", by_alias=True))
-    except ContractViolation:
+        response = TrafficTopResponse(
+            state="ok",
+            dimension=dimension,
+            time_range=time_range,
+            items=items,
+            freshness=_traffic_freshness(window_end, observed_at),
+        )
+        # Canonical contract enforced at the boundary, like every other endpoint.
+        _validate_top(response)
+    except (ValidationError, ContractViolation) as exc:
         _LOGGER.warning(
             "traffic response rejected by canonical contract",
             extra={
                 "correlation_id": correlation_id,
                 "source": "clickhouse",
-                "error_type": "ContractViolation",
+                "error_type": type(exc).__name__,
             },
         )
         return _degraded()
@@ -932,7 +964,7 @@ async def _traffic_top(
 @api.get(
     "/traffic/top-talkers",
     response_model=TrafficTopResponse,
-    responses=_STANDARD_ERROR_RESPONSES,
+    responses=_TRAFFIC_ERROR_RESPONSES,
     tags=["traffic"],
 )
 async def traffic_top_talkers(
@@ -955,7 +987,7 @@ async def traffic_top_talkers(
 @api.get(
     "/traffic/top-destinations",
     response_model=TrafficTopResponse,
-    responses=_STANDARD_ERROR_RESPONSES,
+    responses=_TRAFFIC_ERROR_RESPONSES,
     tags=["traffic"],
 )
 async def traffic_top_destinations(
@@ -976,7 +1008,7 @@ async def traffic_top_destinations(
 @api.get(
     "/traffic/flows",
     response_model=TrafficFlowsResponse,
-    responses=_STANDARD_ERROR_RESPONSES,
+    responses=_TRAFFIC_ERROR_RESPONSES,
     tags=["traffic"],
 )
 async def traffic_flows(
@@ -998,19 +1030,25 @@ async def traffic_flows(
     correlation_id = _request_correlation_id(request)
 
     def _degraded() -> TrafficFlowsResponse:
-        return TrafficFlowsResponse(
-            state="unknown",
-            time_range=time_range,
-            flows=[],
-            freshness=Freshness(state="unknown", observed_at=None, source="clickhouse"),
+        return _validate_flows(
+            TrafficFlowsResponse(
+                state="unknown",
+                time_range=time_range,
+                flows=[],
+                freshness=Freshness(
+                    state="unknown", observed_at=None, source="clickhouse"
+                ),
+            )
         )
 
     if source is None:
-        return TrafficFlowsResponse(
-            state="not-connected",
-            time_range=time_range,
-            flows=[],
-            freshness=Freshness(state="unknown", observed_at=None, source=None),
+        return _validate_flows(
+            TrafficFlowsResponse(
+                state="not-connected",
+                time_range=time_range,
+                flows=[],
+                freshness=Freshness(state="unknown", observed_at=None, source=None),
+            )
         )
     result = await _capture(
         source.flows(start=window_start, end=window_end, limit=limit)
@@ -1026,21 +1064,21 @@ async def traffic_flows(
         )
         return _degraded()
     flows, observed_at = result
-    response = TrafficFlowsResponse(
-        state="ok",
-        time_range=time_range,
-        flows=flows,
-        freshness=_traffic_freshness(window_end, observed_at),
-    )
     try:
-        validate("traffic_flows", response.model_dump(mode="json", by_alias=True))
-    except ContractViolation:
+        response = TrafficFlowsResponse(
+            state="ok",
+            time_range=time_range,
+            flows=flows,
+            freshness=_traffic_freshness(window_end, observed_at),
+        )
+        _validate_flows(response)
+    except (ValidationError, ContractViolation) as exc:
         _LOGGER.warning(
             "traffic flow response rejected by canonical contract",
             extra={
                 "correlation_id": correlation_id,
                 "source": "clickhouse",
-                "error_type": "ContractViolation",
+                "error_type": type(exc).__name__,
             },
         )
         return _degraded()

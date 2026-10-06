@@ -196,12 +196,13 @@ def _window_params(start: datetime, end: datetime) -> dict[str, int]:
 class ClickhouseClient:
     """Read-only flow-query client for one configured ClickHouse endpoint.
 
-    ``dsn`` and ``password`` are excluded from ``repr`` so credentials can
-    never leak through logging or test output.
+    ``dsn``, ``user`` and ``password`` are excluded from ``repr`` so
+    credentials and the service-account name can never leak through logging
+    or test output.
     """
 
     dsn: str = field(repr=False)
-    user: str = ""
+    user: str = field(default="", repr=False)
     password: str = field(default="", repr=False)
     flows_table: str = "flows"
     timeout_seconds: float = 10.0
@@ -434,6 +435,9 @@ class ClickhouseClient:
                 timeout=timeout,
                 auth=auth,
                 transport=self._transport,
+                # Never follow a redirect from the flow store: a 3xx could
+                # silently resend the Authorization header to another host.
+                follow_redirects=False,
             ) as client:
                 response = await client.post("/", params=url_params, content=sql)
         except httpx.TimeoutException as exc:
@@ -441,6 +445,10 @@ class ClickhouseClient:
         except httpx.HTTPError as exc:
             raise AdapterError(AdapterStatus.UNAVAILABLE, "clickhouse request failed") from exc
 
+        if 300 <= response.status_code < 400:
+            raise AdapterError(
+                AdapterStatus.UNAVAILABLE, "clickhouse returned an unexpected redirect"
+            )
         if response.status_code in (401, 403):
             raise AdapterError(
                 AdapterStatus.FORBIDDEN, "clickhouse rejected the configured credentials"

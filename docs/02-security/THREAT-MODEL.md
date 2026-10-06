@@ -62,6 +62,13 @@ through logs; flow labels/hostnames are treated as untrusted source text
 failed or schema-invalid flow read degrades to an explicit `unknown` state
 with static error data; and the `/api/v1/traffic/*` responses are validated
 against the canonical schema before leaving the boundary.
+Traffic reads are currently unscoped by site/asset and are not separately
+audit-logged. Both are recorded platform follow-ups (ABAC/site scoping and an
+audit event for privacy-sensitive reads) awaiting the platform RBAC/audit
+slice; deny-by-default still holds because every route requires `traffic:read`.
+The adapter also refuses to follow upstream redirects (no credential re-send)
+and degrades transport/TLS failures to `UNAVAILABLE`; regression tests pin
+both.
 
 ### Denial of service
 Risk: expensive flow queries, diagnostics floods, upstream failures.
@@ -71,12 +78,16 @@ cable pages × `limit=1000` + 1 NetBox devices page + 1 LibreNMS devices page), 
 graphs are capped at 10,000 nodes/edges and fail closed to `unknown`.
 Open follow-up: per-IP rate limiting and response caching for `/api/v1/topology`.
 Traffic specifics: each traffic request fans out to at most 2 upstream
-ClickHouse calls (1 cached `system.columns` discovery + 1 data query; ≤3 when a
-readonly identity forbids settings and forces one settings-free retry), each
-bounded by a read timeout and an explicit window (≤31 days) plus a row limit
-(≤100 for top-talker/destination, ≤500 for flows). When the identity permits
-`max_execution_time` it is sent as a server-side query budget. A source failure
-never becomes a 5xx and never returns partial data as if complete.
+ClickHouse calls (1 `system.columns` discovery, cached for the lifetime of the
+per-request client instance, + 1 data query; ≤3 when a readonly identity forbids
+settings and forces one settings-free retry), each bounded by a read timeout and
+an explicit window (≤31 days) plus a row limit (≤100 for top-talker/destination,
+≤500 for flows). When the identity permits `max_execution_time` it is sent as a
+server-side query budget. A source failure never becomes a 5xx and never returns
+partial data as if complete.
+Open follow-up: per-identity rate limiting (and process-level `system.columns`
+caching) for `/api/v1/traffic/*` — the `/traffic` page alone issues three reads
+per render, consistent with the existing `/api/v1/topology` rate-limit follow-up.
 
 ### Elevation of privilege
 Risk: AI/tool or user obtains write capability.

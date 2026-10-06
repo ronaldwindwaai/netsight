@@ -32,17 +32,29 @@ test('sums bytes per application and ranks by volume', () => {
   ]);
 });
 
-test('ignores flows without application metadata', () => {
+test('buckets flows without application metadata as unattributed', () => {
   const mix = applicationMix([
-    flow({ application: null, bytes: 900 }),
+    flow({ application: null, bytes: 300 }),
     flow({ application: 'https', bytes: 100 }),
   ]);
-  assert.deepEqual(mix, [{ application: 'https', bytes: 100, share: 1 }]);
+  assert.deepEqual(mix, [
+    { application: null, bytes: 300, share: 0.75 },
+    { application: 'https', bytes: 100, share: 0.25 },
+  ]);
 });
 
-test('returns no mix when nothing is attributable', () => {
+test('shares are computed across every listed flow, not just attributed ones', () => {
+  const mix = applicationMix([
+    flow({ application: 'https', bytes: 100 }),
+    flow({ application: null, bytes: 300 }),
+  ]);
+  const httpsShare = mix.find((entry) => entry.application === 'https')?.share;
+  assert.equal(httpsShare, 0.25);
+});
+
+test('returns no mix when nothing carries bytes', () => {
   assert.deepEqual(applicationMix([]), []);
-  assert.deepEqual(applicationMix([flow({ application: null })]), []);
+  assert.deepEqual(applicationMix([flow({ bytes: 0 })]), []);
 });
 
 test('breaks volume ties by application name for stable output', () => {

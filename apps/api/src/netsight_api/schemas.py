@@ -302,6 +302,18 @@ class TrafficTopResponse(ApiModel):
     items: list[TrafficItem] = Field(max_length=1000)
     freshness: Freshness
 
+    @model_validator(mode="after")
+    def _non_ok_carries_no_rows(self) -> TrafficTopResponse:
+        """A degraded state must never assert traffic data.
+
+        This mirrors the canonical JSON schema `if state != ok then no items`
+        rule and the browser parser, so the invariant is enforced at the
+        platform boundary rather than only by construction convention.
+        """
+        if self.state != "ok" and self.items:
+            raise ValueError("non-ok traffic state must not carry items")
+        return self
+
 
 class TrafficFlow(ApiModel):
     """One high-volume flow row; all enrichment fields are source-reported."""
@@ -325,3 +337,10 @@ class TrafficFlowsResponse(ApiModel):
     time_range: TrafficTimeRange
     flows: list[TrafficFlow] = Field(max_length=500)
     freshness: Freshness
+
+    @model_validator(mode="after")
+    def _non_ok_carries_no_rows(self) -> TrafficFlowsResponse:
+        """A degraded state must never assert flow data (see top response)."""
+        if self.state != "ok" and self.flows:
+            raise ValueError("non-ok traffic state must not carry flows")
+        return self
