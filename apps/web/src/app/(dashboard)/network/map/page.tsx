@@ -1,6 +1,7 @@
 import { AppContent, Card } from '@adminlte/react';
 
 import { DataFailure, FreshnessNotice } from '@/components/data-state';
+import { TopologyGraph } from '@/components/topology-graph';
 import { apiGet } from '@/lib/api';
 import { parseTopologyResponse, type TopologyResponse } from '@/lib/api-contracts';
 
@@ -29,6 +30,7 @@ function GraphEvidence({ topology }: { topology: TopologyResponse }) {
   const label = (deviceId: string) => labels.get(deviceId) ?? deviceId;
   return (
     <>
+      <TopologyGraph topology={topology} />
       <div className="d-flex flex-wrap gap-2 mb-3" role="list" aria-label="Topology nodes">
         {topology.nodes.map((node) => (
           <span

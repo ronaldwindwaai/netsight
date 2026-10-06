@@ -156,6 +156,32 @@ body {
   color: var(--bs-body-color);
 }
 
+.topology-canvas {
+  overflow: hidden;
+  background: var(--bs-tertiary-bg);
+  user-select: none;
+}
+
+.topology-edge {
+  stroke: var(--bs-secondary-color);
+  opacity: 0.7;
+}
+
+.topology-node {
+  fill: var(--bs-body-bg);
+  stroke: var(--bs-border-color);
+}
+
+.topology-node--selected {
+  stroke: var(--bs-primary);
+  fill: color-mix(in srgb, var(--bs-primary) 8%, var(--bs-body-bg));
+}
+
+.topology-node__label {
+  fill: var(--bs-body-color);
+  pointer-events: none;
+}
+
 .unavailable-surface {
   display: flex;
   min-height: 10.5rem;
