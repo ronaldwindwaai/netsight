@@ -28,6 +28,8 @@ SCHEMA_FILES = {
     "action_request": "action-request.schema.json",
     "ai_answer": "ai-answer.schema.json",
     "topology": "topology.schema.json",
+    "traffic_top": "traffic.schema.json",
+    "traffic_flows": "traffic-flows.schema.json",
 }
 
 

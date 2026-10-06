@@ -205,6 +205,68 @@ export interface TopologyResponse {
   freshness: Freshness;
 }
 
+export type TrafficState = 'not-connected' | 'ok' | 'unknown';
+export type TrafficDimension = 'talkers' | 'destinations';
+export type TrafficPreset = '1h' | '6h' | '24h' | '7d';
+export type TrafficSubjectKind =
+  | 'device'
+  | 'ip'
+  | 'user'
+  | 'application'
+  | 'domain'
+  | 'asn'
+  | 'interface';
+export type FlowProtocol = 'tcp' | 'udp' | 'icmp' | 'other';
+export type FlowDirection = 'inbound' | 'outbound' | 'internal' | 'unknown';
+
+export interface TrafficTimeRange {
+  from: string;
+  to: string;
+  preset: TrafficPreset | null;
+}
+
+export interface TrafficItem {
+  rank: number;
+  subject_kind: TrafficSubjectKind;
+  /** Canonical ID when the source resolves one; never inferred. */
+  subject_id: string | null;
+  /** Source-reported label; untrusted, render as data only. */
+  label: string;
+  bytes: number;
+  packets: number | null;
+  share: number | null;
+}
+
+export interface TrafficTopResponse {
+  state: TrafficState;
+  dimension: TrafficDimension;
+  time_range: TrafficTimeRange;
+  items: TrafficItem[];
+  freshness: Freshness;
+}
+
+export interface TrafficFlow {
+  observed_at: string;
+  source_ip: string;
+  source_device_id: string | null;
+  destination_ip: string;
+  destination_host: string | null;
+  protocol: FlowProtocol;
+  destination_port: number | null;
+  bytes: number;
+  packets: number | null;
+  direction: FlowDirection;
+  application: string | null;
+  user: string | null;
+}
+
+export interface TrafficFlowsResponse {
+  state: TrafficState;
+  time_range: TrafficTimeRange;
+  flows: TrafficFlow[];
+  freshness: Freshness;
+}
+
 type UnknownRecord = Record<string, unknown>;
 
 const DEVICE_ID_PATTERN =
@@ -915,6 +977,218 @@ export function parseTopologyResponse(value: unknown): TopologyResponse | null {
   if (freshness === null) return null;
 
   return { state, nodes, edges, freshness };
+}
+
+const TRAFFIC_STATES = ['not-connected', 'ok', 'unknown'] as const;
+const TRAFFIC_DIMENSIONS = ['talkers', 'destinations'] as const;
+const TRAFFIC_PRESETS = ['1h', '6h', '24h', '7d'] as const;
+const TRAFFIC_SUBJECT_KINDS = [
+  'device',
+  'ip',
+  'user',
+  'application',
+  'domain',
+  'asn',
+  'interface',
+] as const;
+const FLOW_PROTOCOLS = ['tcp', 'udp', 'icmp', 'other'] as const;
+const FLOW_DIRECTIONS = ['inbound', 'outbound', 'internal', 'unknown'] as const;
+
+const TRAFFIC_TOP_RESPONSE_KEYS = [
+  'state',
+  'dimension',
+  'time_range',
+  'items',
+  'freshness',
+] as const;
+const TRAFFIC_TIME_RANGE_KEYS = ['from', 'to', 'preset'] as const;
+const TRAFFIC_ITEM_KEYS = [
+  'rank',
+  'subject_kind',
+  'subject_id',
+  'label',
+  'bytes',
+  'packets',
+  'share',
+] as const;
+const TRAFFIC_FLOWS_RESPONSE_KEYS = ['state', 'time_range', 'flows', 'freshness'] as const;
+const TRAFFIC_FLOW_KEYS = [
+  'observed_at',
+  'source_ip',
+  'source_device_id',
+  'destination_ip',
+  'destination_host',
+  'protocol',
+  'destination_port',
+  'bytes',
+  'packets',
+  'direction',
+  'application',
+  'user',
+] as const;
+
+function parseTrafficTimeRange(value: unknown): TrafficTimeRange | null {
+  if (!isRecord(value) || !hasContractKeys(value, TRAFFIC_TIME_RANGE_KEYS)) return null;
+  if (typeof value.from !== 'string' || !isRfc3339(value.from)) return null;
+  if (typeof value.to !== 'string' || !isRfc3339(value.to)) return null;
+  if (value.preset !== null && !TRAFFIC_PRESETS.includes(value.preset as TrafficPreset)) {
+    return null;
+  }
+  return {
+    from: value.from,
+    to: value.to,
+    preset: value.preset as TrafficPreset | null,
+  };
+}
+
+function parseTrafficItem(value: unknown): TrafficItem | null {
+  if (!isRecord(value) || !hasContractKeys(value, TRAFFIC_ITEM_KEYS)) return null;
+  if (
+    !isBoundedInteger(value.rank, 1, 1000) ||
+    typeof value.subject_kind !== 'string' ||
+    !TRAFFIC_SUBJECT_KINDS.includes(value.subject_kind as TrafficSubjectKind) ||
+    !isNullableString(value.subject_id) ||
+    (value.subject_id !== null && !isBoundedString(value.subject_id, 1, 128)) ||
+    typeof value.label !== 'string' ||
+    !isBoundedString(value.label, 1, 255) ||
+    !isBoundedInteger(value.bytes, 0) ||
+    (value.packets !== null && !isBoundedInteger(value.packets, 0))
+  ) {
+    return null;
+  }
+  if (
+    value.share !== null &&
+    (typeof value.share !== 'number' ||
+      !Number.isFinite(value.share) ||
+      value.share < 0 ||
+      value.share > 1)
+  ) {
+    return null;
+  }
+  return {
+    rank: value.rank as number,
+    subject_kind: value.subject_kind as TrafficSubjectKind,
+    subject_id: value.subject_id,
+    label: value.label,
+    bytes: value.bytes as number,
+    packets: value.packets as number | null,
+    share: value.share as number | null,
+  };
+}
+
+export function parseTrafficTopResponse(value: unknown): TrafficTopResponse | null {
+  if (
+    !isRecord(value) ||
+    !hasContractKeys(value, TRAFFIC_TOP_RESPONSE_KEYS) ||
+    typeof value.state !== 'string' ||
+    !TRAFFIC_STATES.includes(value.state as TrafficState) ||
+    typeof value.dimension !== 'string' ||
+    !TRAFFIC_DIMENSIONS.includes(value.dimension as TrafficDimension) ||
+    !Array.isArray(value.items) ||
+    value.items.length > 1000
+  ) {
+    return null;
+  }
+
+  const timeRange = parseTrafficTimeRange(value.time_range);
+  const freshness = parseFreshness(value.freshness);
+  if (timeRange === null || freshness === null) return null;
+
+  const items = value.items.map(parseTrafficItem);
+  if (items.some((item) => item === null)) return null;
+  // Fail closed: a non-ok state must never carry source-derived rows.
+  if (value.state !== 'ok' && items.length > 0) return null;
+
+  return {
+    state: value.state as TrafficState,
+    dimension: value.dimension as TrafficDimension,
+    time_range: timeRange,
+    items: items as TrafficItem[],
+    freshness,
+  };
+}
+
+function parseTrafficFlow(value: unknown): TrafficFlow | null {
+  if (!isRecord(value) || !hasContractKeys(value, TRAFFIC_FLOW_KEYS)) return null;
+  if (typeof value.observed_at !== 'string' || !isRfc3339(value.observed_at)) return null;
+  if (
+    typeof value.source_ip !== 'string' ||
+    !isBoundedString(value.source_ip, 1, 45) ||
+    typeof value.destination_ip !== 'string' ||
+    !isBoundedString(value.destination_ip, 1, 45)
+  ) {
+    return null;
+  }
+  if (
+    value.source_device_id !== null &&
+    (typeof value.source_device_id !== 'string' ||
+      !DEVICE_ID_PATTERN.test(value.source_device_id))
+  ) {
+    return null;
+  }
+  if (
+    !isNullableString(value.destination_host) ||
+    (value.destination_host !== null && !isBoundedString(value.destination_host, 1, 255)) ||
+    typeof value.protocol !== 'string' ||
+    !FLOW_PROTOCOLS.includes(value.protocol as FlowProtocol) ||
+    (value.destination_port !== null &&
+      !isBoundedInteger(value.destination_port, 0, 65535)) ||
+    !isBoundedInteger(value.bytes, 0) ||
+    (value.packets !== null && !isBoundedInteger(value.packets, 0)) ||
+    typeof value.direction !== 'string' ||
+    !FLOW_DIRECTIONS.includes(value.direction as FlowDirection)
+  ) {
+    return null;
+  }
+  for (const key of ['application', 'user'] as const) {
+    const field = value[key];
+    if (field !== null && (typeof field !== 'string' || !isBoundedString(field, 1, 255))) {
+      return null;
+    }
+  }
+  return {
+    observed_at: value.observed_at,
+    source_ip: value.source_ip,
+    source_device_id: value.source_device_id,
+    destination_ip: value.destination_ip,
+    destination_host: value.destination_host,
+    protocol: value.protocol as FlowProtocol,
+    destination_port: value.destination_port as number | null,
+    bytes: value.bytes as number,
+    packets: value.packets as number | null,
+    direction: value.direction as FlowDirection,
+    application: value.application as string | null,
+    user: value.user as string | null,
+  };
+}
+
+export function parseTrafficFlowsResponse(value: unknown): TrafficFlowsResponse | null {
+  if (
+    !isRecord(value) ||
+    !hasContractKeys(value, TRAFFIC_FLOWS_RESPONSE_KEYS) ||
+    typeof value.state !== 'string' ||
+    !TRAFFIC_STATES.includes(value.state as TrafficState) ||
+    !Array.isArray(value.flows) ||
+    value.flows.length > 500
+  ) {
+    return null;
+  }
+
+  const timeRange = parseTrafficTimeRange(value.time_range);
+  const freshness = parseFreshness(value.freshness);
+  if (timeRange === null || freshness === null) return null;
+
+  const flows = value.flows.map(parseTrafficFlow);
+  if (flows.some((flow) => flow === null)) return null;
+  // Fail closed: a non-ok state must never carry source-derived rows.
+  if (value.state !== 'ok' && flows.length > 0) return null;
+
+  return {
+    state: value.state as TrafficState,
+    time_range: timeRange,
+    flows: flows as TrafficFlow[],
+    freshness,
+  };
 }
 
 export function parseApiError(value: unknown): ApiError | null {

@@ -66,6 +66,8 @@
 - `contracts/json-schema/device.schema.json`
 - `contracts/json-schema/evidence.schema.json`
 - `contracts/json-schema/incident.schema.json`
+- `contracts/json-schema/traffic-flows.schema.json`
+- `contracts/json-schema/traffic.schema.json`
 - `contracts/openapi/netsight-api.yaml`
 - `docs/00-product/ACCEPTANCE-SCENARIOS.md`
 - `docs/00-product/NON-GOALS.md`

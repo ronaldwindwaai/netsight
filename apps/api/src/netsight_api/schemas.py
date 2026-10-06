@@ -260,3 +260,68 @@ class ProviderState(ApiModel):
 
 class AuthProvidersResponse(ApiModel):
     providers: dict[Literal["microsoft", "google"], ProviderState]
+
+
+# --- Traffic (S4) -----------------------------------------------------------
+
+TrafficState = Literal["not-connected", "ok", "unknown"]
+TrafficDimension = Literal["talkers", "destinations"]
+TrafficPreset = Literal["1h", "6h", "24h", "7d"]
+
+
+class TrafficTimeRange(ApiModel):
+    """Requested window (server-bounded, never source data)."""
+
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    from_: datetime = Field(..., alias="from")
+    to: datetime
+    preset: TrafficPreset | None
+
+
+class TrafficItem(ApiModel):
+    """One ranked row of a traffic aggregate.
+
+    `label` is source-reported and untrusted; `subject_id` is a canonical ID
+    only when the source resolves one (never inferred).
+    """
+
+    rank: int = Field(ge=1, le=1000)
+    subject_kind: Literal["device", "ip", "user", "application", "domain", "asn", "interface"]
+    subject_id: str | None = Field(..., min_length=1, max_length=128)
+    label: str = Field(min_length=1, max_length=255)
+    bytes: int = Field(ge=0)
+    packets: int | None = Field(..., ge=0)
+    share: float | None = Field(..., ge=0, le=1)
+
+
+class TrafficTopResponse(ApiModel):
+    state: TrafficState
+    dimension: TrafficDimension
+    time_range: TrafficTimeRange
+    items: list[TrafficItem] = Field(max_length=1000)
+    freshness: Freshness
+
+
+class TrafficFlow(ApiModel):
+    """One high-volume flow row; all enrichment fields are source-reported."""
+
+    observed_at: datetime
+    source_ip: str = Field(min_length=1, max_length=45)
+    source_device_id: str | None = Field(..., pattern=_DEVICE_ID_PATTERN, max_length=43)
+    destination_ip: str = Field(min_length=1, max_length=45)
+    destination_host: str | None = Field(..., min_length=1, max_length=255)
+    protocol: Literal["tcp", "udp", "icmp", "other"]
+    destination_port: int | None = Field(..., ge=0, le=65535)
+    bytes: int = Field(ge=0)
+    packets: int | None = Field(..., ge=0)
+    direction: Literal["inbound", "outbound", "internal", "unknown"]
+    application: str | None = Field(..., min_length=1, max_length=255)
+    user: str | None = Field(..., min_length=1, max_length=255)
+
+
+class TrafficFlowsResponse(ApiModel):
+    state: TrafficState
+    time_range: TrafficTimeRange
+    flows: list[TrafficFlow] = Field(max_length=500)
+    freshness: Freshness

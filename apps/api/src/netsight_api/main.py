@@ -9,8 +9,8 @@ import os
 import re
 from collections.abc import AsyncIterator, Awaitable, Mapping
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime
-from typing import Annotated, Any, NoReturn, cast
+from datetime import UTC, datetime, timedelta
+from typing import Annotated, Any, NoReturn, Protocol, cast
 from urllib.parse import urlsplit
 from uuid import uuid4
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -75,6 +75,13 @@ from netsight_api.schemas import (
     TopologyNode,
     TopologyNodeFinding,
     TopologyResponse,
+    TrafficDimension,
+    TrafficFlow,
+    TrafficFlowsResponse,
+    TrafficItem,
+    TrafficPreset,
+    TrafficTimeRange,
+    TrafficTopResponse,
 )
 
 API_PREFIX = "/api/v1"
@@ -297,6 +304,49 @@ OptionalLibrenmsDependency = Annotated[
 ]
 
 
+class TrafficSource(Protocol):
+    """Read-only, bounded flow-aggregate source (ClickHouse lands in S4-2).
+
+    Implementations must run parameterised queries with explicit time
+    bounds and a row limit; they never receive unbounded requests.
+    """
+
+    async def top(
+        self,
+        *,
+        dimension: TrafficDimension,
+        start: datetime,
+        end: datetime,
+        limit: int,
+    ) -> tuple[list[TrafficItem], datetime]:
+        """Return ranked items and the newest flow timestamp included."""
+        ...
+
+    async def flows(
+        self,
+        *,
+        start: datetime,
+        end: datetime,
+        limit: int,
+    ) -> tuple[list[TrafficFlow], datetime]:
+        """Return high-volume flows and the newest flow timestamp included."""
+        ...
+
+
+def get_optional_traffic_source() -> TrafficSource | None:
+    """Flow source when configured; None means explicit not-connected.
+
+    S4-1 defines the protocol only — the ClickHouse adapter arrives in
+    S4-2, so this returns None rather than any fabricated sample data.
+    """
+    return None
+
+
+OptionalTrafficDependency = Annotated[
+    TrafficSource | None, Depends(get_optional_traffic_source)
+]
+
+
 async def _capture[T](operation: Awaitable[T]) -> T | Exception:
     """Await a source read, returning the error instead of raising it.
 
@@ -327,8 +377,15 @@ def require_alert_reader(identity: CurrentIdentity) -> Identity:
     return identity
 
 
+def require_traffic_reader(identity: CurrentIdentity) -> Identity:
+    if not is_allowed(identity, Permission.TRAFFIC_READ.value):
+        raise ApiError(403, "FORBIDDEN", "Permission is required")
+    return identity
+
+
 DeviceReader = Annotated[Identity, Depends(require_device_reader)]
 AlertReader = Annotated[Identity, Depends(require_alert_reader)]
+TrafficReader = Annotated[Identity, Depends(require_traffic_reader)]
 
 _STANDARD_ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {
     401: {"model": ErrorEnvelope, "description": "Authentication required"},
@@ -720,6 +777,232 @@ async def topology(
             edges=[],
             freshness=Freshness(state="unknown", observed_at=None, source="netbox"),
         )
+    return response
+
+
+_TRAFFIC_PRESETS: Mapping[str, timedelta] = {
+    "1h": timedelta(hours=1),
+    "6h": timedelta(hours=6),
+    "24h": timedelta(hours=24),
+    "7d": timedelta(days=7),
+}
+_TRAFFIC_MAX_WINDOW = timedelta(days=31)
+
+
+def _resolve_traffic_window(
+    preset: TrafficPreset,
+    start: datetime | None,
+    end: datetime | None,
+) -> tuple[datetime, datetime, TrafficPreset | None]:
+    """Resolve the requested window: explicit bounds or a bounded preset.
+
+    Windows are server-bounded per API guidelines. Invalid combinations
+    fail with 422 rather than silently substituting a different range.
+    """
+    if (start is None) != (end is None):
+        raise ApiError(422, "VALIDATION_ERROR", "from and to must be provided together")
+    if start is not None and end is not None:
+        if start.tzinfo is None or end.tzinfo is None:
+            raise ApiError(422, "VALIDATION_ERROR", "from and to must be timezone-aware")
+        if start >= end:
+            raise ApiError(422, "VALIDATION_ERROR", "from must be before to")
+        if end - start > _TRAFFIC_MAX_WINDOW:
+            raise ApiError(422, "VALIDATION_ERROR", "time window exceeds 31 days")
+        return start.astimezone(UTC), end.astimezone(UTC), None
+    duration = _TRAFFIC_PRESETS.get(preset)
+    if duration is None:
+        raise ApiError(422, "VALIDATION_ERROR", "unknown time preset")
+    now = datetime.now(UTC)
+    return now - duration, now, preset
+
+
+async def _traffic_top(
+    request: Request,
+    source: TrafficSource | None,
+    dimension: TrafficDimension,
+    preset: TrafficPreset,
+    start: datetime | None,
+    end: datetime | None,
+    limit: int,
+) -> TrafficTopResponse:
+    """Explicit traffic state: not-connected / unknown / source-reported ok."""
+    window_start, window_end, resolved_preset = _resolve_traffic_window(
+        preset, start, end
+    )
+    time_range = TrafficTimeRange.model_validate(
+        {"from": window_start, "to": window_end, "preset": resolved_preset}
+    )
+    correlation_id = _request_correlation_id(request)
+
+    def _degraded() -> TrafficTopResponse:
+        return TrafficTopResponse(
+            state="unknown",
+            dimension=dimension,
+            time_range=time_range,
+            items=[],
+            freshness=Freshness(state="unknown", observed_at=None, source="clickhouse"),
+        )
+
+    if source is None:
+        return TrafficTopResponse(
+            state="not-connected",
+            dimension=dimension,
+            time_range=time_range,
+            items=[],
+            freshness=Freshness(state="unknown", observed_at=None, source=None),
+        )
+    result = await _capture(
+        source.top(dimension=dimension, start=window_start, end=window_end, limit=limit)
+    )
+    if isinstance(result, Exception):
+        # Source configured but not confirmable: unknown, never guess.
+        _LOGGER.warning(
+            "traffic source read failed",
+            extra={
+                "correlation_id": correlation_id,
+                "source": "clickhouse",
+                "error_type": type(result).__name__,
+            },
+        )
+        return _degraded()
+    items, observed_at = result
+    response = TrafficTopResponse(
+        state="ok",
+        dimension=dimension,
+        time_range=time_range,
+        items=items,
+        freshness=Freshness(state="fresh", observed_at=observed_at, source="clickhouse"),
+    )
+    try:
+        validate("traffic_top", response.model_dump(mode="json", by_alias=True))
+    except ContractViolation:
+        _LOGGER.warning(
+            "traffic response rejected by canonical contract",
+            extra={
+                "correlation_id": correlation_id,
+                "source": "clickhouse",
+                "error_type": "ContractViolation",
+            },
+        )
+        return _degraded()
+    return response
+
+
+@api.get(
+    "/traffic/top-talkers",
+    response_model=TrafficTopResponse,
+    responses=_STANDARD_ERROR_RESPONSES,
+    tags=["traffic"],
+)
+async def traffic_top_talkers(
+    request: Request,
+    _identity: TrafficReader,
+    source: OptionalTrafficDependency,
+    preset: Annotated[TrafficPreset, Query()] = "24h",
+    start: Annotated[datetime | None, Query(alias="from")] = None,
+    end: Annotated[datetime | None, Query(alias="to")] = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 10,
+) -> TrafficTopResponse:
+    """Top talkers for a bounded window.
+
+    States are explicit: not-connected without a source, unknown when the
+    source read fails, ok only with source-reported aggregates.
+    """
+    return await _traffic_top(request, source, "talkers", preset, start, end, limit)
+
+
+@api.get(
+    "/traffic/top-destinations",
+    response_model=TrafficTopResponse,
+    responses=_STANDARD_ERROR_RESPONSES,
+    tags=["traffic"],
+)
+async def traffic_top_destinations(
+    request: Request,
+    _identity: TrafficReader,
+    source: OptionalTrafficDependency,
+    preset: Annotated[TrafficPreset, Query()] = "24h",
+    start: Annotated[datetime | None, Query(alias="from")] = None,
+    end: Annotated[datetime | None, Query(alias="to")] = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 10,
+) -> TrafficTopResponse:
+    """Top destinations for a bounded window (same explicit states)."""
+    return await _traffic_top(
+        request, source, "destinations", preset, start, end, limit
+    )
+
+
+@api.get(
+    "/traffic/flows",
+    response_model=TrafficFlowsResponse,
+    responses=_STANDARD_ERROR_RESPONSES,
+    tags=["traffic"],
+)
+async def traffic_flows(
+    request: Request,
+    _identity: TrafficReader,
+    source: OptionalTrafficDependency,
+    preset: Annotated[TrafficPreset, Query()] = "24h",
+    start: Annotated[datetime | None, Query(alias="from")] = None,
+    end: Annotated[datetime | None, Query(alias="to")] = None,
+    limit: Annotated[int, Query(ge=1, le=500)] = 50,
+) -> TrafficFlowsResponse:
+    """Recent high-volume flows for a bounded window (explicit states)."""
+    window_start, window_end, resolved_preset = _resolve_traffic_window(
+        preset, start, end
+    )
+    time_range = TrafficTimeRange.model_validate(
+        {"from": window_start, "to": window_end, "preset": resolved_preset}
+    )
+    correlation_id = _request_correlation_id(request)
+
+    def _degraded() -> TrafficFlowsResponse:
+        return TrafficFlowsResponse(
+            state="unknown",
+            time_range=time_range,
+            flows=[],
+            freshness=Freshness(state="unknown", observed_at=None, source="clickhouse"),
+        )
+
+    if source is None:
+        return TrafficFlowsResponse(
+            state="not-connected",
+            time_range=time_range,
+            flows=[],
+            freshness=Freshness(state="unknown", observed_at=None, source=None),
+        )
+    result = await _capture(
+        source.flows(start=window_start, end=window_end, limit=limit)
+    )
+    if isinstance(result, Exception):
+        _LOGGER.warning(
+            "traffic flow source read failed",
+            extra={
+                "correlation_id": correlation_id,
+                "source": "clickhouse",
+                "error_type": type(result).__name__,
+            },
+        )
+        return _degraded()
+    flows, observed_at = result
+    response = TrafficFlowsResponse(
+        state="ok",
+        time_range=time_range,
+        flows=flows,
+        freshness=Freshness(state="fresh", observed_at=observed_at, source="clickhouse"),
+    )
+    try:
+        validate("traffic_flows", response.model_dump(mode="json", by_alias=True))
+    except ContractViolation:
+        _LOGGER.warning(
+            "traffic flow response rejected by canonical contract",
+            extra={
+                "correlation_id": correlation_id,
+                "source": "clickhouse",
+                "error_type": "ContractViolation",
+            },
+        )
+        return _degraded()
     return response
 
 

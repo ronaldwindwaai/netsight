@@ -1,0 +1,162 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TrafficFlowsResponse",
+  "type": "object",
+  "required": [
+    "state",
+    "time_range",
+    "flows",
+    "freshness"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "state": {
+      "enum": [
+        "not-connected",
+        "ok",
+        "unknown"
+      ]
+    },
+    "time_range": {
+      "$ref": "traffic.schema.json#/$defs/timeRange"
+    },
+    "flows": {
+      "type": "array",
+      "maxItems": 500,
+      "items": {
+        "$ref": "#/$defs/flow"
+      }
+    },
+    "freshness": {
+      "$ref": "common.schema.json#/$defs/freshness"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "enum": [
+              "not-connected",
+              "unknown"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "flows": {
+            "maxItems": 0
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "flow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "observed_at",
+        "source_ip",
+        "source_device_id",
+        "destination_ip",
+        "destination_host",
+        "protocol",
+        "destination_port",
+        "bytes",
+        "packets",
+        "direction",
+        "application",
+        "user"
+      ],
+      "properties": {
+        "observed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "source_ip": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 45
+        },
+        "source_device_id": {
+          "description": "Canonical device ID when resolvable; null otherwise.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^device-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "destination_ip": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 45
+        },
+        "destination_host": {
+          "description": "rDNS/domain as reported by the source; never inferred.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "protocol": {
+          "enum": [
+            "tcp",
+            "udp",
+            "icmp",
+            "other"
+          ]
+        },
+        "destination_port": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 65535
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "packets": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "direction": {
+          "description": "Relative to the observed network; unknown when not determinable.",
+          "enum": [
+            "inbound",
+            "outbound",
+            "internal",
+            "unknown"
+          ]
+        },
+        "application": {
+          "description": "Source-reported application/enrichment metadata only.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "user": {
+          "description": "Source-reported identity; an IP alone is never definitive identity.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 255
+        }
+      }
+    }
+  }
+}

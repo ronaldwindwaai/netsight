@@ -205,6 +205,135 @@ paths:
           $ref: '#/components/responses/InvalidSourceData'
         '503':
           $ref: '#/components/responses/SourceUnavailable'
+  /traffic/top-talkers:
+    get:
+      summary: Top traffic talkers for a bounded time window (explicit source state)
+      operationId: getTrafficTopTalkers
+      parameters:
+        - in: query
+          name: preset
+          schema:
+            enum: [1h, 6h, 24h, 7d]
+            default: 24h
+        - in: query
+          name: from
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: to
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
+      responses:
+        '200':
+          description: Top talkers, or an explicit not-connected/unknown state without items
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrafficTopResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /traffic/top-destinations:
+    get:
+      summary: Top traffic destinations for a bounded time window (explicit source state)
+      operationId: getTrafficTopDestinations
+      parameters:
+        - in: query
+          name: preset
+          schema:
+            enum: [1h, 6h, 24h, 7d]
+            default: 24h
+        - in: query
+          name: from
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: to
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
+      responses:
+        '200':
+          description: Top destinations, or an explicit not-connected/unknown state without items
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrafficTopResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /traffic/flows:
+    get:
+      summary: Recent high-volume flows for a bounded time window (explicit source state)
+      operationId: getTrafficFlows
+      parameters:
+        - in: query
+          name: preset
+          schema:
+            enum: [1h, 6h, 24h, 7d]
+            default: 24h
+        - in: query
+          name: from
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: to
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 50
+      responses:
+        '200':
+          description: High-volume flows, or an explicit not-connected/unknown state without flows
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrafficFlowsResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '422':
+          $ref: '#/components/responses/ValidationError'
   /devices:
     get:
       summary: List canonical devices
@@ -535,6 +664,128 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ReconciliationFinding'
+    TrafficTimeRange:
+      type: object
+      additionalProperties: false
+      required: [from, to, preset]
+      properties:
+        from:
+          type: string
+          format: date-time
+        to:
+          type: string
+          format: date-time
+        preset:
+          type: [string, 'null']
+          enum: [1h, 6h, 24h, 7d, null]
+    TrafficItem:
+      type: object
+      additionalProperties: false
+      required: [rank, subject_kind, subject_id, label, bytes, packets, share]
+      properties:
+        rank:
+          type: integer
+          minimum: 1
+          maximum: 1000
+        subject_kind:
+          enum: [device, ip, user, application, domain, asn, interface]
+        subject_id:
+          type: [string, 'null']
+          minLength: 1
+          maxLength: 128
+        label:
+          type: string
+          minLength: 1
+          maxLength: 255
+        bytes:
+          type: integer
+          minimum: 0
+        packets:
+          type: [integer, 'null']
+          minimum: 0
+        share:
+          type: [number, 'null']
+          minimum: 0
+          maximum: 1
+    TrafficTopResponse:
+      type: object
+      additionalProperties: false
+      required: [state, dimension, time_range, items, freshness]
+      properties:
+        state:
+          enum: [not-connected, ok, unknown]
+        dimension:
+          enum: [talkers, destinations]
+        time_range:
+          $ref: '#/components/schemas/TrafficTimeRange'
+        items:
+          type: array
+          maxItems: 1000
+          items:
+            $ref: '#/components/schemas/TrafficItem'
+        freshness:
+          $ref: '#/components/schemas/Freshness'
+    TrafficFlow:
+      type: object
+      additionalProperties: false
+      required: [observed_at, source_ip, source_device_id, destination_ip, destination_host, protocol, destination_port, bytes, packets, direction, application, user]
+      properties:
+        observed_at:
+          type: string
+          format: date-time
+        source_ip:
+          type: string
+          minLength: 1
+          maxLength: 45
+        source_device_id:
+          type: [string, 'null']
+          pattern: '^device-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+        destination_ip:
+          type: string
+          minLength: 1
+          maxLength: 45
+        destination_host:
+          type: [string, 'null']
+          minLength: 1
+          maxLength: 255
+        protocol:
+          enum: [tcp, udp, icmp, other]
+        destination_port:
+          type: [integer, 'null']
+          minimum: 0
+          maximum: 65535
+        bytes:
+          type: integer
+          minimum: 0
+        packets:
+          type: [integer, 'null']
+          minimum: 0
+        direction:
+          enum: [inbound, outbound, internal, unknown]
+        application:
+          type: [string, 'null']
+          minLength: 1
+          maxLength: 255
+        user:
+          type: [string, 'null']
+          minLength: 1
+          maxLength: 255
+    TrafficFlowsResponse:
+      type: object
+      additionalProperties: false
+      required: [state, time_range, flows, freshness]
+      properties:
+        state:
+          enum: [not-connected, ok, unknown]
+        time_range:
+          $ref: '#/components/schemas/TrafficTimeRange'
+        flows:
+          type: array
+          maxItems: 500
+          items:
+            $ref: '#/components/schemas/TrafficFlow'
+        freshness:
+          $ref: '#/components/schemas/Freshness'
     DeviceListResponse:
       type: object
       additionalProperties: false
