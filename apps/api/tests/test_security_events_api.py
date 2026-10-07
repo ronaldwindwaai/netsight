@@ -27,7 +27,7 @@ _NEWEST = datetime(2026, 10, 6, 7, 55, tzinfo=UTC)
 
 @pytest.fixture(autouse=True)
 def _clean_app_state(monkeypatch: pytest.MonkeyPatch):
-    for name in ("NETSIGHT_ENV", "NETSIGHT_ENABLE_DEV_IDENTITY"):
+    for name in ("NETSIGHT_ENV", "NETSIGHT_ENABLE_DEV_IDENTITY", "WAZUH_INDEXER_URL"):
         monkeypatch.delenv(name, raising=False)
     app.dependency_overrides.clear()
     yield

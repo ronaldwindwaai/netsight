@@ -1,12 +1,15 @@
 """Security Centre read API (S5): explicit-state security events.
 
 Source-backed adapters (Wazuh, Suricata) arrive in S5-2; until one is wired
-the endpoint reports ``not-connected`` and never fabricates events.
+the endpoint reports ``not-connected`` and never fabricates events. The
+Wazuh indexer (which also carries Suricata EVE alerts) is wired from
+``WAZUH_INDEXER_URL`` / ``_USER`` / ``_PASSWORD``.
 """
 
 from __future__ import annotations
 
 import logging
+import os
 from datetime import datetime, timedelta
 from typing import Annotated, Any, Literal, Protocol
 from uuid import uuid4
@@ -14,6 +17,7 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends, Query, Request
 from pydantic import ValidationError
 
+from netsight_api.adapters.wazuh import WazuhIndexerClient
 from netsight_api.auth.deps import get_current_identity
 from netsight_api.contracts import ContractViolation, validate
 from netsight_api.errors import ApiError
@@ -60,8 +64,23 @@ class SecuritySource(Protocol):
 
 
 def get_optional_security_source() -> SecuritySource | None:
-    """Configured security source, or None (= not-connected). Unwired in S5-1."""
-    return None
+    """Wazuh-indexer source when configured; None = not-connected.
+
+    A configured-but-invalid URL still yields a client: its reads then fail
+    and the endpoint degrades to explicit ``unknown`` — configured does not
+    imply connected.
+    """
+    url = os.environ.get("WAZUH_INDEXER_URL", "").strip()
+    if not url:
+        return None
+    ca_bundle = os.environ.get("WAZUH_INDEXER_CA_BUNDLE", "").strip()
+    return WazuhIndexerClient(
+        base_url=url,
+        user=os.environ.get("WAZUH_INDEXER_USER", "").strip(),
+        password=os.environ.get("WAZUH_INDEXER_PASSWORD", ""),
+        index_pattern=os.environ.get("WAZUH_ALERTS_INDEX", "").strip() or "wazuh-alerts-*",
+        verify=ca_bundle or True,
+    )
 
 
 OptionalSecuritySource = Annotated[
