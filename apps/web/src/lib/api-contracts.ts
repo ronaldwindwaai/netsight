@@ -325,11 +325,11 @@ const SESSION_INFO_KEYS = [
   'roles',
 ] as const;
 
-function isRecord(value: unknown): value is UnknownRecord {
+export function isRecord(value: unknown): value is UnknownRecord {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function hasContractKeys(
+export function hasContractKeys(
   value: UnknownRecord,
   required: readonly string[],
   allowed: readonly string[] = required,
@@ -341,7 +341,7 @@ function hasContractKeys(
   );
 }
 
-function isBoundedString(value: unknown, minimum: number, maximum: number): value is string {
+export function isBoundedString(value: unknown, minimum: number, maximum: number): value is string {
   return (
     typeof value === 'string' &&
     value.length >= minimum &&
@@ -349,11 +349,11 @@ function isBoundedString(value: unknown, minimum: number, maximum: number): valu
   );
 }
 
-function isNullableString(value: unknown): value is string | null {
+export function isNullableString(value: unknown): value is string | null {
   return value === null || typeof value === 'string';
 }
 
-function isRfc3339(value: string): boolean {
+export function isRfc3339(value: string): boolean {
   const match = /^(\d{4})-(\d{2})-(\d{2})T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)$/.exec(
     value,
   );
@@ -1027,7 +1027,7 @@ const TRAFFIC_FLOW_KEYS = [
   'user',
 ] as const;
 
-function parseTrafficTimeRange(value: unknown): TrafficTimeRange | null {
+export function parseTrafficTimeRange(value: unknown): TrafficTimeRange | null {
   if (!isRecord(value) || !hasContractKeys(value, TRAFFIC_TIME_RANGE_KEYS)) return null;
   if (typeof value.from !== 'string' || !isRfc3339(value.from)) return null;
   if (typeof value.to !== 'string' || !isRfc3339(value.to)) return null;

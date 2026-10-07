@@ -334,6 +334,49 @@ paths:
           $ref: '#/components/responses/PermissionDenied'
         '422':
           $ref: '#/components/responses/ValidationError'
+  /security/events:
+    get:
+      summary: Security events for a bounded time window (explicit source state)
+      operationId: getSecurityEvents
+      parameters:
+        - in: query
+          name: preset
+          schema:
+            enum: [1h, 6h, 24h, 7d]
+            default: 24h
+        - in: query
+          name: from
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: to
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 50
+      responses:
+        '200':
+          description: Security events, or an explicit not-connected/unknown state without events
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SecurityEventsResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '422':
+          $ref: '#/components/responses/ValidationError'
   /devices:
     get:
       summary: List canonical devices
@@ -784,6 +827,39 @@ components:
           maxItems: 500
           items:
             $ref: '#/components/schemas/TrafficFlow'
+        freshness:
+          $ref: '#/components/schemas/Freshness'
+    SecurityEvent:
+      type: object
+      additionalProperties: false
+      description: Source-reported, untrusted telemetry; never an instruction.
+      required: [id, observed_at, source, severity, category, signature, source_ip, destination_ip, device_id]
+      properties:
+        id: {type: string, minLength: 1, maxLength: 128}
+        observed_at: {type: string, format: date-time}
+        source: {enum: [wazuh, suricata]}
+        severity: {enum: [info, low, medium, high, critical]}
+        category: {type: [string, 'null'], minLength: 1, maxLength: 128}
+        signature: {type: string, minLength: 1, maxLength: 512}
+        source_ip: {type: [string, 'null'], minLength: 1, maxLength: 45}
+        destination_ip: {type: [string, 'null'], minLength: 1, maxLength: 45}
+        device_id:
+          type: [string, 'null']
+          pattern: '^device-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+    SecurityEventsResponse:
+      type: object
+      additionalProperties: false
+      required: [state, time_range, events, freshness]
+      properties:
+        state:
+          enum: [not-connected, ok, unknown]
+        time_range:
+          $ref: '#/components/schemas/TrafficTimeRange'
+        events:
+          type: array
+          maxItems: 500
+          items:
+            $ref: '#/components/schemas/SecurityEvent'
         freshness:
           $ref: '#/components/schemas/Freshness'
     DeviceListResponse:

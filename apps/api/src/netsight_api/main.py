@@ -84,6 +84,8 @@ from netsight_api.schemas import (
     TrafficTimeRange,
     TrafficTopResponse,
 )
+from netsight_api.security_routes import router as security_router
+from netsight_api.timewindow import resolve_window
 
 API_PREFIX = "/api/v1"
 CORRELATION_ID_HEADER = "X-Correlation-ID"
@@ -807,42 +809,6 @@ async def topology(
     return response
 
 
-_TRAFFIC_PRESETS: Mapping[str, timedelta] = {
-    "1h": timedelta(hours=1),
-    "6h": timedelta(hours=6),
-    "24h": timedelta(hours=24),
-    "7d": timedelta(days=7),
-}
-_TRAFFIC_MAX_WINDOW = timedelta(days=31)
-
-
-def _resolve_traffic_window(
-    preset: TrafficPreset,
-    start: datetime | None,
-    end: datetime | None,
-) -> tuple[datetime, datetime, TrafficPreset | None]:
-    """Resolve the requested window: explicit bounds or a bounded preset.
-
-    Windows are server-bounded per API guidelines. Invalid combinations
-    fail with 422 rather than silently substituting a different range.
-    """
-    if (start is None) != (end is None):
-        raise ApiError(422, "VALIDATION_ERROR", "from and to must be provided together")
-    if start is not None and end is not None:
-        if start.tzinfo is None or end.tzinfo is None:
-            raise ApiError(422, "VALIDATION_ERROR", "from and to must be timezone-aware")
-        if start >= end:
-            raise ApiError(422, "VALIDATION_ERROR", "from must be before to")
-        if end - start > _TRAFFIC_MAX_WINDOW:
-            raise ApiError(422, "VALIDATION_ERROR", "time window exceeds 31 days")
-        return start.astimezone(UTC), end.astimezone(UTC), None
-    duration = _TRAFFIC_PRESETS.get(preset)
-    if duration is None:
-        raise ApiError(422, "VALIDATION_ERROR", "unknown time preset")
-    now = datetime.now(UTC)
-    return now - duration, now, preset
-
-
 _TRAFFIC_FRESH_THRESHOLD = timedelta(hours=1)
 
 
@@ -892,7 +858,7 @@ async def _traffic_top(
     limit: int,
 ) -> TrafficTopResponse:
     """Explicit traffic state: not-connected / unknown / source-reported ok."""
-    window_start, window_end, resolved_preset = _resolve_traffic_window(
+    window_start, window_end, resolved_preset = resolve_window(
         preset, start, end
     )
     time_range = TrafficTimeRange.model_validate(
@@ -1021,7 +987,7 @@ async def traffic_flows(
     limit: Annotated[int, Query(ge=1, le=500)] = 50,
 ) -> TrafficFlowsResponse:
     """Recent high-volume flows for a bounded window (explicit states)."""
-    window_start, window_end, resolved_preset = _resolve_traffic_window(
+    window_start, window_end, resolved_preset = resolve_window(
         preset, start, end
     )
     time_range = TrafficTimeRange.model_validate(
@@ -1293,6 +1259,7 @@ async def overview(
 
 
 app.include_router(api)
+app.include_router(security_router, prefix=API_PREFIX)
 # Authentication lives under the same versioned prefix as every other platform
 # route (contracts/openapi/netsight-api.yaml declares `servers: /api/v1` with
 # `/auth/providers` relative to it). Serving it unversioned broke the server

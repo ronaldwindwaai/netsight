@@ -43,6 +43,10 @@ Out of slice pass (P1 follow-ups): NS-043 identity correlation framework, NS-044
 ### E05 — Security operations
 Stories: NS-050..NS-052.
 Steps: Wazuh/Suricata read-only adapters; security overview API; correlated evidence model; security centre UI with explicit unknown states.
+1. ✅ Security events contract + explicit-state endpoint (S5-1, contract-first): `security.schema.json`, pydantic `SecurityEvent`/`SecurityEventsResponse`, OpenAPI path + schemas, TS parser (`api-contracts-security.ts`), `GET /api/v1/security/events` gated by `security:read` with the shared server-bounded window (`timewindow.py`, extracted from the traffic routes). `SecuritySource` protocol unwired → `not-connected`; source failure or contract-invalid row → explicit 200 `unknown`; untrusted signature text passes through as data.
+2. Wazuh read-only adapter (least-privilege API role, agent→canonical device mapping) wired via `SecuritySource`.
+3. Suricata EVE evidence ingestion (via Wazuh/OpenSearch pipeline) + entity linking.
+4. `/security` UI page per DESIGN-INVENTORY row 6; slice gate (review + security review).
 
 ### E06 — Alerts & incidents
 Stories: NS-060..NS-065.

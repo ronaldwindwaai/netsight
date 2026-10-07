@@ -344,3 +344,36 @@ class TrafficFlowsResponse(ApiModel):
         if self.state != "ok" and self.flows:
             raise ValueError("non-ok traffic state must not carry flows")
         return self
+
+
+# --- Security (S5) ----------------------------------------------------------
+
+SecurityState = Literal["not-connected", "ok", "unknown"]
+
+
+class SecurityEvent(ApiModel):
+    """One security event; every text field is untrusted source telemetry."""
+
+    id: str = Field(min_length=1, max_length=128)
+    observed_at: datetime
+    source: Literal["wazuh", "suricata"]
+    severity: AlertSeverity
+    category: str | None = Field(..., min_length=1, max_length=128)
+    signature: str = Field(min_length=1, max_length=512)
+    source_ip: str | None = Field(..., min_length=1, max_length=45)
+    destination_ip: str | None = Field(..., min_length=1, max_length=45)
+    device_id: str | None = Field(..., pattern=_DEVICE_ID_PATTERN, max_length=43)
+
+
+class SecurityEventsResponse(ApiModel):
+    state: SecurityState
+    time_range: TrafficTimeRange
+    events: list[SecurityEvent] = Field(max_length=500)
+    freshness: Freshness
+
+    @model_validator(mode="after")
+    def _non_ok_carries_no_rows(self) -> SecurityEventsResponse:
+        """A degraded state must never assert security events."""
+        if self.state != "ok" and self.events:
+            raise ValueError("non-ok security state must not carry events")
+        return self

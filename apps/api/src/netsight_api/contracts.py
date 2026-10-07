@@ -30,6 +30,7 @@ SCHEMA_FILES = {
     "topology": "topology.schema.json",
     "traffic_top": "traffic.schema.json",
     "traffic_flows": "traffic-flows.schema.json",
+    "security_events": "security.schema.json",
 }
 
 
