@@ -523,15 +523,462 @@ paths:
           $ref: '#/components/responses/SourceUnavailable'
   /incidents:
     get:
-      summary: List incidents
+      summary: List incidents (newest first; explicit store state)
+      operationId: listIncidents
+      parameters:
+      - in: query
+        name: state
+        schema:
+          enum:
+          - open
+          - acknowledged
+          - investigating
+          - mitigated
+          - resolved
+          - closed
+      - in: query
+        name: severity
+        schema:
+          enum:
+          - low
+          - medium
+          - high
+          - critical
+      - in: query
+        name: assignee_id
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 255
+      - in: query
+        name: limit
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 50
+      - in: query
+        name: offset
+        schema:
+          type: integer
+          minimum: 0
+          maximum: 10000
+          default: 0
       responses:
         '200':
-          description: Incident list
+          description: Incident page, or an explicit not-connected/unknown state without rows
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IncidentListResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /incidents/{incident_id}:
+    get:
+      summary: Get one incident (explicit store state)
+      operationId: getIncident
+      parameters:
+      - in: path
+        name: incident_id
+        required: true
+        schema:
+          type: string
+          minLength: 45
+          maxLength: 45
+          pattern: ^incident-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+      responses:
+        '200':
+          description: The incident, or an explicit not-connected/unknown state without it
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IncidentDetailResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '404':
+          $ref: '#/components/responses/IncidentNotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /incidents/{incident_id}/timeline:
+    get:
+      summary: Append-only incident timeline (bounded page)
+      operationId: getIncidentTimeline
+      parameters:
+      - in: path
+        name: incident_id
+        required: true
+        schema:
+          type: string
+          minLength: 45
+          maxLength: 45
+          pattern: ^incident-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+      - in: query
+        name: after_seq
+        schema:
+          type: integer
+          minimum: 0
+          maximum: 1000000
+          default: 0
+      - in: query
+        name: limit
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 500
+          default: 200
+      responses:
+        '200':
+          description: Timeline page, or an explicit not-connected/unknown state without events
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IncidentTimelineResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '404':
+          $ref: '#/components/responses/IncidentNotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /incidents/{incident_id}/acknowledge:
     post:
-      summary: Create incident
+      summary: Acknowledge an open incident
+      operationId: acknowledgeIncident
+      parameters:
+      - in: path
+        name: incident_id
+        required: true
+        schema:
+          type: string
+          minLength: 45
+          maxLength: 45
+          pattern: ^incident-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+      - in: header
+        name: X-CSRF-Token
+        required: true
+        description: Session CSRF token from GET /auth/csrf. Required for cookie-authenticated writes.
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Updated incident
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Incident'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '404':
+          $ref: '#/components/responses/IncidentNotFound'
+        '409':
+          $ref: '#/components/responses/IncidentConflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '503':
+          $ref: '#/components/responses/StoreUnavailable'
+  /incidents/{incident_id}/transition:
+    post:
+      summary: Progress an incident one step (not resolve or reopen)
+      operationId: transitionIncident
+      parameters:
+      - in: path
+        name: incident_id
+        required: true
+        schema:
+          type: string
+          minLength: 45
+          maxLength: 45
+          pattern: ^incident-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+      - in: header
+        name: X-CSRF-Token
+        required: true
+        description: Session CSRF token from GET /auth/csrf. Required for cookie-authenticated writes.
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IncidentTransitionRequest'
+      responses:
+        '200':
+          description: Updated incident
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Incident'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '404':
+          $ref: '#/components/responses/IncidentNotFound'
+        '409':
+          $ref: '#/components/responses/IncidentConflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '503':
+          $ref: '#/components/responses/StoreUnavailable'
+  /incidents/{incident_id}/assign:
+    post:
+      summary: Assign or unassign an incident
+      operationId: assignIncident
+      parameters:
+      - in: path
+        name: incident_id
+        required: true
+        schema:
+          type: string
+          minLength: 45
+          maxLength: 45
+          pattern: ^incident-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+      - in: header
+        name: X-CSRF-Token
+        required: true
+        description: Session CSRF token from GET /auth/csrf. Required for cookie-authenticated writes.
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IncidentAssignRequest'
+      responses:
+        '200':
+          description: Updated incident
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Incident'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '404':
+          $ref: '#/components/responses/IncidentNotFound'
+        '409':
+          $ref: '#/components/responses/IncidentConflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '503':
+          $ref: '#/components/responses/StoreUnavailable'
+  /incidents/{incident_id}/comment:
+    post:
+      summary: Append a comment to the incident timeline
+      operationId: commentIncident
+      parameters:
+      - in: path
+        name: incident_id
+        required: true
+        schema:
+          type: string
+          minLength: 45
+          maxLength: 45
+          pattern: ^incident-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+      - in: header
+        name: X-CSRF-Token
+        required: true
+        description: Session CSRF token from GET /auth/csrf. Required for cookie-authenticated writes.
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IncidentCommentRequest'
       responses:
         '201':
-          description: Created
+          description: The appended timeline event
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IncidentTimelineEvent'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '404':
+          $ref: '#/components/responses/IncidentNotFound'
+        '409':
+          $ref: '#/components/responses/IncidentConflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '503':
+          $ref: '#/components/responses/StoreUnavailable'
+  /incidents/{incident_id}/evidence:
+    post:
+      summary: Attach an evidence reference (idempotent)
+      operationId: addIncidentEvidence
+      parameters:
+      - in: path
+        name: incident_id
+        required: true
+        schema:
+          type: string
+          minLength: 45
+          maxLength: 45
+          pattern: ^incident-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+      - in: header
+        name: X-CSRF-Token
+        required: true
+        description: Session CSRF token from GET /auth/csrf. Required for cookie-authenticated writes.
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IncidentEvidenceRequest'
+      responses:
+        '200':
+          description: Updated incident
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Incident'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '404':
+          $ref: '#/components/responses/IncidentNotFound'
+        '409':
+          $ref: '#/components/responses/IncidentConflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '503':
+          $ref: '#/components/responses/StoreUnavailable'
+  /incidents/{incident_id}/resolve:
+    post:
+      summary: Resolve an incident (human principals only)
+      operationId: resolveIncident
+      parameters:
+      - in: path
+        name: incident_id
+        required: true
+        schema:
+          type: string
+          minLength: 45
+          maxLength: 45
+          pattern: ^incident-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+      - in: header
+        name: X-CSRF-Token
+        required: true
+        description: Session CSRF token from GET /auth/csrf. Required for cookie-authenticated writes.
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IncidentResolveRequest'
+      responses:
+        '200':
+          description: Updated incident
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Incident'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '404':
+          $ref: '#/components/responses/IncidentNotFound'
+        '409':
+          $ref: '#/components/responses/IncidentConflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '503':
+          $ref: '#/components/responses/StoreUnavailable'
+  /incidents/{incident_id}/reopen:
+    post:
+      summary: Reopen a resolved or closed incident with a reason (human principals only)
+      operationId: reopenIncident
+      parameters:
+      - in: path
+        name: incident_id
+        required: true
+        schema:
+          type: string
+          minLength: 45
+          maxLength: 45
+          pattern: ^incident-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+      - in: header
+        name: X-CSRF-Token
+        required: true
+        description: Session CSRF token from GET /auth/csrf. Required for cookie-authenticated writes.
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IncidentReopenRequest'
+      responses:
+        '200':
+          description: Updated incident
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Incident'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '404':
+          $ref: '#/components/responses/IncidentNotFound'
+        '409':
+          $ref: '#/components/responses/IncidentConflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '503':
+          $ref: '#/components/responses/StoreUnavailable'
   /diagnostics:
     post:
       summary: Start an approved read-only diagnostic workflow
@@ -1172,6 +1619,275 @@ components:
           properties:
             subject_id:
               type: string
+    IncidentListResponse:
+      description: One page of incidents, newest first. Paging is a server-capped offset (limit 1-100, offset
+        0-10000); next_offset is null on the last page.
+      type: object
+      additionalProperties: false
+      required:
+      - state
+      - incidents
+      - limit
+      - offset
+      - next_offset
+      properties:
+        state:
+          enum:
+          - not-connected
+          - ok
+          - unknown
+        incidents:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/Incident'
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 100
+        offset:
+          type: integer
+          minimum: 0
+          maximum: 10000
+        next_offset:
+          type:
+          - integer
+          - 'null'
+          minimum: 1
+          maximum: 10000
+      allOf:
+      - if:
+          properties:
+            state:
+              enum:
+              - not-connected
+              - unknown
+          required:
+          - state
+        then:
+          properties:
+            incidents:
+              maxItems: 0
+            next_offset:
+              type: 'null'
+    IncidentDetailResponse:
+      description: One incident. incident is non-null exactly when state is ok; an unknown id is a 404, not
+        a state.
+      type: object
+      additionalProperties: false
+      required:
+      - state
+      - incident
+      properties:
+        state:
+          enum:
+          - not-connected
+          - ok
+          - unknown
+        incident:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/Incident'
+      allOf:
+      - if:
+          properties:
+            state:
+              const: ok
+          required:
+          - state
+        then:
+          properties:
+            incident:
+              type: object
+        else:
+          properties:
+            incident:
+              type: 'null'
+    IncidentTimelineResponse:
+      description: One page of an incident's append-only timeline in ascending seq order. Continue with after_seq
+        = next_after_seq; next_after_seq is null on the last page.
+      type: object
+      additionalProperties: false
+      required:
+      - state
+      - incident_id
+      - events
+      - after_seq
+      - next_after_seq
+      properties:
+        state:
+          enum:
+          - not-connected
+          - ok
+          - unknown
+        incident_id:
+          type: string
+          minLength: 45
+          maxLength: 45
+          pattern: ^incident-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+        events:
+          type: array
+          maxItems: 500
+          items:
+            $ref: '#/components/schemas/IncidentTimelineEvent'
+        after_seq:
+          type: integer
+          minimum: 0
+          maximum: 1000000
+        next_after_seq:
+          type:
+          - integer
+          - 'null'
+          minimum: 1
+          maximum: 1000000
+      allOf:
+      - if:
+          properties:
+            state:
+              enum:
+              - not-connected
+              - unknown
+          required:
+          - state
+        then:
+          properties:
+            events:
+              maxItems: 0
+            next_after_seq:
+              type: 'null'
+    IncidentTransitionRequest:
+      description: Progress an incident one step. Resolving and reopening have their own operations (resolve,
+        reopen) because they need human-only permissions and mandatory fields.
+      type: object
+      additionalProperties: false
+      required:
+      - to_state
+      properties:
+        to_state:
+          enum:
+          - acknowledged
+          - investigating
+          - mitigated
+          - closed
+        reason:
+          type:
+          - string
+          - 'null'
+          minLength: 1
+          maxLength: 1000
+          pattern: \S
+    IncidentAssignRequest:
+      description: Assign the incident to an identity, or null to unassign.
+      type: object
+      additionalProperties: false
+      required:
+      - assignee_id
+      properties:
+        assignee_id:
+          type:
+          - string
+          - 'null'
+          minLength: 1
+          maxLength: 255
+    IncidentCommentRequest:
+      description: Append a comment to the timeline. The text is stored and returned verbatim and is never
+        interpreted.
+      type: object
+      additionalProperties: false
+      required:
+      - message
+      properties:
+        message:
+          type: string
+          minLength: 1
+          maxLength: 4000
+          pattern: \S
+    IncidentEvidenceRequest:
+      description: Attach an immutable evidence record reference. Idempotent.
+      type: object
+      additionalProperties: false
+      required:
+      - evidence_id
+      properties:
+        evidence_id:
+          type: string
+          minLength: 1
+          maxLength: 128
+    IncidentResolveRequest:
+      description: Operator-supplied resolution (INCIDENT-ENGINE.md, Resolution). Human principals only. root_cause_status
+        is 'determined' only with an operator-accepted root_cause text, otherwise 'not-determined' with a
+        null root_cause. The server adds who and when; restored_at must not be after the server's resolved_at
+        (not expressible in JSON Schema).
+      type: object
+      additionalProperties: false
+      required:
+      - summary
+      - root_cause_status
+      - root_cause
+      - impact
+      - restored_at
+      - follow_up_actions
+      properties:
+        summary:
+          type: string
+          minLength: 1
+          maxLength: 2000
+          pattern: \S
+        root_cause_status:
+          enum:
+          - determined
+          - not-determined
+        root_cause:
+          type:
+          - string
+          - 'null'
+          minLength: 1
+          maxLength: 2000
+          pattern: \S
+        impact:
+          type: string
+          minLength: 1
+          maxLength: 2000
+          pattern: \S
+        restored_at:
+          type: string
+          format: date-time
+        follow_up_actions:
+          type: array
+          maxItems: 32
+          items:
+            type: string
+            minLength: 1
+            maxLength: 500
+            pattern: \S
+      allOf:
+      - if:
+          properties:
+            root_cause_status:
+              const: determined
+          required:
+          - root_cause_status
+        then:
+          properties:
+            root_cause:
+              type: string
+        else:
+          properties:
+            root_cause:
+              type: 'null'
+    IncidentReopenRequest:
+      description: Reopen a resolved or closed incident. A reason is mandatory and audited. Human principals
+        only.
+      type: object
+      additionalProperties: false
+      required:
+      - reason
+      properties:
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 1000
+          pattern: \S
     AlertRule:
       description: 'Alert rule independent of any upstream alert product (ALERT-ENGINE.md). PostgreSQL-owned.
         A rule is created as a draft and becomes active only through explicit approval (natural-language or
@@ -1737,6 +2453,33 @@ components:
             $ref: '#/components/schemas/ErrorEnvelope'
     SourceUnavailable:
       description: Source is unavailable or not configured
+      headers:
+        X-Correlation-ID:
+          $ref: '#/components/headers/CorrelationId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    IncidentNotFound:
+      description: Incident not found
+      headers:
+        X-Correlation-ID:
+          $ref: '#/components/headers/CorrelationId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    IncidentConflict:
+      description: The incident is not in a state that allows this change, or was changed concurrently
+      headers:
+        X-Correlation-ID:
+          $ref: '#/components/headers/CorrelationId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    StoreUnavailable:
+      description: Incident storage is not connected or temporarily unavailable
       headers:
         X-Correlation-ID:
           $ref: '#/components/headers/CorrelationId'

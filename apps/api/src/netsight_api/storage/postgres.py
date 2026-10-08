@@ -40,7 +40,7 @@ from netsight_api.schemas import (
 )
 from netsight_api.storage import lifecycle
 from netsight_api.storage.connection import Connection, PostgresSettings
-from netsight_api.storage.errors import NotFoundError, StorageConflictError
+from netsight_api.storage.errors import NotFoundError
 from netsight_api.storage.lifecycle import Clock, UuidFactory
 from netsight_api.storage.repository import NoteKind
 
@@ -170,16 +170,34 @@ _SELECT_INCIDENT = (
     "SELECT id, title, severity, state, assignee_id, evidence_ids, resolution, "
     "created_at, updated_at FROM incidents WHERE id = %s"
 )
-_SELECT_INCIDENTS = (
+_SELECT_INCIDENTS_HEAD = (
     "SELECT id, title, severity, state, assignee_id, evidence_ids, resolution, "
-    "created_at, updated_at FROM incidents "
-    "ORDER BY created_at DESC, id DESC LIMIT %(limit)s OFFSET %(offset)s"
+    "created_at, updated_at FROM incidents"
 )
-_SELECT_INCIDENTS_BY_STATE = (
-    "SELECT id, title, severity, state, assignee_id, evidence_ids, resolution, "
-    "created_at, updated_at FROM incidents WHERE state = %(state)s "
-    "ORDER BY created_at DESC, id DESC LIMIT %(limit)s OFFSET %(offset)s"
+_SELECT_INCIDENTS_TAIL = " ORDER BY created_at DESC, id DESC LIMIT %(limit)s OFFSET %(offset)s"
+# One predicate per optional filter; values are always bound parameters. The statements
+# are assembled once at import from these constants only (never from request data), one
+# per filter combination, so each keeps an index-friendly plan (no optional-filter predicates).
+_INCIDENT_FILTERS: tuple[tuple[str, str], ...] = (
+    ("state", "state = %(state)s"),
+    ("severity", "severity = %(severity)s"),
+    ("assignee_id", "assignee_id = %(assignee_id)s"),
 )
+
+
+def _incident_list_statements() -> dict[frozenset[str], str]:
+    statements: dict[frozenset[str], str] = {}
+    for mask in range(1 << len(_INCIDENT_FILTERS)):
+        chosen = [item for bit, item in enumerate(_INCIDENT_FILTERS) if mask >> bit & 1]
+        where = " AND ".join(predicate for _, predicate in chosen)
+        middle = " WHERE " + where if where else ""
+        statements[frozenset(name for name, _ in chosen)] = (
+            _SELECT_INCIDENTS_HEAD + middle + _SELECT_INCIDENTS_TAIL
+        )
+    return statements
+
+
+_SELECT_INCIDENTS_BY_FILTER = _incident_list_statements()
 _INSERT_INCIDENT = (
     "INSERT INTO incidents (id, title, severity, state, assignee_id, evidence_ids, resolution, "
     "created_at, updated_at) VALUES (%s, %s, %s, %s, %s, %s::text[], %s, %s, %s)"
@@ -341,15 +359,27 @@ class PostgresIncidentRepository:
         return None if row is None else _incident_from_row(row)
 
     def list_incidents(
-        self, *, state: IncidentState | None = None, limit: int = 50, offset: int = 0
+        self,
+        *,
+        state: IncidentState | None = None,
+        severity: IncidentSeverity | None = None,
+        assignee_id: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
     ) -> list[Incident]:
         lifecycle.check_page(limit, offset)
-        page: dict[str, Any] = {"limit": limit, "offset": offset}
+        filters: dict[str, Any] = {
+            name: value
+            for name, value in (
+                ("state", state),
+                ("severity", severity),
+                ("assignee_id", assignee_id),
+            )
+            if value is not None
+        }
+        statement = _SELECT_INCIDENTS_BY_FILTER[frozenset(filters)]
         with self._settings.session() as conn:
-            if state is None:
-                rows = conn.execute(_SELECT_INCIDENTS, page).fetchall()
-            else:
-                rows = conn.execute(_SELECT_INCIDENTS_BY_STATE, {**page, "state": state}).fetchall()
+            rows = conn.execute(statement, {**filters, "limit": limit, "offset": offset}).fetchall()
         return [_incident_from_row(row) for row in rows]
 
     def transition_state(
@@ -360,9 +390,11 @@ class PostgresIncidentRepository:
         actor_id: str,
         reason: str | None = None,
         resolution: IncidentResolutionInput | None = None,
+        required_assignee: str | None = None,
     ) -> Incident:
         with self._settings.session() as conn:
             incident_uuid, current = self._lock(conn, incident_id)
+            lifecycle.require_assignee(current, required_assignee)
             now = self._clock()
             plan = lifecycle.plan_transition(
                 current,
@@ -383,9 +415,17 @@ class PostgresIncidentRepository:
             )
             return self._apply(conn, incident_uuid, plan, actor_id, now)
 
-    def add_evidence(self, incident_id: str, *, evidence_id: str, actor_id: str) -> Incident:
+    def add_evidence(
+        self,
+        incident_id: str,
+        *,
+        evidence_id: str,
+        actor_id: str,
+        required_assignee: str | None = None,
+    ) -> Incident:
         with self._settings.session() as conn:
             incident_uuid, current = self._lock(conn, incident_id)
+            lifecycle.require_assignee(current, required_assignee)
             now = self._clock()
             plan = lifecycle.plan_evidence(
                 current, evidence_id=evidence_id, actor_id=actor_id, now=now
@@ -400,9 +440,11 @@ class PostgresIncidentRepository:
         actor_id: str,
         message: str | None = None,
         subject_id: str | None = None,
+        required_assignee: str | None = None,
     ) -> IncidentTimelineEvent:
         with self._settings.session() as conn:
             incident_uuid, current = self._lock(conn, incident_id)
+            lifecycle.require_assignee(current, required_assignee)
             draft = lifecycle.plan_note(
                 current, kind=kind, actor_id=actor_id, message=message, subject_id=subject_id
             )
@@ -556,27 +598,38 @@ class PostgresAlertRuleRepository:
         return [_rule_from_row(row) for row in rows]
 
     def update_rule(
-        self, rule_id: str, definition: AlertRuleDefinition, *, expected_version: int
+        self,
+        rule_id: str,
+        definition: AlertRuleDefinition,
+        *,
+        expected_version: int,
+        actor_id: str,
     ) -> AlertRule:
         with self._settings.session() as conn:
             rule_uuid, current = self._lock_rule(conn, rule_id)
-            if current.version != expected_version:
-                raise StorageConflictError("the alert rule was changed by someone else")
-            updated = lifecycle.edited_rule(current, definition, now=self._clock())
+            lifecycle.require_version(current, expected_version)
+            updated = lifecycle.edited_rule(
+                current, definition, actor_id=actor_id, now=self._clock()
+            )
             conn.execute(_UPDATE_RULE, _rule_params(updated, rule_uuid))
             return updated
 
-    def approve_rule(self, rule_id: str, *, approver_id: str) -> AlertRule:
+    def approve_rule(self, rule_id: str, *, approver_id: str, expected_version: int) -> AlertRule:
         with self._settings.session() as conn:
             rule_uuid, current = self._lock_rule(conn, rule_id)
-            updated = lifecycle.approved_rule(current, approver_id=approver_id, now=self._clock())
+            updated = lifecycle.approved_rule(
+                current,
+                approver_id=approver_id,
+                expected_version=expected_version,
+                now=self._clock(),
+            )
             conn.execute(_UPDATE_RULE, _rule_params(updated, rule_uuid))
             return updated
 
-    def disable_rule(self, rule_id: str) -> AlertRule:
+    def disable_rule(self, rule_id: str, *, actor_id: str) -> AlertRule:
         with self._settings.session() as conn:
             rule_uuid, current = self._lock_rule(conn, rule_id)
-            updated = lifecycle.disabled_rule(current, now=self._clock())
+            updated = lifecycle.disabled_rule(current, actor_id=actor_id, now=self._clock())
             conn.execute(_UPDATE_RULE, _rule_params(updated, rule_uuid))
             return updated
 

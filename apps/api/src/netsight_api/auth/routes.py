@@ -26,7 +26,7 @@ from netsight_api.auth.oidc import (
 from netsight_api.auth.pending import pending_auth_store
 from netsight_api.auth.providers import ProviderId
 from netsight_api.auth.rate_limit import rate_limiter
-from netsight_api.auth.session import session_manager
+from netsight_api.auth.session import constant_time_equals, session_manager
 from netsight_api.auth.settings import (
     auth_settings,
     google_settings,
@@ -217,7 +217,7 @@ async def logout(request: Request) -> Response:
 
     if session is not None:
         supplied = request.headers.get("X-CSRF-Token", "")
-        if supplied != session.csrf_token:
+        if not constant_time_equals(supplied, session.csrf_token):
             raise ApiError(403, "CSRF_VALIDATION_FAILED", "Logout requires a valid CSRF token")
         manager.revoke(session.id)
 

@@ -1796,5 +1796,472 @@
     "jsonschema_rejects": false
    }
   ]
+ },
+ "incident_list_response": {
+  "base": {
+   "state": "ok",
+   "incidents": [
+    {
+     "id": "incident-3f2b8a40-1c2d-4e5f-8a9b-0c1d2e3f4a5b",
+     "title": "Perimeter outage",
+     "severity": "critical",
+     "state": "open",
+     "created_at": "2026-10-08T08:00:00Z",
+     "updated_at": "2026-10-08T08:00:00Z",
+     "assignee_id": null,
+     "evidence_ids": [],
+     "resolution": null
+    }
+   ],
+   "limit": 50,
+   "offset": 0,
+   "next_offset": null
+  },
+  "cases": [
+   {
+    "name": "ok page with one incident",
+    "valid": true
+   },
+   {
+    "name": "ok empty page",
+    "valid": true,
+    "set": {
+     "incidents": []
+    }
+   },
+   {
+    "name": "ok page with a continuation offset",
+    "valid": true,
+    "set": {
+     "limit": 1,
+     "next_offset": 1
+    }
+   },
+   {
+    "name": "maximum offset",
+    "valid": true,
+    "set": {
+     "offset": 10000,
+     "incidents": []
+    }
+   },
+   {
+    "name": "not-connected is empty",
+    "valid": true,
+    "set": {
+     "state": "not-connected",
+     "incidents": []
+    }
+   },
+   {
+    "name": "unknown is empty",
+    "valid": true,
+    "set": {
+     "state": "unknown",
+     "incidents": []
+    }
+   },
+   {
+    "name": "not-connected must not carry rows",
+    "valid": false,
+    "set": {
+     "state": "not-connected"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "unknown must not carry rows",
+    "valid": false,
+    "set": {
+     "state": "unknown"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "not-connected must not offer a continuation",
+    "valid": false,
+    "set": {
+     "state": "not-connected",
+     "incidents": [],
+     "next_offset": 50
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "unknown must not offer a continuation",
+    "valid": false,
+    "set": {
+     "state": "unknown",
+     "incidents": [],
+     "next_offset": 50
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "state outside the enum",
+    "valid": false,
+    "set": {
+     "state": "degraded",
+     "incidents": []
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "limit zero",
+    "valid": false,
+    "set": {
+     "limit": 0
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "limit above the server cap",
+    "valid": false,
+    "set": {
+     "limit": 101
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "negative offset",
+    "valid": false,
+    "set": {
+     "offset": -1
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "offset above the cap",
+    "valid": false,
+    "set": {
+     "offset": 10001,
+     "incidents": []
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "negative next_offset",
+    "valid": false,
+    "set": {
+     "next_offset": -1
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "next_offset above the cap",
+    "valid": false,
+    "set": {
+     "next_offset": 10001
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "limit as a string",
+    "valid": false,
+    "set": {
+     "limit": "50"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "embedded incident violating the contract",
+    "valid": false,
+    "set": {
+     "incidents.0.state": "deleted"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "embedded incident with an extra field",
+    "valid": false,
+    "set": {
+     "incidents.0.password": "x"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "unknown top-level field",
+    "valid": false,
+    "set": {
+     "extra": 1
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "missing incidents",
+    "valid": false,
+    "delete": [
+     "incidents"
+    ],
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "missing next_offset",
+    "valid": false,
+    "delete": [
+     "next_offset"
+    ],
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "incidents is null",
+    "valid": false,
+    "set": {
+     "incidents": null
+    },
+    "jsonschema_rejects": true
+   }
+  ]
+ },
+ "incident_detail_response": {
+  "base": {
+   "state": "ok",
+   "incident": {
+    "id": "incident-3f2b8a40-1c2d-4e5f-8a9b-0c1d2e3f4a5b",
+    "title": "Perimeter outage",
+    "severity": "critical",
+    "state": "open",
+    "created_at": "2026-10-08T08:00:00Z",
+    "updated_at": "2026-10-08T08:00:00Z",
+    "assignee_id": null,
+    "evidence_ids": [],
+    "resolution": null
+   }
+  },
+  "cases": [
+   {
+    "name": "ok with the incident",
+    "valid": true
+   },
+   {
+    "name": "not-connected carries no incident",
+    "valid": true,
+    "set": {
+     "state": "not-connected",
+     "incident": null
+    }
+   },
+   {
+    "name": "unknown carries no incident",
+    "valid": true,
+    "set": {
+     "state": "unknown",
+     "incident": null
+    }
+   },
+   {
+    "name": "ok without an incident",
+    "valid": false,
+    "set": {
+     "incident": null
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "not-connected with an incident",
+    "valid": false,
+    "set": {
+     "state": "not-connected"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "unknown with an incident",
+    "valid": false,
+    "set": {
+     "state": "unknown"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "state outside the enum",
+    "valid": false,
+    "set": {
+     "state": "missing"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "embedded incident violating the contract",
+    "valid": false,
+    "set": {
+     "incident.severity": "info"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "unknown top-level field",
+    "valid": false,
+    "set": {
+     "extra": 1
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "missing incident",
+    "valid": false,
+    "delete": [
+     "incident"
+    ],
+    "jsonschema_rejects": true
+   }
+  ]
+ },
+ "incident_timeline_response": {
+  "base": {
+   "state": "ok",
+   "incident_id": "incident-3f2b8a40-1c2d-4e5f-8a9b-0c1d2e3f4a5b",
+   "events": [
+    {
+     "id": "incident-event-9d1c7e52-4b3a-4f60-b1c2-7a8d9e0f1a2b",
+     "incident_id": "incident-3f2b8a40-1c2d-4e5f-8a9b-0c1d2e3f4a5b",
+     "seq": 1,
+     "occurred_at": "2026-10-08T08:00:00Z",
+     "actor_id": "identity-ronald",
+     "kind": "comment",
+     "state_from": null,
+     "state_to": null,
+     "reason": null,
+     "message": "Investigating uplink",
+     "subject_id": null
+    }
+   ],
+   "after_seq": 0,
+   "next_after_seq": null
+  },
+  "cases": [
+   {
+    "name": "ok page with one event",
+    "valid": true
+   },
+   {
+    "name": "ok empty page",
+    "valid": true,
+    "set": {
+     "events": []
+    }
+   },
+   {
+    "name": "ok page with a continuation",
+    "valid": true,
+    "set": {
+     "next_after_seq": 1
+    }
+   },
+   {
+    "name": "not-connected is empty",
+    "valid": true,
+    "set": {
+     "state": "not-connected",
+     "events": []
+    }
+   },
+   {
+    "name": "unknown is empty",
+    "valid": true,
+    "set": {
+     "state": "unknown",
+     "events": []
+    }
+   },
+   {
+    "name": "not-connected must not carry rows",
+    "valid": false,
+    "set": {
+     "state": "not-connected"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "unknown must not carry rows",
+    "valid": false,
+    "set": {
+     "state": "unknown"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "not-connected must not offer a continuation",
+    "valid": false,
+    "set": {
+     "state": "not-connected",
+     "events": [],
+     "next_after_seq": 3
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "state outside the enum",
+    "valid": false,
+    "set": {
+     "state": "stale"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "malformed incident id",
+    "valid": false,
+    "set": {
+     "incident_id": "incident-1"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "negative after_seq",
+    "valid": false,
+    "set": {
+     "after_seq": -1
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "after_seq above the sequence ceiling",
+    "valid": false,
+    "set": {
+     "after_seq": 1000001
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "next_after_seq zero",
+    "valid": false,
+    "set": {
+     "next_after_seq": 0
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "embedded event violating the contract",
+    "valid": false,
+    "set": {
+     "events.0.kind": "deleted"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "unknown top-level field",
+    "valid": false,
+    "set": {
+     "extra": 1
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "missing incident_id",
+    "valid": false,
+    "delete": [
+     "incident_id"
+    ],
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "missing next_after_seq",
+    "valid": false,
+    "delete": [
+     "next_after_seq"
+    ],
+    "jsonschema_rejects": true
+   }
+  ]
  }
 }

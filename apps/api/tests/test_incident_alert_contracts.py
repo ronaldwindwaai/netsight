@@ -43,6 +43,21 @@ ENTITIES: dict[str, tuple[str, type[BaseModel], str]] = {
         schemas.IncidentTimelineEvent,
         "IncidentTimelineEvent",
     ),
+    "incident_list_response": (
+        "incident_list",
+        schemas.IncidentListResponse,
+        "IncidentListResponse",
+    ),
+    "incident_detail_response": (
+        "incident_detail",
+        schemas.IncidentDetailResponse,
+        "IncidentDetailResponse",
+    ),
+    "incident_timeline_response": (
+        "incident_timeline",
+        schemas.IncidentTimelineResponse,
+        "IncidentTimelineResponse",
+    ),
     "alert_rule": ("alert_rule", schemas.AlertRule, "AlertRule"),
     "maintenance_window": (
         "maintenance_window",
@@ -141,6 +156,19 @@ DEF_TO_COMPONENT = {
         "#/$defs/resolution": "IncidentResolution",
         "#/$defs/timelineEvent": "IncidentTimelineEvent",
     },
+    "incident-api.schema.json": {
+        "#/$defs/listResponse": "IncidentListResponse",
+        "#/$defs/detailResponse": "IncidentDetailResponse",
+        "#/$defs/timelineResponse": "IncidentTimelineResponse",
+        "#/$defs/transitionRequest": "IncidentTransitionRequest",
+        "#/$defs/assignRequest": "IncidentAssignRequest",
+        "#/$defs/commentRequest": "IncidentCommentRequest",
+        "#/$defs/evidenceRequest": "IncidentEvidenceRequest",
+        "#/$defs/resolveRequest": "IncidentResolveRequest",
+        "#/$defs/reopenRequest": "IncidentReopenRequest",
+        "incident.schema.json": "Incident",
+        "incident.schema.json#/$defs/timelineEvent": "IncidentTimelineEvent",
+    },
     "alert-rule.schema.json": {
         "#/$defs/scope": "AlertScope",
         "#/$defs/condition": "AlertCondition",
@@ -155,6 +183,15 @@ SCHEMA_PAIRS: list[tuple[str, str | None, str]] = [
     ("incident.schema.json", None, "Incident"),
     ("incident.schema.json", "resolution", "IncidentResolution"),
     ("incident.schema.json", "timelineEvent", "IncidentTimelineEvent"),
+    ("incident-api.schema.json", "listResponse", "IncidentListResponse"),
+    ("incident-api.schema.json", "detailResponse", "IncidentDetailResponse"),
+    ("incident-api.schema.json", "timelineResponse", "IncidentTimelineResponse"),
+    ("incident-api.schema.json", "transitionRequest", "IncidentTransitionRequest"),
+    ("incident-api.schema.json", "assignRequest", "IncidentAssignRequest"),
+    ("incident-api.schema.json", "commentRequest", "IncidentCommentRequest"),
+    ("incident-api.schema.json", "evidenceRequest", "IncidentEvidenceRequest"),
+    ("incident-api.schema.json", "resolveRequest", "IncidentResolveRequest"),
+    ("incident-api.schema.json", "reopenRequest", "IncidentReopenRequest"),
     ("alert-rule.schema.json", None, "AlertRule"),
     ("alert-rule.schema.json", "scope", "AlertScope"),
     ("alert-rule.schema.json", "condition", "AlertCondition"),
@@ -220,10 +257,31 @@ def test_every_openapi_component_in_this_slice_is_paired() -> None:
     assert declared == paired
 
 
-def test_slice_adds_no_routes_yet() -> None:
-    # Routes are S6-2; the placeholder /incidents operations stay description-only.
-    for path, operations in OPENAPI["paths"].items():
+def test_alert_rule_and_maintenance_routes_do_not_exist_yet() -> None:
+    # Incident routes arrived in S6-2; alert-rule and maintenance routes are S6-3.
+    for path in OPENAPI["paths"]:
         if path.startswith(("/alert-rules", "/maintenance")):
-            pytest.fail(f"unexpected route {path} before S6-2")
-        if path.startswith("/incidents/"):
-            pytest.fail(f"unexpected route {path} before S6-2: {operations}")
+            pytest.fail(f"unexpected route {path} before S6-3")
+
+
+def test_incident_operations_are_documented_with_every_error_status() -> None:
+    paths = OPENAPI["paths"]
+    reads = ["/incidents", "/incidents/{incident_id}", "/incidents/{incident_id}/timeline"]
+    writes = [
+        f"/incidents/{{incident_id}}/{name}"
+        for name in (
+            "acknowledge",
+            "transition",
+            "assign",
+            "comment",
+            "evidence",
+            "resolve",
+            "reopen",
+        )
+    ]
+    for path in reads:
+        assert {"200", "401", "403", "422"} <= set(paths[path]["get"]["responses"]), path
+    for path in writes:
+        responses = set(paths[path]["post"]["responses"])
+        assert {"401", "403", "404", "409", "422", "503"} <= responses, path
+    assert "post" not in paths["/incidents"], "incidents are created by the engine, not by clients"

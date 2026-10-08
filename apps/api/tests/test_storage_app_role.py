@@ -182,9 +182,11 @@ def test_repository_operations_still_work_as_the_app_role(env: Env) -> None:
     assert [i.id for i in incidents.list_incidents(state="open")] == [incident.id]
 
     rule = rules.create_rule(rule_definition(), actor_id="u-1")
-    edited = rules.update_rule(rule.id, rule_definition(name="renamed"), expected_version=1)
-    active = rules.approve_rule(edited.id, approver_id="u-2")
-    disabled = rules.disable_rule(active.id)
+    edited = rules.update_rule(
+        rule.id, rule_definition(name="renamed"), expected_version=1, actor_id="u-1"
+    )
+    active = rules.approve_rule(edited.id, approver_id="u-2", expected_version=edited.version)
+    disabled = rules.disable_rule(active.id, actor_id="u-1")
     assert (disabled.status, disabled.version) == ("disabled", 4)
     assert [r.id for r in rules.list_rules(status="disabled")] == [rule.id]
 

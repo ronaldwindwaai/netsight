@@ -29,6 +29,7 @@ from netsight_api.storage import (
     InMemoryIncidentRepository,
     InvalidOperationError,
     NotFoundError,
+    ScopeViolationError,
     StorageConflictError,
 )
 
@@ -199,6 +200,22 @@ def test_list_incidents_filters_orders_and_pages(stores: Stores) -> None:
     assert [i.id for i in stores.incidents.list_incidents(state="open")] == [third.id, first.id]
     assert [i.id for i in stores.incidents.list_incidents(limit=1, offset=1)] == [second.id]
     assert stores.incidents.list_incidents(offset=10) == []
+
+
+def test_list_incidents_filters_by_severity_and_assignee(stores: Stores) -> None:
+    low = new_incident(stores.incidents, severity="low")
+    high = new_incident(stores.incidents, severity="high")
+    crit = new_incident(stores.incidents, severity="critical")
+    stores.incidents.set_assignee(high.id, assignee_id="u-9", actor_id="u-1")
+    stores.incidents.set_assignee(crit.id, assignee_id="u-9", actor_id="u-1")
+    listed = stores.incidents.list_incidents
+    assert [i.id for i in listed(severity="low")] == [low.id]
+    assert [i.id for i in listed(assignee_id="u-9")] == [crit.id, high.id]
+    assert [i.id for i in listed(assignee_id="u-9", severity="high")] == [high.id]
+    assert [i.id for i in listed(state="acknowledged")] == []
+    assert listed(assignee_id="someone-else") == []
+    # Filter values are data: SQL metacharacters match nothing and break nothing.
+    assert listed(assignee_id="x' OR '1'='1") == []
 
 
 @pytest.mark.parametrize("limit", [0, -1, 101])
@@ -481,6 +498,87 @@ def test_append_event_on_unknown_incident_is_not_found(stores: Stores) -> None:
         stores.incidents.list_timeline("incident-00000000-0000-4000-8000-000000000000")
 
 
+# --- incidents: assigned-only scope (enforced under the row lock) ---------------
+
+TECH = "microsoft:tech-1"
+SCOPED_WRITES: dict[str, Any] = {
+    "transition": lambda repo, iid, **kw: repo.transition_state(
+        iid, to_state="acknowledged", actor_id=TECH, **kw
+    ),
+    "comment": lambda repo, iid, **kw: repo.append_event(
+        iid, kind="comment", actor_id=TECH, message="on site", **kw
+    ),
+    "evidence": lambda repo, iid, **kw: repo.add_evidence(
+        iid, evidence_id="ev-1", actor_id=TECH, **kw
+    ),
+}
+
+
+@pytest.mark.parametrize("write", sorted(SCOPED_WRITES))
+def test_scoped_write_succeeds_for_the_required_assignee(stores: Stores, write: str) -> None:
+    incident = new_incident(stores.incidents)
+    stores.incidents.set_assignee(incident.id, assignee_id=TECH, actor_id="u-1")
+    SCOPED_WRITES[write](stores.incidents, incident.id, required_assignee=TECH)
+    assert len(stores.incidents.list_timeline(incident.id)) == 2
+
+
+@pytest.mark.parametrize("write", sorted(SCOPED_WRITES))
+@pytest.mark.parametrize("assignee", ["microsoft:tech-2", None, "microsoft:tech-1 "])
+def test_scoped_write_is_refused_and_changes_nothing_for_any_other_assignee(
+    stores: Stores, write: str, assignee: str | None
+) -> None:
+    incident = new_incident(stores.incidents)
+    if assignee is not None:
+        stores.incidents.set_assignee(incident.id, assignee_id=assignee, actor_id="u-1")
+    before = stores.incidents.get_incident(incident.id)
+    history = stores.incidents.list_timeline(incident.id)
+    with pytest.raises(ScopeViolationError):
+        SCOPED_WRITES[write](stores.incidents, incident.id, required_assignee=TECH)
+    assert stores.incidents.get_incident(incident.id) == before
+    assert stores.incidents.list_timeline(incident.id) == history
+
+
+@pytest.mark.parametrize("write", sorted(SCOPED_WRITES))
+def test_scoped_write_is_refused_after_the_incident_is_reassigned(
+    stores: Stores, write: str
+) -> None:
+    incident = new_incident(stores.incidents)
+    stores.incidents.set_assignee(incident.id, assignee_id=TECH, actor_id="u-1")
+    stores.incidents.set_assignee(incident.id, assignee_id="microsoft:tech-2", actor_id="u-1")
+    with pytest.raises(ScopeViolationError):
+        SCOPED_WRITES[write](stores.incidents, incident.id, required_assignee=TECH)
+
+
+@pytest.mark.parametrize("write", sorted(SCOPED_WRITES))
+def test_scope_is_judged_before_the_state_machine_so_state_is_not_disclosed(
+    stores: Stores, write: str
+) -> None:
+    incident = drive_to(stores.incidents, "closed")  # closed: any write is an illegal transition
+    with pytest.raises(ScopeViolationError):
+        SCOPED_WRITES[write](stores.incidents, incident.id, required_assignee=TECH)
+
+
+@pytest.mark.parametrize("write", sorted(SCOPED_WRITES))
+def test_scoped_write_on_an_unknown_incident_is_not_found(stores: Stores, write: str) -> None:
+    with pytest.raises(NotFoundError):
+        SCOPED_WRITES[write](
+            stores.incidents,
+            "incident-00000000-0000-4000-8000-000000000000",
+            required_assignee=TECH,
+        )
+
+
+@pytest.mark.parametrize("write", sorted(SCOPED_WRITES))
+@pytest.mark.parametrize("scope", [{}, {"required_assignee": None}])
+def test_unscoped_write_ignores_the_assignee(
+    stores: Stores, write: str, scope: dict[str, Any]
+) -> None:
+    incident = new_incident(stores.incidents)
+    stores.incidents.set_assignee(incident.id, assignee_id="microsoft:tech-2", actor_id="u-1")
+    SCOPED_WRITES[write](stores.incidents, incident.id, **scope)
+    assert len(stores.incidents.list_timeline(incident.id)) == 2
+
+
 def test_closed_incidents_accept_nothing_but_a_reopen(stores: Stores) -> None:
     incident = drive_to(stores.incidents, "closed")
     events_before = stores.incidents.list_timeline(incident.id)
@@ -603,39 +701,93 @@ def test_rule_round_trips_nested_fields_exactly(stores: Stores) -> None:
 
 def test_approval_activates_a_rule_exactly_once(stores: Stores) -> None:
     rule = stores.rules.create_rule(rule_definition(), actor_id="u-1")
-    active = stores.rules.approve_rule(rule.id, approver_id="u-2")
+    active = stores.rules.approve_rule(rule.id, approver_id="u-2", expected_version=1)
     assert active.status == "active"
     assert active.approved_by == "u-2"
     assert active.approved_at is not None
     assert active.version == 2
     validate("alert_rule", json.loads(active.model_dump_json(by_alias=True)))
     with pytest.raises(IllegalTransitionError):
-        stores.rules.approve_rule(rule.id, approver_id="u-2")
+        stores.rules.approve_rule(rule.id, approver_id="u-2", expected_version=2)
     with pytest.raises(ValueError):
-        stores.rules.approve_rule(rule.id, approver_id="")
+        stores.rules.approve_rule(rule.id, approver_id="", expected_version=2)
     with pytest.raises(NotFoundError):
         stores.rules.approve_rule(
-            "alert-rule-00000000-0000-4000-8000-000000000000", approver_id="u"
+            "alert-rule-00000000-0000-4000-8000-000000000000",
+            approver_id="u",
+            expected_version=1,
         )
+
+
+def test_approval_is_bound_to_the_reviewed_version(stores: Stores) -> None:
+    """A reviewer who approved version 1 must not activate an edit made afterwards."""
+    rule = stores.rules.create_rule(rule_definition(), actor_id="u-1")
+    edited = stores.rules.update_rule(
+        rule.id, rule_definition(name="changed after review"), expected_version=1, actor_id="u-1"
+    )
+    assert edited.version == 2
+    with pytest.raises(StorageConflictError):
+        stores.rules.approve_rule(rule.id, approver_id="u-2", expected_version=1)
+    with pytest.raises(StorageConflictError):
+        stores.rules.approve_rule(rule.id, approver_id="u-2", expected_version=3)
+    unchanged = stores.rules.get_rule(rule.id)
+    assert unchanged is not None
+    assert (unchanged.status, unchanged.version, unchanged.approved_by) == ("draft", 2, None)
+    approved = stores.rules.approve_rule(rule.id, approver_id="u-2", expected_version=2)
+    assert (approved.status, approved.version) == ("active", 3)
+
+
+def test_concurrent_approvals_of_the_same_version_only_one_wins(stores: Stores) -> None:
+    rule = stores.rules.create_rule(rule_definition(), actor_id="u-1")
+
+    def approve(index: int) -> str:
+        try:
+            stores.rules.approve_rule(rule.id, approver_id=f"u-{index}", expected_version=1)
+        except (StorageConflictError, IllegalTransitionError):
+            return "rejected"
+        return "ok"
+
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        outcomes = list(pool.map(approve, range(2, 8)))
+    assert sorted(outcomes) == ["ok"] + ["rejected"] * 5
 
 
 def test_active_rules_cannot_be_edited_until_disabled(stores: Stores) -> None:
     rule = stores.rules.create_rule(rule_definition(), actor_id="u-1")
-    stores.rules.approve_rule(rule.id, approver_id="u-2")
+    stores.rules.approve_rule(rule.id, approver_id="u-2", expected_version=1)
     with pytest.raises(IllegalTransitionError):
-        stores.rules.update_rule(rule.id, rule_definition(name="renamed"), expected_version=2)
-    disabled = stores.rules.disable_rule(rule.id)
+        stores.rules.update_rule(
+            rule.id, rule_definition(name="renamed"), expected_version=2, actor_id="u-1"
+        )
+    disabled = stores.rules.disable_rule(rule.id, actor_id="u-3")
     assert disabled.status == "disabled"
     assert disabled.approved_by == "u-2"
     validate("alert_rule", json.loads(disabled.model_dump_json(by_alias=True)))
 
 
+def test_rule_edit_and_disable_require_a_valid_actor(stores: Stores) -> None:
+    """Every rule mutation names its actor so the route layer can audit it (PRD 32)."""
+    rule = stores.rules.create_rule(rule_definition(), actor_id="u-1")
+    with pytest.raises(ValueError):
+        stores.rules.update_rule(
+            rule.id, rule_definition(name="x"), expected_version=1, actor_id=""
+        )
+    stores.rules.approve_rule(rule.id, approver_id="u-2", expected_version=1)
+    with pytest.raises(ValueError):
+        stores.rules.disable_rule(rule.id, actor_id="")
+    unchanged = stores.rules.get_rule(rule.id)
+    assert unchanged is not None and unchanged.status == "active"
+
+
 def test_editing_a_disabled_rule_resets_it_to_an_unapproved_draft(stores: Stores) -> None:
     rule = stores.rules.create_rule(rule_definition(), actor_id="u-1")
-    stores.rules.approve_rule(rule.id, approver_id="u-2")
-    stores.rules.disable_rule(rule.id)
+    stores.rules.approve_rule(rule.id, approver_id="u-2", expected_version=1)
+    stores.rules.disable_rule(rule.id, actor_id="u-1")
     edited = stores.rules.update_rule(
-        rule.id, rule_definition(name="renamed", severity="low"), expected_version=3
+        rule.id,
+        rule_definition(name="renamed", severity="low"),
+        expected_version=3,
+        actor_id="u-1",
     )
     assert (edited.name, edited.severity, edited.status) == ("renamed", "low", "draft")
     assert edited.approved_by is None and edited.approved_at is None
@@ -643,13 +795,13 @@ def test_editing_a_disabled_rule_resets_it_to_an_unapproved_draft(stores: Stores
     assert edited.created_by == "u-1" and edited.created_at == rule.created_at
     assert edited.updated_at > rule.updated_at
     with pytest.raises(IllegalTransitionError):
-        stores.rules.disable_rule(rule.id)
+        stores.rules.disable_rule(rule.id, actor_id="u-1")
 
 
 def test_draft_edit_bumps_version(stores: Stores) -> None:
     rule = stores.rules.create_rule(rule_definition(), actor_id="u-1")
     edited = stores.rules.update_rule(
-        rule.id, rule_definition(cooldown_seconds=60), expected_version=1
+        rule.id, rule_definition(cooldown_seconds=60), expected_version=1, actor_id="u-1"
     )
     assert (edited.status, edited.version, edited.cooldown_seconds) == ("draft", 2, 60)
     with pytest.raises(NotFoundError):
@@ -657,23 +809,30 @@ def test_draft_edit_bumps_version(stores: Stores) -> None:
             "alert-rule-00000000-0000-4000-8000-000000000000",
             rule_definition(),
             expected_version=1,
+            actor_id="u-1",
         )
 
 
 def test_update_rule_with_a_stale_version_conflicts_and_changes_nothing(stores: Stores) -> None:
     rule = stores.rules.create_rule(rule_definition(), actor_id="u-1")
-    first = stores.rules.update_rule(rule.id, rule_definition(name="first"), expected_version=1)
+    first = stores.rules.update_rule(
+        rule.id, rule_definition(name="first"), expected_version=1, actor_id="u-1"
+    )
     assert first.version == 2
     with pytest.raises(StorageConflictError):
-        stores.rules.update_rule(rule.id, rule_definition(name="second"), expected_version=1)
+        stores.rules.update_rule(
+            rule.id, rule_definition(name="second"), expected_version=1, actor_id="u-1"
+        )
     with pytest.raises(StorageConflictError):
-        stores.rules.update_rule(rule.id, rule_definition(name="future"), expected_version=3)
+        stores.rules.update_rule(
+            rule.id, rule_definition(name="future"), expected_version=3, actor_id="u-1"
+        )
     unchanged = stores.rules.get_rule(rule.id)
     assert unchanged is not None
     assert (unchanged.name, unchanged.version) == ("first", 2)
     assert (
         stores.rules.update_rule(
-            rule.id, rule_definition(name="second"), expected_version=2
+            rule.id, rule_definition(name="second"), expected_version=2, actor_id="u-1"
         ).version
         == 3
     )
@@ -685,7 +844,10 @@ def test_concurrent_edits_from_the_same_version_only_one_wins(stores: Stores) ->
     def edit(index: int) -> str:
         try:
             stores.rules.update_rule(
-                rule.id, rule_definition(name=f"editor {index}"), expected_version=1
+                rule.id,
+                rule_definition(name=f"editor {index}"),
+                expected_version=1,
+                actor_id="u-1",
             )
         except StorageConflictError:
             return "conflict"
@@ -701,7 +863,7 @@ def test_concurrent_edits_from_the_same_version_only_one_wins(stores: Stores) ->
 def test_list_rules_filters_by_status_and_pages(stores: Stores) -> None:
     a = stores.rules.create_rule(rule_definition(name="a"), actor_id="u")
     b = stores.rules.create_rule(rule_definition(name="b"), actor_id="u")
-    stores.rules.approve_rule(b.id, approver_id="u2")
+    stores.rules.approve_rule(b.id, approver_id="u2", expected_version=1)
     assert [r.id for r in stores.rules.list_rules()] == [b.id, a.id]
     assert [r.id for r in stores.rules.list_rules(status="active")] == [b.id]
     assert [r.id for r in stores.rules.list_rules(limit=1, offset=1)] == [a.id]

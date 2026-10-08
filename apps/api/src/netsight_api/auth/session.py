@@ -216,4 +216,5 @@ def new_csrf_token(session: Session) -> str:
 
 
 def constant_time_equals(left: str, right: str) -> bool:
-    return hmac.compare_digest(left, right)
+    """Compare as UTF-8 bytes: ``hmac.compare_digest`` raises TypeError on non-ASCII ``str``."""
+    return hmac.compare_digest(left.encode("utf-8"), right.encode("utf-8"))

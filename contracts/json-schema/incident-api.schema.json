@@ -1,0 +1,386 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "IncidentApi",
+  "description": "Request and response envelopes of the /api/v1/incidents routes (S6-2). The records themselves are defined in incident.schema.json. Responses carry an explicit state: not-connected (no incident store configured) and unknown (the store failed) never carry rows, a continuation cursor or an incident; only ok does. Every free-text field is untrusted data and is never interpreted as an instruction.",
+  "$defs": {
+    "listResponse": {
+      "description": "One page of incidents, newest first. Paging is a server-capped offset (limit 1-100, offset 0-10000); next_offset is null on the last page.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "incidents",
+        "limit",
+        "offset",
+        "next_offset"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "not-connected",
+            "ok",
+            "unknown"
+          ]
+        },
+        "incidents": {
+          "type": "array",
+          "maxItems": 100,
+          "items": {
+            "$ref": "incident.schema.json"
+          }
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "next_offset": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1,
+          "maximum": 10000
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "not-connected",
+                  "unknown"
+                ]
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "incidents": {
+                "maxItems": 0
+              },
+              "next_offset": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "detailResponse": {
+      "description": "One incident. incident is non-null exactly when state is ok; an unknown id is a 404, not a state.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "incident"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "not-connected",
+            "ok",
+            "unknown"
+          ]
+        },
+        "incident": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "incident.schema.json"
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "ok"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "incident": {
+                "type": "object"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "incident": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "timelineResponse": {
+      "description": "One page of an incident's append-only timeline in ascending seq order. Continue with after_seq = next_after_seq; next_after_seq is null on the last page.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "incident_id",
+        "events",
+        "after_seq",
+        "next_after_seq"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "not-connected",
+            "ok",
+            "unknown"
+          ]
+        },
+        "incident_id": {
+          "type": "string",
+          "minLength": 45,
+          "maxLength": 45,
+          "pattern": "^incident-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "events": {
+          "type": "array",
+          "maxItems": 500,
+          "items": {
+            "$ref": "incident.schema.json#/$defs/timelineEvent"
+          }
+        },
+        "after_seq": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "next_after_seq": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1,
+          "maximum": 1000000
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "not-connected",
+                  "unknown"
+                ]
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "events": {
+                "maxItems": 0
+              },
+              "next_after_seq": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "transitionRequest": {
+      "description": "Progress an incident one step. Resolving and reopening have their own operations (resolve, reopen) because they need human-only permissions and mandatory fields.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "to_state"
+      ],
+      "properties": {
+        "to_state": {
+          "enum": [
+            "acknowledged",
+            "investigating",
+            "mitigated",
+            "closed"
+          ]
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 1000,
+          "pattern": "\\S"
+        }
+      }
+    },
+    "assignRequest": {
+      "description": "Assign the incident to an identity, or null to unassign.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "assignee_id"
+      ],
+      "properties": {
+        "assignee_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 255
+        }
+      }
+    },
+    "commentRequest": {
+      "description": "Append a comment to the timeline. The text is stored and returned verbatim and is never interpreted.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "message"
+      ],
+      "properties": {
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000,
+          "pattern": "\\S"
+        }
+      }
+    },
+    "evidenceRequest": {
+      "description": "Attach an immutable evidence record reference. Idempotent.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence_id"
+      ],
+      "properties": {
+        "evidence_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      }
+    },
+    "resolveRequest": {
+      "description": "Operator-supplied resolution (INCIDENT-ENGINE.md, Resolution). Human principals only. root_cause_status is 'determined' only with an operator-accepted root_cause text, otherwise 'not-determined' with a null root_cause. The server adds who and when; restored_at must not be after the server's resolved_at (not expressible in JSON Schema).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "summary",
+        "root_cause_status",
+        "root_cause",
+        "impact",
+        "restored_at",
+        "follow_up_actions"
+      ],
+      "properties": {
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000,
+          "pattern": "\\S"
+        },
+        "root_cause_status": {
+          "enum": [
+            "determined",
+            "not-determined"
+          ]
+        },
+        "root_cause": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 2000,
+          "pattern": "\\S"
+        },
+        "impact": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000,
+          "pattern": "\\S"
+        },
+        "restored_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "follow_up_actions": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "pattern": "\\S"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "root_cause_status": {
+                "const": "determined"
+              }
+            },
+            "required": [
+              "root_cause_status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "root_cause": {
+                "type": "string"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "root_cause": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "reopenRequest": {
+      "description": "Reopen a resolved or closed incident. A reason is mandatory and audited. Human principals only.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reason"
+      ],
+      "properties": {
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000,
+          "pattern": "\\S"
+        }
+      }
+    }
+  }
+}

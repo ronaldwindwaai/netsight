@@ -69,6 +69,25 @@ Storage decision (2026-10-08, human ruling): follow `DATABASE-OWNERSHIP.md` — 
    - Grants script revokes PUBLIC on schema `public`: the NetSight DB must be dedicated; document.
    - Run live suite on Postgres 17 (compose target); add CI Postgres service container.
    - Deferred: keyset paging (M2), resolution history on reopen (M3), connection pool (M6), tighter jsonb CHECKs + corrupt-row tolerance (M7), migration checksums (M9), startup check that `DATABASE_URL` is not an owner/superuser role, 409/503 mapping of storage errors in routes, never log `__cause__` verbatim.
+2. ✅ S6-2 incident routes (2026-10-08, **done: independent reviews complete, review fixes applied, follow-ups below**; not committed): code-reviewer APPROVE, security-reviewer PASS WITH FOLLOW-UPS (no CRITICAL/HIGH). Fixed in the review pass: technician assigned-scope enforced under the incident row lock (`required_assignee` in `transition_state`/`append_event`/`add_evidence`, the unlocked pre-read removed); one session resolution per request and fail-closed, byte-safe CSRF; origin allow-list (`NETSIGHT_ALLOWED_ORIGINS` + public base URL) for cookie writes; dev-bridge writes need the CSRF header; `SameSite=None` rejected unless explicitly allowed; success/failure audit emitted from the worker thread (cancel-safe) and the audit logger configured at start-up (`docs/08-operations/AUDIT-LOGGING.md`); audit hygiene (validated target, hashed free-form values, hashed not truncated actor ids); resolution re-validation inside the audited boundary; only pydantic/domain errors map to 4xx. Delivered scope: `/api/v1/incidents` list/detail/timeline reads and acknowledge/transition/assign/comment/evidence/resolve/reopen writes (`incident_routes.py`), `incident-api.schema.json` + OpenAPI + pydantic + TS parsers in four-way agreement (new vectors), granular RBAC permissions (`incidents:transition|assign|comment|resolve|reopen|write-assigned`), `Identity.principal` (resolve/reopen human-only), CSRF on cookie-authenticated writes, per-identity write rate limit, interim audit log (`netsight_api.audit`), `DATABASE_URL` app-role store wiring. Gate items closed here:
+   - `approve_rule(..., expected_version)` (StorageConflictError on mismatch) in Protocol, memory and PostgreSQL stores + conformance.
+   - `update_rule` / `disable_rule` now require `actor_id` (validated, not persisted: rules have no editor column). **Alert-rule routes (S6-3) must write the audit event** with `record_audit`.
+   - Resolve/reopen restricted to human principals in `rbac.is_allowed`; every non-session identity defaults to `PrincipalKind.SERVICE`.
+   - Reads: no store configured -> 200 `not-connected`; store failure -> 200 `unknown` (rows/cursors always empty); writes: 503 `STORE_NOT_CONNECTED` / `STORE_UNAVAILABLE`, 409 conflict/illegal transition, 422 invalid, 404 unknown id.
+   Remaining S6-2 follow-ups (open for the S6 gate; none blocks S6-3):
+   - **Human decision needed:** should the Management role get a summary-only incident view (and a dedicated summary permission) instead of full `incidents:read`? Not decided; today Management reads everything the other read roles read.
+   - Technician read scope ("Assigned" is enforced for writes only) and site/asset scope for reads.
+   - Read auditing (privacy-sensitive reads are not audit-logged).
+   - Read rate limit and a connection pool (one connection per store call today; a write limiter exists).
+   - Request body size cap (field limits only).
+   - Tamper-evident audit store (PRD 32): the audit sink is a configured log; the append-only timeline is the durable record.
+   - Keyset paging (list uses a server-capped offset of 10 000; a full final page yields one empty trailing page).
+   - Step-up authentication for resolve/reopen.
+   - Per-worker in-memory rate limiter and session store (needs a shared store before running more than one worker).
+   - Comment idempotency (a retry after a timeout can duplicate a comment).
+   - Column-level `UPDATE (state, ...)` on `incidents` for the app role: SQL run as that role can change state without the timeline event (record/history divergence); consider a trigger or stored-procedure write path.
+   - `assignee_id` shape validation (length only today).
+   - Startup check that `DATABASE_URL` is not an owner role; Postgres 17 run + CI service container.
 Stories: NS-060..NS-065.
 Steps: alert-rule domain model, notif routing, incident store, timeline, acknowledgement/incident ownership, audit.
 

@@ -10,7 +10,7 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Annotated, Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 from netsight_api.auth.providers import GOOGLE, MICROSOFT, ProviderId
@@ -112,6 +112,22 @@ class SessionPolicy(BaseSettings):
     secure_cookie: bool = True
     # Domain for the session cookie (empty = host-only).
     cookie_domain: str = ""
+    # SameSite=None sends the session cookie on cross-site requests, removing the browser's
+    # CSRF backstop; it must be opted into explicitly (and requires a Secure cookie).
+    allow_same_site_none: bool = False
+
+    @model_validator(mode="after")
+    def _guard_same_site_none(self) -> SessionPolicy:
+        if self.same_site != "none":
+            return self
+        if not self.allow_same_site_none:
+            raise ValueError(
+                "same_site=none sends the session cookie on cross-site requests; "
+                "set NETSIGHT_SESSION_ALLOW_SAME_SITE_NONE=true to accept that explicitly"
+            )
+        if not self.secure_cookie:
+            raise ValueError("same_site=none requires a secure cookie (secure_cookie=true)")
+        return self
 
 
 class AuthSettings(BaseSettings):
@@ -138,9 +154,23 @@ class AuthSettings(BaseSettings):
         default=False, validation_alias="NETSIGHT_ENABLE_DEV_IDENTITY"
     )
     environment: str = Field(default="production", validation_alias="NETSIGHT_ENV")
+    # Browser origins allowed to make cookie-authenticated writes (comma separated, for
+    # example the web app's origin when it is not the public base URL). The origin of
+    # ``public_base_url`` is always allowed. Empty and no base URL means no browser origin.
+    allowed_origins: Annotated[list[str], NoDecode] = Field(
+        default_factory=list, validation_alias="NETSIGHT_ALLOWED_ORIGINS"
+    )
     auth_rate_limit_per_minute: int = Field(
         default=30, validation_alias="NETSIGHT_AUTH_RATE_LIMIT_PER_MINUTE"
     )
+
+    @field_validator("allowed_origins", mode="before")
+    @classmethod
+    def _split_allowed_origins(cls, value: object) -> object:
+        """Comma-separated list (``NoDecode`` stops a JSON parse of a plain value)."""
+        if isinstance(value, str):
+            return [item.strip() for item in value.split(",") if item.strip()]
+        return value
 
 
 def parse_role_mapping(raw: str) -> dict[str, str]:

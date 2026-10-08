@@ -25,7 +25,6 @@ from netsight_api.schemas import (
     MaintenanceWindowDefinition,
 )
 from netsight_api.storage import lifecycle
-from netsight_api.storage.errors import StorageConflictError
 from netsight_api.storage.lifecycle import Clock, UuidFactory
 from netsight_api.storage.repository import NoteKind
 
@@ -65,11 +64,23 @@ class InMemoryIncidentRepository:
             return found.model_copy(deep=True) if found else None
 
     def list_incidents(
-        self, *, state: IncidentState | None = None, limit: int = 50, offset: int = 0
+        self,
+        *,
+        state: IncidentState | None = None,
+        severity: IncidentSeverity | None = None,
+        assignee_id: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
     ) -> list[Incident]:
         lifecycle.check_page(limit, offset)
         with self._lock:
-            rows = [i for i in self._incidents.values() if state is None or i.state == state]
+            rows = [
+                i
+                for i in self._incidents.values()
+                if (state is None or i.state == state)
+                and (severity is None or i.severity == severity)
+                and (assignee_id is None or i.assignee_id == assignee_id)
+            ]
             rows.sort(key=lambda i: (i.created_at, i.id), reverse=True)
             return [i.model_copy(deep=True) for i in rows[offset : offset + limit]]
 
@@ -81,9 +92,11 @@ class InMemoryIncidentRepository:
         actor_id: str,
         reason: str | None = None,
         resolution: IncidentResolutionInput | None = None,
+        required_assignee: str | None = None,
     ) -> Incident:
         with self._lock:
             current = self._existing(incident_id)
+            lifecycle.require_assignee(current, required_assignee)
             now = self._clock()
             plan = lifecycle.plan_transition(
                 current,
@@ -104,9 +117,17 @@ class InMemoryIncidentRepository:
             )
             return self._commit(plan, actor_id, now)
 
-    def add_evidence(self, incident_id: str, *, evidence_id: str, actor_id: str) -> Incident:
+    def add_evidence(
+        self,
+        incident_id: str,
+        *,
+        evidence_id: str,
+        actor_id: str,
+        required_assignee: str | None = None,
+    ) -> Incident:
         with self._lock:
             current = self._existing(incident_id)
+            lifecycle.require_assignee(current, required_assignee)
             now = self._clock()
             plan = lifecycle.plan_evidence(
                 current, evidence_id=evidence_id, actor_id=actor_id, now=now
@@ -121,9 +142,11 @@ class InMemoryIncidentRepository:
         actor_id: str,
         message: str | None = None,
         subject_id: str | None = None,
+        required_assignee: str | None = None,
     ) -> IncidentTimelineEvent:
         with self._lock:
             current = self._existing(incident_id)
+            lifecycle.require_assignee(current, required_assignee)
             draft = lifecycle.plan_note(
                 current, kind=kind, actor_id=actor_id, message=message, subject_id=subject_id
             )
@@ -208,27 +231,38 @@ class InMemoryAlertRuleRepository:
             return [r.model_copy(deep=True) for r in rows[offset : offset + limit]]
 
     def update_rule(
-        self, rule_id: str, definition: AlertRuleDefinition, *, expected_version: int
+        self,
+        rule_id: str,
+        definition: AlertRuleDefinition,
+        *,
+        expected_version: int,
+        actor_id: str,
     ) -> AlertRule:
         with self._lock:
             current = lifecycle.require_found(self._rules.get(rule_id), "alert rule")
-            if current.version != expected_version:
-                raise StorageConflictError("the alert rule was changed by someone else")
-            updated = lifecycle.edited_rule(current, definition, now=self._clock())
+            lifecycle.require_version(current, expected_version)
+            updated = lifecycle.edited_rule(
+                current, definition, actor_id=actor_id, now=self._clock()
+            )
             self._rules[rule_id] = updated
             return updated.model_copy(deep=True)
 
-    def approve_rule(self, rule_id: str, *, approver_id: str) -> AlertRule:
+    def approve_rule(self, rule_id: str, *, approver_id: str, expected_version: int) -> AlertRule:
         with self._lock:
             current = lifecycle.require_found(self._rules.get(rule_id), "alert rule")
-            updated = lifecycle.approved_rule(current, approver_id=approver_id, now=self._clock())
+            updated = lifecycle.approved_rule(
+                current,
+                approver_id=approver_id,
+                expected_version=expected_version,
+                now=self._clock(),
+            )
             self._rules[rule_id] = updated
             return updated.model_copy(deep=True)
 
-    def disable_rule(self, rule_id: str) -> AlertRule:
+    def disable_rule(self, rule_id: str, *, actor_id: str) -> AlertRule:
         with self._lock:
             current = lifecycle.require_found(self._rules.get(rule_id), "alert rule")
-            updated = lifecycle.disabled_rule(current, now=self._clock())
+            updated = lifecycle.disabled_rule(current, actor_id=actor_id, now=self._clock())
             self._rules[rule_id] = updated
             return updated.model_copy(deep=True)
 

@@ -33,6 +33,9 @@ SCHEMA_FILES = {
     "security_events": "security.schema.json",
     "incident_resolution": "incident.schema.json#/$defs/resolution",
     "incident_timeline_event": "incident.schema.json#/$defs/timelineEvent",
+    "incident_list": "incident-api.schema.json#/$defs/listResponse",
+    "incident_detail": "incident-api.schema.json#/$defs/detailResponse",
+    "incident_timeline": "incident-api.schema.json#/$defs/timelineResponse",
     "alert_rule": "alert-rule.schema.json",
     "maintenance_window": "alert-rule.schema.json#/$defs/maintenanceWindow",
 }

@@ -24,6 +24,14 @@ class InvalidOperationError(StorageError):
     """The request is well-formed but violates a domain rule (for example no reopen reason)."""
 
 
+class ScopeViolationError(StorageError):
+    """The caller's assigned-incidents-only scope does not cover the locked incident row.
+
+    Raised from inside the write, under the same row lock as the change, so a reassignment
+    between authorisation and write cannot be raced (HTTP 403 at the route layer).
+    """
+
+
 class StorageConfigurationError(StorageError):
     """Storage settings are missing or invalid."""
 

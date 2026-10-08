@@ -32,6 +32,8 @@ from netsight_api.storage.errors import (
     IllegalTransitionError,
     InvalidOperationError,
     NotFoundError,
+    ScopeViolationError,
+    StorageConflictError,
 )
 from netsight_api.storage.repository import MAX_PAGE_SIZE, MAX_TIMELINE_PAGE_SIZE, NoteKind
 
@@ -304,8 +306,21 @@ def new_rule(
     )
 
 
-def edited_rule(rule: AlertRule, definition: AlertRuleDefinition, *, now: datetime) -> AlertRule:
-    """Editing resets to an unapproved draft so a changed rule is never silently live."""
+def require_version(rule: AlertRule, expected_version: int) -> None:
+    """Optimistic concurrency: the caller must have seen the version it acts on."""
+    if rule.version != expected_version:
+        raise StorageConflictError("the alert rule was changed by someone else")
+
+
+def edited_rule(
+    rule: AlertRule, definition: AlertRuleDefinition, *, actor_id: str, now: datetime
+) -> AlertRule:
+    """Editing resets to an unapproved draft so a changed rule is never silently live.
+
+    ``actor_id`` is validated but not stored (the rule record has no editor column):
+    the route layer writes the audit event and cannot call this without naming one.
+    """
+    check_identity(actor_id)
     if rule.status == "active":
         raise IllegalTransitionError("disable an active rule before editing it")
     return AlertRule(
@@ -321,8 +336,12 @@ def edited_rule(rule: AlertRule, definition: AlertRuleDefinition, *, now: dateti
     )
 
 
-def approved_rule(rule: AlertRule, *, approver_id: str, now: datetime) -> AlertRule:
+def approved_rule(
+    rule: AlertRule, *, approver_id: str, expected_version: int, now: datetime
+) -> AlertRule:
+    """Activate exactly the version the approver reviewed (never a later edit)."""
     check_identity(approver_id)
+    require_version(rule, expected_version)
     if rule.status == "active":
         raise IllegalTransitionError("the rule is already active")
     return revalidate(
@@ -338,7 +357,9 @@ def approved_rule(rule: AlertRule, *, approver_id: str, now: datetime) -> AlertR
     )
 
 
-def disabled_rule(rule: AlertRule, *, now: datetime) -> AlertRule:
+def disabled_rule(rule: AlertRule, *, actor_id: str, now: datetime) -> AlertRule:
+    """Disable an active rule; ``actor_id`` is validated for the caller's audit event."""
+    check_identity(actor_id)
     if rule.status != "active":
         raise IllegalTransitionError("only an active rule can be disabled")
     return revalidate(
@@ -393,6 +414,16 @@ def window_matches(
     if active_at is None:
         return True
     return window.status == "scheduled" and window.starts_at <= active_at < window.ends_at
+
+
+def require_assignee(incident: Incident, required_assignee: str | None) -> None:
+    """Assigned-incidents-only scope, judged on the locked row and before any state rule.
+
+    ``None`` means the caller has full access. Judged first so a caller outside the scope
+    learns nothing about the incident (not even that a transition would be illegal).
+    """
+    if required_assignee is not None and incident.assignee_id != required_assignee:
+        raise ScopeViolationError("the incident is not assigned to the caller")
 
 
 def require_found[M: BaseModel](value: M | None, what: str) -> M:

@@ -1,0 +1,58 @@
+# Audit Logging (interim sink)
+
+The API writes one JSON object per line for every security-sensitive mutation (currently the
+incident routes, `incident.*` actions) on the Python logger `netsight_api.audit`. This is the
+interim audit sink: an operational log. The tamper-evident audit store (PRD 32) will consume
+the same records; until then the append-only incident timeline is the authoritative record of
+who changed an incident.
+
+## Why it must be configured
+
+Python logging drops records below WARNING unless something enables them, and the success
+audit is an INFO record. The API therefore configures the `netsight_api.audit` logger itself at
+start-up (`configure_audit_logging`, called from the application lifespan). Do not rely on a
+global logging setup for this.
+
+## Settings
+
+| Variable | Values | Default | Meaning |
+|---|---|---|---|
+| `NETSIGHT_AUDIT_LOG_LEVEL` | `INFO`, `WARNING` | `INFO` | `INFO` records successes, denials and failures. `WARNING` records only denied and failed attempts. Higher levels are rejected: they would silently discard denials. |
+| `NETSIGHT_AUDIT_LOG_DESTINATION` | `stderr`, `stdout`, `file` | `stderr` | Where the JSON lines go (container deployments: stdout/stderr, collected by the platform). |
+| `NETSIGHT_AUDIT_LOG_FILE` | path | empty | Required when the destination is `file`. UTF-8, append. No rotation is built in: use logrotate or the collector. |
+
+An invalid value stops the API at start-up (it never runs with audit logging silently off).
+The handler emits the record unmodified (`%(message)s`), so every line is valid JSON.
+The logger still propagates to the root logger: leave the root logger unconfigured, or filter
+`netsight_api.audit` there, to avoid receiving each line twice.
+
+## Record shape
+
+```json
+{"action": "incident.assign", "actor_id": "microsoft:abc", "assignee_hash": "9f86d081884c7d65",
+ "assignee_length": 22, "correlation_id": "c0ffee", "event": "audit", "outcome": "success",
+ "target": "incident-...", "ts": "2026-10-08T08:00:00.123456+00:00"}
+```
+
+- `outcome`: `success` (INFO), `denied` or `failure` (WARNING). `reason` carries a fixed code for
+  denials and failures: `permission`, `scope`, `csrf`, `origin`, `rate-limit`, `NOT_FOUND`,
+  `ILLEGAL_TRANSITION`, `CONFLICT`, `INVALID_OPERATION`, `VALIDATION_ERROR`,
+  `STORE_UNAVAILABLE`, `STORE_NOT_CONNECTED`, `INTERNAL`.
+- Never present: comment, reason or root-cause text, tokens, session values, connection strings.
+- Caller-chosen identifiers (assignee, evidence reference) appear only as `*_length` and a
+  16-hex-character SHA-256 prefix (`*_hash`), so records can be correlated without disclosing
+  the value.
+- Identifiers longer than 128 characters are replaced by `sha256:<64 hex>` (never truncated, so
+  two long identities cannot collide).
+- Success and failure records are written by the worker thread immediately after the database
+  call, so a client that disconnects mid-request cannot lose them. A failing sink never turns a
+  committed write into an error response; it is logged as `audit record could not be emitted`
+  on the `netsight_api` logger.
+
+## Operating notes
+
+- Ship the lines to the log collector and alert on `outcome != success` bursts per `actor_id`.
+- Local files are not tamper-evident; do not treat them as the compliance record.
+- Related settings: `NETSIGHT_ALLOWED_ORIGINS` (comma-separated browser origins allowed to make
+  cookie-authenticated writes, in addition to the origin of `NETSIGHT_PUBLIC_BASE_URL`; refused
+  writes are audited with reason `origin`) and `NETSIGHT_SESSION_ALLOW_SAME_SITE_NONE`.
