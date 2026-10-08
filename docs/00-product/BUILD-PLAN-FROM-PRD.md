@@ -46,7 +46,8 @@ Steps: Wazuh/Suricata read-only adapters; security overview API; correlated evid
 1. ✅ Security events contract + explicit-state endpoint (S5-1, contract-first): `security.schema.json`, pydantic `SecurityEvent`/`SecurityEventsResponse`, OpenAPI path + schemas, TS parser (`api-contracts-security.ts`), `GET /api/v1/security/events` gated by `security:read` with the shared server-bounded window (`timewindow.py`, extracted from the traffic routes). `SecuritySource` protocol unwired → `not-connected`; source failure or contract-invalid row → explicit 200 `unknown`; untrusted signature text passes through as data.
 2. ✅ Wazuh read-only indexer adapter (S5-2): bounded `_search` against `wazuh-alerts-*` (`WAZUH_INDEXER_URL`/`_USER`/`_PASSWORD`/`_CA_BUNDLE`/`WAZUH_ALERTS_INDEX`; unset → `not-connected`), rule-level→severity bands, TLS verify on, redirects refused, credentials excluded from repr, index/URL validated. `device_id` stays null until identity correlation maps agents (no IP inference).
 3. ✅ Suricata EVE alerts are consumed from the same indexer (Wazuh-forwarded): `data.alert.*` signature/category, severity 1/2/3→high/medium/low, `src_ip`/`dest_ip`; flow-id preservation and entity linking remain follow-ups.
-4. `/security` UI page per DESIGN-INVENTORY row 6; slice gate (review + security review).
+4. ✅ `/security` UI page (S5-3): time-range picker, severity counts (labelled as counts of the listed events), events table with plain-text untrusted fields, per-state surfaces (not-connected/unknown/empty/failure), `Security` menu entry. Web: typecheck/lint/103 tests/build clean.
+5. S5 slice gate: independent review + security review; record follow-ups (agent→device mapping, rate limiting, read auditing, flow-id preservation).
 
 ### E06 — Alerts & incidents
 Stories: NS-060..NS-065.
