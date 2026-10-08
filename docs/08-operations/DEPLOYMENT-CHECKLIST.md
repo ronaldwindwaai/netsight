@@ -11,6 +11,9 @@
 - [ ] Reverse proxy/WAF configured
 - [ ] Monitoring engines not publicly exposed
 - [ ] DB backups tested
+- [ ] API runs as the least-privilege DB role (`DATABASE_URL`); migrator credential (`DATABASE_MIGRATION_URL`) is not on the service host
+- [ ] `python -m netsight_api.storage.migrate up` run with the migrator credential (applies schema + app-role grants); `status` shows nothing pending
+- [ ] `NETSIGHT_ALLOW_DESTRUCTIVE_DOWN` unset in production
 - [ ] Audit pipeline verified
 - [ ] Notification delivery tested
 - [ ] Source freshness alarms tested

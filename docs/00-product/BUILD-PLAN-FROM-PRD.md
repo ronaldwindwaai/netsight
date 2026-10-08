@@ -49,7 +49,26 @@ Steps: Wazuh/Suricata read-only adapters; security overview API; correlated evid
 4. ✅ `/security` UI page (S5-3): time-range picker, severity counts (labelled as counts of the listed events), events table with plain-text untrusted fields, per-state surfaces (not-connected/unknown/empty/failure), `Security` menu entry. Web: typecheck/lint/103 tests/build clean.
 5. ✅ S5 slice gate (self-review against the security checklist; **independent reviewer pass still outstanding**): threat-model delta recorded. Follow-ups: agent->device mapping, per-identity rate limiting, site scoping + read auditing, Suricata flow-id preservation, `partial` state for malformed hits, live Wazuh integration test.
 
+6. ✅ S5 independent review (ecc:code-reviewer, 2026-10-08): **APPROVE**, 0 CRITICAL/HIGH, 4 MEDIUM, 5 LOW; 67 API tests pass. Follow-ups (schedule as an S5 hardening pass, M1/M2 before real Wazuh credentials are configured):
+   - M1 require https when `WAZUH_INDEXER_USER` is set (plain http only via explicit dev flag) + test.
+   - M2 `.env.example` still lists `WAZUH_BASE_URL`/`WAZUH_TOKEN`; update to `WAZUH_INDEXER_*`/`WAZUH_ALERTS_INDEX`.
+   - M3 OpenAPI `SecurityEventsResponse` does not express non-ok ⇒ no-rows; add it plus an OpenAPI-vs-JSON-schema diff test.
+   - M4 `_optional_text` must strip before the empty check (a whitespace-only field currently degrades the whole read to `unknown`); fold into the `partial`-state work.
+   - L1 log adapter failure status; L2 use `ssl.SSLContext` for CA bundle (httpx 0.28 deprecation); L3 response-size cap; L4 require `wazuh-` index prefix; L5 stale docstring in `security_routes.py`.
+   - Rollback note: unset `WAZUH_INDEXER_URL` returns the endpoint to `not-connected`.
+
 ### E06 — Alerts & incidents
+Storage decision (2026-10-08, human ruling): follow `DATABASE-OWNERSHIP.md` — PostgreSQL owns incidents, alert rules and maintenance windows. The VPS gets Docker with the required services (Postgres first); local/CI tests run against Postgres.
+
+1. ✅ S6-1 contracts + storage (2026-10-08): `incident.schema.json` / `alert-rule.schema.json` (+ maintenance window), pydantic/OpenAPI/TS parsers in agreement via shared vectors (`contracts/test-vectors/incident-alert.vectors.json`), repository Protocol with in-memory + PostgreSQL stores, migrations 0001/0002, app-role grants, migrator CLI (`python -m netsight_api.storage.migrate up|status`). No routes yet. database-reviewer: CHANGES REQUIRED → H1 role split/grants, H2 guarded down, H3 CLI, M1/M4/M5/M8 fixed; final code review: **APPROVE** (0 CRITICAL/HIGH). Live-Postgres suite passed on PG 16.2 (1284 passed) during the fix pass; the reviewer ran the default suite only (1063 passed, 223 live-DB skips).
+   Gate items before/at S6-2 / S6 gate:
+   - `approve_rule` must take `expected_version` (approval bound to the reviewed version) — do before S6-2 fixes the Protocol.
+   - Rule edit/disable carry no actor; S6-2 must write them to the audit pipeline (PRD §32) or pass `actor_id`.
+   - Resolve must be restricted to human principals in S6-2 (no AI-proposed root cause recorded without operator acceptance).
+   - Confirm adjacent-only state machine (no backward step before `resolved`) is intended.
+   - Grants script revokes PUBLIC on schema `public`: the NetSight DB must be dedicated; document.
+   - Run live suite on Postgres 17 (compose target); add CI Postgres service container.
+   - Deferred: keyset paging (M2), resolution history on reopen (M3), connection pool (M6), tighter jsonb CHECKs + corrupt-row tolerance (M7), migration checksums (M9), startup check that `DATABASE_URL` is not an owner/superuser role, 409/503 mapping of storage errors in routes, never log `__cause__` verbatim.
 Stories: NS-060..NS-065.
 Steps: alert-rule domain model, notif routing, incident store, timeline, acknowledgement/incident ownership, audit.
 

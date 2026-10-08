@@ -31,6 +31,10 @@ SCHEMA_FILES = {
     "traffic_top": "traffic.schema.json",
     "traffic_flows": "traffic-flows.schema.json",
     "security_events": "security.schema.json",
+    "incident_resolution": "incident.schema.json#/$defs/resolution",
+    "incident_timeline_event": "incident.schema.json#/$defs/timelineEvent",
+    "alert_rule": "alert-rule.schema.json",
+    "maintenance_window": "alert-rule.schema.json#/$defs/maintenanceWindow",
 }
 
 
@@ -60,7 +64,15 @@ def _registry() -> Registry:
 def _validator(name: str) -> jsonschema.Draft202012Validator:
     if name not in SCHEMA_FILES:
         raise KeyError(f"unknown canonical schema: {name}")
-    schema = _read_schema(SCHEMA_FILES[name])
+    filename, _, fragment = SCHEMA_FILES[name].partition("#")
+    if fragment:
+        # A named definition inside a canonical schema file ("file#/$defs/x").
+        schema: dict[str, Any] = {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$ref": f"{filename}#{fragment}",
+        }
+    else:
+        schema = _read_schema(filename)
     return jsonschema.Draft202012Validator(schema, registry=_registry())
 
 

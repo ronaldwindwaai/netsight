@@ -1,0 +1,1800 @@
+{
+ "incident": {
+  "base": {
+   "id": "incident-3f2b8a40-1c2d-4e5f-8a9b-0c1d2e3f4a5b",
+   "title": "Perimeter outage",
+   "severity": "critical",
+   "state": "open",
+   "created_at": "2026-10-08T08:00:00Z",
+   "updated_at": "2026-10-08T08:00:00Z",
+   "assignee_id": null,
+   "evidence_ids": [],
+   "resolution": null
+  },
+  "cases": [
+   {
+    "name": "base open incident",
+    "valid": true
+   },
+   {
+    "name": "assigned incident",
+    "valid": true,
+    "set": {
+     "assignee_id": "identity-ronald"
+    }
+   },
+   {
+    "name": "with evidence",
+    "valid": true,
+    "set": {
+     "evidence_ids": [
+      "ev-1",
+      "ev-2"
+     ]
+    }
+   },
+   {
+    "name": "resolved with resolution",
+    "valid": true,
+    "set": {
+     "state": "resolved",
+     "resolution": {
+      "summary": "Replaced failed uplink optic",
+      "root_cause_status": "determined",
+      "root_cause": "Failed SFP on core-sw-01 gi1/0/48",
+      "impact": "Guest Wi-Fi unavailable for 40 minutes",
+      "restored_at": "2026-10-08T08:40:00Z",
+      "resolved_at": "2026-10-08T08:45:00Z",
+      "resolved_by": "identity-ronald",
+      "follow_up_actions": [
+       "Order spare SFPs"
+      ]
+     }
+    }
+   },
+   {
+    "name": "closed with resolution",
+    "valid": true,
+    "set": {
+     "state": "closed",
+     "resolution": {
+      "summary": "Replaced failed uplink optic",
+      "root_cause_status": "determined",
+      "root_cause": "Failed SFP on core-sw-01 gi1/0/48",
+      "impact": "Guest Wi-Fi unavailable for 40 minutes",
+      "restored_at": "2026-10-08T08:40:00Z",
+      "resolved_at": "2026-10-08T08:45:00Z",
+      "resolved_by": "identity-ronald",
+      "follow_up_actions": [
+       "Order spare SFPs"
+      ]
+     }
+    }
+   },
+   {
+    "name": "unknown state",
+    "valid": false,
+    "set": {
+     "state": "deleted"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "info severity not allowed for incidents",
+    "valid": false,
+    "set": {
+     "severity": "info"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "extra field",
+    "valid": false,
+    "set": {
+     "note": "x"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "missing resolution key",
+    "valid": false,
+    "delete": [
+     "resolution"
+    ],
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "missing updated_at",
+    "valid": false,
+    "delete": [
+     "updated_at"
+    ],
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "resolved without resolution",
+    "valid": false,
+    "set": {
+     "state": "resolved"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "closed without resolution",
+    "valid": false,
+    "set": {
+     "state": "closed"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "open with resolution",
+    "valid": false,
+    "set": {
+     "resolution": {
+      "summary": "Replaced failed uplink optic",
+      "root_cause_status": "determined",
+      "root_cause": "Failed SFP on core-sw-01 gi1/0/48",
+      "impact": "Guest Wi-Fi unavailable for 40 minutes",
+      "restored_at": "2026-10-08T08:40:00Z",
+      "resolved_at": "2026-10-08T08:45:00Z",
+      "resolved_by": "identity-ronald",
+      "follow_up_actions": [
+       "Order spare SFPs"
+      ]
+     }
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "legacy id shape",
+    "valid": false,
+    "set": {
+     "id": "inc-1"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "empty title",
+    "valid": false,
+    "set": {
+     "title": ""
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "blank title",
+    "valid": false,
+    "set": {
+     "title": "   "
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "title too long",
+    "valid": false,
+    "set": {
+     "title": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "empty assignee",
+    "valid": false,
+    "set": {
+     "assignee_id": ""
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "duplicate evidence ids",
+    "valid": false,
+    "set": {
+     "evidence_ids": [
+      "ev-1",
+      "ev-1"
+     ]
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "too many evidence ids",
+    "valid": false,
+    "set": {
+     "evidence_ids": [
+      "ev-0",
+      "ev-1",
+      "ev-2",
+      "ev-3",
+      "ev-4",
+      "ev-5",
+      "ev-6",
+      "ev-7",
+      "ev-8",
+      "ev-9",
+      "ev-10",
+      "ev-11",
+      "ev-12",
+      "ev-13",
+      "ev-14",
+      "ev-15",
+      "ev-16",
+      "ev-17",
+      "ev-18",
+      "ev-19",
+      "ev-20",
+      "ev-21",
+      "ev-22",
+      "ev-23",
+      "ev-24",
+      "ev-25",
+      "ev-26",
+      "ev-27",
+      "ev-28",
+      "ev-29",
+      "ev-30",
+      "ev-31",
+      "ev-32",
+      "ev-33",
+      "ev-34",
+      "ev-35",
+      "ev-36",
+      "ev-37",
+      "ev-38",
+      "ev-39",
+      "ev-40",
+      "ev-41",
+      "ev-42",
+      "ev-43",
+      "ev-44",
+      "ev-45",
+      "ev-46",
+      "ev-47",
+      "ev-48",
+      "ev-49",
+      "ev-50",
+      "ev-51",
+      "ev-52",
+      "ev-53",
+      "ev-54",
+      "ev-55",
+      "ev-56",
+      "ev-57",
+      "ev-58",
+      "ev-59",
+      "ev-60",
+      "ev-61",
+      "ev-62",
+      "ev-63",
+      "ev-64",
+      "ev-65",
+      "ev-66",
+      "ev-67",
+      "ev-68",
+      "ev-69",
+      "ev-70",
+      "ev-71",
+      "ev-72",
+      "ev-73",
+      "ev-74",
+      "ev-75",
+      "ev-76",
+      "ev-77",
+      "ev-78",
+      "ev-79",
+      "ev-80",
+      "ev-81",
+      "ev-82",
+      "ev-83",
+      "ev-84",
+      "ev-85",
+      "ev-86",
+      "ev-87",
+      "ev-88",
+      "ev-89",
+      "ev-90",
+      "ev-91",
+      "ev-92",
+      "ev-93",
+      "ev-94",
+      "ev-95",
+      "ev-96",
+      "ev-97",
+      "ev-98",
+      "ev-99",
+      "ev-100",
+      "ev-101",
+      "ev-102",
+      "ev-103",
+      "ev-104",
+      "ev-105",
+      "ev-106",
+      "ev-107",
+      "ev-108",
+      "ev-109",
+      "ev-110",
+      "ev-111",
+      "ev-112",
+      "ev-113",
+      "ev-114",
+      "ev-115",
+      "ev-116",
+      "ev-117",
+      "ev-118",
+      "ev-119",
+      "ev-120",
+      "ev-121",
+      "ev-122",
+      "ev-123",
+      "ev-124",
+      "ev-125",
+      "ev-126",
+      "ev-127",
+      "ev-128",
+      "ev-129",
+      "ev-130",
+      "ev-131",
+      "ev-132",
+      "ev-133",
+      "ev-134",
+      "ev-135",
+      "ev-136",
+      "ev-137",
+      "ev-138",
+      "ev-139",
+      "ev-140",
+      "ev-141",
+      "ev-142",
+      "ev-143",
+      "ev-144",
+      "ev-145",
+      "ev-146",
+      "ev-147",
+      "ev-148",
+      "ev-149",
+      "ev-150",
+      "ev-151",
+      "ev-152",
+      "ev-153",
+      "ev-154",
+      "ev-155",
+      "ev-156",
+      "ev-157",
+      "ev-158",
+      "ev-159",
+      "ev-160",
+      "ev-161",
+      "ev-162",
+      "ev-163",
+      "ev-164",
+      "ev-165",
+      "ev-166",
+      "ev-167",
+      "ev-168",
+      "ev-169",
+      "ev-170",
+      "ev-171",
+      "ev-172",
+      "ev-173",
+      "ev-174",
+      "ev-175",
+      "ev-176",
+      "ev-177",
+      "ev-178",
+      "ev-179",
+      "ev-180",
+      "ev-181",
+      "ev-182",
+      "ev-183",
+      "ev-184",
+      "ev-185",
+      "ev-186",
+      "ev-187",
+      "ev-188",
+      "ev-189",
+      "ev-190",
+      "ev-191",
+      "ev-192",
+      "ev-193",
+      "ev-194",
+      "ev-195",
+      "ev-196",
+      "ev-197",
+      "ev-198",
+      "ev-199",
+      "ev-200",
+      "ev-201",
+      "ev-202",
+      "ev-203",
+      "ev-204",
+      "ev-205",
+      "ev-206",
+      "ev-207",
+      "ev-208",
+      "ev-209",
+      "ev-210",
+      "ev-211",
+      "ev-212",
+      "ev-213",
+      "ev-214",
+      "ev-215",
+      "ev-216",
+      "ev-217",
+      "ev-218",
+      "ev-219",
+      "ev-220",
+      "ev-221",
+      "ev-222",
+      "ev-223",
+      "ev-224",
+      "ev-225",
+      "ev-226",
+      "ev-227",
+      "ev-228",
+      "ev-229",
+      "ev-230",
+      "ev-231",
+      "ev-232",
+      "ev-233",
+      "ev-234",
+      "ev-235",
+      "ev-236",
+      "ev-237",
+      "ev-238",
+      "ev-239",
+      "ev-240",
+      "ev-241",
+      "ev-242",
+      "ev-243",
+      "ev-244",
+      "ev-245",
+      "ev-246",
+      "ev-247",
+      "ev-248",
+      "ev-249",
+      "ev-250",
+      "ev-251",
+      "ev-252",
+      "ev-253",
+      "ev-254",
+      "ev-255",
+      "ev-256"
+     ]
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "evidence id too long",
+    "valid": false,
+    "set": {
+     "evidence_ids": [
+      "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+     ]
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "created_at not RFC 3339 (format not asserted by schema)",
+    "valid": false,
+    "set": {
+     "created_at": "yesterday"
+    },
+    "jsonschema_rejects": false
+   },
+   {
+    "name": "resolved with invalid nested resolution",
+    "valid": false,
+    "set": {
+     "state": "resolved",
+     "resolution": {
+      "summary": "Replaced failed uplink optic",
+      "root_cause_status": "determined",
+      "root_cause": "Failed SFP on core-sw-01 gi1/0/48",
+      "impact": "",
+      "restored_at": "2026-10-08T08:40:00Z",
+      "resolved_at": "2026-10-08T08:45:00Z",
+      "resolved_by": "identity-ronald",
+      "follow_up_actions": [
+       "Order spare SFPs"
+      ]
+     }
+    },
+    "jsonschema_rejects": true
+   }
+  ]
+ },
+ "incident_resolution": {
+  "base": {
+   "summary": "Replaced failed uplink optic",
+   "root_cause_status": "determined",
+   "root_cause": "Failed SFP on core-sw-01 gi1/0/48",
+   "impact": "Guest Wi-Fi unavailable for 40 minutes",
+   "restored_at": "2026-10-08T08:40:00Z",
+   "resolved_at": "2026-10-08T08:45:00Z",
+   "resolved_by": "identity-ronald",
+   "follow_up_actions": [
+    "Order spare SFPs"
+   ]
+  },
+  "cases": [
+   {
+    "name": "base resolution",
+    "valid": true
+   },
+   {
+    "name": "not determined without root cause",
+    "valid": true,
+    "set": {
+     "root_cause_status": "not-determined",
+     "root_cause": null
+    }
+   },
+   {
+    "name": "no follow-ups",
+    "valid": true,
+    "set": {
+     "follow_up_actions": []
+    }
+   },
+   {
+    "name": "determined without root cause",
+    "valid": false,
+    "set": {
+     "root_cause": null
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "not determined with a root cause",
+    "valid": false,
+    "set": {
+     "root_cause_status": "not-determined"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "unknown root cause status",
+    "valid": false,
+    "set": {
+     "root_cause_status": "maybe"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "missing impact",
+    "valid": false,
+    "delete": [
+     "impact"
+    ],
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "missing restored_at",
+    "valid": false,
+    "delete": [
+     "restored_at"
+    ],
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "empty summary",
+    "valid": false,
+    "set": {
+     "summary": ""
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "blank summary",
+    "valid": false,
+    "set": {
+     "summary": " \t "
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "blank impact",
+    "valid": false,
+    "set": {
+     "impact": "  "
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "blank follow-up",
+    "valid": false,
+    "set": {
+     "follow_up_actions": [
+      "ok",
+      " "
+     ]
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "summary too long",
+    "valid": false,
+    "set": {
+     "summary": "sssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "33 follow-ups",
+    "valid": false,
+    "set": {
+     "follow_up_actions": [
+      "a0",
+      "a1",
+      "a2",
+      "a3",
+      "a4",
+      "a5",
+      "a6",
+      "a7",
+      "a8",
+      "a9",
+      "a10",
+      "a11",
+      "a12",
+      "a13",
+      "a14",
+      "a15",
+      "a16",
+      "a17",
+      "a18",
+      "a19",
+      "a20",
+      "a21",
+      "a22",
+      "a23",
+      "a24",
+      "a25",
+      "a26",
+      "a27",
+      "a28",
+      "a29",
+      "a30",
+      "a31",
+      "a32"
+     ]
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "extra field",
+    "valid": false,
+    "set": {
+     "ai_suggested": true
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "restored after resolved (cross-field)",
+    "valid": false,
+    "set": {
+     "restored_at": "2026-10-08T09:00:00Z"
+    },
+    "jsonschema_rejects": false
+   }
+  ]
+ },
+ "incident_timeline_event": {
+  "base": {
+   "id": "incident-event-9d1c7e52-4b3a-4f60-b1c2-7a8d9e0f1a2b",
+   "incident_id": "incident-3f2b8a40-1c2d-4e5f-8a9b-0c1d2e3f4a5b",
+   "seq": 1,
+   "occurred_at": "2026-10-08T08:00:00Z",
+   "actor_id": "identity-ronald",
+   "kind": "comment",
+   "state_from": null,
+   "state_to": null,
+   "reason": null,
+   "message": "Investigating uplink",
+   "subject_id": null
+  },
+  "cases": [
+   {
+    "name": "comment",
+    "valid": true
+   },
+   {
+    "name": "forward state change",
+    "valid": true,
+    "set": {
+     "kind": "state-changed",
+     "state_from": "open",
+     "state_to": "acknowledged",
+     "message": null
+    }
+   },
+   {
+    "name": "reopen with reason",
+    "valid": true,
+    "set": {
+     "kind": "state-changed",
+     "state_from": "resolved",
+     "state_to": "open",
+     "reason": "Fault recurred",
+     "message": null
+    }
+   },
+   {
+    "name": "alert linked",
+    "valid": true,
+    "set": {
+     "kind": "alert-linked",
+     "subject_id": "alert-1",
+     "message": null
+    }
+   },
+   {
+    "name": "resolution event",
+    "valid": true,
+    "set": {
+     "kind": "resolution",
+     "message": "Replaced optic"
+    }
+   },
+   {
+    "name": "unassign (assignee-changed with null subject)",
+    "valid": true,
+    "set": {
+     "kind": "assignee-changed",
+     "message": null
+    }
+   },
+   {
+    "name": "comment without message",
+    "valid": false,
+    "set": {
+     "message": null
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "blank comment",
+    "valid": false,
+    "set": {
+     "message": "   "
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "state change missing state_to",
+    "valid": false,
+    "set": {
+     "kind": "state-changed",
+     "state_from": "open",
+     "message": null
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "comment carrying state_from",
+    "valid": false,
+    "set": {
+     "state_from": "open"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "reopen without reason",
+    "valid": false,
+    "set": {
+     "kind": "state-changed",
+     "state_from": "closed",
+     "state_to": "open",
+     "message": null
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "alert-linked without subject",
+    "valid": false,
+    "set": {
+     "kind": "alert-linked",
+     "message": null
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "evidence-added without subject",
+    "valid": false,
+    "set": {
+     "kind": "evidence-added",
+     "message": null
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "resolution event without message",
+    "valid": false,
+    "set": {
+     "kind": "resolution",
+     "message": null
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "unknown kind",
+    "valid": false,
+    "set": {
+     "kind": "deleted"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "seq zero",
+    "valid": false,
+    "set": {
+     "seq": 0
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "seq fractional",
+    "valid": false,
+    "set": {
+     "seq": 1.5
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "bad incident id",
+    "valid": false,
+    "set": {
+     "incident_id": "inc-1"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "bad id shape",
+    "valid": false,
+    "set": {
+     "id": "evt-1"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "message too long",
+    "valid": false,
+    "set": {
+     "message": "mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "extra field",
+    "valid": false,
+    "set": {
+     "edited": true
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "unknown state value",
+    "valid": false,
+    "set": {
+     "kind": "state-changed",
+     "state_from": "open",
+     "state_to": "paused",
+     "message": null
+    },
+    "jsonschema_rejects": true
+   }
+  ]
+ },
+ "alert_rule": {
+  "base": {
+   "id": "alert-rule-5a6b7c8d-1e2f-4a3b-9c4d-5e6f7a8b9c0d",
+   "name": "After-hours large upload",
+   "status": "draft",
+   "scope": {
+    "kind": "device_group",
+    "ref": "staff-workstations"
+   },
+   "condition": {
+    "metric": "traffic.upload_bytes",
+    "operator": "gt",
+    "threshold": 1000000000,
+    "pattern": null
+   },
+   "baseline_mode": "none",
+   "window_seconds": 900,
+   "for_seconds": 0,
+   "cooldown_seconds": 3600,
+   "schedule": {
+    "timezone": "Africa/Windhoek",
+    "active": [
+     {
+      "weekdays": [
+       "mon",
+       "tue",
+       "wed",
+       "thu",
+       "fri"
+      ],
+      "from": "20:00",
+      "to": "06:00"
+     }
+    ]
+   },
+   "exceptions": {
+    "destinations": [
+     "approved-backup",
+     "microsoft-update"
+    ],
+    "device_groups": [
+     "backup-servers",
+     "cctv"
+    ]
+   },
+   "severity": "high",
+   "labels": {
+    "team": "network"
+   },
+   "actions": [
+    "create_alert",
+    "email",
+    "push"
+   ],
+   "incident_policy": "create",
+   "created_by": "identity-ronald",
+   "created_at": "2026-10-08T08:00:00Z",
+   "updated_at": "2026-10-08T08:00:00Z",
+   "approved_by": null,
+   "approved_at": null,
+   "version": 1
+  },
+  "cases": [
+   {
+    "name": "draft rule",
+    "valid": true
+   },
+   {
+    "name": "active approved rule",
+    "valid": true,
+    "set": {
+     "status": "active",
+     "approved_by": "identity-admin",
+     "approved_at": "2026-10-08T09:00:00Z"
+    }
+   },
+   {
+    "name": "disabled previously approved",
+    "valid": true,
+    "set": {
+     "status": "disabled",
+     "approved_by": "identity-admin",
+     "approved_at": "2026-10-08T09:00:00Z"
+    }
+   },
+   {
+    "name": "pattern rule",
+    "valid": true,
+    "set": {
+     "condition": {
+      "metric": "dns.query",
+      "operator": "matches",
+      "threshold": null,
+      "pattern": "^bad\\."
+     }
+    }
+   },
+   {
+    "name": "no schedule",
+    "valid": true,
+    "set": {
+     "schedule": null
+    }
+   },
+   {
+    "name": "baseline mode",
+    "valid": true,
+    "set": {
+     "baseline_mode": "above-baseline"
+    }
+   },
+   {
+    "name": "negative threshold",
+    "valid": true,
+    "set": {
+     "condition": {
+      "metric": "x.y",
+      "operator": "lt",
+      "threshold": -5.5,
+      "pattern": null
+     }
+    }
+   },
+   {
+    "name": "active without approval",
+    "valid": false,
+    "set": {
+     "status": "active"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "active with approver but no timestamp",
+    "valid": false,
+    "set": {
+     "status": "active",
+     "approved_by": "identity-admin"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "draft already approved",
+    "valid": false,
+    "set": {
+     "approved_by": "identity-admin",
+     "approved_at": "2026-10-08T09:00:00Z"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "approved_by without approved_at",
+    "valid": false,
+    "set": {
+     "status": "disabled",
+     "approved_by": "identity-admin"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "approved_at without approved_by",
+    "valid": false,
+    "set": {
+     "status": "disabled",
+     "approved_at": "2026-10-08T09:00:00Z"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "numeric operator without threshold",
+    "valid": false,
+    "set": {
+     "condition": {
+      "metric": "x.y",
+      "operator": "gt",
+      "threshold": null,
+      "pattern": null
+     }
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "numeric operator with pattern",
+    "valid": false,
+    "set": {
+     "condition": {
+      "metric": "x.y",
+      "operator": "gt",
+      "threshold": 1,
+      "pattern": "a"
+     }
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "matches without pattern",
+    "valid": false,
+    "set": {
+     "condition": {
+      "metric": "x.y",
+      "operator": "matches",
+      "threshold": null,
+      "pattern": null
+     }
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "matches with threshold",
+    "valid": false,
+    "set": {
+     "condition": {
+      "metric": "x.y",
+      "operator": "matches",
+      "threshold": 1,
+      "pattern": "a"
+     }
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "unknown operator",
+    "valid": false,
+    "set": {
+     "condition": {
+      "metric": "x.y",
+      "operator": "contains",
+      "threshold": 1,
+      "pattern": null
+     }
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "threshold above bound",
+    "valid": false,
+    "set": {
+     "condition.threshold": 10000000000000000
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "threshold is a string",
+    "valid": false,
+    "set": {
+     "condition.threshold": "5"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "bad metric",
+    "valid": false,
+    "set": {
+     "condition.metric": "Traffic Upload"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "pattern too long",
+    "valid": false,
+    "set": {
+     "condition": {
+      "metric": "x.y",
+      "operator": "matches",
+      "threshold": null,
+      "pattern": "ppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp"
+     }
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "window below minimum",
+    "valid": false,
+    "set": {
+     "window_seconds": 59
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "window above maximum",
+    "valid": false,
+    "set": {
+     "window_seconds": 86401
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "negative for_seconds",
+    "valid": false,
+    "set": {
+     "for_seconds": -1
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "cooldown above maximum",
+    "valid": false,
+    "set": {
+     "cooldown_seconds": 604801
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "scope kind unknown",
+    "valid": false,
+    "set": {
+     "scope.kind": "network"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "empty scope ref",
+    "valid": false,
+    "set": {
+     "scope.ref": ""
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "no actions",
+    "valid": false,
+    "set": {
+     "actions": []
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "duplicate actions",
+    "valid": false,
+    "set": {
+     "actions": [
+      "email",
+      "email"
+     ]
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "unknown action",
+    "valid": false,
+    "set": {
+     "actions": [
+      "sms"
+     ]
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "unknown incident policy",
+    "valid": false,
+    "set": {
+     "incident_policy": "always"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "unknown baseline mode",
+    "valid": false,
+    "set": {
+     "baseline_mode": "x"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "severity urgent",
+    "valid": false,
+    "set": {
+     "severity": "urgent"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "label key invalid",
+    "valid": false,
+    "set": {
+     "labels": {
+      "Bad Key": "v"
+     }
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "label value not a string",
+    "valid": false,
+    "set": {
+     "labels": {
+      "team": 5
+     }
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "33 labels",
+    "valid": false,
+    "set": {
+     "labels": {
+      "k0": "v",
+      "k1": "v",
+      "k2": "v",
+      "k3": "v",
+      "k4": "v",
+      "k5": "v",
+      "k6": "v",
+      "k7": "v",
+      "k8": "v",
+      "k9": "v",
+      "k10": "v",
+      "k11": "v",
+      "k12": "v",
+      "k13": "v",
+      "k14": "v",
+      "k15": "v",
+      "k16": "v",
+      "k17": "v",
+      "k18": "v",
+      "k19": "v",
+      "k20": "v",
+      "k21": "v",
+      "k22": "v",
+      "k23": "v",
+      "k24": "v",
+      "k25": "v",
+      "k26": "v",
+      "k27": "v",
+      "k28": "v",
+      "k29": "v",
+      "k30": "v",
+      "k31": "v",
+      "k32": "v"
+     }
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "label value too long",
+    "valid": false,
+    "set": {
+     "labels": {
+      "team": "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv"
+     }
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "schedule without weekdays",
+    "valid": false,
+    "set": {
+     "schedule.active.0.weekdays": []
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "long weekday name",
+    "valid": false,
+    "set": {
+     "schedule.active.0.weekdays": [
+      "monday"
+     ]
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "duplicate weekdays",
+    "valid": false,
+    "set": {
+     "schedule.active.0.weekdays": [
+      "mon",
+      "mon"
+     ]
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "time 24:00",
+    "valid": false,
+    "set": {
+     "schedule.active.0.to": "24:00"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "time without leading zero",
+    "valid": false,
+    "set": {
+     "schedule.active.0.from": "8:00"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "timezone without region",
+    "valid": false,
+    "set": {
+     "schedule.timezone": "Windhoek"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "empty active list",
+    "valid": false,
+    "set": {
+     "schedule.active": []
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "15 active entries",
+    "valid": false,
+    "set": {
+     "schedule.active": [
+      {
+       "weekdays": [
+        "mon"
+       ],
+       "from": "08:00",
+       "to": "09:00"
+      },
+      {
+       "weekdays": [
+        "mon"
+       ],
+       "from": "08:00",
+       "to": "09:00"
+      },
+      {
+       "weekdays": [
+        "mon"
+       ],
+       "from": "08:00",
+       "to": "09:00"
+      },
+      {
+       "weekdays": [
+        "mon"
+       ],
+       "from": "08:00",
+       "to": "09:00"
+      },
+      {
+       "weekdays": [
+        "mon"
+       ],
+       "from": "08:00",
+       "to": "09:00"
+      },
+      {
+       "weekdays": [
+        "mon"
+       ],
+       "from": "08:00",
+       "to": "09:00"
+      },
+      {
+       "weekdays": [
+        "mon"
+       ],
+       "from": "08:00",
+       "to": "09:00"
+      },
+      {
+       "weekdays": [
+        "mon"
+       ],
+       "from": "08:00",
+       "to": "09:00"
+      },
+      {
+       "weekdays": [
+        "mon"
+       ],
+       "from": "08:00",
+       "to": "09:00"
+      },
+      {
+       "weekdays": [
+        "mon"
+       ],
+       "from": "08:00",
+       "to": "09:00"
+      },
+      {
+       "weekdays": [
+        "mon"
+       ],
+       "from": "08:00",
+       "to": "09:00"
+      },
+      {
+       "weekdays": [
+        "mon"
+       ],
+       "from": "08:00",
+       "to": "09:00"
+      },
+      {
+       "weekdays": [
+        "mon"
+       ],
+       "from": "08:00",
+       "to": "09:00"
+      },
+      {
+       "weekdays": [
+        "mon"
+       ],
+       "from": "08:00",
+       "to": "09:00"
+      },
+      {
+       "weekdays": [
+        "mon"
+       ],
+       "from": "08:00",
+       "to": "09:00"
+      }
+     ]
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "exceptions missing device_groups",
+    "valid": false,
+    "delete": [
+     "exceptions.device_groups"
+    ],
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "65 exception destinations",
+    "valid": false,
+    "set": {
+     "exceptions.destinations": [
+      "d0",
+      "d1",
+      "d2",
+      "d3",
+      "d4",
+      "d5",
+      "d6",
+      "d7",
+      "d8",
+      "d9",
+      "d10",
+      "d11",
+      "d12",
+      "d13",
+      "d14",
+      "d15",
+      "d16",
+      "d17",
+      "d18",
+      "d19",
+      "d20",
+      "d21",
+      "d22",
+      "d23",
+      "d24",
+      "d25",
+      "d26",
+      "d27",
+      "d28",
+      "d29",
+      "d30",
+      "d31",
+      "d32",
+      "d33",
+      "d34",
+      "d35",
+      "d36",
+      "d37",
+      "d38",
+      "d39",
+      "d40",
+      "d41",
+      "d42",
+      "d43",
+      "d44",
+      "d45",
+      "d46",
+      "d47",
+      "d48",
+      "d49",
+      "d50",
+      "d51",
+      "d52",
+      "d53",
+      "d54",
+      "d55",
+      "d56",
+      "d57",
+      "d58",
+      "d59",
+      "d60",
+      "d61",
+      "d62",
+      "d63",
+      "d64"
+     ]
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "extra top-level field",
+    "valid": false,
+    "set": {
+     "enabled": true
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "version zero",
+    "valid": false,
+    "set": {
+     "version": 0
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "empty name",
+    "valid": false,
+    "set": {
+     "name": ""
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "blank name",
+    "valid": false,
+    "set": {
+     "name": "  "
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "missing created_by",
+    "valid": false,
+    "delete": [
+     "created_by"
+    ],
+    "jsonschema_rejects": true
+   }
+  ]
+ },
+ "maintenance_window": {
+  "base": {
+   "id": "maintenance-0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+   "name": "Core switch firmware upgrade",
+   "scope": {
+    "kind": "site",
+    "ref": "windhoek-hq"
+   },
+   "starts_at": "2026-10-10T22:00:00Z",
+   "ends_at": "2026-10-11T02:00:00Z",
+   "evaluation": "retain",
+   "status": "scheduled",
+   "reason": "Planned firmware upgrade",
+   "created_by": "identity-ronald",
+   "created_at": "2026-10-08T08:00:00Z",
+   "cancelled_by": null,
+   "cancelled_at": null
+  },
+  "cases": [
+   {
+    "name": "scheduled window",
+    "valid": true
+   },
+   {
+    "name": "cancelled window",
+    "valid": true,
+    "set": {
+     "status": "cancelled",
+     "cancelled_by": "identity-ronald",
+     "cancelled_at": "2026-10-09T08:00:00Z"
+    }
+   },
+   {
+    "name": "evaluator disabled",
+    "valid": true,
+    "set": {
+     "evaluation": "disable"
+    }
+   },
+   {
+    "name": "cancelled without actor",
+    "valid": false,
+    "set": {
+     "status": "cancelled",
+     "cancelled_at": "2026-10-09T08:00:00Z"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "cancelled without timestamp",
+    "valid": false,
+    "set": {
+     "status": "cancelled",
+     "cancelled_by": "identity-ronald"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "scheduled with cancelled_at",
+    "valid": false,
+    "set": {
+     "cancelled_at": "2026-10-09T08:00:00Z"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "scheduled with cancelled_by",
+    "valid": false,
+    "set": {
+     "cancelled_by": "identity-ronald"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "unknown status",
+    "valid": false,
+    "set": {
+     "status": "active"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "unknown evaluation",
+    "valid": false,
+    "set": {
+     "evaluation": "pause"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "empty reason",
+    "valid": false,
+    "set": {
+     "reason": ""
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "blank reason",
+    "valid": false,
+    "set": {
+     "reason": "  "
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "empty name",
+    "valid": false,
+    "set": {
+     "name": ""
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "bad scope kind",
+    "valid": false,
+    "set": {
+     "scope.kind": "all"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "bad id",
+    "valid": false,
+    "set": {
+     "id": "mw-1"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "extra field",
+    "valid": false,
+    "set": {
+     "recurring": true
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "missing ends_at",
+    "valid": false,
+    "delete": [
+     "ends_at"
+    ],
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "ends before starts (cross-field)",
+    "valid": false,
+    "set": {
+     "ends_at": "2026-10-10T21:00:00Z"
+    },
+    "jsonschema_rejects": false
+   },
+   {
+    "name": "ends equal starts (cross-field)",
+    "valid": false,
+    "set": {
+     "ends_at": "2026-10-10T22:00:00Z"
+    },
+    "jsonschema_rejects": false
+   },
+   {
+    "name": "longer than 30 days (cross-field)",
+    "valid": false,
+    "set": {
+     "ends_at": "2026-11-20T22:00:00Z"
+    },
+    "jsonschema_rejects": false
+   }
+  ]
+ }
+}

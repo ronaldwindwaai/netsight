@@ -12,7 +12,7 @@ requires-python = ">=3.12"
 dependencies = [
   "fastapi>=0.115,<1",
   "uvicorn[standard]>=0.30,<1",
-  "pydantic>=2.9,<3",
+  "pydantic>=2.11,<3",
   "pydantic-settings>=2.5,<3",
   "httpx>=0.27,<1",
   "sqlalchemy>=2.0,<3",
@@ -25,10 +25,22 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8,<9", "pytest-asyncio>=0.24,<1", "ruff>=0.8,<1", "mypy>=1.13,<2", "types-qrcode>=7.4,<9"]
+dev = [
+  "pytest>=8,<9",
+  "pytest-asyncio>=0.24,<1",
+  "ruff>=0.8,<1",
+  "mypy>=1.13,<2",
+  "types-qrcode>=7.4,<9",
+  "pyyaml>=6,<7",
+  # Lets the packaging test build the wheel in-process (no network, no uv).
+  "hatchling>=1.25",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/netsight_api"]
+# Rollback SQL is destructive (it drops tables) and must never ship in the production
+# wheel; only the forward ``*.up.sql`` migrations are packaged.
+exclude = ["**/*.down.sql"]
 
 [tool.ruff]
 line-length = 100

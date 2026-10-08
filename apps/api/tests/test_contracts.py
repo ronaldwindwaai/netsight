@@ -20,12 +20,18 @@ ALERT = {
     "observed_at": "2026-10-02T12:00:00Z",
 }
 
+# S6-1 tightened the incident contract (canonical IDs, required-nullable fields,
+# resolution invariant); exhaustive cases live in test_incident_alert_contracts.py.
 INCIDENT = {
-    "id": "inc-1",
+    "id": "incident-3f2b8a40-1c2d-4e5f-8a9b-0c1d2e3f4a5b",
     "title": "Perimeter outage",
     "severity": "critical",
     "state": "open",
     "created_at": "2026-10-02T12:00:00Z",
+    "updated_at": "2026-10-02T12:00:00Z",
+    "assignee_id": None,
+    "evidence_ids": [],
+    "resolution": None,
 }
 
 EVIDENCE = {

@@ -1,20 +1,32 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Incident",
+  "description": "Canonical incident record (PostgreSQL-owned, see DATABASE-OWNERSHIP.md). State machine: open -> acknowledged -> investigating -> mitigated -> resolved -> closed; reopen (resolved|closed -> open) requires an audited reason. Invariant: resolution is non-null exactly when state is resolved or closed.",
   "type": "object",
+  "additionalProperties": false,
   "required": [
     "id",
     "title",
     "severity",
     "state",
-    "created_at"
+    "created_at",
+    "updated_at",
+    "assignee_id",
+    "evidence_ids",
+    "resolution"
   ],
   "properties": {
     "id": {
-      "type": "string"
+      "type": "string",
+      "minLength": 45,
+      "maxLength": 45,
+      "pattern": "^incident-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
     },
     "title": {
-      "type": "string"
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255,
+      "pattern": "\\S"
     },
     "severity": {
       "enum": [
@@ -38,17 +50,382 @@
       "type": "string",
       "format": "date-time"
     },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
     "assignee_id": {
       "type": [
         "string",
         "null"
-      ]
+      ],
+      "minLength": 1,
+      "maxLength": 255
     },
     "evidence_ids": {
+      "description": "References to immutable evidence records; never inline telemetry.",
       "type": "array",
+      "maxItems": 256,
+      "uniqueItems": true,
       "items": {
-        "type": "string"
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128
       }
+    },
+    "resolution": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/resolution"
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "enum": [
+              "resolved",
+              "closed"
+            ]
+          }
+        },
+        "required": [
+          "state"
+        ]
+      },
+      "then": {
+        "properties": {
+          "resolution": {
+            "type": "object"
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "resolution": {
+            "type": "null"
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "resolution": {
+      "description": "Mandatory resolution record. root_cause_status is 'determined' only with an operator-accepted root cause text, otherwise 'not-determined' with a null root cause; an AI-proposed root cause is never written here without an authorised operator accepting it. Cross-field rule not expressible in JSON Schema and enforced by the API models and the browser parser: restored_at must not be after resolved_at.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "summary",
+        "root_cause_status",
+        "root_cause",
+        "impact",
+        "restored_at",
+        "resolved_at",
+        "resolved_by",
+        "follow_up_actions"
+      ],
+      "properties": {
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000,
+          "pattern": "\\S"
+        },
+        "root_cause_status": {
+          "enum": [
+            "determined",
+            "not-determined"
+          ]
+        },
+        "root_cause": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 2000,
+          "pattern": "\\S"
+        },
+        "impact": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000,
+          "pattern": "\\S"
+        },
+        "restored_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "resolved_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "resolved_by": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "follow_up_actions": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "pattern": "\\S"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "root_cause_status": {
+                "const": "determined"
+              }
+            },
+            "required": [
+              "root_cause_status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "root_cause": {
+                "type": "string"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "root_cause": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "timelineEvent": {
+      "description": "One append-only timeline entry. The store exposes no update or delete path and the database rejects them. Rules: state_from/state_to are present exactly for state-changed; a transition to 'open' (reopen) requires reason; comment and resolution require message; every other kind except assignee-changed (null subject_id means unassigned) requires subject_id.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "incident_id",
+        "seq",
+        "occurred_at",
+        "actor_id",
+        "kind",
+        "state_from",
+        "state_to",
+        "reason",
+        "message",
+        "subject_id"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 51,
+          "maxLength": 51,
+          "pattern": "^incident-event-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "incident_id": {
+          "type": "string",
+          "minLength": 45,
+          "maxLength": 45,
+          "pattern": "^incident-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000
+        },
+        "occurred_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "actor_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "kind": {
+          "enum": [
+            "alert-linked",
+            "alert-unlinked",
+            "assignee-changed",
+            "comment",
+            "diagnostic",
+            "action-proposed",
+            "action-approved",
+            "action-executed",
+            "evidence-added",
+            "state-changed",
+            "resolution"
+          ]
+        },
+        "state_from": {
+          "enum": [
+            "open",
+            "acknowledged",
+            "investigating",
+            "mitigated",
+            "resolved",
+            "closed",
+            null
+          ]
+        },
+        "state_to": {
+          "enum": [
+            "open",
+            "acknowledged",
+            "investigating",
+            "mitigated",
+            "resolved",
+            "closed",
+            null
+          ]
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 1000,
+          "pattern": "\\S"
+        },
+        "message": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 4000,
+          "pattern": "\\S"
+        },
+        "subject_id": {
+          "description": "Opaque reference: alert, diagnostic, action request, evidence record or (assignee-changed) the new assignee identity.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 128
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "state-changed"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "state_from": {
+                "type": "string"
+              },
+              "state_to": {
+                "type": "string"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "state_from": {
+                "type": "null"
+              },
+              "state_to": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "state-changed"
+              },
+              "state_to": {
+                "const": "open"
+              }
+            },
+            "required": [
+              "kind",
+              "state_to"
+            ]
+          },
+          "then": {
+            "properties": {
+              "reason": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "comment",
+                  "resolution"
+                ]
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "alert-linked",
+                  "alert-unlinked",
+                  "diagnostic",
+                  "action-proposed",
+                  "action-approved",
+                  "action-executed",
+                  "evidence-added"
+                ]
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "subject_id": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      ]
     }
   }
 }

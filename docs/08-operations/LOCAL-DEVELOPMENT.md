@@ -17,6 +17,33 @@ Use mocked adapter fixtures until a lab LibreNMS/NetBox is available.
 
 Do not connect development directly to production monitoring systems.
 
+## Database migrations and roles (API)
+
+Two database credentials, never the same one:
+
+| Variable | Role | Used by |
+|---|---|---|
+| `DATABASE_MIGRATION_URL` | owner / migrator (DDL, grants) | `python -m netsight_api.storage.migrate` only |
+| `DATABASE_URL` | least-privilege application role | the running API |
+| `DATABASE_APP_ROLE` | name of that application role | the migrator, to apply its grants |
+
+Create the application role out of band (login, no superuser/createdb/createrole, password from
+the secrets manager, not owner of anything), then from `apps/api`:
+
+```
+python -m netsight_api.storage.migrate status
+python -m netsight_api.storage.migrate up          # migrations, then grants for $DATABASE_APP_ROLE
+python -m netsight_api.storage.migrate up --no-grants
+```
+
+Exit codes: 0 ok, 1 migration/database failure, 2 usage or configuration error. The DSN and
+database error text are never printed. `up` is idempotent and re-applies the grants each run.
+Rollback SQL (`*.down.sql`) is destructive and is not packaged in the production wheel; in a
+source checkout `apply_down` needs `allow_destructive=True` and, when it would drop tables that
+hold rows, `NETSIGHT_ALLOW_DESTRUCTIVE_DOWN=1`. Live database tests are opt-in:
+`NETSIGHT_TEST_PG_DSN=postgresql://...` (a role allowed to `CREATE ROLE`/`CREATE SCHEMA`; each
+test uses a throwaway schema and role).
+
 ## OpenCode plugin (ECC port)
 
 This repo uses OpenCode V2. `opencode.json` loads a project-local plugin from

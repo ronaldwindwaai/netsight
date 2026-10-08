@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from datetime import datetime
-from typing import Literal
+from datetime import datetime, timedelta
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
 
 DeviceStatus = Literal[
     "healthy",
@@ -376,4 +376,304 @@ class SecurityEventsResponse(ApiModel):
         """A degraded state must never assert security events."""
         if self.state != "ok" and self.events:
             raise ValueError("non-ok security state must not carry events")
+        return self
+
+
+# --- Incidents, alert rules, maintenance windows (S6) -----------------------
+#
+# These mirror contracts/json-schema/incident.schema.json and
+# alert-rule.schema.json and the OpenAPI components of the same names; the
+# four-way agreement tests drive all of them from one vector file. Unlike the
+# read-only telemetry models above they are strict (no type coercion), frozen
+# and never strip input, so pydantic accepts exactly what the schema accepts.
+
+
+class ContractModel(ApiModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        strict=True,
+        frozen=True,
+        str_strip_whitespace=False,
+        populate_by_name=True,
+        serialize_by_alias=True,
+    )
+
+
+_UUID = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+INCIDENT_ID_PATTERN = rf"^incident-{_UUID}$"
+TIMELINE_EVENT_ID_PATTERN = rf"^incident-event-{_UUID}$"
+ALERT_RULE_ID_PATTERN = rf"^alert-rule-{_UUID}$"
+MAINTENANCE_WINDOW_ID_PATTERN = rf"^maintenance-{_UUID}$"
+NON_BLANK = r"\S"
+MAX_MAINTENANCE_DURATION = timedelta(days=30)
+
+IncidentSeverity = Literal["low", "medium", "high", "critical"]
+IncidentState = Literal["open", "acknowledged", "investigating", "mitigated", "resolved", "closed"]
+RootCauseStatus = Literal["determined", "not-determined"]
+TimelineEventKind = Literal[
+    "alert-linked",
+    "alert-unlinked",
+    "assignee-changed",
+    "comment",
+    "diagnostic",
+    "action-proposed",
+    "action-approved",
+    "action-executed",
+    "evidence-added",
+    "state-changed",
+    "resolution",
+]
+AlertScopeKind = Literal[
+    "organisation", "site", "device", "device_group", "vlan", "user", "service"
+]
+AlertOperator = Literal["gt", "gte", "lt", "lte", "eq", "ne", "matches"]
+BaselineMode = Literal["none", "above-baseline", "below-baseline", "outside-baseline"]
+Weekday = Literal["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+AlertRuleStatus = Literal["draft", "active", "disabled"]
+AlertAction = Literal["create_alert", "email", "push"]
+IncidentPolicy = Literal["none", "create", "group"]
+MaintenanceEvaluation = Literal["retain", "disable"]
+MaintenanceStatus = Literal["scheduled", "cancelled"]
+
+IdentityRef = Annotated[str, Field(min_length=1, max_length=255)]
+FollowUpAction = Annotated[str, Field(min_length=1, max_length=500, pattern=NON_BLANK)]
+EvidenceRef = Annotated[str, Field(min_length=1, max_length=128)]
+ShortName = Annotated[str, Field(min_length=1, max_length=128)]
+_TIME_OF_DAY = r"^([01][0-9]|2[0-3]):[0-5][0-9]$"
+_THRESHOLD_BOUND = 1_000_000_000_000_000
+
+
+def _require_unique(values: list[str], what: str) -> None:
+    if len(set(values)) != len(values):
+        raise ValueError(f"{what} must be unique")
+
+
+class IncidentResolutionInput(ContractModel):
+    """Operator-supplied resolution fields (the store adds who and when)."""
+
+    summary: str = Field(min_length=1, max_length=2000, pattern=NON_BLANK)
+    root_cause_status: RootCauseStatus
+    root_cause: str | None = Field(..., min_length=1, max_length=2000, pattern=NON_BLANK)
+    impact: str = Field(min_length=1, max_length=2000, pattern=NON_BLANK)
+    restored_at: AwareDatetime
+    follow_up_actions: list[FollowUpAction] = Field(max_length=32)
+
+    @model_validator(mode="after")
+    def _root_cause_matches_status(self) -> IncidentResolutionInput:
+        """'determined' needs an accepted root cause; 'not-determined' carries none."""
+        if (self.root_cause_status == "determined") != (self.root_cause is not None):
+            raise ValueError("root_cause is required exactly when root_cause_status is determined")
+        return self
+
+
+class IncidentResolution(IncidentResolutionInput):
+    resolved_at: AwareDatetime
+    resolved_by: IdentityRef
+
+    @model_validator(mode="after")
+    def _restored_not_after_resolved(self) -> IncidentResolution:
+        if self.restored_at > self.resolved_at:
+            raise ValueError("restored_at must not be after resolved_at")
+        return self
+
+
+class Incident(ContractModel):
+    id: str = Field(min_length=45, max_length=45, pattern=INCIDENT_ID_PATTERN)
+    title: str = Field(min_length=1, max_length=255, pattern=NON_BLANK)
+    severity: IncidentSeverity
+    state: IncidentState
+    created_at: AwareDatetime
+    updated_at: AwareDatetime
+    assignee_id: str | None = Field(..., min_length=1, max_length=255)
+    evidence_ids: list[EvidenceRef] = Field(max_length=256)
+    resolution: IncidentResolution | None = Field(...)
+
+    @model_validator(mode="after")
+    def _invariants(self) -> Incident:
+        _require_unique(self.evidence_ids, "evidence_ids")
+        if (self.state in ("resolved", "closed")) != (self.resolution is not None):
+            raise ValueError("resolution is required exactly when state is resolved or closed")
+        return self
+
+
+_SUBJECT_REQUIRED_KINDS = frozenset(
+    {
+        "alert-linked",
+        "alert-unlinked",
+        "diagnostic",
+        "action-proposed",
+        "action-approved",
+        "action-executed",
+        "evidence-added",
+    }
+)
+
+
+class IncidentTimelineEvent(ContractModel):
+    """One append-only timeline entry (no update or delete path exists)."""
+
+    id: str = Field(min_length=51, max_length=51, pattern=TIMELINE_EVENT_ID_PATTERN)
+    incident_id: str = Field(min_length=45, max_length=45, pattern=INCIDENT_ID_PATTERN)
+    seq: int = Field(ge=1, le=1_000_000)
+    occurred_at: AwareDatetime
+    actor_id: IdentityRef
+    kind: TimelineEventKind
+    state_from: IncidentState | None = Field(...)
+    state_to: IncidentState | None = Field(...)
+    reason: str | None = Field(..., min_length=1, max_length=1000, pattern=NON_BLANK)
+    message: str | None = Field(..., min_length=1, max_length=4000, pattern=NON_BLANK)
+    subject_id: str | None = Field(..., min_length=1, max_length=128)
+
+    @model_validator(mode="after")
+    def _payload_matches_kind(self) -> IncidentTimelineEvent:
+        is_state_change = self.kind == "state-changed"
+        has_states = self.state_from is not None and self.state_to is not None
+        if is_state_change != has_states:
+            raise ValueError("state_from and state_to are required exactly for state-changed")
+        if not is_state_change and (self.state_from is not None or self.state_to is not None):
+            raise ValueError("state_from and state_to are only valid for state-changed")
+        if is_state_change and self.state_to == "open" and self.reason is None:
+            raise ValueError("reopening an incident requires a reason")
+        if self.kind in ("comment", "resolution") and self.message is None:
+            raise ValueError(f"{self.kind} requires a message")
+        if self.kind in _SUBJECT_REQUIRED_KINDS and self.subject_id is None:
+            raise ValueError(f"{self.kind} requires a subject_id")
+        return self
+
+
+class AlertScope(ContractModel):
+    kind: AlertScopeKind
+    ref: str = Field(min_length=1, max_length=255)
+
+
+class AlertCondition(ContractModel):
+    metric: str = Field(
+        min_length=1, max_length=128, pattern=r"^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*$"
+    )
+    operator: AlertOperator
+    threshold: float | None = Field(
+        ..., ge=-_THRESHOLD_BOUND, le=_THRESHOLD_BOUND, allow_inf_nan=False
+    )
+    pattern: str | None = Field(..., min_length=1, max_length=256)
+
+    @model_validator(mode="after")
+    def _operand_matches_operator(self) -> AlertCondition:
+        if self.operator == "matches":
+            if self.pattern is None or self.threshold is not None:
+                raise ValueError("matches takes a pattern and no threshold")
+        elif self.threshold is None or self.pattern is not None:
+            raise ValueError(f"{self.operator} takes a threshold and no pattern")
+        return self
+
+
+class AlertScheduleEntry(ContractModel):
+    weekdays: list[Weekday] = Field(min_length=1, max_length=7)
+    from_: str = Field(alias="from", pattern=_TIME_OF_DAY)
+    to: str = Field(pattern=_TIME_OF_DAY)
+
+    @model_validator(mode="after")
+    def _unique_weekdays(self) -> AlertScheduleEntry:
+        _require_unique(list(self.weekdays), "weekdays")
+        return self
+
+
+class AlertSchedule(ContractModel):
+    timezone: str = Field(
+        max_length=64,
+        pattern=r"^(UTC|[A-Za-z][A-Za-z0-9_+-]*(/[A-Za-z][A-Za-z0-9_+-]*){1,2})$",
+    )
+    active: list[AlertScheduleEntry] = Field(min_length=1, max_length=14)
+
+
+class AlertExceptions(ContractModel):
+    destinations: list[ShortName] = Field(max_length=64)
+    device_groups: list[ShortName] = Field(max_length=64)
+
+    @model_validator(mode="after")
+    def _unique(self) -> AlertExceptions:
+        _require_unique(self.destinations, "destinations")
+        _require_unique(self.device_groups, "device_groups")
+        return self
+
+
+class AlertRuleDefinition(ContractModel):
+    """Operator-editable rule fields (everything except lifecycle and audit)."""
+
+    name: str = Field(min_length=1, max_length=255, pattern=NON_BLANK)
+    scope: AlertScope
+    condition: AlertCondition
+    baseline_mode: BaselineMode
+    window_seconds: int = Field(ge=60, le=86_400)
+    for_seconds: int = Field(ge=0, le=86_400)
+    cooldown_seconds: int = Field(ge=0, le=604_800)
+    schedule: AlertSchedule | None = Field(...)
+    exceptions: AlertExceptions
+    severity: AlertSeverity
+    labels: dict[
+        Annotated[str, Field(pattern=r"^[a-z][a-z0-9_]{0,62}$")],
+        Annotated[str, Field(max_length=128)],
+    ] = Field(max_length=32)
+    actions: list[AlertAction] = Field(min_length=1, max_length=3)
+    incident_policy: IncidentPolicy
+
+    @model_validator(mode="after")
+    def _unique_actions(self) -> AlertRuleDefinition:
+        _require_unique(list(self.actions), "actions")
+        return self
+
+
+class AlertRule(AlertRuleDefinition):
+    id: str = Field(min_length=47, max_length=47, pattern=ALERT_RULE_ID_PATTERN)
+    status: AlertRuleStatus
+    created_by: IdentityRef
+    created_at: AwareDatetime
+    updated_at: AwareDatetime
+    approved_by: str | None = Field(..., min_length=1, max_length=255)
+    approved_at: AwareDatetime | None = Field(...)
+    version: int = Field(ge=1, le=1_000_000)
+
+    @model_validator(mode="after")
+    def _approval_invariants(self) -> AlertRule:
+        """No rule is active without a recorded approval; drafts are never approved."""
+        if (self.approved_by is None) != (self.approved_at is None):
+            raise ValueError("approved_by and approved_at must be set together")
+        if self.status == "active" and self.approved_by is None:
+            raise ValueError("an active rule requires approval")
+        if self.status == "draft" and self.approved_by is not None:
+            raise ValueError("a draft rule cannot carry an approval")
+        return self
+
+
+class MaintenanceWindowDefinition(ContractModel):
+    name: str = Field(min_length=1, max_length=255, pattern=NON_BLANK)
+    scope: AlertScope
+    starts_at: AwareDatetime
+    ends_at: AwareDatetime
+    evaluation: MaintenanceEvaluation
+    reason: str = Field(min_length=1, max_length=1000, pattern=NON_BLANK)
+
+    @model_validator(mode="after")
+    def _bounded_positive_duration(self) -> MaintenanceWindowDefinition:
+        duration = self.ends_at - self.starts_at
+        if duration <= timedelta(0):
+            raise ValueError("ends_at must be after starts_at")
+        if duration > MAX_MAINTENANCE_DURATION:
+            raise ValueError("a maintenance window may last at most 30 days")
+        return self
+
+
+class MaintenanceWindow(MaintenanceWindowDefinition):
+    id: str = Field(min_length=48, max_length=48, pattern=MAINTENANCE_WINDOW_ID_PATTERN)
+    status: MaintenanceStatus
+    created_by: IdentityRef
+    created_at: AwareDatetime
+    cancelled_by: str | None = Field(..., min_length=1, max_length=255)
+    cancelled_at: AwareDatetime | None = Field(...)
+
+    @model_validator(mode="after")
+    def _cancellation_invariants(self) -> MaintenanceWindow:
+        has_cancellation = self.cancelled_by is not None and self.cancelled_at is not None
+        has_partial = (self.cancelled_by is None) != (self.cancelled_at is None)
+        if has_partial or (self.status == "cancelled") != has_cancellation:
+            raise ValueError("cancelled_by and cancelled_at are required exactly when cancelled")
         return self
