@@ -47,7 +47,7 @@ Steps: Wazuh/Suricata read-only adapters; security overview API; correlated evid
 2. ✅ Wazuh read-only indexer adapter (S5-2): bounded `_search` against `wazuh-alerts-*` (`WAZUH_INDEXER_URL`/`_USER`/`_PASSWORD`/`_CA_BUNDLE`/`WAZUH_ALERTS_INDEX`; unset → `not-connected`), rule-level→severity bands, TLS verify on, redirects refused, credentials excluded from repr, index/URL validated. `device_id` stays null until identity correlation maps agents (no IP inference).
 3. ✅ Suricata EVE alerts are consumed from the same indexer (Wazuh-forwarded): `data.alert.*` signature/category, severity 1/2/3→high/medium/low, `src_ip`/`dest_ip`; flow-id preservation and entity linking remain follow-ups.
 4. ✅ `/security` UI page (S5-3): time-range picker, severity counts (labelled as counts of the listed events), events table with plain-text untrusted fields, per-state surfaces (not-connected/unknown/empty/failure), `Security` menu entry. Web: typecheck/lint/103 tests/build clean.
-5. S5 slice gate: independent review + security review; record follow-ups (agent→device mapping, rate limiting, read auditing, flow-id preservation).
+5. ✅ S5 slice gate (self-review against the security checklist; **independent reviewer pass still outstanding**): threat-model delta recorded. Follow-ups: agent->device mapping, per-identity rate limiting, site scoping + read auditing, Suricata flow-id preservation, `partial` state for malformed hits, live Wazuh integration test.
 
 ### E06 — Alerts & incidents
 Stories: NS-060..NS-065.

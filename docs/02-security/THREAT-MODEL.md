@@ -69,6 +69,7 @@ slice; deny-by-default still holds because every route requires `traffic:read`.
 The adapter also refuses to follow upstream redirects (no credential re-send)
 and degrades transport/TLS failures to `UNAVAILABLE`; regression tests pin
 both.
+Security-events specifics: the Wazuh indexer URL, user, password and CA bundle are read from the environment only and excluded from client `repr`; alert signature/category/address text is untrusted telemetry (length-bounded, passed through as data, rendered as plain text, never interpreted as markup or an AI instruction); `device_id` is only ever null until agent->device mapping exists (no IP inference); the adapter is read-only (`_search` only), verifies TLS, refuses redirects, validates URL and index pattern, and any source failure or contract-invalid row degrades to an explicit `unknown` with static error data. `/api/v1/security/events` requires `security:read` and is validated against `security.schema.json` before leaving the boundary. Security reads are not site-scoped and not audit-logged yet (same platform ABAC/audit follow-ups as traffic).
 
 ### Denial of service
 Risk: expensive flow queries, diagnostics floods, upstream failures.
@@ -88,6 +89,7 @@ partial data as if complete.
 Open follow-up: per-identity rate limiting (and process-level `system.columns`
 caching) for `/api/v1/traffic/*` — the `/traffic` page alone issues three reads
 per render, consistent with the existing `/api/v1/topology` rate-limit follow-up.
+Security-events specifics: one request issues exactly one indexer `_search` bounded by a window (<=31 days), a row cap (<=500) and a read timeout. Open follow-ups: per-identity rate limiting for `/api/v1/security/events`; a single malformed hit currently degrades the whole read to `unknown` (a `partial` state would be more useful).
 
 ### Elevation of privilege
 Risk: AI/tool or user obtains write capability.
