@@ -2263,5 +2263,7574 @@
     "jsonschema_rejects": true
    }
   ]
+ },
+ "alert_rule_definition": {
+  "base": {
+   "name": "After-hours large upload",
+   "scope": {
+    "kind": "device_group",
+    "ref": "staff-workstations"
+   },
+   "condition": {
+    "metric": "traffic.upload_bytes",
+    "operator": "gt",
+    "threshold": 1000000000,
+    "pattern": null
+   },
+   "baseline_mode": "none",
+   "window_seconds": 900,
+   "for_seconds": 0,
+   "cooldown_seconds": 3600,
+   "schedule": {
+    "timezone": "Africa/Windhoek",
+    "active": [
+     {
+      "weekdays": [
+       "mon",
+       "tue",
+       "wed",
+       "thu",
+       "fri"
+      ],
+      "from": "20:00",
+      "to": "06:00"
+     }
+    ]
+   },
+   "exceptions": {
+    "destinations": [
+     "approved-backup",
+     "microsoft-update"
+    ],
+    "device_groups": [
+     "backup-servers",
+     "cctv"
+    ]
+   },
+   "severity": "high",
+   "labels": {
+    "team": "network"
+   },
+   "actions": [
+    "create_alert",
+    "email",
+    "push"
+   ],
+   "incident_policy": "create"
+  },
+  "cases": [
+   {
+    "name": "base definition",
+    "valid": true
+   },
+   {
+    "name": "no schedule",
+    "valid": true,
+    "set": {
+     "schedule": null
+    }
+   },
+   {
+    "name": "pattern rule",
+    "valid": true,
+    "set": {
+     "condition": {
+      "metric": "security.signature",
+      "operator": "matches",
+      "threshold": null,
+      "pattern": "*ssh*"
+     }
+    }
+   },
+   {
+    "name": "baseline mode",
+    "valid": true,
+    "set": {
+     "baseline_mode": "above-baseline"
+    }
+   },
+   {
+    "name": "negative threshold",
+    "valid": true,
+    "set": {
+     "condition.threshold": -5
+    }
+   },
+   {
+    "name": "single action",
+    "valid": true,
+    "set": {
+     "actions": [
+      "email"
+     ],
+     "incident_policy": "none"
+    }
+   },
+   {
+    "name": "lifecycle id present",
+    "valid": false,
+    "set": {
+     "id": "alert-rule-5a6b7c8d-1e2f-4a3b-9c4d-5e6f7a8b9c0d"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "lifecycle status present",
+    "valid": false,
+    "set": {
+     "status": "active"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "lifecycle version present",
+    "valid": false,
+    "set": {
+     "version": 1
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "approval fields present",
+    "valid": false,
+    "set": {
+     "approved_by": "identity-admin"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "missing name",
+    "valid": false,
+    "delete": [
+     "name"
+    ],
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "blank name",
+    "valid": false,
+    "set": {
+     "name": "   "
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "missing schedule key",
+    "valid": false,
+    "delete": [
+     "schedule"
+    ],
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "bad scope kind",
+    "valid": false,
+    "set": {
+     "scope.kind": "planet"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "numeric operator with a pattern",
+    "valid": false,
+    "set": {
+     "condition.pattern": "*"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "matches with a threshold",
+    "valid": false,
+    "set": {
+     "condition.operator": "matches",
+     "condition.pattern": "*"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "threshold above bound",
+    "valid": false,
+    "set": {
+     "condition.threshold": 1000000000000001
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "threshold is a string",
+    "valid": false,
+    "set": {
+     "condition.threshold": "5"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "window below minimum",
+    "valid": false,
+    "set": {
+     "window_seconds": 59
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "window above maximum",
+    "valid": false,
+    "set": {
+     "window_seconds": 86401
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "negative for_seconds",
+    "valid": false,
+    "set": {
+     "for_seconds": -1
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "cooldown above maximum",
+    "valid": false,
+    "set": {
+     "cooldown_seconds": 604801
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "duplicate actions",
+    "valid": false,
+    "set": {
+     "actions": [
+      "email",
+      "email"
+     ]
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "no actions",
+    "valid": false,
+    "set": {
+     "actions": []
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "unknown action",
+    "valid": false,
+    "set": {
+     "actions": [
+      "sms"
+     ]
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "unknown incident policy",
+    "valid": false,
+    "set": {
+     "incident_policy": "page"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "severity urgent",
+    "valid": false,
+    "set": {
+     "severity": "urgent"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "label key invalid",
+    "valid": false,
+    "set": {
+     "labels": {
+      "Team": "x"
+     }
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "schedule time 24:00",
+    "valid": false,
+    "set": {
+     "schedule.active.0.to": "24:00"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "timezone without region",
+    "valid": false,
+    "set": {
+     "schedule.timezone": "Windhoek"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "empty active list",
+    "valid": false,
+    "set": {
+     "schedule.active": []
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "exceptions missing device_groups",
+    "valid": false,
+    "delete": [
+     "exceptions.device_groups"
+    ],
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "duplicate exception destinations",
+    "valid": false,
+    "set": {
+     "exceptions.destinations": [
+      "a",
+      "a"
+     ]
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "extra field",
+    "valid": false,
+    "set": {
+     "enabled": true
+    },
+    "jsonschema_rejects": true
+   }
+  ]
+ },
+ "alert_rule_list_response": {
+  "base": {
+   "state": "ok",
+   "rules": [
+    {
+     "id": "alert-rule-5a6b7c8d-1e2f-4a3b-9c4d-5e6f7a8b9c0d",
+     "name": "After-hours large upload",
+     "status": "draft",
+     "scope": {
+      "kind": "device_group",
+      "ref": "staff-workstations"
+     },
+     "condition": {
+      "metric": "traffic.upload_bytes",
+      "operator": "gt",
+      "threshold": 1000000000,
+      "pattern": null
+     },
+     "baseline_mode": "none",
+     "window_seconds": 900,
+     "for_seconds": 0,
+     "cooldown_seconds": 3600,
+     "schedule": {
+      "timezone": "Africa/Windhoek",
+      "active": [
+       {
+        "weekdays": [
+         "mon",
+         "tue",
+         "wed",
+         "thu",
+         "fri"
+        ],
+        "from": "20:00",
+        "to": "06:00"
+       }
+      ]
+     },
+     "exceptions": {
+      "destinations": [
+       "approved-backup",
+       "microsoft-update"
+      ],
+      "device_groups": [
+       "backup-servers",
+       "cctv"
+      ]
+     },
+     "severity": "high",
+     "labels": {
+      "team": "network"
+     },
+     "actions": [
+      "create_alert",
+      "email",
+      "push"
+     ],
+     "incident_policy": "create",
+     "created_by": "identity-ronald",
+     "created_at": "2026-10-08T08:00:00Z",
+     "updated_at": "2026-10-08T08:00:00Z",
+     "approved_by": null,
+     "approved_at": null,
+     "version": 1
+    }
+   ],
+   "limit": 50,
+   "offset": 0,
+   "next_offset": null
+  },
+  "cases": [
+   {
+    "name": "ok page with one rule",
+    "valid": true
+   },
+   {
+    "name": "ok empty page",
+    "valid": true,
+    "set": {
+     "rules": []
+    }
+   },
+   {
+    "name": "ok page with a continuation offset",
+    "valid": true,
+    "set": {
+     "limit": 1,
+     "next_offset": 1
+    }
+   },
+   {
+    "name": "maximum offset",
+    "valid": true,
+    "set": {
+     "offset": 10000,
+     "rules": []
+    }
+   },
+   {
+    "name": "not-connected is empty",
+    "valid": true,
+    "set": {
+     "state": "not-connected",
+     "rules": []
+    }
+   },
+   {
+    "name": "unknown is empty",
+    "valid": true,
+    "set": {
+     "state": "unknown",
+     "rules": []
+    }
+   },
+   {
+    "name": "not-connected must not carry rows",
+    "valid": false,
+    "set": {
+     "state": "not-connected"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "unknown must not carry rows",
+    "valid": false,
+    "set": {
+     "state": "unknown"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "not-connected must not offer a continuation",
+    "valid": false,
+    "set": {
+     "state": "not-connected",
+     "rules": [],
+     "next_offset": 50
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "unknown must not offer a continuation",
+    "valid": false,
+    "set": {
+     "state": "unknown",
+     "rules": [],
+     "next_offset": 50
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "state outside the enum",
+    "valid": false,
+    "set": {
+     "state": "degraded",
+     "rules": []
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "limit zero",
+    "valid": false,
+    "set": {
+     "limit": 0
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "limit above the server cap",
+    "valid": false,
+    "set": {
+     "limit": 101
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "negative offset",
+    "valid": false,
+    "set": {
+     "offset": -1
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "offset above the cap",
+    "valid": false,
+    "set": {
+     "offset": 10001,
+     "rules": []
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "next_offset above the cap",
+    "valid": false,
+    "set": {
+     "next_offset": 10001
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "limit as a string",
+    "valid": false,
+    "set": {
+     "limit": "50"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "embedded rule violating the contract",
+    "valid": false,
+    "set": {
+     "rules.0.status": "deleted"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "embedded active rule without approval",
+    "valid": false,
+    "set": {
+     "rules.0.status": "active"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "embedded rule with an extra field",
+    "valid": false,
+    "set": {
+     "rules.0.password": "x"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "unknown top-level field",
+    "valid": false,
+    "set": {
+     "extra": 1
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "missing rules",
+    "valid": false,
+    "delete": [
+     "rules"
+    ],
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "missing next_offset",
+    "valid": false,
+    "delete": [
+     "next_offset"
+    ],
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "rules is null",
+    "valid": false,
+    "set": {
+     "rules": null
+    },
+    "jsonschema_rejects": true
+   }
+  ]
+ },
+ "alert_rule_detail_response": {
+  "base": {
+   "state": "ok",
+   "rule": {
+    "id": "alert-rule-5a6b7c8d-1e2f-4a3b-9c4d-5e6f7a8b9c0d",
+    "name": "After-hours large upload",
+    "status": "draft",
+    "scope": {
+     "kind": "device_group",
+     "ref": "staff-workstations"
+    },
+    "condition": {
+     "metric": "traffic.upload_bytes",
+     "operator": "gt",
+     "threshold": 1000000000,
+     "pattern": null
+    },
+    "baseline_mode": "none",
+    "window_seconds": 900,
+    "for_seconds": 0,
+    "cooldown_seconds": 3600,
+    "schedule": {
+     "timezone": "Africa/Windhoek",
+     "active": [
+      {
+       "weekdays": [
+        "mon",
+        "tue",
+        "wed",
+        "thu",
+        "fri"
+       ],
+       "from": "20:00",
+       "to": "06:00"
+      }
+     ]
+    },
+    "exceptions": {
+     "destinations": [
+      "approved-backup",
+      "microsoft-update"
+     ],
+     "device_groups": [
+      "backup-servers",
+      "cctv"
+     ]
+    },
+    "severity": "high",
+    "labels": {
+     "team": "network"
+    },
+    "actions": [
+     "create_alert",
+     "email",
+     "push"
+    ],
+    "incident_policy": "create",
+    "created_by": "identity-ronald",
+    "created_at": "2026-10-08T08:00:00Z",
+    "updated_at": "2026-10-08T08:00:00Z",
+    "approved_by": null,
+    "approved_at": null,
+    "version": 1
+   }
+  },
+  "cases": [
+   {
+    "name": "ok with the rule",
+    "valid": true
+   },
+   {
+    "name": "not-connected carries no rule",
+    "valid": true,
+    "set": {
+     "state": "not-connected",
+     "rule": null
+    }
+   },
+   {
+    "name": "unknown carries no rule",
+    "valid": true,
+    "set": {
+     "state": "unknown",
+     "rule": null
+    }
+   },
+   {
+    "name": "ok without a rule",
+    "valid": false,
+    "set": {
+     "rule": null
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "not-connected with a rule",
+    "valid": false,
+    "set": {
+     "state": "not-connected"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "unknown with a rule",
+    "valid": false,
+    "set": {
+     "state": "unknown"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "state outside the enum",
+    "valid": false,
+    "set": {
+     "state": "missing"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "embedded rule violating the contract",
+    "valid": false,
+    "set": {
+     "rule.severity": "urgent"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "unknown top-level field",
+    "valid": false,
+    "set": {
+     "extra": 1
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "missing rule",
+    "valid": false,
+    "delete": [
+     "rule"
+    ],
+    "jsonschema_rejects": true
+   }
+  ]
+ },
+ "maintenance_window_list_response": {
+  "base": {
+   "state": "ok",
+   "windows": [
+    {
+     "id": "maintenance-0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+     "name": "Core switch firmware upgrade",
+     "scope": {
+      "kind": "site",
+      "ref": "windhoek-hq"
+     },
+     "starts_at": "2026-10-10T22:00:00Z",
+     "ends_at": "2026-10-11T02:00:00Z",
+     "evaluation": "retain",
+     "status": "scheduled",
+     "reason": "Planned firmware upgrade",
+     "created_by": "identity-ronald",
+     "created_at": "2026-10-08T08:00:00Z",
+     "cancelled_by": null,
+     "cancelled_at": null
+    }
+   ],
+   "limit": 50,
+   "offset": 0,
+   "next_offset": null
+  },
+  "cases": [
+   {
+    "name": "ok page with one window",
+    "valid": true
+   },
+   {
+    "name": "ok empty page",
+    "valid": true,
+    "set": {
+     "windows": []
+    }
+   },
+   {
+    "name": "ok page with a continuation offset",
+    "valid": true,
+    "set": {
+     "limit": 1,
+     "next_offset": 1
+    }
+   },
+   {
+    "name": "not-connected is empty",
+    "valid": true,
+    "set": {
+     "state": "not-connected",
+     "windows": []
+    }
+   },
+   {
+    "name": "unknown is empty",
+    "valid": true,
+    "set": {
+     "state": "unknown",
+     "windows": []
+    }
+   },
+   {
+    "name": "not-connected must not carry rows",
+    "valid": false,
+    "set": {
+     "state": "not-connected"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "unknown must not carry rows",
+    "valid": false,
+    "set": {
+     "state": "unknown"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "unknown must not offer a continuation",
+    "valid": false,
+    "set": {
+     "state": "unknown",
+     "windows": [],
+     "next_offset": 50
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "limit zero",
+    "valid": false,
+    "set": {
+     "limit": 0
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "limit above the server cap",
+    "valid": false,
+    "set": {
+     "limit": 101
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "negative offset",
+    "valid": false,
+    "set": {
+     "offset": -1
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "offset above the cap",
+    "valid": false,
+    "set": {
+     "offset": 10001,
+     "windows": []
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "embedded window violating the contract",
+    "valid": false,
+    "set": {
+     "windows.0.status": "active"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "embedded window ending before it starts (cross-field)",
+    "valid": false,
+    "set": {
+     "windows.0.ends_at": "2026-10-10T21:00:00Z"
+    },
+    "jsonschema_rejects": false
+   },
+   {
+    "name": "unknown top-level field",
+    "valid": false,
+    "set": {
+     "extra": 1
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "missing windows",
+    "valid": false,
+    "delete": [
+     "windows"
+    ],
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "missing next_offset",
+    "valid": false,
+    "delete": [
+     "next_offset"
+    ],
+    "jsonschema_rejects": true
+   }
+  ]
+ },
+ "maintenance_window_detail_response": {
+  "base": {
+   "state": "ok",
+   "window": {
+    "id": "maintenance-0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+    "name": "Core switch firmware upgrade",
+    "scope": {
+     "kind": "site",
+     "ref": "windhoek-hq"
+    },
+    "starts_at": "2026-10-10T22:00:00Z",
+    "ends_at": "2026-10-11T02:00:00Z",
+    "evaluation": "retain",
+    "status": "scheduled",
+    "reason": "Planned firmware upgrade",
+    "created_by": "identity-ronald",
+    "created_at": "2026-10-08T08:00:00Z",
+    "cancelled_by": null,
+    "cancelled_at": null
+   }
+  },
+  "cases": [
+   {
+    "name": "ok with the window",
+    "valid": true
+   },
+   {
+    "name": "not-connected carries no window",
+    "valid": true,
+    "set": {
+     "state": "not-connected",
+     "window": null
+    }
+   },
+   {
+    "name": "unknown carries no window",
+    "valid": true,
+    "set": {
+     "state": "unknown",
+     "window": null
+    }
+   },
+   {
+    "name": "ok without a window",
+    "valid": false,
+    "set": {
+     "window": null
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "not-connected with a window",
+    "valid": false,
+    "set": {
+     "state": "not-connected"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "unknown with a window",
+    "valid": false,
+    "set": {
+     "state": "unknown"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "state outside the enum",
+    "valid": false,
+    "set": {
+     "state": "missing"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "embedded window violating the contract",
+    "valid": false,
+    "set": {
+     "window.evaluation": "pause"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "unknown top-level field",
+    "valid": false,
+    "set": {
+     "extra": 1
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "missing window",
+    "valid": false,
+    "delete": [
+     "window"
+    ],
+    "jsonschema_rejects": true
+   }
+  ]
+ },
+ "alert_rule_update_request": {
+  "base": {
+   "expected_version": 1,
+   "definition": {
+    "name": "After-hours large upload",
+    "scope": {
+     "kind": "device_group",
+     "ref": "staff-workstations"
+    },
+    "condition": {
+     "metric": "traffic.upload_bytes",
+     "operator": "gt",
+     "threshold": 1000000000,
+     "pattern": null
+    },
+    "baseline_mode": "none",
+    "window_seconds": 900,
+    "for_seconds": 0,
+    "cooldown_seconds": 3600,
+    "schedule": {
+     "timezone": "Africa/Windhoek",
+     "active": [
+      {
+       "weekdays": [
+        "mon",
+        "tue",
+        "wed",
+        "thu",
+        "fri"
+       ],
+       "from": "20:00",
+       "to": "06:00"
+      }
+     ]
+    },
+    "exceptions": {
+     "destinations": [
+      "approved-backup",
+      "microsoft-update"
+     ],
+     "device_groups": [
+      "backup-servers",
+      "cctv"
+     ]
+    },
+    "severity": "high",
+    "labels": {
+     "team": "network"
+    },
+    "actions": [
+     "create_alert",
+     "email",
+     "push"
+    ],
+    "incident_policy": "create"
+   }
+  },
+  "cases": [
+   {
+    "name": "base update",
+    "valid": true
+   },
+   {
+    "name": "maximum version",
+    "valid": true,
+    "set": {
+     "expected_version": 1000000
+    }
+   },
+   {
+    "name": "version zero",
+    "valid": false,
+    "set": {
+     "expected_version": 0
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "version above maximum",
+    "valid": false,
+    "set": {
+     "expected_version": 1000001
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "version as a string",
+    "valid": false,
+    "set": {
+     "expected_version": "1"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "version as a boolean",
+    "valid": false,
+    "set": {
+     "expected_version": true
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "version as a float",
+    "valid": false,
+    "set": {
+     "expected_version": 1.5
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "missing version",
+    "valid": false,
+    "delete": [
+     "expected_version"
+    ],
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "missing definition",
+    "valid": false,
+    "delete": [
+     "definition"
+    ],
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "definition violating the contract",
+    "valid": false,
+    "set": {
+     "definition.severity": "urgent"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "definition carrying lifecycle fields",
+    "valid": false,
+    "set": {
+     "definition.status": "active"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "unknown top-level field",
+    "valid": false,
+    "set": {
+     "force": true
+    },
+    "jsonschema_rejects": true
+   }
+  ]
+ },
+ "alert_rule_approve_request": {
+  "base": {
+   "expected_version": 3
+  },
+  "cases": [
+   {
+    "name": "base approval",
+    "valid": true
+   },
+   {
+    "name": "maximum version",
+    "valid": true,
+    "set": {
+     "expected_version": 1000000
+    }
+   },
+   {
+    "name": "version zero",
+    "valid": false,
+    "set": {
+     "expected_version": 0
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "negative version",
+    "valid": false,
+    "set": {
+     "expected_version": -1
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "version above maximum",
+    "valid": false,
+    "set": {
+     "expected_version": 1000001
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "version as a string",
+    "valid": false,
+    "set": {
+     "expected_version": "3"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "version as a boolean",
+    "valid": false,
+    "set": {
+     "expected_version": true
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "version null",
+    "valid": false,
+    "set": {
+     "expected_version": null
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "missing version",
+    "valid": false,
+    "delete": [
+     "expected_version"
+    ],
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "unknown field",
+    "valid": false,
+    "set": {
+     "approved_by": "someone-else"
+    },
+    "jsonschema_rejects": true
+   }
+  ]
+ },
+ "maintenance_window_create_request": {
+  "base": {
+   "name": "Core switch firmware upgrade",
+   "scope": {
+    "kind": "site",
+    "ref": "windhoek-hq"
+   },
+   "starts_at": "2026-10-10T22:00:00Z",
+   "ends_at": "2026-10-11T02:00:00Z",
+   "evaluation": "retain",
+   "reason": "Planned firmware upgrade"
+  },
+  "cases": [
+   {
+    "name": "base window",
+    "valid": true
+   },
+   {
+    "name": "evaluation disabled",
+    "valid": true,
+    "set": {
+     "evaluation": "disable"
+    }
+   },
+   {
+    "name": "organisation scope",
+    "valid": true,
+    "set": {
+     "scope": {
+      "kind": "organisation",
+      "ref": "default"
+     }
+    }
+   },
+   {
+    "name": "lifecycle status present",
+    "valid": false,
+    "set": {
+     "status": "scheduled"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "lifecycle id present",
+    "valid": false,
+    "set": {
+     "id": "maintenance-0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "cancellation fields present",
+    "valid": false,
+    "set": {
+     "cancelled_by": "identity-ronald"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "missing reason",
+    "valid": false,
+    "delete": [
+     "reason"
+    ],
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "blank reason",
+    "valid": false,
+    "set": {
+     "reason": "  "
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "empty name",
+    "valid": false,
+    "set": {
+     "name": ""
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "unknown evaluation",
+    "valid": false,
+    "set": {
+     "evaluation": "pause"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "bad scope kind",
+    "valid": false,
+    "set": {
+     "scope.kind": "all"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "missing ends_at",
+    "valid": false,
+    "delete": [
+     "ends_at"
+    ],
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "ends before starts (cross-field)",
+    "valid": false,
+    "set": {
+     "ends_at": "2026-10-10T21:00:00Z"
+    },
+    "jsonschema_rejects": false
+   },
+   {
+    "name": "ends equal starts (cross-field)",
+    "valid": false,
+    "set": {
+     "ends_at": "2026-10-10T22:00:00Z"
+    },
+    "jsonschema_rejects": false
+   },
+   {
+    "name": "longer than 30 days (cross-field)",
+    "valid": false,
+    "set": {
+     "ends_at": "2026-11-20T22:00:00Z"
+    },
+    "jsonschema_rejects": false
+   },
+   {
+    "name": "timestamp without a timezone (format not asserted by the schema)",
+    "valid": false,
+    "set": {
+     "starts_at": "2026-10-10T22:00:00"
+    },
+    "jsonschema_rejects": false
+   },
+   {
+    "name": "timestamp as a number",
+    "valid": false,
+    "set": {
+     "starts_at": 1791669600
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "extra field",
+    "valid": false,
+    "set": {
+     "recurring": true
+    },
+    "jsonschema_rejects": true
+   }
+  ]
+ },
+ "alert_rule_evaluate_request": {
+  "base": {
+   "definition": {
+    "name": "After-hours large upload",
+    "scope": {
+     "kind": "device_group",
+     "ref": "staff-workstations"
+    },
+    "condition": {
+     "metric": "traffic.upload_bytes",
+     "operator": "gt",
+     "threshold": 1000000000,
+     "pattern": null
+    },
+    "baseline_mode": "none",
+    "window_seconds": 900,
+    "for_seconds": 0,
+    "cooldown_seconds": 3600,
+    "schedule": {
+     "timezone": "Africa/Windhoek",
+     "active": [
+      {
+       "weekdays": [
+        "mon",
+        "tue",
+        "wed",
+        "thu",
+        "fri"
+       ],
+       "from": "20:00",
+       "to": "06:00"
+      }
+     ]
+    },
+    "exceptions": {
+     "destinations": [
+      "approved-backup",
+      "microsoft-update"
+     ],
+     "device_groups": [
+      "backup-servers",
+      "cctv"
+     ]
+    },
+    "severity": "high",
+    "labels": {
+     "team": "network"
+    },
+    "actions": [
+     "create_alert",
+     "email",
+     "push"
+    ],
+    "incident_policy": "create"
+   },
+   "observations": [
+    {
+     "at": "2026-10-08T18:30:00Z",
+     "entity": "device-1",
+     "scopes": [
+      {
+       "kind": "device_group",
+       "ref": "staff-workstations"
+      }
+     ],
+     "value": 5000000000,
+     "text": null,
+     "anomaly": null,
+     "destination": "evil.example",
+     "device_groups": [
+      "laptops"
+     ]
+    }
+   ],
+   "windows": []
+  },
+  "cases": [
+   {
+    "name": "single observation",
+    "valid": true
+   },
+   {
+    "name": "with a sample window",
+    "valid": true,
+    "set": {
+     "windows": [
+      {
+       "scope": {
+        "kind": "site",
+        "ref": "windhoek-hq"
+       },
+       "starts_at": "2026-10-08T18:00:00Z",
+       "ends_at": "2026-10-08T20:00:00Z",
+       "evaluation": "retain",
+       "status": "scheduled"
+      }
+     ]
+    }
+   },
+   {
+    "name": "two ascending observations",
+    "valid": true,
+    "set": {
+     "observations": [
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:31:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "text and anomaly observation",
+    "valid": true,
+    "set": {
+     "observations.0.value": null,
+     "observations.0.text": "ssh brute force",
+     "observations.0.anomaly": "above"
+    }
+   },
+   {
+    "name": "no destination",
+    "valid": true,
+    "set": {
+     "observations.0.destination": null
+    }
+   },
+   {
+    "name": "no observations",
+    "valid": false,
+    "set": {
+     "observations": []
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "too many observations",
+    "valid": false,
+    "set": {
+     "observations": [
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      }
+     ]
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "observations not ascending (cross-field)",
+    "valid": false,
+    "set": {
+     "observations": [
+      {
+       "at": "2026-10-08T18:31:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      }
+     ]
+    },
+    "jsonschema_rejects": false
+   },
+   {
+    "name": "duplicate observation time (cross-field)",
+    "valid": false,
+    "set": {
+     "observations": [
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "entity": "device-1",
+       "scopes": [
+        {
+         "kind": "device_group",
+         "ref": "staff-workstations"
+        }
+       ],
+       "value": 5000000000,
+       "text": null,
+       "anomaly": null,
+       "destination": "evil.example",
+       "device_groups": [
+        "laptops"
+       ]
+      }
+     ]
+    },
+    "jsonschema_rejects": false
+   },
+   {
+    "name": "observation without scopes",
+    "valid": false,
+    "set": {
+     "observations.0.scopes": []
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "too many scopes",
+    "valid": false,
+    "set": {
+     "observations.0.scopes": [
+      {
+       "kind": "site",
+       "ref": "s0"
+      },
+      {
+       "kind": "site",
+       "ref": "s1"
+      },
+      {
+       "kind": "site",
+       "ref": "s2"
+      },
+      {
+       "kind": "site",
+       "ref": "s3"
+      },
+      {
+       "kind": "site",
+       "ref": "s4"
+      },
+      {
+       "kind": "site",
+       "ref": "s5"
+      },
+      {
+       "kind": "site",
+       "ref": "s6"
+      },
+      {
+       "kind": "site",
+       "ref": "s7"
+      },
+      {
+       "kind": "site",
+       "ref": "s8"
+      },
+      {
+       "kind": "site",
+       "ref": "s9"
+      },
+      {
+       "kind": "site",
+       "ref": "s10"
+      },
+      {
+       "kind": "site",
+       "ref": "s11"
+      },
+      {
+       "kind": "site",
+       "ref": "s12"
+      },
+      {
+       "kind": "site",
+       "ref": "s13"
+      },
+      {
+       "kind": "site",
+       "ref": "s14"
+      },
+      {
+       "kind": "site",
+       "ref": "s15"
+      },
+      {
+       "kind": "site",
+       "ref": "s16"
+      }
+     ]
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "empty entity",
+    "valid": false,
+    "set": {
+     "observations.0.entity": ""
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "value as a string",
+    "valid": false,
+    "set": {
+     "observations.0.value": "5"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "value above bound",
+    "valid": false,
+    "set": {
+     "observations.0.value": 1000000000000001
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "text above the match limit",
+    "valid": false,
+    "set": {
+     "observations.0.text": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "unknown anomaly",
+    "valid": false,
+    "set": {
+     "observations.0.anomaly": "sideways"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "duplicate device groups",
+    "valid": false,
+    "set": {
+     "observations.0.device_groups": [
+      "a",
+      "a"
+     ]
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "observation missing destination",
+    "valid": false,
+    "delete": [
+     "observations.0.destination"
+    ],
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "observation timestamp without a timezone (format not asserted)",
+    "valid": false,
+    "set": {
+     "observations.0.at": "2026-10-08T18:30:00"
+    },
+    "jsonschema_rejects": false
+   },
+   {
+    "name": "definition violating the contract",
+    "valid": false,
+    "set": {
+     "definition.window_seconds": 1
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "too many sample windows",
+    "valid": false,
+    "set": {
+     "windows": [
+      {
+       "scope": {
+        "kind": "site",
+        "ref": "windhoek-hq"
+       },
+       "starts_at": "2026-10-08T18:00:00Z",
+       "ends_at": "2026-10-08T20:00:00Z",
+       "evaluation": "retain",
+       "status": "scheduled"
+      },
+      {
+       "scope": {
+        "kind": "site",
+        "ref": "windhoek-hq"
+       },
+       "starts_at": "2026-10-08T18:00:00Z",
+       "ends_at": "2026-10-08T20:00:00Z",
+       "evaluation": "retain",
+       "status": "scheduled"
+      },
+      {
+       "scope": {
+        "kind": "site",
+        "ref": "windhoek-hq"
+       },
+       "starts_at": "2026-10-08T18:00:00Z",
+       "ends_at": "2026-10-08T20:00:00Z",
+       "evaluation": "retain",
+       "status": "scheduled"
+      },
+      {
+       "scope": {
+        "kind": "site",
+        "ref": "windhoek-hq"
+       },
+       "starts_at": "2026-10-08T18:00:00Z",
+       "ends_at": "2026-10-08T20:00:00Z",
+       "evaluation": "retain",
+       "status": "scheduled"
+      },
+      {
+       "scope": {
+        "kind": "site",
+        "ref": "windhoek-hq"
+       },
+       "starts_at": "2026-10-08T18:00:00Z",
+       "ends_at": "2026-10-08T20:00:00Z",
+       "evaluation": "retain",
+       "status": "scheduled"
+      },
+      {
+       "scope": {
+        "kind": "site",
+        "ref": "windhoek-hq"
+       },
+       "starts_at": "2026-10-08T18:00:00Z",
+       "ends_at": "2026-10-08T20:00:00Z",
+       "evaluation": "retain",
+       "status": "scheduled"
+      },
+      {
+       "scope": {
+        "kind": "site",
+        "ref": "windhoek-hq"
+       },
+       "starts_at": "2026-10-08T18:00:00Z",
+       "ends_at": "2026-10-08T20:00:00Z",
+       "evaluation": "retain",
+       "status": "scheduled"
+      },
+      {
+       "scope": {
+        "kind": "site",
+        "ref": "windhoek-hq"
+       },
+       "starts_at": "2026-10-08T18:00:00Z",
+       "ends_at": "2026-10-08T20:00:00Z",
+       "evaluation": "retain",
+       "status": "scheduled"
+      },
+      {
+       "scope": {
+        "kind": "site",
+        "ref": "windhoek-hq"
+       },
+       "starts_at": "2026-10-08T18:00:00Z",
+       "ends_at": "2026-10-08T20:00:00Z",
+       "evaluation": "retain",
+       "status": "scheduled"
+      },
+      {
+       "scope": {
+        "kind": "site",
+        "ref": "windhoek-hq"
+       },
+       "starts_at": "2026-10-08T18:00:00Z",
+       "ends_at": "2026-10-08T20:00:00Z",
+       "evaluation": "retain",
+       "status": "scheduled"
+      },
+      {
+       "scope": {
+        "kind": "site",
+        "ref": "windhoek-hq"
+       },
+       "starts_at": "2026-10-08T18:00:00Z",
+       "ends_at": "2026-10-08T20:00:00Z",
+       "evaluation": "retain",
+       "status": "scheduled"
+      },
+      {
+       "scope": {
+        "kind": "site",
+        "ref": "windhoek-hq"
+       },
+       "starts_at": "2026-10-08T18:00:00Z",
+       "ends_at": "2026-10-08T20:00:00Z",
+       "evaluation": "retain",
+       "status": "scheduled"
+      },
+      {
+       "scope": {
+        "kind": "site",
+        "ref": "windhoek-hq"
+       },
+       "starts_at": "2026-10-08T18:00:00Z",
+       "ends_at": "2026-10-08T20:00:00Z",
+       "evaluation": "retain",
+       "status": "scheduled"
+      },
+      {
+       "scope": {
+        "kind": "site",
+        "ref": "windhoek-hq"
+       },
+       "starts_at": "2026-10-08T18:00:00Z",
+       "ends_at": "2026-10-08T20:00:00Z",
+       "evaluation": "retain",
+       "status": "scheduled"
+      },
+      {
+       "scope": {
+        "kind": "site",
+        "ref": "windhoek-hq"
+       },
+       "starts_at": "2026-10-08T18:00:00Z",
+       "ends_at": "2026-10-08T20:00:00Z",
+       "evaluation": "retain",
+       "status": "scheduled"
+      },
+      {
+       "scope": {
+        "kind": "site",
+        "ref": "windhoek-hq"
+       },
+       "starts_at": "2026-10-08T18:00:00Z",
+       "ends_at": "2026-10-08T20:00:00Z",
+       "evaluation": "retain",
+       "status": "scheduled"
+      },
+      {
+       "scope": {
+        "kind": "site",
+        "ref": "windhoek-hq"
+       },
+       "starts_at": "2026-10-08T18:00:00Z",
+       "ends_at": "2026-10-08T20:00:00Z",
+       "evaluation": "retain",
+       "status": "scheduled"
+      },
+      {
+       "scope": {
+        "kind": "site",
+        "ref": "windhoek-hq"
+       },
+       "starts_at": "2026-10-08T18:00:00Z",
+       "ends_at": "2026-10-08T20:00:00Z",
+       "evaluation": "retain",
+       "status": "scheduled"
+      },
+      {
+       "scope": {
+        "kind": "site",
+        "ref": "windhoek-hq"
+       },
+       "starts_at": "2026-10-08T18:00:00Z",
+       "ends_at": "2026-10-08T20:00:00Z",
+       "evaluation": "retain",
+       "status": "scheduled"
+      },
+      {
+       "scope": {
+        "kind": "site",
+        "ref": "windhoek-hq"
+       },
+       "starts_at": "2026-10-08T18:00:00Z",
+       "ends_at": "2026-10-08T20:00:00Z",
+       "evaluation": "retain",
+       "status": "scheduled"
+      },
+      {
+       "scope": {
+        "kind": "site",
+        "ref": "windhoek-hq"
+       },
+       "starts_at": "2026-10-08T18:00:00Z",
+       "ends_at": "2026-10-08T20:00:00Z",
+       "evaluation": "retain",
+       "status": "scheduled"
+      }
+     ]
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "sample window with an unknown status",
+    "valid": false,
+    "set": {
+     "windows": [
+      {
+       "scope": {
+        "kind": "site",
+        "ref": "windhoek-hq"
+       },
+       "starts_at": "2026-10-08T18:00:00Z",
+       "ends_at": "2026-10-08T20:00:00Z",
+       "evaluation": "retain",
+       "status": "active"
+      }
+     ]
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "sample window ending before it starts (cross-field)",
+    "valid": false,
+    "set": {
+     "windows": [
+      {
+       "scope": {
+        "kind": "site",
+        "ref": "windhoek-hq"
+       },
+       "starts_at": "2026-10-08T18:00:00Z",
+       "ends_at": "2026-10-08T17:00:00Z",
+       "evaluation": "retain",
+       "status": "scheduled"
+      }
+     ]
+    },
+    "jsonschema_rejects": false
+   },
+   {
+    "name": "sample window longer than 30 days (cross-field)",
+    "valid": false,
+    "set": {
+     "windows": [
+      {
+       "scope": {
+        "kind": "site",
+        "ref": "windhoek-hq"
+       },
+       "starts_at": "2026-10-08T18:00:00Z",
+       "ends_at": "2026-12-08T18:00:00Z",
+       "evaluation": "retain",
+       "status": "scheduled"
+      }
+     ]
+    },
+    "jsonschema_rejects": false
+   },
+   {
+    "name": "missing windows",
+    "valid": false,
+    "delete": [
+     "windows"
+    ],
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "unknown top-level field",
+    "valid": false,
+    "set": {
+     "persist": true
+    },
+    "jsonschema_rejects": true
+   }
+  ]
+ },
+ "alert_rule_evaluate_response": {
+  "base": {
+   "valid": true,
+   "problems": [],
+   "results": [
+    {
+     "at": "2026-10-08T18:30:00Z",
+     "outcome": "firing",
+     "phase": "firing",
+     "transition": "fired",
+     "notify": true,
+     "blocked_by": null,
+     "maintenance_windows": []
+    }
+   ]
+  },
+  "cases": [
+   {
+    "name": "firing and notified",
+    "valid": true
+   },
+   {
+    "name": "blocked by maintenance",
+    "valid": true,
+    "set": {
+     "results.0.notify": false,
+     "results.0.blocked_by": "maintenance",
+     "results.0.maintenance_windows": [
+      0
+     ]
+    }
+   },
+   {
+    "name": "blocked by cooldown",
+    "valid": true,
+    "set": {
+     "results.0.notify": false,
+     "results.0.blocked_by": "cooldown"
+    }
+   },
+   {
+    "name": "resolved",
+    "valid": true,
+    "set": {
+     "results.0.outcome": "not-met",
+     "results.0.phase": "inactive",
+     "results.0.transition": "resolved",
+     "results.0.notify": false
+    }
+   },
+   {
+    "name": "no results for an empty run",
+    "valid": true,
+    "set": {
+     "results": []
+    }
+   },
+   {
+    "name": "invalid configuration carries problems and no results",
+    "valid": true,
+    "set": {
+     "valid": false,
+     "problems": [
+      {
+       "code": "SCHEDULE_TIMEZONE_UNKNOWN",
+       "field": "schedule.timezone"
+      }
+     ],
+     "results": []
+    }
+   },
+   {
+    "name": "valid with problems",
+    "valid": false,
+    "set": {
+     "problems": [
+      {
+       "code": "X",
+       "field": "f"
+      }
+     ]
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "invalid without problems",
+    "valid": false,
+    "set": {
+     "valid": false,
+     "results": []
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "invalid with results",
+    "valid": false,
+    "set": {
+     "valid": false,
+     "problems": [
+      {
+       "code": "X",
+       "field": "f"
+      }
+     ]
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "unknown outcome",
+    "valid": false,
+    "set": {
+     "results.0.outcome": "exploded"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "unknown phase",
+    "valid": false,
+    "set": {
+     "results.0.phase": "sleeping"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "unknown transition",
+    "valid": false,
+    "set": {
+     "results.0.transition": "paused"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "unknown blocked_by",
+    "valid": false,
+    "set": {
+     "results.0.blocked_by": "weather"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "notify as a string",
+    "valid": false,
+    "set": {
+     "results.0.notify": "yes"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "maintenance index negative",
+    "valid": false,
+    "set": {
+     "results.0.maintenance_windows": [
+      -1
+     ]
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "maintenance index too large",
+    "valid": false,
+    "set": {
+     "results.0.maintenance_windows": [
+      20
+     ]
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "duplicate maintenance indexes",
+    "valid": false,
+    "set": {
+     "results.0.maintenance_windows": [
+      1,
+      1
+     ]
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "problem code lower-case",
+    "valid": false,
+    "set": {
+     "valid": false,
+     "problems": [
+      {
+       "code": "x",
+       "field": "f"
+      }
+     ],
+     "results": []
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "too many results",
+    "valid": false,
+    "set": {
+     "results": [
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      },
+      {
+       "at": "2026-10-08T18:30:00Z",
+       "outcome": "firing",
+       "phase": "firing",
+       "transition": "fired",
+       "notify": true,
+       "blocked_by": null,
+       "maintenance_windows": []
+      }
+     ]
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "result missing blocked_by",
+    "valid": false,
+    "delete": [
+     "results.0.blocked_by"
+    ],
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "unknown top-level field",
+    "valid": false,
+    "set": {
+     "extra": 1
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "missing problems",
+    "valid": false,
+    "delete": [
+     "problems"
+    ],
+    "jsonschema_rejects": true
+   }
+  ]
  }
 }

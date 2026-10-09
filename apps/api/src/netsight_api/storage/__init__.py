@@ -7,6 +7,7 @@ Import the PostgreSQL implementation explicitly from
 from netsight_api.storage.errors import (
     IllegalTransitionError,
     InvalidOperationError,
+    LimitExceededError,
     NotFoundError,
     ScopeViolationError,
     StorageConfigurationError,
@@ -24,6 +25,7 @@ __all__ = [
     "InMemoryIncidentRepository",
     "IncidentRepository",
     "InvalidOperationError",
+    "LimitExceededError",
     "NotFoundError",
     "NoteKind",
     "ScopeViolationError",

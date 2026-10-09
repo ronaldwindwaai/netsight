@@ -7,5 +7,6 @@ export const menuItems: MenuNode[] = [
   { type: 'item', text: 'Devices', href: '/devices', icon: 'bi-hdd-network' },
   { type: 'item', text: 'Traffic', href: '/traffic', icon: 'bi-bar-chart-line' },
   { type: 'item', text: 'Security', href: '/security', icon: 'bi-shield-exclamation' },
+  { type: 'item', text: 'Incidents', href: '/incidents', icon: 'bi-exclamation-triangle' },
   { type: 'item', text: 'Alerts', href: '/alerts', icon: 'bi-bell' },
 ];

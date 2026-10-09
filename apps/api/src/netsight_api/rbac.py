@@ -25,6 +25,14 @@ class Permission(StrEnum):
     INCIDENTS_REOPEN = "incidents:reopen"
     # RBAC-MATRIX "Assigned": progress / comment / evidence on incidents assigned to the caller.
     INCIDENTS_WRITE_ASSIGNED = "incidents:write-assigned"
+    # Alert rules and maintenance windows (RBAC-MATRIX 'Alert rules'); every write is human-only.
+    ALERT_RULES_READ = "alert-rules:read"
+    ALERT_RULES_WRITE = "alert-rules:write"  # create / edit a draft
+    ALERT_RULES_APPROVE = "alert-rules:approve"  # activation of the reviewed version
+    ALERT_RULES_DISABLE = "alert-rules:disable"
+    MAINTENANCE_READ = "maintenance:read"
+    MAINTENANCE_WRITE = "maintenance:write"  # create / cancel a window below organisation scope
+    MAINTENANCE_WRITE_ORGANISATION = "maintenance:write-organisation"  # silences everything
     TRAFFIC_READ = "traffic:read"
     SECURITY_READ = "security:read"
     DIAGNOSTICS_READ = "diagnostics:read"
@@ -46,7 +54,16 @@ class PrincipalKind(StrEnum):
 # Permissions that record a human judgement. No service or AI principal may hold them,
 # whatever role it carries: an AI-proposed root cause must be accepted by an operator.
 HUMAN_ONLY_PERMISSIONS: frozenset[Permission] = frozenset(
-    {Permission.INCIDENTS_RESOLVE, Permission.INCIDENTS_REOPEN}
+    {
+        Permission.INCIDENTS_RESOLVE,
+        Permission.INCIDENTS_REOPEN,
+        # Monitoring configuration is never altered by an AI or service principal (AGENTS.md).
+        Permission.ALERT_RULES_WRITE,
+        Permission.ALERT_RULES_APPROVE,
+        Permission.ALERT_RULES_DISABLE,
+        Permission.MAINTENANCE_WRITE,
+        Permission.MAINTENANCE_WRITE_ORGANISATION,
+    }
 )
 
 _INCIDENT_FULL = {
@@ -56,6 +73,18 @@ _INCIDENT_FULL = {
     Permission.INCIDENTS_RESOLVE,
     Permission.INCIDENTS_REOPEN,
 }
+
+# "Scoped" in RBAC-MATRIX for Network Engineer / Security Analyst. Site scoping does not exist
+# yet, so they author drafts, disable and schedule site-level maintenance, but cannot approve
+# (activate) a rule or silence the whole organisation.
+_ALERTING_AUTHOR = {
+    Permission.ALERT_RULES_READ,
+    Permission.ALERT_RULES_WRITE,
+    Permission.ALERT_RULES_DISABLE,
+    Permission.MAINTENANCE_READ,
+    Permission.MAINTENANCE_WRITE,
+}
+_ALERTING_READ = {Permission.ALERT_RULES_READ, Permission.MAINTENANCE_READ}
 
 
 class Role(StrEnum):
@@ -79,8 +108,12 @@ _ALL_READ = {
 
 ROLE_PERMISSIONS: Mapping[Role, frozenset[Permission]] = {
     Role.ADMINISTRATOR: frozenset(Permission),
-    Role.NETWORK_ENGINEER: frozenset(_ALL_READ | _INCIDENT_FULL | {Permission.ACTIONS_PROPOSE}),
-    Role.SECURITY_ANALYST: frozenset(_ALL_READ | _INCIDENT_FULL | {Permission.ACTIONS_PROPOSE}),
+    Role.NETWORK_ENGINEER: frozenset(
+        _ALL_READ | _INCIDENT_FULL | _ALERTING_AUTHOR | {Permission.ACTIONS_PROPOSE}
+    ),
+    Role.SECURITY_ANALYST: frozenset(
+        _ALL_READ | _INCIDENT_FULL | _ALERTING_AUTHOR | {Permission.ACTIONS_PROPOSE}
+    ),
     Role.TECHNICIAN: frozenset(
         {
             Permission.DEVICES_READ,
@@ -92,7 +125,7 @@ ROLE_PERMISSIONS: Mapping[Role, frozenset[Permission]] = {
         }
     ),
     Role.MANAGEMENT: frozenset(_ALL_READ | {Permission.AUDIT_READ}),
-    Role.AUDITOR: frozenset(_ALL_READ | {Permission.AUDIT_READ}),
+    Role.AUDITOR: frozenset(_ALL_READ | _ALERTING_READ | {Permission.AUDIT_READ}),
 }
 
 

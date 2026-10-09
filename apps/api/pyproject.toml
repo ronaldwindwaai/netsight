@@ -22,6 +22,9 @@ dependencies = [
   "pyjwt[crypto]>=2.10,<3",
   "argon2-cffi>=23.1,<26",
   "qrcode>=8,<9",
+  # IANA zone database for rule schedules; slim images and Windows have no system copy, and
+  # without it scheduled rules fail closed (cannot be saved, approved or evaluated).
+  "tzdata>=2024.1",
 ]
 
 [project.optional-dependencies]
@@ -32,6 +35,9 @@ dev = [
   "mypy>=1.13,<2",
   "types-qrcode>=7.4,<9",
   "pyyaml>=6,<7",
+  # The untrusted-TLS SSRF test builds a throwaway server context and a CA. It arrives
+  # transitively via `pyjwt[crypto]`, but is declared so the test environment is reproducible.
+  "cryptography>=50,<51",
   # Lets the packaging test build the wheel in-process (no network, no uv).
   "hatchling>=1.25",
 ]

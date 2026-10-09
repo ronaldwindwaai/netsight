@@ -56,3 +56,14 @@ The logger still propagates to the root logger: leave the root logger unconfigur
 - Related settings: `NETSIGHT_ALLOWED_ORIGINS` (comma-separated browser origins allowed to make
   cookie-authenticated writes, in addition to the origin of `NETSIGHT_PUBLIC_BASE_URL`; refused
   writes are audited with reason `origin`) and `NETSIGHT_SESSION_ALLOW_SAME_SITE_NONE`.
+
+## Alert-rule and maintenance actions (S6-3)
+
+`alert_rule.create|update|approve|disable` and `maintenance.create|cancel` use the same record shape. `target` is the rule
+or window id (for create, the new id on success and absent on refusal); successes add `version` and `status` (rules),
+`expected_version` (update, approve), and `name_hash`/`name_length` (rule and window names are free text and are never
+logged), plus `scope_kind`, `scope_ref_hash`, `evaluation`, `duration_seconds`, `starts_at` and `reason_length` for
+windows. Extra `reason` codes: `RULE_INVALID`, `organisation-scope` (refusal: an organisation-scope window without
+`maintenance:write-organisation`), `disable-evaluation` (refusal: a window with `evaluation: "disable"` without the same
+permission, whatever its scope — it stops all rule evaluation). `alert_rule.evaluate` (the read-only dry-run) is audited
+only when refused (`permission`, `csrf`, `origin`, `rate-limit`, `busy`).

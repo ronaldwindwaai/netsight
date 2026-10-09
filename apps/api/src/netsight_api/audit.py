@@ -61,6 +61,12 @@ def _bounded_id(value: object) -> object:
     return _clean(value)
 
 
+def bounded_identifier(value: str) -> str:
+    """An identifier for a details field: verbatim when short, hashed (never truncated) when long."""
+    bounded = _bounded_id(value)
+    return bounded if isinstance(bounded, str) else ""
+
+
 def _clean(value: object) -> object:
     if isinstance(value, bool) or value is None or isinstance(value, int | float):
         return value

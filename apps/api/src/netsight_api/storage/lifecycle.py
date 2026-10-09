@@ -31,6 +31,7 @@ from netsight_api.schemas import (
 from netsight_api.storage.errors import (
     IllegalTransitionError,
     InvalidOperationError,
+    LimitExceededError,
     NotFoundError,
     ScopeViolationError,
     StorageConflictError,
@@ -42,6 +43,13 @@ UuidFactory = Callable[[], uuid.UUID]
 
 MAX_REASON_LENGTH = 1000
 MAX_EVIDENCE_IDS = 256
+
+# Capacity caps on monitoring configuration (S6-3 security review H1/M5). Rules and windows are
+# never deleted, so an unbounded creator could grow them without limit and, with windows, bury
+# the legitimate ones. Enforced inside the store call (under a lock), read at call time.
+MAX_RULES = 2000
+MAX_LIVE_WINDOWS = 500  # scheduled (not cancelled) and not yet ended, in total
+MAX_LIVE_WINDOWS_PER_SCOPE = 20  # the same, per (scope kind, scope reference)
 
 # Each state advances to exactly one successor. Resolved/closed may be reopened
 # (to "open") with an audited reason; nothing else moves backwards.
@@ -386,6 +394,52 @@ def new_window(
         cancelled_by=None,
         cancelled_at=None,
     )
+
+
+def check_rule_capacity(rule_count: int) -> None:
+    if rule_count >= MAX_RULES:
+        raise LimitExceededError("the alert-rule limit is reached")
+
+
+def check_window_capacity(*, live_total: int, live_in_scope: int) -> None:
+    """``live_*`` count scheduled windows that have not ended, before the new one is added."""
+    if live_total >= MAX_LIVE_WINDOWS or live_in_scope >= MAX_LIVE_WINDOWS_PER_SCOPE:
+        raise LimitExceededError("the maintenance-window limit is reached")
+
+
+def window_is_live(window: MaintenanceWindow, now: datetime) -> bool:
+    return window.status == "scheduled" and window.ends_at > now
+
+
+def require_window_scope(window: MaintenanceWindow, *, organisation_allowed: bool) -> None:
+    """Organisation-wide windows may only be cancelled with the organisation permission.
+
+    Judged on the locked row, before the state rule, like the incident assignee scope.
+    """
+    if window.scope.kind == "organisation" and not organisation_allowed:
+        raise ScopeViolationError("the window has organisation scope")
+
+
+def require_window_creation_scope(
+    definition: MaintenanceWindowDefinition, *, organisation_allowed: bool
+) -> None:
+    """Defence in depth for window creation, judged on the immutable definition.
+
+    The route already refuses with a specific audit reason; this closes the gap for any
+    future call path (scheduler, CLI, refactor) that reaches the repository directly.
+    Unlike the cancel path (``require_window_scope``), this reads only the caller-supplied
+    definition, which cannot change under us, so no row lock is needed: the in-memory store
+    calls it under its lock, PostgreSQL checks it before opening the transaction, and both
+    agree because the check is deterministic.
+    An organisation-scope window silences everything and ``disable`` evaluation stops rules
+    from running entirely, so both need ``organisation_allowed`` whatever the scope kind.
+    """
+    if organisation_allowed:
+        return
+    if definition.scope.kind == "organisation":
+        raise ScopeViolationError("the window has organisation scope")
+    if definition.evaluation == "disable":
+        raise ScopeViolationError("the window disables evaluation")
 
 
 def cancelled_window(

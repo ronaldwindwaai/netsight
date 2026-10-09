@@ -5,7 +5,13 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import Annotated, Literal
 
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
+from pydantic import (
+    AwareDatetime,
+    BaseModel,
+    ConfigDict,
+    Field,
+    model_validator,
+)
 
 DeviceStatus = Literal[
     "healthy",

@@ -963,3 +963,100 @@ def test_window_paging_is_bounded(stores: Stores) -> None:
         stores.rules.list_windows(limit=0)
     with pytest.raises(ValueError):
         stores.rules.list_windows(offset=-1)
+
+
+# --- capacity caps and organisation-scope cancellation ------------------------------------
+
+
+def test_live_windows_per_scope_are_capped_and_cancelled_or_ended_ones_do_not_count(
+    stores: Stores, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from netsight_api.storage import LimitExceededError, lifecycle
+
+    monkeypatch.setattr(lifecycle, "MAX_LIVE_WINDOWS_PER_SCOPE", 2)
+    first = stores.rules.create_window(window_definition(), actor_id="u")
+    stores.rules.create_window(window_definition(), actor_id="u")
+    with pytest.raises(LimitExceededError):
+        stores.rules.create_window(window_definition(), actor_id="u")
+    # Another scope reference, and the same reference under another kind, have their own budget.
+    stores.rules.create_window(window_definition(scope={"kind": "site", "ref": "b"}), actor_id="u")
+    stores.rules.create_window(
+        window_definition(scope={"kind": "device", "ref": "windhoek-hq"}), actor_id="u"
+    )
+    stores.rules.cancel_window(first.id, actor_id="u")
+    stores.rules.create_window(window_definition(), actor_id="u")
+    with pytest.raises(LimitExceededError):
+        stores.rules.create_window(window_definition(), actor_id="u")
+    # A window that has already ended (before the store clock) frees its slot as well.
+    ended = {"starts_at": "2026-10-07T01:00:00Z", "ends_at": "2026-10-07T02:00:00Z"}
+    stores.rules.create_window(
+        window_definition(scope={"kind": "site", "ref": "past"}, **ended), actor_id="u"
+    )
+    stores.rules.create_window(
+        window_definition(scope={"kind": "site", "ref": "past"}, **ended), actor_id="u"
+    )
+    stores.rules.create_window(
+        window_definition(scope={"kind": "site", "ref": "past"}, **ended), actor_id="u"
+    )
+
+
+def test_total_live_windows_and_total_rules_are_capped(
+    stores: Stores, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from netsight_api.storage import LimitExceededError, lifecycle
+
+    monkeypatch.setattr(lifecycle, "MAX_LIVE_WINDOWS", 2)
+    monkeypatch.setattr(lifecycle, "MAX_RULES", 2)
+    for ref in ("a", "b"):
+        stores.rules.create_window(
+            window_definition(scope={"kind": "site", "ref": ref}), actor_id="u"
+        )
+    with pytest.raises(LimitExceededError):
+        stores.rules.create_window(
+            window_definition(scope={"kind": "site", "ref": "c"}), actor_id="u"
+        )
+    stores.rules.create_rule(rule_definition(), actor_id="u")
+    stores.rules.create_rule(rule_definition(), actor_id="u")
+    with pytest.raises(LimitExceededError):
+        stores.rules.create_rule(rule_definition(), actor_id="u")
+    assert len(stores.rules.list_rules()) == 2
+
+
+def test_organisation_windows_are_cancelled_only_with_the_organisation_permission(
+    stores: Stores,
+) -> None:
+    organisation = {"kind": "organisation", "ref": "default"}
+    window = stores.rules.create_window(
+        window_definition(scope=organisation), actor_id="u", organisation_allowed=True
+    )
+    with pytest.raises(ScopeViolationError):
+        stores.rules.cancel_window(window.id, actor_id="u-2")
+    with pytest.raises(ScopeViolationError):
+        stores.rules.cancel_window(window.id, actor_id="u-2", organisation_allowed=False)
+    assert stores.rules.get_window(window.id).status == "scheduled"  # type: ignore[union-attr]
+    cancelled = stores.rules.cancel_window(window.id, actor_id="u-2", organisation_allowed=True)
+    assert cancelled.status == "cancelled"
+    site = stores.rules.create_window(window_definition(), actor_id="u")
+    assert stores.rules.cancel_window(site.id, actor_id="u-2").status == "cancelled"
+
+
+def test_window_creation_scope_is_denied_by_default(stores: Stores) -> None:
+    """Defence in depth: organisation scope and ``disable`` evaluation need the permission
+    inside the store, not only in the route."""
+    organisation = {"kind": "organisation", "ref": "default"}
+    with pytest.raises(ScopeViolationError):
+        stores.rules.create_window(window_definition(scope=organisation), actor_id="u")
+    with pytest.raises(ScopeViolationError):
+        stores.rules.create_window(window_definition(evaluation="disable"), actor_id="u")
+    assert stores.rules.list_windows() == []  # nothing was inserted
+
+    org_window = stores.rules.create_window(
+        window_definition(scope=organisation), actor_id="u", organisation_allowed=True
+    )
+    assert org_window.scope.kind == "organisation"
+    disable_window = stores.rules.create_window(
+        window_definition(evaluation="disable"), actor_id="u", organisation_allowed=True
+    )
+    assert disable_window.evaluation == "disable"
+    # A site-scope window that retains evaluation needs no permission at all.
+    assert stores.rules.create_window(window_definition(), actor_id="u").status == "scheduled"

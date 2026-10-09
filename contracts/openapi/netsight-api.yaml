@@ -979,6 +979,452 @@ paths:
           $ref: '#/components/responses/ValidationError'
         '503':
           $ref: '#/components/responses/StoreUnavailable'
+  /alert-rules:
+    get:
+      summary: List alert rules (newest first; explicit store state)
+      operationId: listAlertRules
+      parameters:
+      - in: query
+        name: status
+        schema:
+          enum:
+          - draft
+          - active
+          - disabled
+      - in: query
+        name: limit
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 50
+      - in: query
+        name: offset
+        schema:
+          type: integer
+          minimum: 0
+          maximum: 10000
+          default: 0
+      responses:
+        '200':
+          description: Rule page, or an explicit not-connected/unknown state without rows
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertRuleListResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    post:
+      summary: Create a draft alert rule (never active until approved)
+      operationId: createAlertRule
+      parameters:
+      - in: header
+        name: X-CSRF-Token
+        required: true
+        description: Session CSRF token from GET /auth/csrf. Required for cookie-authenticated writes.
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AlertRuleDefinition'
+      responses:
+        '201':
+          description: The new draft rule
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertRule'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '409':
+          $ref: '#/components/responses/AlertingConflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/AlertingStoreUnavailable'
+  /alert-rules/evaluate:
+    post:
+      summary: Dry-run a rule definition over supplied observations (read-only, no external effect)
+      operationId: evaluateAlertRule
+      parameters:
+      - in: header
+        name: X-CSRF-Token
+        required: true
+        description: Session CSRF token from GET /auth/csrf. Required for cookie-authenticated writes.
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AlertRuleEvaluateRequest'
+      responses:
+        '200':
+          description: One engine decision per observation, or valid=false with problems
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertRuleEvaluateResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/AlertingBusy'
+  /alert-rules/{rule_id}:
+    get:
+      summary: Get one alert rule (explicit store state)
+      operationId: getAlertRule
+      parameters:
+      - in: path
+        name: rule_id
+        required: true
+        schema:
+          type: string
+          minLength: 47
+          maxLength: 47
+          pattern: ^alert-rule-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+      responses:
+        '200':
+          description: The rule, or an explicit not-connected/unknown state without it
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertRuleDetailResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '404':
+          $ref: '#/components/responses/AlertingNotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    put:
+      summary: Replace a draft or disabled rule's definition (optimistic, expected_version)
+      operationId: updateAlertRule
+      parameters:
+      - in: path
+        name: rule_id
+        required: true
+        schema:
+          type: string
+          minLength: 47
+          maxLength: 47
+          pattern: ^alert-rule-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+      - in: header
+        name: X-CSRF-Token
+        required: true
+        description: Session CSRF token from GET /auth/csrf. Required for cookie-authenticated writes.
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AlertRuleUpdateRequest'
+      responses:
+        '200':
+          description: The updated draft rule
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertRule'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '404':
+          $ref: '#/components/responses/AlertingNotFound'
+        '409':
+          $ref: '#/components/responses/AlertingConflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/AlertingStoreUnavailable'
+  /alert-rules/{rule_id}/approve:
+    post:
+      summary: Approve (activate) the reviewed version of a rule
+      operationId: approveAlertRule
+      parameters:
+      - in: path
+        name: rule_id
+        required: true
+        schema:
+          type: string
+          minLength: 47
+          maxLength: 47
+          pattern: ^alert-rule-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+      - in: header
+        name: X-CSRF-Token
+        required: true
+        description: Session CSRF token from GET /auth/csrf. Required for cookie-authenticated writes.
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AlertRuleApproveRequest'
+      responses:
+        '200':
+          description: The active rule
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertRule'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '404':
+          $ref: '#/components/responses/AlertingNotFound'
+        '409':
+          $ref: '#/components/responses/AlertingConflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/AlertingStoreUnavailable'
+  /alert-rules/{rule_id}/disable:
+    post:
+      summary: Disable an active rule
+      operationId: disableAlertRule
+      parameters:
+      - in: path
+        name: rule_id
+        required: true
+        schema:
+          type: string
+          minLength: 47
+          maxLength: 47
+          pattern: ^alert-rule-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+      - in: header
+        name: X-CSRF-Token
+        required: true
+        description: Session CSRF token from GET /auth/csrf. Required for cookie-authenticated writes.
+        schema:
+          type: string
+      responses:
+        '200':
+          description: The disabled rule
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertRule'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '404':
+          $ref: '#/components/responses/AlertingNotFound'
+        '409':
+          $ref: '#/components/responses/AlertingConflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/AlertingStoreUnavailable'
+  /maintenance-windows:
+    get:
+      summary: List maintenance windows (explicit store state)
+      operationId: listMaintenanceWindows
+      parameters:
+      - in: query
+        name: active
+        schema:
+          type: boolean
+          default: false
+        description: Only windows active at the server clock.
+      - in: query
+        name: include_cancelled
+        schema:
+          type: boolean
+          default: false
+      - in: query
+        name: limit
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 50
+      - in: query
+        name: offset
+        schema:
+          type: integer
+          minimum: 0
+          maximum: 10000
+          default: 0
+      responses:
+        '200':
+          description: Window page, or an explicit not-connected/unknown state without rows
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaintenanceWindowListResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    post:
+      summary: Schedule a maintenance window
+      operationId: createMaintenanceWindow
+      parameters:
+      - in: header
+        name: X-CSRF-Token
+        required: true
+        description: Session CSRF token from GET /auth/csrf. Required for cookie-authenticated writes.
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MaintenanceWindowCreateRequest'
+      responses:
+        '201':
+          description: The scheduled window
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaintenanceWindow'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '409':
+          $ref: '#/components/responses/AlertingConflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/AlertingStoreUnavailable'
+  /maintenance-windows/{window_id}:
+    get:
+      summary: Get one maintenance window (explicit store state)
+      operationId: getMaintenanceWindow
+      parameters:
+      - in: path
+        name: window_id
+        required: true
+        schema:
+          type: string
+          minLength: 48
+          maxLength: 48
+          pattern: ^maintenance-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+      responses:
+        '200':
+          description: The window, or an explicit not-connected/unknown state without it
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaintenanceWindowDetailResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '404':
+          $ref: '#/components/responses/AlertingNotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /maintenance-windows/{window_id}/cancel:
+    post:
+      summary: Cancel a scheduled maintenance window
+      operationId: cancelMaintenanceWindow
+      parameters:
+      - in: path
+        name: window_id
+        required: true
+        schema:
+          type: string
+          minLength: 48
+          maxLength: 48
+          pattern: ^maintenance-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+      - in: header
+        name: X-CSRF-Token
+        required: true
+        description: Session CSRF token from GET /auth/csrf. Required for cookie-authenticated writes.
+        schema:
+          type: string
+      responses:
+        '200':
+          description: The cancelled window
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaintenanceWindow'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '404':
+          $ref: '#/components/responses/AlertingNotFound'
+        '409':
+          $ref: '#/components/responses/AlertingConflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/AlertingStoreUnavailable'
   /diagnostics:
     post:
       summary: Start an approved read-only diagnostic workflow
@@ -2300,6 +2746,556 @@ components:
               type: 'null'
             cancelled_at:
               type: 'null'
+    AlertRuleDefinition:
+      description: 'Operator-editable rule fields: the body of a create request and the definition of an update
+        or dry-run. Lifecycle and audit fields (id, status, version, created_*, approved_*) are server-owned
+        and rejected here. A new rule is always a draft; it becomes active only through the approve operation.'
+      type: object
+      additionalProperties: false
+      required:
+      - name
+      - scope
+      - condition
+      - baseline_mode
+      - window_seconds
+      - for_seconds
+      - cooldown_seconds
+      - schedule
+      - exceptions
+      - severity
+      - labels
+      - actions
+      - incident_policy
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+          pattern: \S
+        scope:
+          $ref: '#/components/schemas/AlertScope'
+        condition:
+          $ref: '#/components/schemas/AlertCondition'
+        baseline_mode:
+          description: 'none: compare against the threshold only; otherwise compare against the baseline detector
+            output (AnomalySignal) in the given direction.'
+          enum:
+          - none
+          - above-baseline
+          - below-baseline
+          - outside-baseline
+        window_seconds:
+          description: Aggregation window the condition is evaluated over.
+          type: integer
+          minimum: 60
+          maximum: 86400
+        for_seconds:
+          description: Duration the condition must hold before firing (debounce); 0 fires immediately.
+          type: integer
+          minimum: 0
+          maximum: 86400
+        cooldown_seconds:
+          type: integer
+          minimum: 0
+          maximum: 604800
+        schedule:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/AlertSchedule'
+        exceptions:
+          $ref: '#/components/schemas/AlertExceptions'
+        severity:
+          enum:
+          - info
+          - low
+          - medium
+          - high
+          - critical
+        labels:
+          type: object
+          maxProperties: 32
+          propertyNames:
+            pattern: ^[a-z][a-z0-9_]{0,62}$
+          additionalProperties:
+            type: string
+            maxLength: 128
+        actions:
+          description: Rule actions. These only create alerts and notifications; remote write actions go through
+            the action framework, never through a rule.
+          type: array
+          minItems: 1
+          maxItems: 3
+          uniqueItems: true
+          items:
+            enum:
+            - create_alert
+            - email
+            - push
+        incident_policy:
+          enum:
+          - none
+          - create
+          - group
+    AlertRuleListResponse:
+      description: One page of alert rules, newest first. Paging is a server-capped offset (limit 1-100, offset
+        0-10000); next_offset is null on the last page. not-connected and unknown never carry rows or a cursor.
+      type: object
+      additionalProperties: false
+      required:
+      - state
+      - rules
+      - limit
+      - offset
+      - next_offset
+      properties:
+        state:
+          enum:
+          - not-connected
+          - ok
+          - unknown
+        rules:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/AlertRule'
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 100
+        offset:
+          type: integer
+          minimum: 0
+          maximum: 10000
+        next_offset:
+          type:
+          - integer
+          - 'null'
+          minimum: 1
+          maximum: 10000
+      allOf:
+      - if:
+          properties:
+            state:
+              enum:
+              - not-connected
+              - unknown
+          required:
+          - state
+        then:
+          properties:
+            rules:
+              maxItems: 0
+            next_offset:
+              type: 'null'
+    AlertRuleDetailResponse:
+      description: One alert rule. rule is non-null exactly when state is ok; an unknown id is a 404, not
+        a state.
+      type: object
+      additionalProperties: false
+      required:
+      - state
+      - rule
+      properties:
+        state:
+          enum:
+          - not-connected
+          - ok
+          - unknown
+        rule:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/AlertRule'
+      allOf:
+      - if:
+          properties:
+            state:
+              const: ok
+          required:
+          - state
+        then:
+          properties:
+            rule:
+              type: object
+        else:
+          properties:
+            rule:
+              type: 'null'
+    AlertRuleUpdateRequest:
+      description: 'Replace the definition of a draft or disabled rule. expected_version is the version the
+        editor loaded; the edit is refused with 409 when the stored version differs, and an active rule must
+        be disabled first. An edit always returns the rule to draft: it must be approved again.'
+      type: object
+      additionalProperties: false
+      required:
+      - expected_version
+      - definition
+      properties:
+        expected_version:
+          type: integer
+          minimum: 1
+          maximum: 1000000
+        definition:
+          $ref: '#/components/schemas/AlertRuleDefinition'
+    AlertRuleApproveRequest:
+      description: Approve (activate) exactly the version the reviewer saw. A rule changed since then is refused
+        with 409; an invalid rule is refused with 422 and stays inactive.
+      type: object
+      additionalProperties: false
+      required:
+      - expected_version
+      properties:
+        expected_version:
+          type: integer
+          minimum: 1
+          maximum: 1000000
+    MaintenanceWindowListResponse:
+      description: One page of maintenance windows ordered by start time. Same paging and not-connected/unknown
+        rules as the rule list.
+      type: object
+      additionalProperties: false
+      required:
+      - state
+      - windows
+      - limit
+      - offset
+      - next_offset
+      properties:
+        state:
+          enum:
+          - not-connected
+          - ok
+          - unknown
+        windows:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/MaintenanceWindow'
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 100
+        offset:
+          type: integer
+          minimum: 0
+          maximum: 10000
+        next_offset:
+          type:
+          - integer
+          - 'null'
+          minimum: 1
+          maximum: 10000
+      allOf:
+      - if:
+          properties:
+            state:
+              enum:
+              - not-connected
+              - unknown
+          required:
+          - state
+        then:
+          properties:
+            windows:
+              maxItems: 0
+            next_offset:
+              type: 'null'
+    MaintenanceWindowDetailResponse:
+      description: One maintenance window. window is non-null exactly when state is ok.
+      type: object
+      additionalProperties: false
+      required:
+      - state
+      - window
+      properties:
+        state:
+          enum:
+          - not-connected
+          - ok
+          - unknown
+        window:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/MaintenanceWindow'
+      allOf:
+      - if:
+          properties:
+            state:
+              const: ok
+          required:
+          - state
+        then:
+          properties:
+            window:
+              type: object
+        else:
+          properties:
+            window:
+              type: 'null'
+    MaintenanceWindowCreateRequest:
+      description: 'Schedule a maintenance window. Cross-field rules not expressible in JSON Schema and enforced
+        by the API models and the browser parser: ends_at must be after starts_at, at most 30 days later,
+        ends_at must be in the future and starts_at at most one year ahead. A window with organisation scope
+        needs a separate permission.'
+      type: object
+      additionalProperties: false
+      required:
+      - name
+      - scope
+      - starts_at
+      - ends_at
+      - evaluation
+      - reason
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+          pattern: \S
+        scope:
+          $ref: '#/components/schemas/AlertScope'
+        starts_at:
+          type: string
+          format: date-time
+        ends_at:
+          type: string
+          format: date-time
+        evaluation:
+          enum:
+          - retain
+          - disable
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 1000
+          pattern: \S
+    AlertRuleEvaluateObservation:
+      description: One reading of one monitored entity. All text is untrusted data used only for comparison.
+      type: object
+      additionalProperties: false
+      required:
+      - at
+      - entity
+      - scopes
+      - value
+      - text
+      - anomaly
+      - destination
+      - device_groups
+      properties:
+        at:
+          type: string
+          format: date-time
+        entity:
+          type: string
+          minLength: 1
+          maxLength: 255
+        scopes:
+          description: Every scope the entity belongs to; the rule only sees entities inside its own scope.
+          type: array
+          minItems: 1
+          maxItems: 16
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/AlertScope'
+        value:
+          type:
+          - number
+          - 'null'
+          minimum: -1000000000000000
+          maximum: 1000000000000000
+        text:
+          type:
+          - string
+          - 'null'
+          maxLength: 4096
+        anomaly:
+          enum:
+          - above
+          - below
+          - normal
+          - null
+        destination:
+          type:
+          - string
+          - 'null'
+          minLength: 1
+          maxLength: 255
+        device_groups:
+          type: array
+          maxItems: 16
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+            maxLength: 128
+    AlertRuleEvaluateWindow:
+      description: A sample maintenance window supplied for the dry-run (nothing is read from the store).
+        ends_at must be after starts_at and at most 30 days later (API models and parser).
+      type: object
+      additionalProperties: false
+      required:
+      - scope
+      - starts_at
+      - ends_at
+      - evaluation
+      - status
+      properties:
+        scope:
+          $ref: '#/components/schemas/AlertScope'
+        starts_at:
+          type: string
+          format: date-time
+        ends_at:
+          type: string
+          format: date-time
+        evaluation:
+          enum:
+          - retain
+          - disable
+        status:
+          enum:
+          - scheduled
+          - cancelled
+    AlertRuleEvaluateRequest:
+      description: 'Replay observations through a rule definition at fixed times, with no external effect:
+        nothing is stored, sent or created. Observations must be in strictly ascending time order (API models
+        and parser); each is judged at its own timestamp, so schedules, maintenance windows, for and cooldown
+        are all derived from the supplied times. The combined length of all observation text is at most 262144
+        characters (API models and parser).'
+      type: object
+      additionalProperties: false
+      required:
+      - definition
+      - observations
+      - windows
+      properties:
+        definition:
+          $ref: '#/components/schemas/AlertRuleDefinition'
+        observations:
+          type: array
+          minItems: 1
+          maxItems: 200
+          items:
+            $ref: '#/components/schemas/AlertRuleEvaluateObservation'
+        windows:
+          type: array
+          maxItems: 20
+          items:
+            $ref: '#/components/schemas/AlertRuleEvaluateWindow'
+    AlertRuleEvaluateProblem:
+      description: A static configuration problem code and the contract field it concerns.
+      type: object
+      additionalProperties: false
+      required:
+      - code
+      - field
+      properties:
+        code:
+          type: string
+          minLength: 1
+          maxLength: 64
+          pattern: ^[A-Z0-9_]+$
+        field:
+          type: string
+          minLength: 1
+          maxLength: 64
+    AlertRuleEvaluateResult:
+      description: The engine decision for one observation. notify means a notification would be released;
+        blocked_by says why a firing alert was not notified. maintenance_windows are indexes into the supplied
+        windows.
+      type: object
+      additionalProperties: false
+      required:
+      - at
+      - outcome
+      - phase
+      - transition
+      - notify
+      - blocked_by
+      - maintenance_windows
+      properties:
+        at:
+          type: string
+          format: date-time
+        outcome:
+          enum:
+          - firing
+          - pending
+          - not-met
+          - excepted
+          - outside-schedule
+          - no-data
+          - out-of-scope
+          - stale
+          - future
+          - maintenance-disabled
+          - invalid-config
+          - rule-not-active
+        phase:
+          enum:
+          - inactive
+          - pending
+          - firing
+        transition:
+          enum:
+          - fired
+          - resolved
+          - null
+        notify:
+          type: boolean
+        blocked_by:
+          enum:
+          - maintenance
+          - cooldown
+          - null
+        maintenance_windows:
+          type: array
+          maxItems: 20
+          uniqueItems: true
+          items:
+            type: integer
+            minimum: 0
+            maximum: 19
+    AlertRuleEvaluateResponse:
+      description: 'Dry-run verdict. valid is false when the definition cannot be evaluated here (fail closed):
+        problems then lists why and results is empty. Otherwise problems is empty and results holds one decision
+        per observation, in order. The dry-run is read-only.'
+      type: object
+      additionalProperties: false
+      required:
+      - valid
+      - problems
+      - results
+      properties:
+        valid:
+          type: boolean
+        problems:
+          type: array
+          maxItems: 8
+          items:
+            $ref: '#/components/schemas/AlertRuleEvaluateProblem'
+        results:
+          type: array
+          maxItems: 200
+          items:
+            $ref: '#/components/schemas/AlertRuleEvaluateResult'
+      allOf:
+      - if:
+          properties:
+            valid:
+              const: true
+          required:
+          - valid
+        then:
+          properties:
+            problems:
+              maxItems: 0
+        else:
+          properties:
+            problems:
+              minItems: 1
+            results:
+              maxItems: 0
     DeviceListResponse:
       type: object
       additionalProperties: false
@@ -2480,6 +3476,55 @@ components:
             $ref: '#/components/schemas/ErrorEnvelope'
     StoreUnavailable:
       description: Incident storage is not connected or temporarily unavailable
+      headers:
+        X-Correlation-ID:
+          $ref: '#/components/headers/CorrelationId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    AlertingNotFound:
+      description: Alert rule or maintenance window not found
+      headers:
+        X-Correlation-ID:
+          $ref: '#/components/headers/CorrelationId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    AlertingConflict:
+      description: The record was changed concurrently, is in a state that does not allow this change, the
+        supplied version is stale, or a configuration limit was reached (code LIMIT_REACHED, fixed message)
+      headers:
+        X-Correlation-ID:
+          $ref: '#/components/headers/CorrelationId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    AlertingBusy:
+      description: Too many dry-runs are in progress (code EVALUATE_BUSY, fixed message); retry shortly
+      headers:
+        X-Correlation-ID:
+          $ref: '#/components/headers/CorrelationId'
+        Retry-After:
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    AlertingStoreUnavailable:
+      description: Alert-rule storage is not connected or temporarily unavailable
+      headers:
+        X-Correlation-ID:
+          $ref: '#/components/headers/CorrelationId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    RateLimited:
+      description: Write rate limit exceeded
       headers:
         X-Correlation-ID:
           $ref: '#/components/headers/CorrelationId'

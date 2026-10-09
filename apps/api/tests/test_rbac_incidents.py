@@ -66,8 +66,14 @@ def test_legacy_coarse_write_permission_is_gone() -> None:
     assert not is_allowed(person("administrator"), "incidents:write")
 
 
-def test_resolve_and_reopen_are_the_human_only_permissions() -> None:
-    assert HUMAN_ONLY_PERMISSIONS == {Permission.INCIDENTS_RESOLVE, Permission.INCIDENTS_REOPEN}
+def test_resolve_and_reopen_are_human_only_permissions() -> None:
+    # S6-3 added the alert-rule and maintenance writes (test_rbac_alerting.py pins those).
+    assert {Permission.INCIDENTS_RESOLVE, Permission.INCIDENTS_REOPEN} <= HUMAN_ONLY_PERMISSIONS
+    incident_permissions = {p for p in Permission if p.value.startswith("incidents:")}
+    assert HUMAN_ONLY_PERMISSIONS & incident_permissions == {
+        Permission.INCIDENTS_RESOLVE,
+        Permission.INCIDENTS_REOPEN,
+    }
 
 
 @pytest.mark.parametrize("kind", [PrincipalKind.SERVICE, PrincipalKind.AI])

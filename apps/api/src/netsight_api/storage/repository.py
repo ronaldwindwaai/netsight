@@ -124,7 +124,9 @@ class IncidentRepository(Protocol):
 
 
 class AlertRuleRepository(Protocol):
-    def create_rule(self, definition: AlertRuleDefinition, *, actor_id: str) -> AlertRule: ...
+    def create_rule(self, definition: AlertRuleDefinition, *, actor_id: str) -> AlertRule:
+        """``LimitExceededError`` once ``lifecycle.MAX_RULES`` rules exist (checked under a lock)."""
+        ...
 
     def get_rule(self, rule_id: str) -> AlertRule | None: ...
 
@@ -156,8 +158,20 @@ class AlertRuleRepository(Protocol):
         ...
 
     def create_window(
-        self, definition: MaintenanceWindowDefinition, *, actor_id: str
-    ) -> MaintenanceWindow: ...
+        self,
+        definition: MaintenanceWindowDefinition,
+        *,
+        actor_id: str,
+        organisation_allowed: bool = False,
+    ) -> MaintenanceWindow:
+        """``LimitExceededError`` when live windows (scheduled, not ended) would exceed the
+        per-scope or total cap in ``lifecycle``; counted and inserted under one lock.
+
+        Without ``organisation_allowed`` an organisation-scope window or an ``evaluation =
+        "disable"`` window is refused with ``ScopeViolationError`` (deny by default): the
+        routes check the same conditions with a specific audit reason, so this is defence
+        in depth for any other call path that reaches the repository directly."""
+        ...
 
     def get_window(self, window_id: str) -> MaintenanceWindow | None: ...
 
@@ -170,4 +184,9 @@ class AlertRuleRepository(Protocol):
         offset: int = 0,
     ) -> list[MaintenanceWindow]: ...
 
-    def cancel_window(self, window_id: str, *, actor_id: str) -> MaintenanceWindow: ...
+    def cancel_window(
+        self, window_id: str, *, actor_id: str, organisation_allowed: bool = False
+    ) -> MaintenanceWindow:
+        """Without ``organisation_allowed`` an organisation-scope window is refused with
+        ``ScopeViolationError``, judged on the locked row (deny by default)."""
+        ...

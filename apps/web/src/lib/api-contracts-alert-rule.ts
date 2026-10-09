@@ -9,6 +9,7 @@ import {
   isText,
   parseArray,
   textItem,
+  type UnknownRecord,
 } from './contract-guards.ts';
 
 export const ALERT_SCOPE_KINDS = [
@@ -172,7 +173,7 @@ function isNullableTimestamp(value: unknown): value is string | null {
   return value === null || isTimestamp(value);
 }
 
-function parseScope(value: unknown): AlertScope | null {
+export function parseScope(value: unknown): AlertScope | null {
   if (!isPlainRecord(value) || !hasExactKeys(value, SCOPE_KEYS)) return null;
   if (!isOneOf(value.kind, ALERT_SCOPE_KINDS) || !isText(value.ref, 1, 255)) return null;
   return { kind: value.kind, ref: value.ref };
@@ -265,8 +266,40 @@ function parseLabels(value: unknown): Record<string, string> | null {
   return labels;
 }
 
-export function parseAlertRule(value: unknown): AlertRule | null {
-  if (!isPlainRecord(value) || !hasExactKeys(value, RULE_KEYS)) return null;
+/** Operator-editable fields of a rule (everything but lifecycle and audit). */
+export interface AlertRuleDefinition {
+  name: string;
+  scope: AlertScope;
+  condition: AlertCondition;
+  baseline_mode: BaselineMode;
+  window_seconds: number;
+  for_seconds: number;
+  cooldown_seconds: number;
+  schedule: AlertSchedule | null;
+  exceptions: AlertExceptions;
+  severity: AlertSeverity;
+  labels: Record<string, string>;
+  actions: AlertAction[];
+  incident_policy: IncidentPolicy;
+}
+
+const DEFINITION_KEYS = [
+  'name',
+  'scope',
+  'condition',
+  'baseline_mode',
+  'window_seconds',
+  'for_seconds',
+  'cooldown_seconds',
+  'schedule',
+  'exceptions',
+  'severity',
+  'labels',
+  'actions',
+  'incident_policy',
+] as const;
+
+function parseDefinitionFields(value: UnknownRecord): AlertRuleDefinition | null {
   const scope = parseScope(value.scope);
   const condition = parseCondition(value.condition);
   const schedule = value.schedule === null ? null : parseSchedule(value.schedule);
@@ -280,10 +313,7 @@ export function parseAlertRule(value: unknown): AlertRule | null {
     true,
   );
   if (
-    typeof value.id !== 'string' ||
-    !RULE_ID.test(value.id) ||
     !isNonBlankText(value.name, 255) ||
-    !isOneOf(value.status, ALERT_RULE_STATUSES) ||
     scope === null ||
     condition === null ||
     !isOneOf(value.baseline_mode, BASELINE_MODES) ||
@@ -295,7 +325,41 @@ export function parseAlertRule(value: unknown): AlertRule | null {
     !isOneOf(value.severity, ALERT_SEVERITIES) ||
     labels === null ||
     actions === null ||
-    !isOneOf(value.incident_policy, INCIDENT_POLICIES) ||
+    !isOneOf(value.incident_policy, INCIDENT_POLICIES)
+  ) {
+    return null;
+  }
+  return {
+    name: value.name,
+    scope,
+    condition,
+    baseline_mode: value.baseline_mode,
+    window_seconds: value.window_seconds,
+    for_seconds: value.for_seconds,
+    cooldown_seconds: value.cooldown_seconds,
+    schedule,
+    exceptions,
+    severity: value.severity,
+    labels,
+    actions,
+    incident_policy: value.incident_policy,
+  };
+}
+
+/** Exactly the definition fields: lifecycle or audit fields make it invalid (fail closed). */
+export function parseAlertRuleDefinition(value: unknown): AlertRuleDefinition | null {
+  if (!isPlainRecord(value) || !hasExactKeys(value, DEFINITION_KEYS)) return null;
+  return parseDefinitionFields(value);
+}
+
+export function parseAlertRule(value: unknown): AlertRule | null {
+  if (!isPlainRecord(value) || !hasExactKeys(value, RULE_KEYS)) return null;
+  const definition = parseDefinitionFields(value);
+  if (
+    definition === null ||
+    typeof value.id !== 'string' ||
+    !RULE_ID.test(value.id) ||
+    !isOneOf(value.status, ALERT_RULE_STATUSES) ||
     !isText(value.created_by, 1, 255) ||
     !isTimestamp(value.created_at) ||
     !isTimestamp(value.updated_at) ||
@@ -311,20 +375,8 @@ export function parseAlertRule(value: unknown): AlertRule | null {
   if (value.status === 'draft' && value.approved_by !== null) return null;
   return {
     id: value.id,
-    name: value.name,
     status: value.status,
-    scope,
-    condition,
-    baseline_mode: value.baseline_mode,
-    window_seconds: value.window_seconds,
-    for_seconds: value.for_seconds,
-    cooldown_seconds: value.cooldown_seconds,
-    schedule,
-    exceptions,
-    severity: value.severity,
-    labels,
-    actions,
-    incident_policy: value.incident_policy,
+    ...definition,
     created_by: value.created_by,
     created_at: value.created_at,
     updated_at: value.updated_at,

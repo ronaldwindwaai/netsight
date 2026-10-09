@@ -210,6 +210,7 @@ class InMemoryAlertRuleRepository:
 
     def create_rule(self, definition: AlertRuleDefinition, *, actor_id: str) -> AlertRule:
         with self._lock:
+            lifecycle.check_rule_capacity(len(self._rules))
             rule = lifecycle.new_rule(
                 definition, rule_uuid=self._new_uuid(), actor_id=actor_id, now=self._clock()
             )
@@ -267,11 +268,24 @@ class InMemoryAlertRuleRepository:
             return updated.model_copy(deep=True)
 
     def create_window(
-        self, definition: MaintenanceWindowDefinition, *, actor_id: str
+        self,
+        definition: MaintenanceWindowDefinition,
+        *,
+        actor_id: str,
+        organisation_allowed: bool = False,
     ) -> MaintenanceWindow:
         with self._lock:
+            lifecycle.require_window_creation_scope(
+                definition, organisation_allowed=organisation_allowed
+            )
+            now = self._clock()
+            live = [w for w in self._windows.values() if lifecycle.window_is_live(w, now)]
+            lifecycle.check_window_capacity(
+                live_total=len(live),
+                live_in_scope=sum(1 for w in live if w.scope == definition.scope),
+            )
             window = lifecycle.new_window(
-                definition, window_uuid=self._new_uuid(), actor_id=actor_id, now=self._clock()
+                definition, window_uuid=self._new_uuid(), actor_id=actor_id, now=now
             )
             self._windows[window.id] = window
             return window.model_copy(deep=True)
@@ -302,9 +316,12 @@ class InMemoryAlertRuleRepository:
             rows.sort(key=lambda w: (w.starts_at, w.id))
             return [w.model_copy(deep=True) for w in rows[offset : offset + limit]]
 
-    def cancel_window(self, window_id: str, *, actor_id: str) -> MaintenanceWindow:
+    def cancel_window(
+        self, window_id: str, *, actor_id: str, organisation_allowed: bool = False
+    ) -> MaintenanceWindow:
         with self._lock:
             current = lifecycle.require_found(self._windows.get(window_id), "maintenance window")
+            lifecycle.require_window_scope(current, organisation_allowed=organisation_allowed)
             updated = lifecycle.cancelled_window(current, actor_id=actor_id, now=self._clock())
             self._windows[window_id] = updated
             return updated.model_copy(deep=True)

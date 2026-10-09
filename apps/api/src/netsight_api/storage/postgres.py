@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import datetime
 from typing import Any
 
@@ -295,6 +295,17 @@ _INSERT_WINDOW = (
     "reason, created_by, created_at, cancelled_by, cancelled_at) "
     "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
 )
+# Serialises the count-then-insert of the capacity caps; any role may take an advisory lock.
+_LOCK_RULE_CREATION = "SELECT pg_advisory_xact_lock(hashtextextended('netsight.alert_rules', 0))"
+_LOCK_WINDOW_CREATION = (
+    "SELECT pg_advisory_xact_lock(hashtextextended('netsight.maintenance_windows', 0))"
+)
+_COUNT_RULES = "SELECT count(*) AS n FROM alert_rules"
+_COUNT_LIVE_WINDOWS = (
+    "SELECT count(*) AS n, "
+    "count(*) FILTER (WHERE scope = %(scope)s) AS in_scope FROM maintenance_windows "
+    "WHERE status = 'scheduled' AND ends_at > %(now)s"
+)
 _UPDATE_WINDOW_CANCELLED = (
     "UPDATE maintenance_windows SET status = %s, cancelled_by = %s, cancelled_at = %s WHERE id = %s"
 )
@@ -574,6 +585,8 @@ class PostgresAlertRuleRepository:
             definition, rule_uuid=rule_uuid, actor_id=actor_id, now=self._clock()
         )
         with self._settings.session() as conn:
+            conn.execute(_LOCK_RULE_CREATION)
+            lifecycle.check_rule_capacity(self._count(conn, _COUNT_RULES, {}))
             conn.execute(_INSERT_RULE, _rule_params(rule, rule_uuid))
         return rule
 
@@ -634,13 +647,29 @@ class PostgresAlertRuleRepository:
             return updated
 
     def create_window(
-        self, definition: MaintenanceWindowDefinition, *, actor_id: str
+        self,
+        definition: MaintenanceWindowDefinition,
+        *,
+        actor_id: str,
+        organisation_allowed: bool = False,
     ) -> MaintenanceWindow:
+        lifecycle.require_window_creation_scope(
+            definition, organisation_allowed=organisation_allowed
+        )
         window_uuid = self._new_uuid()
+        now = self._clock()
         window = lifecycle.new_window(
-            definition, window_uuid=window_uuid, actor_id=actor_id, now=self._clock()
+            definition, window_uuid=window_uuid, actor_id=actor_id, now=now
         )
         with self._settings.session() as conn:
+            conn.execute(_LOCK_WINDOW_CREATION)
+            counts = conn.execute(
+                _COUNT_LIVE_WINDOWS, {"scope": _dump(window.scope), "now": now}
+            ).fetchone()
+            lifecycle.check_window_capacity(
+                live_total=0 if counts is None else int(counts["n"]),
+                live_in_scope=0 if counts is None else int(counts["in_scope"]),
+            )
             conn.execute(
                 _INSERT_WINDOW,
                 (
@@ -689,7 +718,9 @@ class PostgresAlertRuleRepository:
             rows = conn.execute(statement, params).fetchall()
         return [_window_from_row(row) for row in rows]
 
-    def cancel_window(self, window_id: str, *, actor_id: str) -> MaintenanceWindow:
+    def cancel_window(
+        self, window_id: str, *, actor_id: str, organisation_allowed: bool = False
+    ) -> MaintenanceWindow:
         window_uuid = lifecycle.parse_id("maintenance", window_id)
         if window_uuid is None:
             raise NotFoundError("maintenance window not found")
@@ -697,14 +728,19 @@ class PostgresAlertRuleRepository:
             row = _one(conn, _SELECT_WINDOW_LOCKED, (window_uuid,))
             if row is None:
                 raise NotFoundError("maintenance window not found")
-            updated = lifecycle.cancelled_window(
-                _window_from_row(row), actor_id=actor_id, now=self._clock()
-            )
+            current = _window_from_row(row)
+            lifecycle.require_window_scope(current, organisation_allowed=organisation_allowed)
+            updated = lifecycle.cancelled_window(current, actor_id=actor_id, now=self._clock())
             conn.execute(
                 _UPDATE_WINDOW_CANCELLED,
                 (updated.status, updated.cancelled_by, updated.cancelled_at, window_uuid),
             )
             return updated
+
+    @staticmethod
+    def _count(conn: Connection, statement: str, params: Mapping[str, object]) -> int:
+        row = conn.execute(statement, params).fetchone()
+        return 0 if row is None else int(row["n"])
 
     def _lock_rule(self, conn: Connection, rule_id: str) -> tuple[uuid.UUID, AlertRule]:
         rule_uuid = lifecycle.parse_id("alert-rule", rule_id)

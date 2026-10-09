@@ -2,9 +2,14 @@ import Link from 'next/link';
 import { AppContent, Card } from '@adminlte/react';
 
 import { AlertTable } from '@/components/alert-table';
+import { AlertRulesCard, MaintenanceWindowsCard } from '@/components/alerting-sections';
 import { DataFailure, FreshnessNotice } from '@/components/data-state';
 import { apiGet } from '@/lib/api';
 import { parseAlertList } from '@/lib/api-contracts';
+import { parseAlertRuleListResponse, parseMaintenanceWindowListResponse } from '@/lib/api-contracts-alert-rule-api';
+import { alertingListPath, parseAlertingOffsets } from '@/lib/alerting-view';
+import { formatUtcTimestamp } from '@/lib/format-time';
+import type { RawQuery } from '@/lib/incident-view';
 
 const PAGE_SIZE = 50;
 
@@ -18,22 +23,34 @@ function requestedPage(value: string | string[] | undefined): number {
 export default async function AlertsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string | string[] }>;
+  searchParams: Promise<RawQuery>;
 }) {
-  const page = requestedPage((await searchParams).page);
+  const query = await searchParams;
+  const page = requestedPage(query.page);
+  const offsets = parseAlertingOffsets(query);
+  const nowMs = new Date().getTime();
+  const [rules, windows] = await Promise.all([
+    apiGet(alertingListPath('rules', offsets.rules), parseAlertRuleListResponse),
+    apiGet(alertingListPath('windows', offsets.windows), parseMaintenanceWindowListResponse),
+  ]);
+  const paging = { offsets, alertsPage: page };
   const state = await apiGet(
     `/api/v1/alerts?page=${page}&page_size=${PAGE_SIZE}`,
     parseAlertList,
   );
+  const retrievedAt = formatUtcTimestamp(new Date().toISOString());
 
   return (
     <AppContent title="Alerts" breadcrumbs={[{ label: 'Alerts' }]}>
       <div className="page-intro">
         <p className="text-body-secondary mb-0">
-          Read-only alerts mapped from LibreNMS into the canonical Netsight contract.
+          Read-only alerts mapped from LibreNMS, plus the alert rules and maintenance windows
+          held by Netsight. Rule and window names, labels and reasons are operator-entered text
+          and are displayed as data only.
         </p>
       </div>
 
+      <h2 className="h5">Source alerts</h2>
       {state.kind !== 'ok' ? (
         <DataFailure state={state} />
       ) : (
@@ -85,6 +102,16 @@ export default async function AlertsPage({
           )}
         </>
       )}
+
+      <div className="mt-4">
+        <AlertRulesCard state={rules} paging={paging} retrievedAt={retrievedAt} />
+        <MaintenanceWindowsCard
+          state={windows}
+          paging={paging}
+          nowMs={nowMs}
+          retrievedAt={retrievedAt}
+        />
+      </div>
     </AppContent>
   );
 }

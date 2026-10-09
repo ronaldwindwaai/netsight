@@ -19,7 +19,7 @@ import pytest
 import yaml  # type: ignore[import-untyped]
 from pydantic import BaseModel, ValidationError
 
-from netsight_api import schemas
+from netsight_api import schemas, schemas_alerting
 from netsight_api.contracts import SCHEMA_DIR, ContractViolation, validate
 
 REPO_ROOT = SCHEMA_DIR.parents[1]
@@ -63,6 +63,57 @@ ENTITIES: dict[str, tuple[str, type[BaseModel], str]] = {
         "maintenance_window",
         schemas.MaintenanceWindow,
         "MaintenanceWindow",
+    ),
+    # S6-3: /alert-rules and /maintenance-windows envelopes and request bodies.
+    "alert_rule_definition": (
+        "alert_rule_definition",
+        schemas.AlertRuleDefinition,
+        "AlertRuleDefinition",
+    ),
+    "alert_rule_list_response": (
+        "alert_rule_list",
+        schemas_alerting.AlertRuleListResponse,
+        "AlertRuleListResponse",
+    ),
+    "alert_rule_detail_response": (
+        "alert_rule_detail",
+        schemas_alerting.AlertRuleDetailResponse,
+        "AlertRuleDetailResponse",
+    ),
+    "maintenance_window_list_response": (
+        "maintenance_window_list",
+        schemas_alerting.MaintenanceWindowListResponse,
+        "MaintenanceWindowListResponse",
+    ),
+    "maintenance_window_detail_response": (
+        "maintenance_window_detail",
+        schemas_alerting.MaintenanceWindowDetailResponse,
+        "MaintenanceWindowDetailResponse",
+    ),
+    "alert_rule_update_request": (
+        "alert_rule_update_request",
+        schemas_alerting.AlertRuleUpdateRequest,
+        "AlertRuleUpdateRequest",
+    ),
+    "alert_rule_approve_request": (
+        "alert_rule_approve_request",
+        schemas_alerting.AlertRuleApproveRequest,
+        "AlertRuleApproveRequest",
+    ),
+    "maintenance_window_create_request": (
+        "maintenance_window_create_request",
+        schemas_alerting.MaintenanceWindowCreateRequest,
+        "MaintenanceWindowCreateRequest",
+    ),
+    "alert_rule_evaluate_request": (
+        "alert_rule_evaluate_request",
+        schemas_alerting.AlertRuleEvaluateRequest,
+        "AlertRuleEvaluateRequest",
+    ),
+    "alert_rule_evaluate_response": (
+        "alert_rule_evaluate_response",
+        schemas_alerting.AlertRuleEvaluateResponse,
+        "AlertRuleEvaluateResponse",
     ),
 }
 
@@ -169,6 +220,19 @@ DEF_TO_COMPONENT = {
         "incident.schema.json": "Incident",
         "incident.schema.json#/$defs/timelineEvent": "IncidentTimelineEvent",
     },
+    "alert-rule-api.schema.json": {
+        "#/$defs/ruleDefinition": "AlertRuleDefinition",
+        "#/$defs/evaluateObservation": "AlertRuleEvaluateObservation",
+        "#/$defs/evaluateWindow": "AlertRuleEvaluateWindow",
+        "#/$defs/evaluateProblem": "AlertRuleEvaluateProblem",
+        "#/$defs/evaluateResult": "AlertRuleEvaluateResult",
+        "alert-rule.schema.json": "AlertRule",
+        "alert-rule.schema.json#/$defs/scope": "AlertScope",
+        "alert-rule.schema.json#/$defs/condition": "AlertCondition",
+        "alert-rule.schema.json#/$defs/schedule": "AlertSchedule",
+        "alert-rule.schema.json#/$defs/exceptions": "AlertExceptions",
+        "alert-rule.schema.json#/$defs/maintenanceWindow": "MaintenanceWindow",
+    },
     "alert-rule.schema.json": {
         "#/$defs/scope": "AlertScope",
         "#/$defs/condition": "AlertCondition",
@@ -199,6 +263,20 @@ SCHEMA_PAIRS: list[tuple[str, str | None, str]] = [
     ("alert-rule.schema.json", "scheduleEntry", "AlertScheduleEntry"),
     ("alert-rule.schema.json", "exceptions", "AlertExceptions"),
     ("alert-rule.schema.json", "maintenanceWindow", "MaintenanceWindow"),
+    ("alert-rule-api.schema.json", "ruleDefinition", "AlertRuleDefinition"),
+    ("alert-rule-api.schema.json", "ruleListResponse", "AlertRuleListResponse"),
+    ("alert-rule-api.schema.json", "ruleDetailResponse", "AlertRuleDetailResponse"),
+    ("alert-rule-api.schema.json", "ruleUpdateRequest", "AlertRuleUpdateRequest"),
+    ("alert-rule-api.schema.json", "ruleApproveRequest", "AlertRuleApproveRequest"),
+    ("alert-rule-api.schema.json", "windowListResponse", "MaintenanceWindowListResponse"),
+    ("alert-rule-api.schema.json", "windowDetailResponse", "MaintenanceWindowDetailResponse"),
+    ("alert-rule-api.schema.json", "windowCreateRequest", "MaintenanceWindowCreateRequest"),
+    ("alert-rule-api.schema.json", "evaluateObservation", "AlertRuleEvaluateObservation"),
+    ("alert-rule-api.schema.json", "evaluateWindow", "AlertRuleEvaluateWindow"),
+    ("alert-rule-api.schema.json", "evaluateRequest", "AlertRuleEvaluateRequest"),
+    ("alert-rule-api.schema.json", "evaluateProblem", "AlertRuleEvaluateProblem"),
+    ("alert-rule-api.schema.json", "evaluateResult", "AlertRuleEvaluateResult"),
+    ("alert-rule-api.schema.json", "evaluateResponse", "AlertRuleEvaluateResponse"),
 ]
 _DROPPED_KEYS = {"$schema", "title", "description", "$defs"}
 _ORDER_INSENSITIVE = {"required", "enum"}
@@ -257,11 +335,30 @@ def test_every_openapi_component_in_this_slice_is_paired() -> None:
     assert declared == paired
 
 
-def test_alert_rule_and_maintenance_routes_do_not_exist_yet() -> None:
-    # Incident routes arrived in S6-2; alert-rule and maintenance routes are S6-3.
-    for path in OPENAPI["paths"]:
-        if path.startswith(("/alert-rules", "/maintenance")):
-            pytest.fail(f"unexpected route {path} before S6-3")
+def test_alert_rule_and_maintenance_operations_are_documented_with_every_error_status() -> None:
+    paths = OPENAPI["paths"]
+    write = {"401", "403", "404", "409", "422", "503"}
+    create = {"401", "403", "409", "422", "429", "503"}
+    expectations = {
+        ("/alert-rules", "get"): {"200", "401", "403", "422"},
+        ("/alert-rules", "post"): {"201", *create},
+        ("/alert-rules/evaluate", "post"): {"200", "401", "403", "422", "429"},
+        ("/alert-rules/{rule_id}", "get"): {"200", "401", "403", "404", "422"},
+        ("/alert-rules/{rule_id}", "put"): {"200", *write},
+        ("/alert-rules/{rule_id}/approve", "post"): {"200", *write},
+        ("/alert-rules/{rule_id}/disable", "post"): {"200", *write},
+        ("/maintenance-windows", "get"): {"200", "401", "403", "422"},
+        ("/maintenance-windows", "post"): {"201", *create},
+        ("/maintenance-windows/{window_id}", "get"): {"200", "401", "403", "404", "422"},
+        ("/maintenance-windows/{window_id}/cancel", "post"): {"200", *write},
+    }
+    for (path, method), statuses in expectations.items():
+        assert statuses <= set(paths[path][method]["responses"]), (path, method)
+    documented = {p for p in paths if p.startswith(("/alert-rules", "/maintenance-windows"))}
+    assert documented == {path for path, _ in expectations}
+    # Rules and windows can never be deleted through the API.
+    assert "delete" not in paths["/alert-rules/{rule_id}"]
+    assert "delete" not in paths["/maintenance-windows/{window_id}"]
 
 
 def test_incident_operations_are_documented_with_every_error_status() -> None:

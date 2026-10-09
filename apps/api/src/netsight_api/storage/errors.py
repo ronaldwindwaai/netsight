@@ -24,11 +24,20 @@ class InvalidOperationError(StorageError):
     """The request is well-formed but violates a domain rule (for example no reopen reason)."""
 
 
-class ScopeViolationError(StorageError):
-    """The caller's assigned-incidents-only scope does not cover the locked incident row.
+class LimitExceededError(StorageError):
+    """A configuration capacity cap (rules, live windows) is reached; nothing was written.
 
-    Raised from inside the write, under the same row lock as the change, so a reassignment
-    between authorisation and write cannot be raced (HTTP 403 at the route layer).
+    Raised inside the write, under the same lock as the insert, so concurrent creators cannot
+    jointly exceed a cap (HTTP 409 at the route layer).
+    """
+
+
+class ScopeViolationError(StorageError):
+    """The caller's scope does not cover the locked row (assigned-incidents-only callers on an
+    incident, callers without ``maintenance:write-organisation`` on an organisation window).
+
+    Raised from inside the write, under the same row lock as the change, so a reassignment or
+    scope change between authorisation and write cannot be raced (HTTP 403 at the route layer).
     """
 
 

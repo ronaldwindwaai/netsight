@@ -38,6 +38,16 @@ SCHEMA_FILES = {
     "incident_timeline": "incident-api.schema.json#/$defs/timelineResponse",
     "alert_rule": "alert-rule.schema.json",
     "maintenance_window": "alert-rule.schema.json#/$defs/maintenanceWindow",
+    "alert_rule_definition": "alert-rule-api.schema.json#/$defs/ruleDefinition",
+    "alert_rule_list": "alert-rule-api.schema.json#/$defs/ruleListResponse",
+    "alert_rule_detail": "alert-rule-api.schema.json#/$defs/ruleDetailResponse",
+    "alert_rule_update_request": "alert-rule-api.schema.json#/$defs/ruleUpdateRequest",
+    "alert_rule_approve_request": "alert-rule-api.schema.json#/$defs/ruleApproveRequest",
+    "maintenance_window_list": "alert-rule-api.schema.json#/$defs/windowListResponse",
+    "maintenance_window_detail": "alert-rule-api.schema.json#/$defs/windowDetailResponse",
+    "maintenance_window_create_request": "alert-rule-api.schema.json#/$defs/windowCreateRequest",
+    "alert_rule_evaluate_request": "alert-rule-api.schema.json#/$defs/evaluateRequest",
+    "alert_rule_evaluate_response": "alert-rule-api.schema.json#/$defs/evaluateResponse",
 }
 
 

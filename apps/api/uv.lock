@@ -736,11 +736,13 @@ dependencies = [
     { name = "pyjwt", extra = ["crypto"] },
     { name = "qrcode" },
     { name = "sqlalchemy" },
+    { name = "tzdata" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
 [package.optional-dependencies]
 dev = [
+    { name = "cryptography" },
     { name = "hatchling" },
     { name = "mypy" },
     { name = "pytest" },
@@ -754,6 +756,7 @@ dev = [
 requires-dist = [
     { name = "alembic", specifier = ">=1.13,<2" },
     { name = "argon2-cffi", specifier = ">=23.1,<26" },
+    { name = "cryptography", marker = "extra == 'dev'", specifier = ">=50,<51" },
     { name = "fastapi", specifier = ">=0.115,<1" },
     { name = "hatchling", marker = "extra == 'dev'", specifier = ">=1.25" },
     { name = "httpx", specifier = ">=0.27,<1" },
@@ -770,6 +773,7 @@ requires-dist = [
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.8,<1" },
     { name = "sqlalchemy", specifier = ">=2.0,<3" },
     { name = "types-qrcode", marker = "extra == 'dev'", specifier = ">=7.4,<9" },
+    { name = "tzdata", specifier = ">=2024.1" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.30,<1" },
 ]
 provides-extras = ["dev"]
