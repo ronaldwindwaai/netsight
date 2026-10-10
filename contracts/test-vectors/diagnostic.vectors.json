@@ -1,0 +1,891 @@
+{
+ "diagnostic_finding": {
+  "base": {
+   "statement": "External TCP 443 fails while internal 443 passes",
+   "evidence_ids": [
+    "ev-1"
+   ]
+  },
+  "cases": [
+   {
+    "name": "base finding",
+    "valid": true
+   },
+   {
+    "name": "reasoning with no evidence",
+    "valid": true,
+    "set": {
+     "evidence_ids": []
+    }
+   },
+   {
+    "name": "missing statement",
+    "valid": false,
+    "delete": [
+     "statement"
+    ],
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "blank statement",
+    "valid": false,
+    "set": {
+     "statement": "   "
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "missing evidence_ids",
+    "valid": false,
+    "delete": [
+     "evidence_ids"
+    ],
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "extra field",
+    "valid": false,
+    "set": {
+     "confidence": "high"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "duplicate evidence ids (cross-field)",
+    "valid": false,
+    "set": {
+     "evidence_ids": [
+      "ev-1",
+      "ev-1"
+     ]
+    },
+    "jsonschema_rejects": false
+   },
+   {
+    "name": "33 evidence ids",
+    "valid": false,
+    "set": {
+     "evidence_ids": [
+      "e0",
+      "e1",
+      "e2",
+      "e3",
+      "e4",
+      "e5",
+      "e6",
+      "e7",
+      "e8",
+      "e9",
+      "e10",
+      "e11",
+      "e12",
+      "e13",
+      "e14",
+      "e15",
+      "e16",
+      "e17",
+      "e18",
+      "e19",
+      "e20",
+      "e21",
+      "e22",
+      "e23",
+      "e24",
+      "e25",
+      "e26",
+      "e27",
+      "e28",
+      "e29",
+      "e30",
+      "e31",
+      "e32"
+     ]
+    },
+    "jsonschema_rejects": true
+   }
+  ]
+ },
+ "diagnostic_probe_result": {
+  "base": {
+   "id": "check-tcp-internet-443",
+   "kind": "tcp",
+   "label": "TCP 443 from internet",
+   "status": "fail",
+   "vantage": "internet",
+   "port": 443,
+   "latency_ms": null,
+   "detail": "connection timed out",
+   "observed_at": "2026-10-10T08:00:03Z",
+   "evidence_id": "ev-2"
+  },
+  "cases": [
+   {
+    "name": "base tcp check",
+    "valid": true
+   },
+   {
+    "name": "icmp check without port",
+    "valid": true,
+    "set": {
+     "kind": "icmp",
+     "port": null,
+     "latency_ms": 4.2,
+     "detail": "echo reply"
+    }
+   },
+   {
+    "name": "dns check",
+    "valid": true,
+    "set": {
+     "kind": "dns",
+     "port": null,
+     "detail": null,
+     "observed_at": null
+    }
+   },
+   {
+    "name": "unknown status with no evidence",
+    "valid": true,
+    "set": {
+     "status": "unknown",
+     "evidence_id": null
+    }
+   },
+   {
+    "name": "port on a non-port check",
+    "valid": false,
+    "set": {
+     "kind": "icmp"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "port zero",
+    "valid": false,
+    "set": {
+     "port": 0
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "port above range",
+    "valid": false,
+    "set": {
+     "port": 65536
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "negative latency",
+    "valid": false,
+    "set": {
+     "latency_ms": -1
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "latency above range",
+    "valid": false,
+    "set": {
+     "latency_ms": 3600001
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "unknown kind",
+    "valid": false,
+    "set": {
+     "kind": "trace"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "unknown status",
+    "valid": false,
+    "set": {
+     "status": "ok"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "blank label",
+    "valid": false,
+    "set": {
+     "label": "  "
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "blank vantage",
+    "valid": false,
+    "set": {
+     "vantage": ""
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "missing evidence_id",
+    "valid": false,
+    "delete": [
+     "evidence_id"
+    ],
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "extra field",
+    "valid": false,
+    "set": {
+     "resolved": true
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "observed_at not RFC 3339 (format not asserted by schema)",
+    "valid": false,
+    "set": {
+     "observed_at": "just now"
+    },
+    "jsonschema_rejects": false
+   }
+  ]
+ },
+ "diagnostic_run": {
+  "base": {
+   "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d",
+   "target": "SERVER01",
+   "target_id": null,
+   "symptom": "External users cannot reach the service",
+   "vantage": "internet",
+   "started_at": "2026-10-10T08:00:00Z",
+   "completed_at": "2026-10-10T08:00:05Z",
+   "checks": [
+    {
+     "id": "check-tcp-internet-443",
+     "kind": "tcp",
+     "label": "TCP 443 from internet",
+     "status": "fail",
+     "vantage": "internet",
+     "port": 443,
+     "latency_ms": null,
+     "detail": "connection timed out",
+     "observed_at": "2026-10-10T08:00:03Z",
+     "evidence_id": "ev-2"
+    }
+   ],
+   "facts": [
+    {
+     "statement": "Internal TCP 443 to the host passes",
+     "evidence_ids": [
+      "ev-1"
+     ]
+    }
+   ],
+   "contradictions": [],
+   "unknowns": [
+    {
+     "statement": "No flow telemetry for the perimeter link",
+     "evidence_ids": []
+    }
+   ],
+   "probable_fault_domain": "firewall",
+   "confidence": "medium",
+   "alternative_hypotheses": [
+    {
+     "statement": "Upstream routing change",
+     "evidence_ids": [
+      "ev-2"
+     ]
+    }
+   ],
+   "recommended_next_checks": [
+    {
+     "statement": "Compare the firewall rule set against the last change",
+     "evidence_ids": []
+    }
+   ],
+   "evidence_ids": [
+    "ev-1",
+    "ev-2"
+   ]
+  },
+  "cases": [
+   {
+    "name": "base run",
+    "valid": true
+   },
+   {
+    "name": "resolved target with no evidence and an undetermined result",
+    "valid": true,
+    "set": {
+     "target_id": "device-0f8a1b2c-3d4e-5f60-7a8b-9c0d1e2f3a4b",
+     "checks": [],
+     "facts": [],
+     "contradictions": [],
+     "unknowns": [
+      {
+       "statement": "The probe channel has no route to the target",
+       "evidence_ids": []
+      }
+     ],
+     "probable_fault_domain": null,
+     "confidence": "unknown",
+     "alternative_hypotheses": [],
+     "recommended_next_checks": [],
+     "evidence_ids": []
+    }
+   },
+   {
+    "name": "high confidence with several checks",
+    "valid": true,
+    "set": {
+     "confidence": "high",
+     "checks": [
+      {
+       "id": "c1",
+       "kind": "identity",
+       "label": "Target identity resolved",
+       "status": "pass",
+       "vantage": null,
+       "port": null,
+       "latency_ms": null,
+       "detail": null,
+       "observed_at": null,
+       "evidence_id": null
+      },
+      {
+       "id": "c2",
+       "kind": "icmp",
+       "label": "ICMP from server VLAN",
+       "status": "pass",
+       "vantage": "server-vlan",
+       "port": null,
+       "latency_ms": 1.8,
+       "detail": null,
+       "observed_at": "2026-10-10T08:00:01Z",
+       "evidence_id": "ev-1"
+      }
+     ]
+    }
+   },
+   {
+    "name": "named domain but unknown confidence (cross-field)",
+    "valid": false,
+    "set": {
+     "confidence": "unknown"
+    },
+    "jsonschema_rejects": false
+   },
+   {
+    "name": "no domain but a real confidence (cross-field)",
+    "valid": false,
+    "set": {
+     "probable_fault_domain": null
+    },
+    "jsonschema_rejects": false
+   },
+   {
+    "name": "completed before started (cross-field)",
+    "valid": false,
+    "set": {
+     "completed_at": "2026-10-10T07:59:59Z"
+    },
+    "jsonschema_rejects": false
+   },
+   {
+    "name": "duplicate check ids (cross-field)",
+    "valid": false,
+    "set": {
+     "checks": [
+      {
+       "id": "c1",
+       "kind": "dns",
+       "label": "DNS",
+       "status": "pass",
+       "vantage": null,
+       "port": null,
+       "latency_ms": null,
+       "detail": null,
+       "observed_at": null,
+       "evidence_id": null
+      },
+      {
+       "id": "c1",
+       "kind": "icmp",
+       "label": "ICMP",
+       "status": "pass",
+       "vantage": null,
+       "port": null,
+       "latency_ms": null,
+       "detail": null,
+       "observed_at": null,
+       "evidence_id": null
+      }
+     ]
+    },
+    "jsonschema_rejects": false
+   },
+   {
+    "name": "duplicate evidence ids (cross-field)",
+    "valid": false,
+    "set": {
+     "evidence_ids": [
+      "ev-1",
+      "ev-1"
+     ]
+    },
+    "jsonschema_rejects": false
+   },
+   {
+    "name": "unknown fault domain",
+    "valid": false,
+    "set": {
+     "probable_fault_domain": "wan"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "unknown confidence",
+    "valid": false,
+    "set": {
+     "confidence": "certain"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "bad id shape",
+    "valid": false,
+    "set": {
+     "id": "diag-1"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "blank target",
+    "valid": false,
+    "set": {
+     "target": "   "
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "missing completed_at",
+    "valid": false,
+    "delete": [
+     "completed_at"
+    ],
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "missing probable_fault_domain",
+    "valid": false,
+    "delete": [
+     "probable_fault_domain"
+    ],
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "bad target_id",
+    "valid": false,
+    "set": {
+     "target_id": "device-1"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "33 unknowns",
+    "valid": false,
+    "set": {
+     "unknowns": [
+      {
+       "statement": "u0",
+       "evidence_ids": []
+      },
+      {
+       "statement": "u1",
+       "evidence_ids": []
+      },
+      {
+       "statement": "u2",
+       "evidence_ids": []
+      },
+      {
+       "statement": "u3",
+       "evidence_ids": []
+      },
+      {
+       "statement": "u4",
+       "evidence_ids": []
+      },
+      {
+       "statement": "u5",
+       "evidence_ids": []
+      },
+      {
+       "statement": "u6",
+       "evidence_ids": []
+      },
+      {
+       "statement": "u7",
+       "evidence_ids": []
+      },
+      {
+       "statement": "u8",
+       "evidence_ids": []
+      },
+      {
+       "statement": "u9",
+       "evidence_ids": []
+      },
+      {
+       "statement": "u10",
+       "evidence_ids": []
+      },
+      {
+       "statement": "u11",
+       "evidence_ids": []
+      },
+      {
+       "statement": "u12",
+       "evidence_ids": []
+      },
+      {
+       "statement": "u13",
+       "evidence_ids": []
+      },
+      {
+       "statement": "u14",
+       "evidence_ids": []
+      },
+      {
+       "statement": "u15",
+       "evidence_ids": []
+      },
+      {
+       "statement": "u16",
+       "evidence_ids": []
+      },
+      {
+       "statement": "u17",
+       "evidence_ids": []
+      },
+      {
+       "statement": "u18",
+       "evidence_ids": []
+      },
+      {
+       "statement": "u19",
+       "evidence_ids": []
+      },
+      {
+       "statement": "u20",
+       "evidence_ids": []
+      },
+      {
+       "statement": "u21",
+       "evidence_ids": []
+      },
+      {
+       "statement": "u22",
+       "evidence_ids": []
+      },
+      {
+       "statement": "u23",
+       "evidence_ids": []
+      },
+      {
+       "statement": "u24",
+       "evidence_ids": []
+      },
+      {
+       "statement": "u25",
+       "evidence_ids": []
+      },
+      {
+       "statement": "u26",
+       "evidence_ids": []
+      },
+      {
+       "statement": "u27",
+       "evidence_ids": []
+      },
+      {
+       "statement": "u28",
+       "evidence_ids": []
+      },
+      {
+       "statement": "u29",
+       "evidence_ids": []
+      },
+      {
+       "statement": "u30",
+       "evidence_ids": []
+      },
+      {
+       "statement": "u31",
+       "evidence_ids": []
+      },
+      {
+       "statement": "u32",
+       "evidence_ids": []
+      }
+     ]
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "extra field",
+    "valid": false,
+    "set": {
+     "ai_summary": "x"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "symptom not RFC 3339 style is irrelevant; started_at not RFC 3339 (format not asserted)",
+    "valid": false,
+    "set": {
+     "started_at": "yesterday"
+    },
+    "jsonschema_rejects": false
+   }
+  ]
+ },
+ "diagnostic_run_request": {
+  "base": {
+   "target": "SERVER01",
+   "symptom": "External users cannot reach the service",
+   "vantage": "internet",
+   "requested_checks": [
+    "dns",
+    "icmp",
+    "tcp",
+    "https"
+   ]
+  },
+  "cases": [
+   {
+    "name": "base request",
+    "valid": true
+   },
+   {
+    "name": "no symptom or vantage",
+    "valid": true,
+    "set": {
+     "symptom": null,
+     "vantage": null
+    }
+   },
+   {
+    "name": "single check",
+    "valid": true,
+    "set": {
+     "requested_checks": [
+      "target-health"
+     ]
+    }
+   },
+   {
+    "name": "no checks",
+    "valid": false,
+    "set": {
+     "requested_checks": []
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "13 checks",
+    "valid": false,
+    "set": {
+     "requested_checks": [
+      "identity",
+      "source-freshness",
+      "target-health",
+      "dns",
+      "icmp",
+      "tcp",
+      "http",
+      "https",
+      "service",
+      "dependencies",
+      "recent-changes",
+      "baseline",
+      "icmp"
+     ]
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "duplicate checks (cross-field)",
+    "valid": false,
+    "set": {
+     "requested_checks": [
+      "icmp",
+      "icmp"
+     ]
+    },
+    "jsonschema_rejects": false
+   },
+   {
+    "name": "unknown check kind",
+    "valid": false,
+    "set": {
+     "requested_checks": [
+      "trace"
+     ]
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "blank target",
+    "valid": false,
+    "set": {
+     "target": "  "
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "missing vantage",
+    "valid": false,
+    "delete": [
+     "vantage"
+    ],
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "extra field",
+    "valid": false,
+    "set": {
+     "notify": true
+    },
+    "jsonschema_rejects": true
+   }
+  ]
+ },
+ "diagnostic_run_response": {
+  "base": {
+   "state": "ok",
+   "run": null
+  },
+  "cases": [
+   {
+    "name": "not-connected without a run",
+    "valid": true,
+    "set": {
+     "state": "not-connected"
+    }
+   },
+   {
+    "name": "unknown without a run",
+    "valid": true,
+    "set": {
+     "state": "unknown"
+    }
+   },
+   {
+    "name": "ok with a run",
+    "valid": true,
+    "set": {
+     "run": {
+      "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d",
+      "target": "SERVER01",
+      "target_id": null,
+      "symptom": "External users cannot reach the service",
+      "vantage": "internet",
+      "started_at": "2026-10-10T08:00:00Z",
+      "completed_at": "2026-10-10T08:00:05Z",
+      "checks": [],
+      "facts": [],
+      "contradictions": [],
+      "unknowns": [],
+      "probable_fault_domain": null,
+      "confidence": "unknown",
+      "alternative_hypotheses": [],
+      "recommended_next_checks": [],
+      "evidence_ids": []
+     }
+    }
+   },
+   {
+    "name": "ok without a run",
+    "valid": false,
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "not-connected with a run",
+    "valid": false,
+    "set": {
+     "state": "not-connected",
+     "run": {
+      "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d",
+      "target": "SERVER01",
+      "target_id": null,
+      "symptom": null,
+      "vantage": null,
+      "started_at": "2026-10-10T08:00:00Z",
+      "completed_at": "2026-10-10T08:00:05Z",
+      "checks": [],
+      "facts": [],
+      "contradictions": [],
+      "unknowns": [],
+      "probable_fault_domain": null,
+      "confidence": "unknown",
+      "alternative_hypotheses": [],
+      "recommended_next_checks": [],
+      "evidence_ids": []
+     }
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "unknown with a run",
+    "valid": false,
+    "set": {
+     "state": "unknown",
+     "run": {
+      "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d",
+      "target": "SERVER01",
+      "target_id": null,
+      "symptom": null,
+      "vantage": null,
+      "started_at": "2026-10-10T08:00:00Z",
+      "completed_at": "2026-10-10T08:00:05Z",
+      "checks": [],
+      "facts": [],
+      "contradictions": [],
+      "unknowns": [],
+      "probable_fault_domain": null,
+      "confidence": "unknown",
+      "alternative_hypotheses": [],
+      "recommended_next_checks": [],
+      "evidence_ids": []
+     }
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "state outside the enum",
+    "valid": false,
+    "set": {
+     "state": "degraded"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "missing run",
+    "valid": false,
+    "delete": [
+     "run"
+    ],
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "extra field",
+    "valid": false,
+    "set": {
+     "correlation_id": "x"
+    },
+    "jsonschema_rejects": true
+   }
+  ]
+ }
+}

@@ -20,8 +20,17 @@ const VECTOR_URL = new URL(
   import.meta.url,
 );
 
+const DIAGNOSTIC_VECTOR_URL = new URL(
+  '../../../../contracts/test-vectors/diagnostic.vectors.json',
+  import.meta.url,
+);
+
 export function loadVectors(): Record<string, VectorBlock> {
   return JSON.parse(readFileSync(VECTOR_URL, 'utf-8')) as Record<string, VectorBlock>;
+}
+
+export function loadDiagnosticVectors(): Record<string, VectorBlock> {
+  return JSON.parse(readFileSync(DIAGNOSTIC_VECTOR_URL, 'utf-8')) as Record<string, VectorBlock>;
 }
 
 function walk(root: unknown, parts: string[]): Record<string, unknown> | unknown[] {

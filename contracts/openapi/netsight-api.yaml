@@ -1427,10 +1427,32 @@ paths:
           $ref: '#/components/responses/AlertingStoreUnavailable'
   /diagnostics:
     post:
-      summary: Start an approved read-only diagnostic workflow
+      summary: Start a bounded read-only diagnostic run and return its result
+      operationId: createDiagnosticRun
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DiagnosticRunRequest'
       responses:
-        '202':
-          description: Diagnostic accepted
+        '200':
+          description: The completed read-only run, or an explicit not-connected/unknown state without a run
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiagnosticRunResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
   /action-requests:
     post:
       summary: Propose a controlled remote action
@@ -3401,6 +3423,205 @@ components:
               type: string
               minLength: 1
               maxLength: 64
+    DiagnosticFinding:
+      type: object
+      additionalProperties: false
+      required: [statement, evidence_ids]
+      properties:
+        statement:
+          type: string
+          minLength: 1
+          maxLength: 1000
+          pattern: '\S'
+        evidence_ids:
+          type: array
+          maxItems: 32
+          items:
+            type: string
+            minLength: 1
+            maxLength: 128
+    DiagnosticProbeResult:
+      type: object
+      additionalProperties: false
+      required: [id, kind, label, status, vantage, port, latency_ms, detail, observed_at, evidence_id]
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 128
+        kind:
+          enum: [identity, source-freshness, target-health, dns, icmp, tcp, http, https, service, dependencies, recent-changes, baseline]
+        label:
+          type: string
+          minLength: 1
+          maxLength: 255
+          pattern: '\S'
+        status:
+          enum: [pass, fail, unknown]
+        vantage:
+          type: [string, 'null']
+          minLength: 1
+          maxLength: 128
+          pattern: '\S'
+        port:
+          type: [integer, 'null']
+          minimum: 1
+          maximum: 65535
+        latency_ms:
+          type: [number, 'null']
+          minimum: 0
+          maximum: 3600000
+        detail:
+          type: [string, 'null']
+          minLength: 1
+          maxLength: 1000
+          pattern: '\S'
+        observed_at:
+          type: [string, 'null']
+          format: date-time
+        evidence_id:
+          type: [string, 'null']
+          minLength: 1
+          maxLength: 128
+      allOf:
+      - if:
+          properties:
+            kind:
+              not:
+                enum: [tcp, http, https]
+          required: [kind]
+        then:
+          properties:
+            port:
+              type: 'null'
+    DiagnosticRun:
+      type: object
+      additionalProperties: false
+      required: [id, target, target_id, symptom, vantage, started_at, completed_at, checks, facts, contradictions, unknowns, probable_fault_domain, confidence, alternative_hypotheses, recommended_next_checks, evidence_ids]
+      properties:
+        id:
+          type: string
+          minLength: 47
+          maxLength: 47
+          pattern: '^diagnostic-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+        target:
+          type: string
+          minLength: 1
+          maxLength: 255
+          pattern: '\S'
+        target_id:
+          type: [string, 'null']
+          minLength: 43
+          maxLength: 43
+          pattern: '^device-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+        symptom:
+          type: [string, 'null']
+          minLength: 1
+          maxLength: 1000
+          pattern: '\S'
+        vantage:
+          type: [string, 'null']
+          minLength: 1
+          maxLength: 128
+          pattern: '\S'
+        started_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+        checks:
+          type: array
+          maxItems: 64
+          items:
+            $ref: '#/components/schemas/DiagnosticProbeResult'
+        facts:
+          type: array
+          maxItems: 64
+          items:
+            $ref: '#/components/schemas/DiagnosticFinding'
+        contradictions:
+          type: array
+          maxItems: 32
+          items:
+            $ref: '#/components/schemas/DiagnosticFinding'
+        unknowns:
+          type: array
+          maxItems: 32
+          items:
+            $ref: '#/components/schemas/DiagnosticFinding'
+        probable_fault_domain:
+          enum: [target, service, host, interface, access-device, core, firewall, wan-dns-external, null]
+        confidence:
+          enum: [low, medium, high, unknown]
+        alternative_hypotheses:
+          type: array
+          maxItems: 16
+          items:
+            $ref: '#/components/schemas/DiagnosticFinding'
+        recommended_next_checks:
+          type: array
+          maxItems: 32
+          items:
+            $ref: '#/components/schemas/DiagnosticFinding'
+        evidence_ids:
+          type: array
+          maxItems: 256
+          items:
+            type: string
+            minLength: 1
+            maxLength: 128
+    DiagnosticRunRequest:
+      type: object
+      additionalProperties: false
+      required: [target, symptom, vantage, requested_checks]
+      properties:
+        target:
+          type: string
+          minLength: 1
+          maxLength: 255
+          pattern: '\S'
+        symptom:
+          type: [string, 'null']
+          minLength: 1
+          maxLength: 1000
+          pattern: '\S'
+        vantage:
+          type: [string, 'null']
+          minLength: 1
+          maxLength: 128
+          pattern: '\S'
+        requested_checks:
+          type: array
+          minItems: 1
+          maxItems: 12
+          items:
+            enum: [identity, source-freshness, target-health, dns, icmp, tcp, http, https, service, dependencies, recent-changes, baseline]
+    DiagnosticRunResponse:
+      type: object
+      additionalProperties: false
+      required: [state, run]
+      properties:
+        state:
+          enum: [not-connected, ok, unknown]
+        run:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/DiagnosticRun'
+      allOf:
+      - if:
+          properties:
+            state:
+              const: ok
+          required: [state]
+        then:
+          properties:
+            run:
+              type: object
+        else:
+          properties:
+            run:
+              type: 'null'
   responses:
     AuthenticationRequired:
       description: Authentication required

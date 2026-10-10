@@ -1,0 +1,303 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Diagnostic",
+  "description": "Root-cause ('Why?') diagnostic records (S7). A run holds the bounded read-only probe checks, the facts it established, the contradictions and unknowns it could not resolve, and one probable fault domain with a separate confidence. Every free-text field (target, symptom, detail, statement) is untrusted data and is never interpreted as an instruction. Missing telemetry is an unknown: a run names a probable_fault_domain exactly when it has enough evidence, which is exactly when confidence is low, medium or high; with no probable domain confidence is unknown (cross-field rule JSON Schema cannot express). completed_at is never before started_at (also not expressible here).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "target",
+    "target_id",
+    "symptom",
+    "vantage",
+    "started_at",
+    "completed_at",
+    "checks",
+    "facts",
+    "contradictions",
+    "unknowns",
+    "probable_fault_domain",
+    "confidence",
+    "alternative_hypotheses",
+    "recommended_next_checks",
+    "evidence_ids"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 47,
+      "maxLength": 47,
+      "pattern": "^diagnostic-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "target": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255,
+      "pattern": "\\S"
+    },
+    "target_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 43,
+      "maxLength": 43,
+      "pattern": "^device-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "symptom": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1,
+      "maxLength": 1000,
+      "pattern": "\\S"
+    },
+    "vantage": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "\\S"
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "completed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "checks": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "$ref": "#/$defs/probeResult"
+      }
+    },
+    "facts": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "$ref": "#/$defs/finding"
+      }
+    },
+    "contradictions": {
+      "type": "array",
+      "maxItems": 32,
+      "items": {
+        "$ref": "#/$defs/finding"
+      }
+    },
+    "unknowns": {
+      "type": "array",
+      "maxItems": 32,
+      "items": {
+        "$ref": "#/$defs/finding"
+      }
+    },
+    "probable_fault_domain": {
+      "enum": [
+        "target",
+        "service",
+        "host",
+        "interface",
+        "access-device",
+        "core",
+        "firewall",
+        "wan-dns-external",
+        null
+      ]
+    },
+    "confidence": {
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "unknown"
+      ]
+    },
+    "alternative_hypotheses": {
+      "type": "array",
+      "maxItems": 16,
+      "items": {
+        "$ref": "#/$defs/finding"
+      }
+    },
+    "recommended_next_checks": {
+      "type": "array",
+      "maxItems": 32,
+      "items": {
+        "$ref": "#/$defs/finding"
+      }
+    },
+    "evidence_ids": {
+      "type": "array",
+      "maxItems": 256,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128
+      }
+    }
+  },
+  "$defs": {
+    "finding": {
+      "description": "One statement with the evidence that supports it. A fact, contradiction, unknown, alternative hypothesis or recommended next check is a statement plus the immutable evidence IDs it rests on; an empty evidence list means the statement is the run's own reasoning, never a raw observation.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "statement",
+        "evidence_ids"
+      ],
+      "properties": {
+        "statement": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000,
+          "pattern": "\\S"
+        },
+        "evidence_ids": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        }
+      }
+    },
+    "probeResult": {
+      "description": "One bounded read-only diagnostic check (the canonical ProbeResult). A successful ping is not application availability and an ICMP failure is not host failure, so status pass/fail never asserts more than the check measured; a check that could not run is unknown. port is set only for tcp, http and https checks. label, vantage and detail are untrusted source text.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "label",
+        "status",
+        "vantage",
+        "port",
+        "latency_ms",
+        "detail",
+        "observed_at",
+        "evidence_id"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "kind": {
+          "enum": [
+            "identity",
+            "source-freshness",
+            "target-health",
+            "dns",
+            "icmp",
+            "tcp",
+            "http",
+            "https",
+            "service",
+            "dependencies",
+            "recent-changes",
+            "baseline"
+          ]
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255,
+          "pattern": "\\S"
+        },
+        "status": {
+          "enum": [
+            "pass",
+            "fail",
+            "unknown"
+          ]
+        },
+        "vantage": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "\\S"
+        },
+        "port": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "latency_ms": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 3600000
+        },
+        "detail": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 1000,
+          "pattern": "\\S"
+        },
+        "observed_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "evidence_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 128
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "not": {
+                  "enum": [
+                    "tcp",
+                    "http",
+                    "https"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "port": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

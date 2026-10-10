@@ -48,6 +48,11 @@ SCHEMA_FILES = {
     "maintenance_window_create_request": "alert-rule-api.schema.json#/$defs/windowCreateRequest",
     "alert_rule_evaluate_request": "alert-rule-api.schema.json#/$defs/evaluateRequest",
     "alert_rule_evaluate_response": "alert-rule-api.schema.json#/$defs/evaluateResponse",
+    "diagnostic_run": "diagnostic.schema.json",
+    "diagnostic_probe_result": "diagnostic.schema.json#/$defs/probeResult",
+    "diagnostic_finding": "diagnostic.schema.json#/$defs/finding",
+    "diagnostic_run_request": "diagnostic-api.schema.json#/$defs/runRequest",
+    "diagnostic_run_response": "diagnostic-api.schema.json#/$defs/runResponse",
 }
 
 
