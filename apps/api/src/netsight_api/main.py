@@ -53,6 +53,7 @@ from netsight_api.auth.oidc import aclose as oidc_aclose
 from netsight_api.auth.routes import router as auth_router
 from netsight_api.auth.settings import session_policy
 from netsight_api.contracts import ContractViolation, validate
+from netsight_api.diagnostic_routes import router as diagnostic_router
 from netsight_api.errors import ApiError
 from netsight_api.incident_routes import router as incident_router
 from netsight_api.localauth.routes import router as localauth_router
@@ -1272,6 +1273,7 @@ app.include_router(security_router, prefix=API_PREFIX)
 app.include_router(incident_router, prefix=API_PREFIX)
 app.include_router(alert_rule_router, prefix=API_PREFIX)
 app.include_router(maintenance_router, prefix=API_PREFIX)
+app.include_router(diagnostic_router, prefix=API_PREFIX)
 # Authentication lives under the same versioned prefix as every other platform
 # route (contracts/openapi/netsight-api.yaml declares `servers: /api/v1` with
 # `/auth/providers` relative to it). Serving it unversioned broke the server
