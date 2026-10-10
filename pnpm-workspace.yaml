@@ -7,5 +7,7 @@ packages:
 allowBuilds:
   unrs-resolver: false
   msgpackr-extract: false
+  # esbuild (component-test bundler) ships its binary via optional platform packages.
+  esbuild: false
 patchedDependencies:
   ecc-universal: patches/ecc-universal.patch

@@ -6,6 +6,7 @@ import { performAlertingAction } from '@/app/(dashboard)/alerts/actions';
 import { RuleFormFields } from '@/components/rule-form';
 import { WindowFormFields } from '@/components/window-form';
 import { ActionDialog, DisabledReason, WriteFeedback, useServerWrite } from '@/components/write-ui';
+import type { WriteRunner } from '@/components/write-ui';
 import {
   availableRuleActions,
   availableWindowActions,
@@ -26,11 +27,14 @@ const PATH = '/alerts';
 
 function FormFooter({
   pending,
+  locked,
   label,
   theme = 'primary',
   onCancel,
 }: {
   pending: boolean;
+  /** The last result could not be confirmed: submitting again could repeat the change. */
+  locked: boolean;
   label: string;
   theme?: string;
   onCancel: () => void;
@@ -40,11 +44,23 @@ function FormFooter({
       <button type="button" className="btn btn-outline-secondary" onClick={onCancel} disabled={pending}>
         Cancel
       </button>
-      <button type="submit" className={`btn btn-${theme}`} disabled={pending}>
+      <button type="submit" className={`btn btn-${theme}`} disabled={pending || locked}>
         {pending ? 'Working…' : label}
       </button>
     </div>
   );
+}
+
+/**
+ * Closing a dialog whose write could not be confirmed reloads the page: the change may have been
+ * applied, and the operator must see the current state before anything is sent again.
+ */
+function closeAfterWrite(runner: WriteRunner, onClose: () => void): () => void {
+  return () => {
+    if (runner.pending) return;
+    if (runner.unconfirmed) runner.reload();
+    onClose();
+  };
 }
 
 /** Create or edit a rule. An edit is bound to the version the operator loaded. */
@@ -60,6 +76,7 @@ function RuleEditorDialog({
   const [values, setValues] = useState<RuleFormValues>(rule === null ? emptyRuleForm() : ruleToForm(rule));
   const [errors, setErrors] = useState<FieldErrors>({});
   const runner = useServerWrite(performAlertingAction);
+  const close = closeAfterWrite(runner, onClose);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -81,7 +98,7 @@ function RuleEditorDialog({
   return (
     <ActionDialog
       title={rule === null ? 'New alert rule' : `Edit rule (version ${rule.version})`}
-      onClose={onClose}
+      onClose={close}
       busy={runner.pending}
     >
       <form onSubmit={submit} noValidate aria-busy={runner.pending}>
@@ -97,9 +114,14 @@ function RuleEditorDialog({
         ) : null}
         <RuleFormFields values={values} errors={errors} disabled={runner.pending} onChange={setValues} />
         <div aria-live="polite">
-          <WriteFeedback result={runner.result} currentPath={PATH} />
+          <WriteFeedback result={runner.result} currentPath={PATH} onReload={runner.reload} />
         </div>
-        <FormFooter pending={runner.pending} label={rule === null ? 'Create draft' : 'Save draft'} onCancel={onClose} />
+        <FormFooter
+          pending={runner.pending}
+          locked={runner.unconfirmed}
+          label={rule === null ? 'Create draft' : 'Save draft'}
+          onCancel={close}
+        />
       </form>
     </ActionDialog>
   );
@@ -125,20 +147,21 @@ function ConfirmDialog({
   onDone: (message: string) => void;
 }) {
   const runner = useServerWrite(performAlertingAction);
+  const close = closeAfterWrite(runner, onClose);
   return (
-    <ActionDialog title={title} onClose={onClose} busy={runner.pending}>
+    <ActionDialog title={title} onClose={close} busy={runner.pending}>
       <div>{summary}</div>
       <div className="mt-3" aria-live="polite">
-        <WriteFeedback result={runner.result} currentPath={PATH} />
+        <WriteFeedback result={runner.result} currentPath={PATH} onReload={runner.reload} />
       </div>
       <div className="d-flex justify-content-end gap-2 mt-3">
-        <button type="button" className="btn btn-outline-secondary" onClick={onClose} disabled={runner.pending}>
+        <button type="button" className="btn btn-outline-secondary" onClick={close} disabled={runner.pending}>
           Cancel
         </button>
         <button
           type="button"
           className={`btn btn-${theme}`}
-          disabled={runner.pending}
+          disabled={runner.pending || runner.unconfirmed}
           onClick={async () => {
             if (await runner.submit(input)) onDone(successMessage);
           }}
@@ -309,6 +332,7 @@ function WindowEditorDialog({
   const [values, setValues] = useState<WindowFormValues>(emptyWindowForm());
   const [errors, setErrors] = useState<FieldErrors>({});
   const runner = useServerWrite(performAlertingAction);
+  const close = closeAfterWrite(runner, onClose);
   const { organisationScope } = canCreateWindow(viewer);
 
   async function submit(event: React.FormEvent) {
@@ -323,7 +347,7 @@ function WindowEditorDialog({
   }
 
   return (
-    <ActionDialog title="Schedule a maintenance window" onClose={onClose} busy={runner.pending}>
+    <ActionDialog title="Schedule a maintenance window" onClose={close} busy={runner.pending}>
       <form onSubmit={submit} noValidate aria-busy={runner.pending}>
         <p className="small text-body-secondary">
           Rules in scope hold their notifications (or stop evaluating, with the organisation
@@ -342,9 +366,14 @@ function WindowEditorDialog({
           onChange={setValues}
         />
         <div aria-live="polite">
-          <WriteFeedback result={runner.result} currentPath={PATH} />
+          <WriteFeedback result={runner.result} currentPath={PATH} onReload={runner.reload} />
         </div>
-        <FormFooter pending={runner.pending} label="Schedule window" onCancel={onClose} />
+        <FormFooter
+          pending={runner.pending}
+          locked={runner.unconfirmed}
+          label="Schedule window"
+          onCancel={close}
+        />
       </form>
     </ActionDialog>
   );

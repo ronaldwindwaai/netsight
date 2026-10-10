@@ -143,7 +143,29 @@ Storage decision (2026-10-08, human ruling): follow `DATABASE-OWNERSHIP.md` — 
    - **Web.** Server actions (`incidents/[incidentId]/actions.ts`, `alerts/actions.ts`): same-origin assert, payload rebuilt and validated against contract bounds, `apiPost` attaches cookie and CSRF server-side (no tokens in client JS; `apiPost` gained PUT). Incident Acknowledge / Advance (investigating, mitigated) / Assign / Comment / Resolve / Reopen; alert-rule create/edit/approve/disable and maintenance-window create/cancel (approve and edit bound to `expected_version`; disable/cancel have no version). Disabled-with-reason controls, 409/422/503/429/401 and step-up messages (`write-outcome.ts`), "result could not be confirmed" for lost answers, single-flight, non-dismissable while in flight; step-up sends the operator through `/login?step_up=true&next=...` (`safeNextPath`; the auth proxy forwards only `redirect_to` and `step_up`). Management sees the summary table; its detail route explains. The "Read only" badge now follows permissions.
    - **Verification.** ruff clean, mypy (`src`) clean, default pytest 3740 passed / 405 skipped (baseline 3562 / 405); web typecheck, lint clean, 719 web tests pass, `next build` succeeds. UI components are verified by typecheck/lint/build only (no browser run). Live PostgreSQL suites were not re-run (no storage change).
    - **Rollback.** Remove the `step_up` argument from `incident_writer` for resolve/reopen; drop the `/incidents/summary` route and restore `incidents:read` on Management; revert the `permissions` field. Web: restore `UnavailableActions` in the incident and alerts cards.
-   - **Follow-ups.** Expose MFA recency in `/auth/session` so the UI prompts before a long form; keep a draft across step-up; revoke the superseded session on re-login; Google emits no `amr`, so OIDC step-up is impossible there (local accounts or a provider that emits `amr=mfa` required); Close (resolved -> closed) in the UI; read auditing; Playwright E2E for the write flows; `title` remains visible to Management (decide whether to withhold it); dev bridge has no session so the UI shows controls disabled in that mode.
+   - **Review fix pass** (2026-10-10, test-first; not committed). HIGH (code review): the write UI had no component tests. Added a jsdom +
+     Testing Library setup that runs on plain `node --test` (`pnpm --filter @netsight/web test:components`, `apps/web/scripts/run-component-tests.mjs`
+     bundles `src/**/*.test.tsx` with esbuild, stubbing `next/navigation` and the server actions; `test` now runs the unit and component suites) and
+     99 component tests over `write-ui`, `incident-actions-panel` (with its forms), `alerting-write-controls` (with the rule and window forms): double
+     click and double submit send one request (inFlight guard); 409/422/503/401/429/403-STEP_UP_REQUIRED/403/unknown render the right advice; Technician,
+     Management, Auditor and signed-out viewers get disabled controls with reasons; the "Sign in again" link; dialog focus trap, Escape, no close while
+     busy. The tests found one real defect, fixed: with every control disabled mid-request, Tab left the modal and a disabled submit dropped focus to
+     the page (keys are now handled on the document and focus is pulled back to the dialog). MEDIUM (code review): after an unknown result
+     the control locks until reload (a comment or rule-create cannot be sent twice); icon `aria-label` replaced by visually-hidden text, redundant
+     `aria-disabled` dropped; 401 links to `/login?next=<path>`; first field focused on open; `RuleFormFields` (~370 lines) split into six sections
+     over shared `form-field.tsx` controls, `ResolveForm` (~137 lines) split into `resolve-form.tsx` with `RootCauseFieldset`; incident list/summary
+     routes moved to `incident_list_routes.py` (shared pieces in `incident_deps.py`), incident envelopes and requests to `schemas_incidents.py`
+     (`incident_routes.py` 634, `schemas.py` 688 lines). MEDIUM (security): `_safe_redirect` and web `safeNextPath` share the same rules plus a UI-path
+     allow-list (backslash, control characters, decoded `//`, `/api`); the origin check requires Origin when present, compares scheme and host and
+     trusts `X-Forwarded-*` only with `NETSIGHT_TRUST_PROXY_HEADERS=true`; the old session is revoked on OIDC callback and local MFA sign-in. LOW: denied-MFA
+     audit carries an identity fingerprint; 5 s step-up replay tolerance; tests for the dev bridge outside development, the summary schema forbidding
+     extra fields, a valid token that predates the request, and linear-time `matches`; RBAC-MATRIX records that rule approve/disable are outside
+     step-up. Verification: ruff clean, mypy (`src`, 96 files) clean, default pytest 3808 passed / 405 skipped (was 3740 / 405); web typecheck and lint
+     clean, 735 unit + 99 component tests pass (was 719 unit), `next build` succeeds. Live PostgreSQL suites not re-run (no storage change). Rollback:
+     revert the diff; `pnpm install` drops the new dev dependencies (`jsdom`, `@testing-library/*`, `esbuild`, `@types/jsdom`). Deferred: idempotency keys
+     (a second tab or client can still repeat a lost write), Playwright E2E of the write flows, `prettier` is not installed so the web files follow the
+     existing style by hand. Threat model: "Step 3 review fix pass" delta.
+   - **Follow-ups.** Expose MFA recency in `/auth/session` so the UI prompts before a long form; keep a draft across step-up; Google emits no `amr`, so OIDC step-up is impossible there (local accounts or a provider that emits `amr=mfa` required); Close (resolved -> closed) in the UI; read auditing; Playwright E2E for the write flows; `title` remains visible to Management (decide whether to withhold it); dev bridge has no session so the UI shows controls disabled in that mode.
 Stories: NS-060..NS-065.
 Steps: alert-rule domain model, notif routing, incident store, timeline, acknowledgement/incident ownership, audit.
 

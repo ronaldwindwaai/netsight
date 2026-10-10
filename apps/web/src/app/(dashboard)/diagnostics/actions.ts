@@ -1,12 +1,10 @@
 'use server';
 
-import { headers } from 'next/headers';
-
 import { apiPost, type FetchState } from '@/lib/api';
 import { parseDiagnosticRunResponse } from '@/lib/api-contracts-diagnostic';
 import type { DiagnosticRunRequest, DiagnosticRunResponse } from '@/lib/api-contracts-diagnostic';
 import { cleanRunForm, isDiagnosticRunForm } from '@/lib/diagnostic-view';
-import { sameOrigin } from '@/lib/request-origin';
+import { fromSameOrigin } from '@/lib/server-write';
 
 // A run performs up to twelve bounded probes and the API caps the whole run at
 // ~20 s, so this write needs a longer budget than the default read timeout.
@@ -15,18 +13,6 @@ const DIAGNOSTIC_RUN_TIMEOUT_MS = 45_000;
 export type DiagnosticActionResult =
   | { ok: true; state: FetchState<DiagnosticRunResponse> }
   | { ok: false; message: string };
-
-/**
- * A server action is a public POST, so its own cross-site control is asserted here rather than left
- * to the framework default: the browser's Origin (or Referer) must match the host the request was
- * addressed to. This is defence in depth in front of `apiPost`, which attaches the session cookie
- * and CSRF token server-side.
- */
-async function fromSameOrigin(): Promise<boolean> {
-  const headerList = await headers();
-  const host = headerList.get('x-forwarded-host') ?? headerList.get('host');
-  return sameOrigin(host, headerList.get('origin'), headerList.get('referer'));
-}
 
 /**
  * Server-side run of a read-only diagnostic. The session cookie and CSRF token

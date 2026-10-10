@@ -68,6 +68,9 @@ def mfa_asserted(claims: dict[str, Any]) -> bool:
 
 
 MFA_CLOCK_SKEW_SECONDS = 5.0
+# A step-up token's ``auth_time`` may precede the moment the step-up was requested by this much
+# (provider clock skew and second-granularity ``auth_time``); anything older is a replayed token.
+STEP_UP_REPLAY_TOLERANCE_SECONDS = 5.0
 
 
 def mfa_age(
@@ -81,7 +84,7 @@ def mfa_age(
 
     Returns ``(age_seconds, None)`` when the token asserts MFA (``amr``) *and* carries a numeric
     ``auth_time`` that is not in the future (beyond a small skew), not older than ``max_age`` and,
-    for a step-up, not older than the moment the step-up was requested. Otherwise
+    for a step-up, not older than the moment the step-up was requested (less ``STEP_UP_REPLAY_TOLERANCE_SECONDS``). Otherwise
     ``(None, reason)`` with a static reason code (``mfa-not-asserted`` is expected for tokens
     that simply do not claim MFA). The age is relative to ``now`` so the caller can place it on
     the session store's clock; session creation time is never used.
@@ -95,7 +98,10 @@ def mfa_age(
         return None, "auth-time-invalid"
     if not math.isfinite(auth_time):
         return None, "auth-time-invalid"
-    if step_up_requested_at is not None and auth_time < step_up_requested_at:
+    if (
+        step_up_requested_at is not None
+        and auth_time < step_up_requested_at - STEP_UP_REPLAY_TOLERANCE_SECONDS
+    ):
         return None, "step-up-replay"
     age = now - auth_time
     if age < -MFA_CLOCK_SKEW_SECONDS:

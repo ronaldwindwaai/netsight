@@ -13,7 +13,7 @@ from typing import Any
 from fastapi import APIRouter, Request, Response
 from fastapi.responses import RedirectResponse
 
-from netsight_api.audit import record_audit
+from netsight_api.audit import fingerprint, record_audit
 from netsight_api.auth.deps import get_session
 from netsight_api.auth.identity import build_identity, mfa_age
 from netsight_api.auth.oidc import (
@@ -28,6 +28,7 @@ from netsight_api.auth.oidc import (
 from netsight_api.auth.pending import pending_auth_store
 from netsight_api.auth.providers import ProviderId
 from netsight_api.auth.rate_limit import rate_limiter
+from netsight_api.auth.redirects import safe_ui_redirect
 from netsight_api.auth.session import constant_time_equals, session_manager
 from netsight_api.auth.settings import (
     auth_settings,
@@ -52,9 +53,7 @@ def _provider_or_error(raw: str) -> ProviderId:
 
 
 def _safe_redirect(target: str | None) -> str:
-    if not isinstance(target, str) or not target.startswith("/") or target.startswith("//"):
-        return "/overview"
-    return target
+    return safe_ui_redirect(target)
 
 
 def _redirect_uri(request: Request) -> str:
@@ -69,7 +68,7 @@ def _client_ip(request: Request) -> str:
 
 
 def _verified_mfa_age(
-    request: Request, raw: dict[str, Any], step_up_requested_at: float | None
+    request: Request, raw: dict[str, Any], step_up_requested_at: float | None, identity_id: str
 ) -> float | None:
     """The token's own MFA age (``auth_time``), or None; a rejected assertion is audited.
 
@@ -90,6 +89,7 @@ def _verified_mfa_age(
             actor_id=None,
             correlation_id=getattr(request.state, "correlation_id", "unknown"),
             reason=reason,
+            identity_fingerprint=fingerprint(identity_id),
         )
     return age
 
@@ -117,9 +117,7 @@ async def providers() -> AuthProvidersResponse:
     google = google_settings()
     return AuthProvidersResponse(
         providers={
-            "microsoft": ProviderState(
-                configured=bool(microsoft.enabled and microsoft.client_id)
-            ),
+            "microsoft": ProviderState(configured=bool(microsoft.enabled and microsoft.client_id)),
             "google": ProviderState(configured=bool(google.enabled and google.client_id)),
         }
     )
@@ -216,8 +214,12 @@ async def callback(
         provider=pending.provider.value,
         roles=identity.roles,
         email=claims.email,
-        mfa_age_seconds=_verified_mfa_age(request, claims.raw, pending.step_up_requested_at),
+        mfa_age_seconds=_verified_mfa_age(
+            request, claims.raw, pending.step_up_requested_at, identity.id
+        ),
     )
+    # Rotation: the session the browser presented (if any) must not outlive the new one.
+    manager.revoke_cookie(request.cookies.get(manager.policy.cookie_name))
 
     target = _safe_redirect(pending.redirect_to)
     response = RedirectResponse(target, status_code=302)

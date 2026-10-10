@@ -28,47 +28,45 @@ Behaviour, in the order a request meets it:
 from __future__ import annotations
 
 import logging
-import os
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Annotated, Any, NoReturn, cast
+from typing import Annotated
 
-from fastapi import APIRouter, Depends, Path, Query, Request
+from fastapi import APIRouter, Depends, Query, Request
 from fastapi.concurrency import run_in_threadpool
 from pydantic import ValidationError
 
 from netsight_api.audit import AuditOutcome, fingerprint, record_audit
 from netsight_api.auth.csrf import write_refusal
-from netsight_api.auth.deps import get_current_identity
 from netsight_api.auth.rate_limit import RateLimiter
 from netsight_api.auth.step_up import step_up_refusal
-from netsight_api.contracts import validate
 from netsight_api.errors import ApiError
+from netsight_api.incident_deps import (
+    ITEM_READ_ERRORS,
+    STEP_UP_ERRORS,
+    WRITE_ERRORS,
+    CurrentIdentity,
+    IncidentId,
+    IncidentReader,
+    OptionalIncidentStore,
+    checked_response,
+    correlation_id_of,
+    get_optional_incident_store,
+    log_read_failure,
+)
 from netsight_api.rbac import Identity, Permission, is_allowed
-from netsight_api.read_limit import enforce_read_limit
-from netsight_api.schemas import (
-    INCIDENT_ID_PATTERN,
-    MAX_INCIDENT_LIST_OFFSET,
-    MAX_INCIDENT_PAGE_SIZE,
+from netsight_api.schemas import Incident, IncidentTimelineEvent, StoreState
+from netsight_api.schemas_incidents import (
     MAX_TIMELINE_PAGE_SIZE,
     MAX_TIMELINE_SEQ,
-    ErrorEnvelope,
-    Incident,
     IncidentAssignRequest,
     IncidentCommentRequest,
     IncidentDetailResponse,
     IncidentEvidenceRequest,
-    IncidentListResponse,
     IncidentReopenRequest,
     IncidentResolveRequest,
-    IncidentSeverity,
-    IncidentState,
-    IncidentSummary,
-    IncidentSummaryListResponse,
-    IncidentTimelineEvent,
     IncidentTimelineResponse,
     IncidentTransitionRequest,
-    StoreState,
 )
 from netsight_api.storage import (
     IllegalTransitionError,
@@ -76,10 +74,11 @@ from netsight_api.storage import (
     InvalidOperationError,
     NotFoundError,
     ScopeViolationError,
-    StorageConfigurationError,
     StorageConflictError,
     StorageError,
 )
+
+__all__ = ["get_optional_incident_store", "router"]  # the store dependency tests override
 
 _LOGGER = logging.getLogger("netsight_api")
 
@@ -91,66 +90,6 @@ _write_limiter = RateLimiter()
 
 router = APIRouter(prefix="/incidents", tags=["incidents"])
 
-_READ_ERRORS: dict[int | str, dict[str, Any]] = {
-    401: {"model": ErrorEnvelope, "description": "Authentication required"},
-    403: {"model": ErrorEnvelope, "description": "Permission denied"},
-    422: {"model": ErrorEnvelope, "description": "Invalid request"},
-}
-_ITEM_READ_ERRORS: dict[int | str, dict[str, Any]] = {
-    **_READ_ERRORS,
-    404: {"model": ErrorEnvelope, "description": "Incident not found"},
-}
-_WRITE_ERRORS: dict[int | str, dict[str, Any]] = {
-    **_ITEM_READ_ERRORS,
-    409: {"model": ErrorEnvelope, "description": "Illegal transition or concurrent change"},
-    429: {"model": ErrorEnvelope, "description": "Write rate limit exceeded"},
-    503: {"model": ErrorEnvelope, "description": "Incident store not connected or unavailable"},
-}
-_STEP_UP_ERRORS: dict[int | str, dict[str, Any]] = {
-    **_WRITE_ERRORS,
-    403: {
-        "model": ErrorEnvelope,
-        "description": "Permission denied, or STEP_UP_REQUIRED: recent MFA is needed (sign in again)",
-    },
-}
-
-
-# --- store wiring -----------------------------------------------------------------------------
-
-
-class _UnavailableStore:
-    """Stands in when ``DATABASE_URL`` is set but unusable: every call fails as unavailable."""
-
-    def __getattr__(self, name: str) -> Callable[..., NoReturn]:
-        def unavailable(*_args: object, **_kwargs: object) -> NoReturn:
-            raise StorageError("the incident store is not usable")
-
-        return unavailable
-
-
-def get_optional_incident_store() -> IncidentRepository | None:
-    """PostgreSQL store for the app role (``DATABASE_URL``); ``None`` means not-connected.
-
-    Only the least-privilege application DSN is ever read here, never the migrator's.
-    A configured-but-invalid DSN yields a store whose calls fail, so the endpoints degrade
-    to explicit ``unknown`` (configured does not imply connected) without echoing it.
-    """
-    if not os.environ.get("DATABASE_URL", "").strip():
-        return None
-    from netsight_api.storage.connection import PostgresSettings
-    from netsight_api.storage.postgres import PostgresIncidentRepository
-
-    try:
-        settings = PostgresSettings.from_env()
-    except StorageConfigurationError:
-        return cast(IncidentRepository, _UnavailableStore())
-    return PostgresIncidentRepository(settings)
-
-
-OptionalIncidentStore = Annotated[IncidentRepository | None, Depends(get_optional_incident_store)]
-CurrentIdentity = Annotated[Identity, Depends(get_current_identity)]
-IncidentId = Annotated[str, Path(min_length=45, max_length=45, pattern=INCIDENT_ID_PATTERN)]
-
 
 def _assignee_details(assignee_id: str | None) -> dict[str, object]:
     """Audit details for an assignment: a hash and length, never the identity value."""
@@ -159,32 +98,7 @@ def _assignee_details(assignee_id: str | None) -> dict[str, object]:
     return {"assignee_hash": fingerprint(assignee_id), "assignee_length": len(assignee_id)}
 
 
-def _correlation_id(request: Request) -> str:
-    value = getattr(request.state, "correlation_id", None)
-    return value if isinstance(value, str) else "unknown"
-
-
 # --- authorisation, CSRF, rate limiting --------------------------------------------------------
-
-
-def require_incident_reader(identity: CurrentIdentity) -> Identity:
-    if not is_allowed(identity, Permission.INCIDENTS_READ.value):
-        raise ApiError(403, "FORBIDDEN", "Permission is required")
-    enforce_read_limit(identity, "incidents")
-    return identity
-
-
-IncidentReader = Annotated[Identity, Depends(require_incident_reader)]
-
-
-def require_incident_summary_reader(identity: CurrentIdentity) -> Identity:
-    if not is_allowed(identity, Permission.INCIDENTS_READ_SUMMARY.value):
-        raise ApiError(403, "FORBIDDEN", "Permission is required")
-    enforce_read_limit(identity, "incidents")
-    return identity
-
-
-IncidentSummaryReader = Annotated[Identity, Depends(require_incident_summary_reader)]
 
 
 @dataclass(frozen=True)
@@ -208,7 +122,7 @@ def _audit_refusal(
         action,
         outcome="denied",
         actor_id=identity.id,
-        correlation_id=_correlation_id(request),
+        correlation_id=correlation_id_of(request),
         target=incident_id,
         reason=reason,
     )
@@ -304,9 +218,7 @@ _EvidenceActor = Annotated[
 ]
 _ResolveActor = Annotated[
     IncidentActor,
-    Depends(
-        incident_writer(Permission.INCIDENTS_RESOLVE, action="incident.resolve", step_up=True)
-    ),
+    Depends(incident_writer(Permission.INCIDENTS_RESOLVE, action="incident.resolve", step_up=True)),
 ]
 _ReopenActor = Annotated[
     IncidentActor,
@@ -370,7 +282,7 @@ async def _mutate[T](
     disconnects mid-request cannot make a committed write unaudited. Assigned scope is the
     store's job (``required_assignee`` under the row lock), not this function's.
     """
-    correlation_id = _correlation_id(request)
+    correlation_id = correlation_id_of(request)
 
     def audit(outcome: AuditOutcome, **extra: object) -> None:
         record_audit(
@@ -412,150 +324,10 @@ async def _mutate[T](
 # --- reads ------------------------------------------------------------------------------------------
 
 
-def _log_read_failure(request: Request, exc: Exception) -> None:
-    _LOGGER.warning(
-        "incident store read failed",
-        extra={"correlation_id": _correlation_id(request), "error_type": type(exc).__name__},
-    )
-
-
-def _checked[
-    M: IncidentListResponse
-    | IncidentSummaryListResponse
-    | IncidentDetailResponse
-    | IncidentTimelineResponse
-](name: str, body: M) -> M:
-    """Canonical boundary validation applied on every successful return path."""
-    validate(name, body.model_dump(mode="json", by_alias=True))
-    return body
-
-
-@router.get(
-    "",
-    response_model=IncidentListResponse,
-    responses=_READ_ERRORS,
-    operation_id="listIncidents",
-)
-async def list_incidents(
-    request: Request,
-    _identity: IncidentReader,
-    store: OptionalIncidentStore,
-    state: Annotated[IncidentState | None, Query()] = None,
-    severity: Annotated[IncidentSeverity | None, Query()] = None,
-    assignee_id: Annotated[str | None, Query(min_length=1, max_length=255)] = None,
-    limit: Annotated[int, Query(ge=1, le=MAX_INCIDENT_PAGE_SIZE)] = 50,
-    offset: Annotated[int, Query(ge=0, le=MAX_INCIDENT_LIST_OFFSET)] = 0,
-) -> IncidentListResponse:
-    """Incidents newest first with an explicit store state.
-
-    not-connected without a store; unknown when the read fails; ok only with stored
-    incidents. ``next_offset`` is set when the page was full and the capped offset allows
-    another page (a full final page yields one empty trailing page).
-    """
-
-    def empty(state_name: StoreState) -> IncidentListResponse:
-        return _checked(
-            "incident_list",
-            IncidentListResponse(
-                state=state_name,
-                incidents=[],
-                limit=limit,
-                offset=offset,
-                next_offset=None,
-            ),
-        )
-
-    if store is None:
-        return empty("not-connected")
-    incident_store = store
-    try:
-        rows = await run_in_threadpool(
-            lambda: incident_store.list_incidents(
-                state=state,
-                severity=severity,
-                assignee_id=assignee_id,
-                limit=limit,
-                offset=offset,
-            )
-        )
-        following = offset + limit
-        more = len(rows) == limit and following <= MAX_INCIDENT_LIST_OFFSET
-        return _checked(
-            "incident_list",
-            IncidentListResponse(
-                state="ok",
-                incidents=rows,
-                limit=limit,
-                offset=offset,
-                next_offset=following if more else None,
-            ),
-        )
-    except Exception as exc:  # noqa: BLE001 — deliberate store/contract boundary
-        _log_read_failure(request, exc)
-        return empty("unknown")
-
-
-@router.get(
-    "/summary",
-    response_model=IncidentSummaryListResponse,
-    responses=_READ_ERRORS,
-    operation_id="listIncidentSummaries",
-)
-async def list_incident_summaries(
-    request: Request,
-    _identity: IncidentSummaryReader,
-    store: OptionalIncidentStore,
-    state: Annotated[IncidentState | None, Query()] = None,
-    severity: Annotated[IncidentSeverity | None, Query()] = None,
-    limit: Annotated[int, Query(ge=1, le=MAX_INCIDENT_PAGE_SIZE)] = 50,
-    offset: Annotated[int, Query(ge=0, le=MAX_INCIDENT_LIST_OFFSET)] = 0,
-) -> IncidentSummaryListResponse:
-    """Management's reduced incident list (``incidents:read-summary``).
-
-    Rows are projected from the stored incident into ``IncidentSummary`` here, so evidence
-    ids, resolution text and the assignee identity never reach the response model. There is
-    deliberately no assignee filter: it would let a summary reader probe who holds what.
-    Declared before ``/{incident_id}`` so the static path is never read as an id.
-    """
-
-    def empty(state_name: StoreState) -> IncidentSummaryListResponse:
-        return _checked(
-            "incident_summary_list",
-            IncidentSummaryListResponse(
-                state=state_name, incidents=[], limit=limit, offset=offset, next_offset=None
-            ),
-        )
-
-    if store is None:
-        return empty("not-connected")
-    incident_store = store
-    try:
-        rows = await run_in_threadpool(
-            lambda: incident_store.list_incidents(
-                state=state, severity=severity, assignee_id=None, limit=limit, offset=offset
-            )
-        )
-        following = offset + limit
-        more = len(rows) == limit and following <= MAX_INCIDENT_LIST_OFFSET
-        return _checked(
-            "incident_summary_list",
-            IncidentSummaryListResponse(
-                state="ok",
-                incidents=[IncidentSummary.from_incident(row) for row in rows],
-                limit=limit,
-                offset=offset,
-                next_offset=following if more else None,
-            ),
-        )
-    except Exception as exc:  # noqa: BLE001 — deliberate store/contract boundary
-        _log_read_failure(request, exc)
-        return empty("unknown")
-
-
 @router.get(
     "/{incident_id}",
     response_model=IncidentDetailResponse,
-    responses=_ITEM_READ_ERRORS,
+    responses=ITEM_READ_ERRORS,
     operation_id="getIncident",
 )
 async def get_incident(
@@ -566,24 +338,28 @@ async def get_incident(
 ) -> IncidentDetailResponse:
     """One incident; an unknown id is a 404, never a fabricated record."""
     if store is None:
-        return _checked(
+        return checked_response(
             "incident_detail", IncidentDetailResponse(state="not-connected", incident=None)
         )
     incident_store = store
     try:
         incident = await run_in_threadpool(incident_store.get_incident, incident_id)
     except Exception as exc:  # noqa: BLE001 — deliberate store boundary
-        _log_read_failure(request, exc)
-        return _checked("incident_detail", IncidentDetailResponse(state="unknown", incident=None))
+        log_read_failure(request, exc)
+        return checked_response(
+            "incident_detail", IncidentDetailResponse(state="unknown", incident=None)
+        )
     if incident is None:
         raise ApiError(404, "NOT_FOUND", "Incident was not found")
-    return _checked("incident_detail", IncidentDetailResponse(state="ok", incident=incident))
+    return checked_response(
+        "incident_detail", IncidentDetailResponse(state="ok", incident=incident)
+    )
 
 
 @router.get(
     "/{incident_id}/timeline",
     response_model=IncidentTimelineResponse,
-    responses=_ITEM_READ_ERRORS,
+    responses=ITEM_READ_ERRORS,
     operation_id="getIncidentTimeline",
 )
 async def get_incident_timeline(
@@ -597,7 +373,7 @@ async def get_incident_timeline(
     """Append-only timeline in seq order, bounded per page."""
 
     def empty(state_name: StoreState) -> IncidentTimelineResponse:
-        return _checked(
+        return checked_response(
             "incident_timeline",
             IncidentTimelineResponse(
                 state=state_name,
@@ -615,7 +391,7 @@ async def get_incident_timeline(
         events = await run_in_threadpool(
             lambda: incident_store.list_timeline(incident_id, after_seq=after_seq, limit=limit)
         )
-        return _checked(
+        return checked_response(
             "incident_timeline",
             IncidentTimelineResponse(
                 state="ok",
@@ -628,7 +404,7 @@ async def get_incident_timeline(
     except NotFoundError:
         raise ApiError(404, "NOT_FOUND", "Incident was not found") from None
     except Exception as exc:  # noqa: BLE001 — deliberate store/contract boundary
-        _log_read_failure(request, exc)
+        log_read_failure(request, exc)
         return empty("unknown")
 
 
@@ -638,7 +414,7 @@ async def get_incident_timeline(
 @router.post(
     "/{incident_id}/acknowledge",
     response_model=Incident,
-    responses=_WRITE_ERRORS,
+    responses=WRITE_ERRORS,
     operation_id="acknowledgeIncident",
 )
 async def acknowledge_incident(
@@ -668,7 +444,7 @@ async def acknowledge_incident(
 @router.post(
     "/{incident_id}/transition",
     response_model=Incident,
-    responses=_WRITE_ERRORS,
+    responses=WRITE_ERRORS,
     operation_id="transitionIncident",
 )
 async def transition_incident(
@@ -707,7 +483,7 @@ async def transition_incident(
 @router.post(
     "/{incident_id}/assign",
     response_model=Incident,
-    responses=_WRITE_ERRORS,
+    responses=WRITE_ERRORS,
     operation_id="assignIncident",
 )
 async def assign_incident(
@@ -736,7 +512,7 @@ async def assign_incident(
     "/{incident_id}/comment",
     response_model=IncidentTimelineEvent,
     status_code=201,
-    responses=_WRITE_ERRORS,
+    responses=WRITE_ERRORS,
     operation_id="commentIncident",
 )
 async def comment_incident(
@@ -768,7 +544,7 @@ async def comment_incident(
 @router.post(
     "/{incident_id}/evidence",
     response_model=Incident,
-    responses=_WRITE_ERRORS,
+    responses=WRITE_ERRORS,
     operation_id="addIncidentEvidence",
 )
 async def add_incident_evidence(
@@ -800,7 +576,7 @@ async def add_incident_evidence(
 @router.post(
     "/{incident_id}/resolve",
     response_model=Incident,
-    responses=_STEP_UP_ERRORS,
+    responses=STEP_UP_ERRORS,
     operation_id="resolveIncident",
 )
 async def resolve_incident(
@@ -834,7 +610,7 @@ async def resolve_incident(
 @router.post(
     "/{incident_id}/reopen",
     response_model=Incident,
-    responses=_STEP_UP_ERRORS,
+    responses=STEP_UP_ERRORS,
     operation_id="reopenIncident",
 )
 async def reopen_incident(

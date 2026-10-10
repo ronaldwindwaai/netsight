@@ -225,7 +225,7 @@ summary-only incident view for Management, and creators may approve their own ru
   (`safeNextPath` rejects anything but a same-origin path; the auth proxy forwards only `redirect_to` and `step_up`, never `state`).
   **Residual:** `auth_time` is trusted as the provider reports it (a provider that ignores `prompt=login` and reuses its session returns an
   old `auth_time`, which is then refused as stale or a replay); a provider that never emits `amr` (Google) cannot satisfy step-up through OIDC at all (resolve/reopen are then unavailable to
-  that sign-in route, which fails closed); the superseded session is not revoked by the re-login (it ages out); the stamp lives in the
+  that sign-in route, which fails closed); the superseded session is revoked by the re-login (see the review delta below); the stamp lives in the
   per-worker in-memory session store; the dev identity bridge is exempt (no session, development only); a step-up redirect discards a
   half-typed resolve form (the dialog says so).
 - **Information disclosure - Management (controlled; partly closes the S6-2 open item).** Management loses `incidents:read` and holds
@@ -245,6 +245,47 @@ summary-only incident view for Management, and creators may approve their own ru
   clicks in one tick send one request) and a dialog cannot be dismissed while a request is in flight. Comments are still not idempotent
   (a retry after a lost answer can duplicate one; the dialog says to reload first).
 - **Still open.** Read auditing; surfacing MFA recency in the session so the UI can prompt before a long form is filled; per-site scoping of the "Scoped" roles; a draft-preserving step-up round trip; Close (resolved -> closed) is not in the UI.
+
+### Step 3 review fix pass (2026-10-10) - threat-model delta
+Closes the independent code and security review of the Step 3 UI write actions. Status:
+
+- **Open redirect (controlled).** The sign-in destination (`redirect_to` on the API, `next` on the web) is accepted only as a same-origin
+  absolute path whose first segment is a dashboard area (`overview`, `network`, `devices`, `traffic`, `security`, `diagnostics`, `incidents`,
+  `alerts`), checked as written **and** after percent-decoding. Rejected: `//`, a backslash, control characters (so a tab after the first
+  slash, `/` followed by a backslash and `/%09/` all fall back to `/overview`), bidi and zero-width characters, `/api`, `/auth`, `/login`, more
+  than 512 characters. The same rules are implemented twice and tested on both sides (`auth/redirects.py`, `sign-in-redirect.ts`).
+- **Cross-site server actions (tightened).** `sameOrigin` now requires the Origin header when present and consults Referer only when Origin is
+  absent (a present-but-unusable Origin, e.g. `null`, is a rejection and never falls back); scheme **and** host (with port) must match, with
+  https required in production except on loopback. `X-Forwarded-Host` / `X-Forwarded-Proto` are client-controllable, so they are honoured only
+  when `NETSIGHT_TRUST_PROXY_HEADERS=true` is set explicitly (exact value; default off). Turn it on only behind a reverse proxy that
+  **overwrites** both headers; with it off, the proxy must pass the public name in `Host`. A misconfiguration fails closed (writes are refused
+  as "not from this site"), never open. Diagnostics and the write actions share one implementation (`fromSameOrigin`).
+- **Session fixation / stale sessions (closed).** Completing an OIDC callback or a local MFA verification revokes the session the browser
+  presented (`SessionManager.revoke_cookie`; a missing or forged cookie revokes nothing) before the new cookie is set. This removes the
+  previously recorded residual that a superseded session aged out on its own.
+- **Audit (tightened).** A denied `auth.mfa` record carries `identity_fingerprint` (a short SHA-256 of the provider-qualified identity), so
+  repeated denials correlate without recording who was refused. The step-up replay check allows `STEP_UP_REPLAY_TOLERANCE_SECONDS` = 5 s
+  (provider clock skew and second-granularity `auth_time`); a token older than the request by more than that is still a replay.
+- **Dev identity bridge (pinned).** Tests assert it cannot be enabled when `NETSIGHT_ENV` is anything other than exactly `development`
+  (production, staging, test, empty, other casing or spacing) even with `NETSIGHT_ENABLE_DEV_IDENTITY=true`, and that both flags are required.
+- **ReDoS (confirmed not applicable).** The `matches` operator is a glob evaluated by a bit-parallel NFA simulation
+  (`alerting/matching.py`); no regular-expression engine, `fnmatch` or backtracking is used on rule patterns. Tests pin this by source
+  inspection, a catastrophic `*a*a*...b` pattern against 4000 characters, and a linear-growth check; text over 4096 characters never matches.
+- **Management summary schema (pinned).** The summary item and list models forbid extra fields (a test per omitted field), so a future change
+  that adds assignee identity or evidence ids to the projection fails at validation.
+- **UI write safety (tightened).** An unconfirmed result (no usable answer) now **locks** the control: nothing more is sent until the operator
+  clicks "Reload current state" (closing the dialog also reloads), so a lost answer can no longer lead to a second comment or rule. A definite
+  refusal (409, 422, 503, 429, 403) does not lock. The dialog is a real focus trap (Tab and Shift+Tab wrap; Tab with nothing focusable stays
+  on the dialog; keys are handled on the document so a submit button disabled mid-request cannot drop keyboard focus out of the modal), cannot
+  be dismissed while a request is in flight, and focuses its first field on open. The 401 advice links to `/login?next=<current path>` through
+  `safeNextPath`. Icon-only labels were replaced by visually-hidden text with `aria-hidden` icons. Component tests (jsdom + Testing Library,
+  `apps/web/scripts/run-component-tests.mjs`) pin all of this, including the double-click single-flight guard and the per-role disabled reasons.
+- **Alert-rule approve/disable are outside step-up** by decision (recorded in RBAC-MATRIX); the audit record and `expected_version` binding
+  are the controls.
+- **Still open.** Idempotency keys (the lock prevents a resend from this page but not from a second tab or another client); step-up for rule
+  approval if the product decides it; a Playwright run of the write flows against a real stack (component tests use jsdom and stubbed server
+  actions); the proxy-trust setting is read from the process environment per request and is not validated against the actual proxy; read
+  auditing; the per-worker in-memory session store (a revoked session is only revoked in that worker).
 
 ## AI-specific threats
 - prompt injection in logs/hostnames/knowledge;

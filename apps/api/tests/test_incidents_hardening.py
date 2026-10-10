@@ -38,7 +38,8 @@ from netsight_api.auth.settings import SessionPolicy, session_policy
 from netsight_api.incident_routes import IncidentActor, _mutate, get_optional_incident_store
 from netsight_api.main import app
 from netsight_api.rbac import Identity, PrincipalKind
-from netsight_api.schemas import IncidentResolutionInput, IncidentResolveRequest
+from netsight_api.schemas import IncidentResolutionInput
+from netsight_api.schemas_incidents import IncidentResolveRequest
 from netsight_api.storage import (
     InMemoryIncidentRepository,
     ScopeViolationError,
@@ -259,9 +260,7 @@ def test_a_non_ascii_csrf_token_is_an_audited_403_not_a_500(
     incident_id = seed(store)
     caller = Caller("administrator")
     caplog.set_level(logging.INFO, logger="netsight_api.audit")
-    response = caller.http.post(
-        f"{API}/{incident_id}/acknowledge", headers={"X-CSRF-Token": token}
-    )
+    response = caller.http.post(f"{API}/{incident_id}/acknowledge", headers={"X-CSRF-Token": token})
     assert response.status_code == 403
     assert response.json()["error"]["code"] == "CSRF_VALIDATION_FAILED"
     assert [(r["outcome"], r["reason"]) for r in audit_records(caplog)] == [("denied", "csrf")]
@@ -378,7 +377,9 @@ def test_the_public_base_url_origin_is_allowed_without_extra_configuration(
     incident_id = seed(store)
     caller = Caller("administrator")
     assert post_with(caller, incident_id, {"Origin": "https://ns.example.org"}).status_code == 201
-    assert post_with(caller, incident_id, {"Origin": "https://ns.example.org:8443"}).status_code == 403
+    assert (
+        post_with(caller, incident_id, {"Origin": "https://ns.example.org:8443"}).status_code == 403
+    )
 
 
 @pytest.mark.parametrize(
@@ -718,7 +719,9 @@ def test_a_refusal_targets_the_validated_id(
     assert [r["target"] for r in audit_records(caplog)] == [incident_id, incident_id]
 
 
-@pytest.mark.parametrize("hostile", ["x%0A{%22event%22:%22forged%22}", "..%2F..%2Fpasswd", "A" * 300])
+@pytest.mark.parametrize(
+    "hostile", ["x%0A{%22event%22:%22forged%22}", "..%2F..%2Fpasswd", "A" * 300]
+)
 def test_a_malformed_path_id_is_never_echoed_into_the_audit_log(
     store: InMemoryIncidentRepository, caplog: pytest.LogCaptureFixture, hostile: str
 ) -> None:
@@ -892,4 +895,3 @@ def test_next_offset_never_exceeds_the_offset_cap(
     body = Caller("auditor").get(API, limit=limit, offset=offset).json()
     assert body["state"] == "ok"
     assert body["next_offset"] == expected
-

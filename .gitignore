@@ -3,6 +3,7 @@
 !.env.example
 node_modules/
 .next/
+.test-build/
 dist/
 !.opencode/dist/
 build/

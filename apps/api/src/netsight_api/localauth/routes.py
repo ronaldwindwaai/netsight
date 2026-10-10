@@ -87,7 +87,9 @@ def _session_secret() -> str:
     return secret
 
 
-def _issue_session(response: Response, username: str, roles: frozenset[str], email: str | None) -> None:
+def _issue_session(
+    request: Request, response: Response, username: str, roles: frozenset[str], email: str | None
+) -> None:
     manager = session_manager()
     session = manager.create_session(
         subject=f"local:{username}",
@@ -97,6 +99,8 @@ def _issue_session(response: Response, username: str, roles: frozenset[str], ema
         # Only reachable after a redeemed challenge and a verified second factor.
         mfa_age_seconds=0.0,
     )
+    # Rotation: the session the browser presented (if any) must not outlive the new one.
+    manager.revoke_cookie(request.cookies.get(manager.policy.cookie_name))
     response.set_cookie(value=manager.cookie_value(session), **manager.cookie_attributes())
 
 
@@ -112,7 +116,13 @@ async def login(body: LoginRequest, request: Request) -> Response:
     limiter = local_auth_limiter()
 
     if not limiter.allow_password(client_ip, username):
-        audit("login", outcome="denied", correlation_id=correlation_id, username=username, reason="rate_limited")
+        audit(
+            "login",
+            outcome="denied",
+            correlation_id=correlation_id,
+            username=username,
+            reason="rate_limited",
+        )
         raise ApiError(
             *_RATE_LIMITED,
             headers={"Retry-After": str(limiter.password_retry_after(client_ip, username))},
@@ -171,7 +181,13 @@ async def verify_second_factor(
 
     username = challenge.username
     if not limiter.allow_mfa(client_ip, username):
-        audit("mfa", outcome="denied", correlation_id=correlation_id, username=username, reason="rate_limited")
+        audit(
+            "mfa",
+            outcome="denied",
+            correlation_id=correlation_id,
+            username=username,
+            reason="rate_limited",
+        )
         raise ApiError(
             *_RATE_LIMITED,
             headers={"Retry-After": str(limiter.mfa_retry_after(client_ip, username))},
@@ -194,8 +210,14 @@ async def verify_second_factor(
         raise ApiError(*_INVALID_SECOND_FACTOR)
 
     store.register_success(username)
-    _issue_session(response, account.username, account.roles, challenge.email)
-    audit("login", outcome="success", correlation_id=correlation_id, username=account.username, factor="totp")
+    _issue_session(request, response, account.username, account.roles, challenge.email)
+    audit(
+        "login",
+        outcome="success",
+        correlation_id=correlation_id,
+        username=account.username,
+        factor="totp",
+    )
 
     return {
         "authenticated": True,
@@ -322,7 +344,12 @@ async def activate_enrolment(
         )
 
     if totp.verify_code(secret, body.code) is None:
-        audit("mfa_activated", outcome="failure", correlation_id=correlation_id, username=account.username)
+        audit(
+            "mfa_activated",
+            outcome="failure",
+            correlation_id=correlation_id,
+            username=account.username,
+        )
         raise ApiError(*_INVALID_SECOND_FACTOR)
 
     codes = generate_recovery_codes()
@@ -333,7 +360,9 @@ async def activate_enrolment(
     )
     store.save(updated)
 
-    audit("mfa_activated", outcome="success", correlation_id=correlation_id, username=account.username)
+    audit(
+        "mfa_activated", outcome="success", correlation_id=correlation_id, username=account.username
+    )
     return ActivateResponse(activated=True, recovery_codes=codes)
 
 
@@ -362,7 +391,10 @@ async def change_password(
     if not verify_password(account.password_hash, body.current_password):
         store.register_failure(account.username)
         audit(
-            "password_change", outcome="failure", correlation_id=correlation_id, username=account.username
+            "password_change",
+            outcome="failure",
+            correlation_id=correlation_id,
+            username=account.username,
         )
         raise ApiError(*_INVALID_CREDENTIALS)
 
@@ -382,5 +414,10 @@ async def change_password(
     account.record_success()
     store.save(account)
 
-    audit("password_change", outcome="success", correlation_id=correlation_id, username=account.username)
+    audit(
+        "password_change",
+        outcome="success",
+        correlation_id=correlation_id,
+        username=account.username,
+    )
     return {"changed": True}

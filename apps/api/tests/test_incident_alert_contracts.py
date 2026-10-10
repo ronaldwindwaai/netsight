@@ -19,7 +19,7 @@ import pytest
 import yaml  # type: ignore[import-untyped]
 from pydantic import BaseModel, ValidationError
 
-from netsight_api import schemas, schemas_alerting
+from netsight_api import schemas, schemas_alerting, schemas_incidents
 from netsight_api.contracts import SCHEMA_DIR, ContractViolation, validate
 
 REPO_ROOT = SCHEMA_DIR.parents[1]
@@ -45,22 +45,22 @@ ENTITIES: dict[str, tuple[str, type[BaseModel], str]] = {
     ),
     "incident_list_response": (
         "incident_list",
-        schemas.IncidentListResponse,
+        schemas_incidents.IncidentListResponse,
         "IncidentListResponse",
     ),
     "incident_summary_list_response": (
         "incident_summary_list",
-        schemas.IncidentSummaryListResponse,
+        schemas_incidents.IncidentSummaryListResponse,
         "IncidentSummaryListResponse",
     ),
     "incident_detail_response": (
         "incident_detail",
-        schemas.IncidentDetailResponse,
+        schemas_incidents.IncidentDetailResponse,
         "IncidentDetailResponse",
     ),
     "incident_timeline_response": (
         "incident_timeline",
-        schemas.IncidentTimelineResponse,
+        schemas_incidents.IncidentTimelineResponse,
         "IncidentTimelineResponse",
     ),
     "alert_rule": ("alert_rule", schemas.AlertRule, "AlertRule"),

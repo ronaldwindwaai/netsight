@@ -26,9 +26,7 @@ PASSWORD = "a-strong-unique-passphrase"
 
 
 @pytest.fixture(autouse=True)
-def _clean(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> Iterator[None]:
+def _clean(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Iterator[None]:
     import netsight_api.auth.session as session_module
 
     for name in ("NETSIGHT_ENV", "NETSIGHT_ENABLE_DEV_IDENTITY", "NETSIGHT_SESSION_SECRET"):
@@ -490,9 +488,7 @@ def test_mfa_limiter_blocks_spraying_from_one_host() -> None:
     from netsight_api.localauth.ratelimit import MFA_ATTEMPTS_PER_WINDOW, LocalAuthLimiter
 
     limiter = LocalAuthLimiter()
-    assert all(
-        limiter.allow_mfa("10.0.0.1", "ops") for _ in range(MFA_ATTEMPTS_PER_WINDOW)
-    )
+    assert all(limiter.allow_mfa("10.0.0.1", "ops") for _ in range(MFA_ATTEMPTS_PER_WINDOW))
     # Account budget spent: blocked from this host...
     assert limiter.allow_mfa("10.0.0.1", "ops") is False
     # ...and from any other host, so the account is protected regardless of
@@ -645,3 +641,26 @@ def test_account_store_is_durable_and_type_guarded() -> None:
     from netsight_api.localauth.filestore import FileAccountStore
 
     assert isinstance(account_store(), FileAccountStore)
+
+
+def test_a_local_sign_in_revokes_the_session_the_browser_presented() -> None:
+    from netsight_api.auth.session import session_manager
+
+    secret = _create_account()
+    manager = session_manager()
+    stale = manager.create_session("old-subject", "local", ["viewer"])
+    client = _client()
+    presented = {"Cookie": f"{manager.policy.cookie_name}={manager.cookie_value(stale)}"}
+
+    first = client.post(
+        "/api/v1/auth/local/login", json={"username": USERNAME, "password": PASSWORD}
+    )
+    second = client.post(
+        "/api/v1/auth/local/mfa/verify",
+        json={"challenge_id": _challenge_id(first), "code": totp.generate_code(secret)},
+        headers=presented,
+    )
+
+    assert second.status_code == 200
+    assert manager.validate_cookie(manager.cookie_value(stale)) is None
+    assert manager.validate_cookie(client.cookies.get(manager.policy.cookie_name)) is not None

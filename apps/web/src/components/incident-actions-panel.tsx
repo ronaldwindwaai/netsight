@@ -3,14 +3,16 @@
 import { useId, useState } from 'react';
 
 import { performIncidentAction } from '@/app/(dashboard)/incidents/[incidentId]/actions';
+import { AssignForm, CommentForm, ReopenForm } from '@/components/incident-action-forms';
+import type { FormPayload } from '@/components/incident-form-parts';
+import { ResolveForm } from '@/components/resolve-form';
 import {
-  AssignForm,
-  CommentForm,
-  ReopenForm,
-  ResolveForm,
-  type FormPayload,
-} from '@/components/incident-action-forms';
-import { ActionDialog, DisabledReason, WriteFeedback, useServerWrite } from '@/components/write-ui';
+  ActionDialog,
+  DisabledReason,
+  StepUpMarker,
+  WriteFeedback,
+  useServerWrite,
+} from '@/components/write-ui';
 import { availableIncidentActions } from '@/lib/incident-actions';
 import type { IncidentActionName, Viewer } from '@/lib/incident-actions';
 import type { IncidentState } from '@/lib/api-contracts-incident';
@@ -78,12 +80,14 @@ export function IncidentActionsPanel({
   function close() {
     if (runner.pending) return;
     setOpen(null);
-    runner.reset();
+    // An unconfirmed result stays on screen (with its reload button) after the dialog is gone.
+    if (!runner.unconfirmed) runner.reset();
   }
 
   const label = open === null ? '' : (actions.find((item) => item.action === open)?.label ?? '');
   const dialogProps = {
     disabled: runner.pending,
+    locked: runner.unconfirmed,
     onCancel: close,
     onSubmit: (payload: FormPayload) => void run(payload, label),
   };
@@ -96,15 +100,12 @@ export function IncidentActionsPanel({
             key={item.action}
             type="button"
             className={`btn btn-sm ${item.enabled ? BUTTON_THEME[item.action] : 'btn-outline-secondary'}`}
-            disabled={!item.enabled || runner.pending}
-            aria-disabled={!item.enabled}
+            disabled={!item.enabled || runner.pending || runner.unconfirmed}
             aria-describedby={item.enabled ? undefined : `${noteId}-${item.action}`}
             onClick={() => start(item.action, item.label)}
           >
             {item.label}
-            {item.needsStepUp ? (
-              <i className="bi bi-shield-lock ms-1" aria-label="needs recent multi-factor sign-in" />
-            ) : null}
+            {item.needsStepUp ? <StepUpMarker /> : null}
           </button>
         ))}
       </div>
@@ -126,7 +127,9 @@ export function IncidentActionsPanel({
             {notice}
           </div>
         ) : null}
-        {open === null ? <WriteFeedback result={runner.result} currentPath={currentPath} /> : null}
+        {open === null ? (
+          <WriteFeedback result={runner.result} currentPath={currentPath} onReload={runner.reload} />
+        ) : null}
       </div>
 
       {open !== null ? (
@@ -138,7 +141,7 @@ export function IncidentActionsPanel({
           {open === 'resolve' ? <ResolveForm {...dialogProps} /> : null}
           {open === 'reopen' ? <ReopenForm {...dialogProps} /> : null}
           <div className="mt-3" aria-live="polite">
-            <WriteFeedback result={runner.result} currentPath={currentPath} />
+            <WriteFeedback result={runner.result} currentPath={currentPath} onReload={runner.reload} />
           </div>
         </ActionDialog>
       ) : null}

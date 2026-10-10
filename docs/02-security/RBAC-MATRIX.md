@@ -92,6 +92,15 @@ a rule **may** approve it (no four-eyes rule; today's behaviour is kept and the 
 identity; the approval dialog states this when the approver is the creator). Still open: whether technicians should see
 maintenance windows (the matrix says nothing, so denied).
 
+### Step-up scope for alert rules and maintenance (decision record, 2026-10-10)
+
+Step-up (a recent second factor, see above) applies to **incident resolve and reopen only**. Alert-rule approve and disable, rule
+create/edit and maintenance-window create/cancel are **deliberately outside step-up**: each is authorised by its own permission,
+human-only, CSRF- and origin-checked, rate-limited and audited with the actor, and approval is bound to the version the approver saw
+(`expected_version`), so a stale or concurrent edit cannot be activated by mistake. Extending step-up to `alert-rules:approve` /
+`alert-rules:disable` (the highest-impact alerting actions) is an open product decision, not an oversight; if it is taken, add
+`step_up=True` to those two writer dependencies and a `STEP_UP_REQUIRED` case to the UI (the shared `WriteFeedback` already renders it).
+
 ## Session permissions for the UI
 
 `GET /api/v1/auth/session` returns `permissions`: the sorted permission names the session's roles hold (derived from the same

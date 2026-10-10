@@ -4,20 +4,30 @@ import { headers } from 'next/headers';
 
 import { apiPost } from '@/lib/api';
 import type { ResponseParser } from '@/lib/api';
-import { sameOrigin } from '@/lib/request-origin';
+import { readTrustProxy, sameOrigin } from '@/lib/request-origin';
 import { NOT_SAME_ORIGIN_MESSAGE, type WriteActionResult } from '@/lib/write-result';
 import { describeWriteFailure } from '@/lib/write-outcome';
 
 /**
  * A server action is a public POST. Its own cross-site control is asserted here rather than left
- * to the framework default: the browser's Origin (or Referer) must match the host the request was
- * addressed to. This is defence in depth in front of `apiPost`, which attaches the session cookie
- * and the CSRF token server-side; the API enforces its own origin allow-list as well.
+ * to the framework default: the browser's Origin (Referer only when Origin is absent) must be
+ * this very site, scheme and host. `X-Forwarded-Host` / `-Proto` count only when
+ * `NETSIGHT_TRUST_PROXY_HEADERS=true` (a proxy that overwrites them). This is defence in depth in
+ * front of `apiPost`, which attaches the session cookie and the CSRF token server-side; the API
+ * enforces its own origin allow-list as well.
  */
 export async function fromSameOrigin(): Promise<boolean> {
   const headerList = await headers();
-  const host = headerList.get('x-forwarded-host') ?? headerList.get('host');
-  return sameOrigin(host, headerList.get('origin'), headerList.get('referer'));
+  return sameOrigin(
+    {
+      host: headerList.get('host'),
+      forwardedHost: headerList.get('x-forwarded-host'),
+      forwardedProto: headerList.get('x-forwarded-proto'),
+      origin: headerList.get('origin'),
+      referer: headerList.get('referer'),
+    },
+    { trustProxy: readTrustProxy(process.env), production: process.env.NODE_ENV === 'production' },
+  );
 }
 
 export function rejected(message: string): WriteActionResult {

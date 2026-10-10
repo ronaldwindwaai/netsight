@@ -57,6 +57,7 @@ from netsight_api.contracts import ContractViolation, validate
 from netsight_api.diagnostic_routes import router as diagnostic_router
 from netsight_api.errors import ApiError
 from netsight_api.evaluation.wiring import build_evaluation_service, start_evaluation
+from netsight_api.incident_list_routes import router as incident_list_router
 from netsight_api.incident_routes import router as incident_router
 from netsight_api.localauth.routes import router as localauth_router
 from netsight_api.maintenance_routes import router as maintenance_router
@@ -313,9 +314,7 @@ def get_optional_netbox_client() -> NetboxClient | None:
         return None
 
 
-OptionalNetboxDependency = Annotated[
-    NetboxClient | None, Depends(get_optional_netbox_client)
-]
+OptionalNetboxDependency = Annotated[NetboxClient | None, Depends(get_optional_netbox_client)]
 
 
 def get_optional_librenms_client() -> LibrenmsClient | None:
@@ -326,9 +325,7 @@ def get_optional_librenms_client() -> LibrenmsClient | None:
         return None
 
 
-OptionalLibrenmsDependency = Annotated[
-    LibrenmsClient | None, Depends(get_optional_librenms_client)
-]
+OptionalLibrenmsDependency = Annotated[LibrenmsClient | None, Depends(get_optional_librenms_client)]
 
 
 class TrafficSource(Protocol):
@@ -386,9 +383,7 @@ def get_optional_traffic_source() -> TrafficSource | None:
     )
 
 
-OptionalTrafficDependency = Annotated[
-    TrafficSource | None, Depends(get_optional_traffic_source)
-]
+OptionalTrafficDependency = Annotated[TrafficSource | None, Depends(get_optional_traffic_source)]
 
 
 async def _capture[T](operation: Awaitable[T]) -> T | Exception:
@@ -714,9 +709,7 @@ async def topology(
             extra={
                 "correlation_id": correlation_id,
                 "source": "netbox",
-                "adapter_status": str(
-                    getattr(cables_result, "status", "unknown")
-                ),
+                "adapter_status": str(getattr(cables_result, "status", "unknown")),
             },
         )
         return TopologyResponse(
@@ -736,9 +729,7 @@ async def topology(
             extra={
                 "correlation_id": correlation_id,
                 "source": "netbox",
-                "adapter_status": str(
-                    getattr(devices_result, "status", "unknown")
-                ),
+                "adapter_status": str(getattr(devices_result, "status", "unknown")),
             },
         )
         netbox_devices = None
@@ -756,9 +747,7 @@ async def topology(
             extra={
                 "correlation_id": correlation_id,
                 "source": "librenms",
-                "adapter_status": str(
-                    getattr(discovery_result, "status", "unknown")
-                ),
+                "adapter_status": str(getattr(discovery_result, "status", "unknown")),
             },
         )
         discovered = None
@@ -768,9 +757,7 @@ async def topology(
     reconciled = netbox_devices is not None and discovered is not None
     findings: dict[str, TopologyNodeFinding] = {}
     if netbox_devices is not None and discovered is not None:
-        for finding in reconcile(
-            list(netbox_devices.items), list(discovered.items)
-        ):
+        for finding in reconcile(list(netbox_devices.items), list(discovered.items)):
             if finding.netbox_device_id is None:
                 continue
             if finding.kind == "unknown-discovered":
@@ -849,11 +836,7 @@ def _traffic_freshness(window_end: datetime, observed_at: datetime | None) -> Fr
     if observed_at is None:
         return Freshness(state="unknown", observed_at=None, source="clickhouse")
     return Freshness(
-        state=(
-            "fresh"
-            if observed_at >= window_end - _TRAFFIC_FRESH_THRESHOLD
-            else "stale"
-        ),
+        state=("fresh" if observed_at >= window_end - _TRAFFIC_FRESH_THRESHOLD else "stale"),
         observed_at=observed_at,
         source="clickhouse",
     )
@@ -885,9 +868,7 @@ async def _traffic_top(
     limit: int,
 ) -> TrafficTopResponse:
     """Explicit traffic state: not-connected / unknown / source-reported ok."""
-    window_start, window_end, resolved_preset = resolve_window(
-        preset, start, end
-    )
+    window_start, window_end, resolved_preset = resolve_window(preset, start, end)
     time_range = TrafficTimeRange.model_validate(
         {"from": window_start, "to": window_end, "preset": resolved_preset}
     )
@@ -900,9 +881,7 @@ async def _traffic_top(
                 dimension=dimension,
                 time_range=time_range,
                 items=[],
-                freshness=Freshness(
-                    state="unknown", observed_at=None, source="clickhouse"
-                ),
+                freshness=Freshness(state="unknown", observed_at=None, source="clickhouse"),
             )
         )
 
@@ -993,9 +972,7 @@ async def traffic_top_destinations(
     limit: Annotated[int, Query(ge=1, le=100)] = 10,
 ) -> TrafficTopResponse:
     """Top destinations for a bounded window (same explicit states)."""
-    return await _traffic_top(
-        request, source, "destinations", preset, start, end, limit
-    )
+    return await _traffic_top(request, source, "destinations", preset, start, end, limit)
 
 
 @api.get(
@@ -1014,9 +991,7 @@ async def traffic_flows(
     limit: Annotated[int, Query(ge=1, le=500)] = 50,
 ) -> TrafficFlowsResponse:
     """Recent high-volume flows for a bounded window (explicit states)."""
-    window_start, window_end, resolved_preset = resolve_window(
-        preset, start, end
-    )
+    window_start, window_end, resolved_preset = resolve_window(preset, start, end)
     time_range = TrafficTimeRange.model_validate(
         {"from": window_start, "to": window_end, "preset": resolved_preset}
     )
@@ -1028,9 +1003,7 @@ async def traffic_flows(
                 state="unknown",
                 time_range=time_range,
                 flows=[],
-                freshness=Freshness(
-                    state="unknown", observed_at=None, source="clickhouse"
-                ),
+                freshness=Freshness(state="unknown", observed_at=None, source="clickhouse"),
             )
         )
 
@@ -1043,9 +1016,7 @@ async def traffic_flows(
                 freshness=Freshness(state="unknown", observed_at=None, source=None),
             )
         )
-    result = await _capture(
-        source.flows(start=window_start, end=window_end, limit=limit)
-    )
+    result = await _capture(source.flows(start=window_start, end=window_end, limit=limit))
     if isinstance(result, Exception):
         _LOGGER.warning(
             "traffic flow source read failed",
@@ -1262,8 +1233,7 @@ async def overview(
         "maintenance",
     )
     by_status = [
-        DeviceStatusCount(status=status, count=counts.get(status, 0))
-        for status in ordered_statuses
+        DeviceStatusCount(status=status, count=counts.get(status, 0)) for status in ordered_statuses
     ]
     return OverviewResponse(
         devices=DeviceHealthSummary(
@@ -1287,6 +1257,8 @@ async def overview(
 
 app.include_router(api)
 app.include_router(security_router, prefix=API_PREFIX)
+# The list router first: its static /incidents/summary must precede /incidents/{incident_id}.
+app.include_router(incident_list_router, prefix=API_PREFIX)
 app.include_router(incident_router, prefix=API_PREFIX)
 app.include_router(alert_rule_router, prefix=API_PREFIX)
 app.include_router(maintenance_router, prefix=API_PREFIX)

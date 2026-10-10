@@ -166,9 +166,7 @@ class SessionManager:
     ) -> Session:
         """``mfa_age_seconds``: how long ago the sign-in's second factor happened (the token's
         own ``auth_time``), mapped onto the store clock; None when it is not proven."""
-        return self.store.create(
-            subject, provider, roles, email, mfa_age_seconds=mfa_age_seconds
-        )
+        return self.store.create(subject, provider, roles, email, mfa_age_seconds=mfa_age_seconds)
 
     def mfa_age(self, session: Session) -> float | None:
         """Seconds since the second factor; None when unknown (never, or a stamp from the future)."""
@@ -192,6 +190,14 @@ class SessionManager:
 
     def revoke(self, session_id: str) -> None:
         self.store.revoke(session_id)
+
+    def revoke_cookie(self, cookie_value: str | None) -> None:
+        """Revoke the session a cookie names; a missing or forged cookie revokes nothing."""
+        if not cookie_value:
+            return
+        session_id = self._verify_signed_id(cookie_value)
+        if session_id is not None:
+            self.store.revoke(session_id)
 
     def revoke_subject(self, provider: str, subject: str) -> None:
         self.store.revoke_subject(provider, subject)
