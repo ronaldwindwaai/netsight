@@ -742,6 +742,7 @@ dependencies = [
 
 [package.optional-dependencies]
 dev = [
+    { name = "certifi" },
     { name = "cryptography" },
     { name = "hatchling" },
     { name = "mypy" },
@@ -756,6 +757,7 @@ dev = [
 requires-dist = [
     { name = "alembic", specifier = ">=1.13,<2" },
     { name = "argon2-cffi", specifier = ">=23.1,<26" },
+    { name = "certifi", marker = "extra == 'dev'", specifier = ">=2024" },
     { name = "cryptography", marker = "extra == 'dev'", specifier = ">=50,<51" },
     { name = "fastapi", specifier = ">=0.115,<1" },
     { name = "hatchling", marker = "extra == 'dev'", specifier = ">=1.25" },

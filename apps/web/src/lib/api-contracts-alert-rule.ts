@@ -115,6 +115,14 @@ export interface MaintenanceWindow {
 const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
 const RULE_ID = new RegExp(`^alert-rule-${UUID}$`);
 const WINDOW_ID = new RegExp(`^maintenance-${UUID}$`);
+export function isAlertRuleId(value: unknown): value is string {
+  return typeof value === 'string' && RULE_ID.test(value);
+}
+
+export function isMaintenanceWindowId(value: unknown): value is string {
+  return typeof value === 'string' && WINDOW_ID.test(value);
+}
+
 const METRIC = /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*$/;
 const TIME_OF_DAY = /^([01][0-9]|2[0-3]):[0-5][0-9]$/;
 const TIMEZONE = /^(UTC|[A-Za-z][A-Za-z0-9_+-]*(\/[A-Za-z][A-Za-z0-9_+-]*){1,2})$/;

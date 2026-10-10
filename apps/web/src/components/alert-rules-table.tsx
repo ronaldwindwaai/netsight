@@ -1,4 +1,6 @@
+import { RuleRowActions } from '@/components/alerting-write-controls';
 import type { AlertRule } from '@/lib/api-contracts-alert-rule';
+import type { Viewer } from '@/lib/incident-actions';
 import {
   describeCondition,
   describeScope,
@@ -25,11 +27,17 @@ const SEVERITY_THEME: Record<AlertRule['severity'], string> = {
 };
 
 /**
- * Read-only rules. Names, scope references, patterns and labels are
+ * Rules with the actions the viewer may take. Names, scope references, patterns and labels are
  * operator-entered, untrusted text rendered as plain text nodes. The rule
  * version and approval record are shown as the evidence for what is in force.
  */
-export function AlertRulesTable({ rules }: { rules: readonly AlertRule[] }) {
+export function AlertRulesTable({
+  rules,
+  viewer,
+}: {
+  rules: readonly AlertRule[];
+  viewer: Viewer | null;
+}) {
   return (
     <div className="table-responsive">
       <table className="table table-sm table-striped table-hover mb-0">
@@ -42,6 +50,7 @@ export function AlertRulesTable({ rules }: { rules: readonly AlertRule[] }) {
             <th scope="col">Condition</th>
             <th scope="col">Timing</th>
             <th scope="col">Version and approval</th>
+            <th scope="col">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -91,6 +100,9 @@ export function AlertRulesTable({ rules }: { rules: readonly AlertRule[] }) {
                   ) : (
                     <span className="d-block text-body-secondary">No approval recorded</span>
                   )}
+                </td>
+                <td>
+                  <RuleRowActions rule={rule} viewer={viewer} />
                 </td>
               </tr>
             );

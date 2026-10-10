@@ -60,7 +60,8 @@ function messageFor(status: number, data: Record<string, unknown>): string {
   return 'Sign-in could not be completed. Try again.';
 }
 
-export function LocalSignIn() {
+/** `redirectTo` is a path already vetted by `safeNextPath` on the server. */
+export function LocalSignIn({ redirectTo = '/overview' }: { redirectTo?: string }) {
   const router = useRouter();
   const [step, setStep] = useState<Step>('credentials');
   const [username, setUsername] = useState('');
@@ -107,7 +108,7 @@ export function LocalSignIn() {
 
     if (status === 200) {
       writeChallenge('');
-      router.push('/overview');
+      router.push(redirectTo);
       router.refresh();
       return;
     }

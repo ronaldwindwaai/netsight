@@ -5,10 +5,12 @@ import { AppLink } from '@/components/app-link';
 import { apiGet } from '@/lib/api';
 import { parseSessionInfo } from '@/lib/api-contracts';
 import { menuItems } from '@/lib/menu';
+import { canChangeAnything, viewerFromSession } from '@/lib/viewer';
 
 export default async function Layout({ children }: { children: React.ReactNode }) {
   const sessionState = await apiGet('/api/v1/auth/session', parseSessionInfo);
   const session = sessionState.kind === 'ok' ? sessionState.data : null;
+  const readOnly = !canChangeAnything(viewerFromSession(session));
 
   return (
     <DashboardLayout
@@ -26,10 +28,12 @@ export default async function Layout({ children }: { children: React.ReactNode }
       sidebarTheme="dark"
       topbarEnd={
         <>
-          <span className="badge text-bg-secondary me-2">
-            <i className="bi bi-eye me-1" aria-hidden="true" />
-            Read only
-          </span>
+          {readOnly ? (
+            <span className="badge text-bg-secondary me-2">
+              <i className="bi bi-eye me-1" aria-hidden="true" />
+              Read only
+            </span>
+          ) : null}
           <IdentityMenu session={session} />
         </>
       }

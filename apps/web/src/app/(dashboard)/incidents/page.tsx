@@ -4,25 +4,36 @@ import { AppContent, Card } from '@adminlte/react';
 import { DataFailure } from '@/components/data-state';
 import { IncidentFiltersForm } from '@/components/incident-filters';
 import { IncidentListTable } from '@/components/incident-list-table';
+import { IncidentSummaryTable } from '@/components/incident-summary-table';
 import { Pager } from '@/components/pager';
 import { StateSurface, StoreStateSurface } from '@/components/state-surface';
 import { apiGet } from '@/lib/api';
 import type { FetchState } from '@/lib/api';
-import { parseIncidentListResponse } from '@/lib/api-contracts-incident-api';
-import type { IncidentListResponse } from '@/lib/api-contracts-incident-api';
+import { parseSessionInfo } from '@/lib/api-contracts';
+import {
+  parseIncidentListResponse,
+  parseIncidentSummaryListResponse,
+} from '@/lib/api-contracts-incident-api';
+import type {
+  IncidentListResponse,
+  IncidentSummaryListResponse,
+} from '@/lib/api-contracts-incident-api';
 import { formatUtcTimestamp } from '@/lib/format-time';
+import { viewerFromSession } from '@/lib/viewer';
 import {
   DEFAULT_INCIDENT_PAGE_SIZE,
   SEVERITY_DISPLAY_ORDER,
   incidentCounts,
   incidentListPath,
   incidentPageHrefs,
+  incidentReadMode,
+  incidentSummaryListPath,
   parseIncidentFilters,
   severityLabel,
 } from '@/lib/incident-view';
 import type { IncidentFilters, RawQuery } from '@/lib/incident-view';
 
-function CountsStrip({ response }: { response: IncidentListResponse }) {
+function CountsStrip({ response }: { response: IncidentListResponse | IncidentSummaryListResponse }) {
   const counts = incidentCounts(response.incidents);
   return (
     <section className="px-3 pt-3" aria-label="Severity counts of the listed incidents">
@@ -47,9 +58,11 @@ function CountsStrip({ response }: { response: IncidentListResponse }) {
 function ListBody({
   state,
   filters,
+  summary,
 }: {
-  state: FetchState<IncidentListResponse>;
+  state: FetchState<IncidentListResponse | IncidentSummaryListResponse>;
   filters: IncidentFilters;
+  summary: boolean;
 }): ReactNode {
   if (state.kind !== 'ok') {
     return (
@@ -82,7 +95,11 @@ function ListBody({
   return (
     <>
       <CountsStrip response={response} />
-      <IncidentListTable incidents={response.incidents} />
+      {summary ? (
+        <IncidentSummaryTable incidents={response.incidents as IncidentSummaryListResponse['incidents']} />
+      ) : (
+        <IncidentListTable incidents={response.incidents as IncidentListResponse['incidents']} />
+      )}
       <Pager
         label="Incident pages"
         hrefs={incidentPageHrefs(filters, response.limit || DEFAULT_INCIDENT_PAGE_SIZE, response.next_offset)}
@@ -96,8 +113,20 @@ export default async function IncidentsPage({
 }: {
   searchParams: Promise<RawQuery>;
 }) {
-  const filters = parseIncidentFilters(await searchParams);
-  const state = await apiGet(incidentListPath(filters), parseIncidentListResponse);
+  const parsed = parseIncidentFilters(await searchParams);
+  const sessionState = await apiGet('/api/v1/auth/session', parseSessionInfo);
+  const mode = incidentReadMode(
+    sessionState.kind === 'ok' ? viewerFromSession(sessionState.data)?.permissions ?? null : null,
+  );
+  const summary = mode === 'summary';
+  // The summary view has no assignee filter; a stale bookmark carrying one must not apply it.
+  const filters = summary ? { ...parsed, assigneeId: null } : parsed;
+  const state: FetchState<IncidentListResponse | IncidentSummaryListResponse> | null =
+    mode === 'none'
+      ? null
+      : summary
+        ? await apiGet(incidentSummaryListPath(filters), parseIncidentSummaryListResponse)
+        : await apiGet(incidentListPath(filters), parseIncidentListResponse);
   const retrievedAt = formatUtcTimestamp(new Date().toISOString());
 
   return (
@@ -107,13 +136,15 @@ export default async function IncidentsPage({
     >
       <div className="page-intro d-flex flex-wrap align-items-end justify-content-between gap-2">
         <p className="text-body-secondary mb-0">
-          Read-only incident list, newest first. Titles and assignees are operator-entered text and
-          are displayed as data only. Retrieved {retrievedAt}; the incident API does not report a
-          freshness value.
+          {summary
+            ? 'Summary view for your role: severity, headline, state and whether an incident is assigned. Evidence, comments, resolution text and assignee identities are not shown to this role. '
+            : 'Incident list, newest first. Open an incident to act on it. '}
+          Titles and assignees are operator-entered text and are displayed as data only. Retrieved{' '}
+          {retrievedAt}; the incident API does not report a freshness value.
         </p>
       </div>
 
-      <IncidentFiltersForm filters={filters} />
+      {mode === 'none' ? null : <IncidentFiltersForm filters={filters} showAssignee={!summary} />}
 
       <Card
         className="operational-card"
@@ -123,7 +154,15 @@ export default async function IncidentsPage({
         theme="primary"
         bodyClass="p-0"
       >
-        <ListBody state={state} filters={filters} />
+        {state === null ? (
+          <StateSurface
+            icon="bi bi-shield-lock"
+            title="Permission denied"
+            detail="Your role does not include incident access. Access is enforced by the Netsight API."
+          />
+        ) : (
+          <ListBody state={state} filters={filters} summary={summary} />
+        )}
       </Card>
     </AppContent>
   );

@@ -16,7 +16,7 @@ from collections.abc import Callable, Mapping, Sequence
 from collections.abc import Set as AbstractSet
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from threading import Lock
+from threading import Lock, Thread
 from typing import Final, Literal, Protocol
 
 from netsight_api.alerting.schedule import ScheduleError, schedule_active
@@ -29,11 +29,13 @@ from netsight_api.notifications.models import (
     unique_destinations,
 )
 from netsight_api.notifications.senders import NotificationSender
+from netsight_api.notifications.store import check_recent_limit, validate_attempt
 from netsight_api.schemas import AlertSchedule, AlertSeverity
 
 _LOGGER: Final = logging.getLogger("netsight_api.notifications")
 MAX_ESCALATION_SECONDS: Final = 7 * 24 * 3600
 MAX_QUEUE_LIMIT: Final = 10_000
+DEFAULT_SEND_TIMEOUT_SECONDS: Final = 60.0
 _SEVERITY_RANK: Final = {"info": 0, "low": 1, "medium": 2, "high": 3, "critical": 4}
 
 # --- routing -----------------------------------------------------------------------------------
@@ -158,7 +160,8 @@ class DeliveryRecorder(Protocol):
 
 
 class InMemoryDeliveryRecorder:
-    """A bounded ring of the most recent attempts (durable storage is a follow-up)."""
+    """A bounded ring of the most recent attempts: the fallback when no durable store is
+    configured or reachable, and the in-memory implementation of ``DeliveryAttemptRepository``."""
 
     def __init__(self, maxlen: int = 1000) -> None:
         if not 1 <= maxlen <= 100_000:
@@ -167,6 +170,7 @@ class InMemoryDeliveryRecorder:
         self._attempts: deque[DeliveryAttempt] = deque(maxlen=maxlen)
 
     def record(self, attempt: DeliveryAttempt) -> None:
+        validate_attempt(attempt)
         with self._lock:
             self._attempts.append(attempt)
 
@@ -176,7 +180,17 @@ class InMemoryDeliveryRecorder:
             return tuple(self._attempts)
 
     def for_notification(self, notification_id: str) -> tuple[DeliveryAttempt, ...]:
-        return tuple(a for a in self.attempts if a.notification_id == notification_id)
+        found = (a for a in self.attempts if a.notification_id == notification_id)
+        return tuple(sorted(found, key=lambda a: a.attempt))
+
+    def recent(self, limit: int = 100) -> tuple[DeliveryAttempt, ...]:
+        check_recent_limit(limit)
+        ordered = sorted(enumerate(self.attempts), key=lambda pair: (pair[1].at, pair[0]))
+        return tuple(attempt for _, attempt in reversed(ordered))[:limit]
+
+    def last_sent_at(self, alert_ref: str) -> datetime | None:
+        sent = [a.at for a in self.attempts if a.alert_ref == alert_ref and a.status == "sent"]
+        return max(sent, default=None)
 
 
 # --- dispatcher -----------------------------------------------------------------------------------
@@ -208,9 +222,13 @@ class NotificationDispatcher:
         policy: RetryPolicy | None = None,
         queue_limit: int = 1000,
         public_base_url: str | None = None,
+        send_timeout_seconds: float = DEFAULT_SEND_TIMEOUT_SECONDS,
     ) -> None:
         if not 1 <= queue_limit <= MAX_QUEUE_LIMIT:
             raise ValueError(f"queue_limit must be between 1 and {MAX_QUEUE_LIMIT}")
+        if not 0 < send_timeout_seconds <= 300:
+            raise ValueError("send_timeout_seconds must be up to 300")
+        self._send_timeout = send_timeout_seconds
         self._senders = dict(senders)
         self._recorder = recorder
         self._clock = clock
@@ -273,10 +291,28 @@ class NotificationDispatcher:
         return DeliveryOutcome(notification.id, "failed", self._policy.max_attempts, result.code)
 
     def _send_once(self, sender: NotificationSender, notification: Notification) -> SendResult:
-        try:
-            result = sender.send(notification.destination, notification.payload)
-        except Exception as exc:  # noqa: BLE001 - a sender bug must not stop the dispatcher
-            _LOGGER.warning("notification sender raised", extra={"error_type": type(exc).__name__})
+        """One send, bounded overall: socket timeouts bound each operation, not the whole send."""
+        box: list[SendResult | Exception] = []
+
+        def work() -> None:
+            try:
+                box.append(sender.send(notification.destination, notification.payload))
+            except Exception as exc:  # noqa: BLE001 - handed back to the caller below
+                box.append(exc)
+
+        worker = Thread(target=work, name="netsight-send", daemon=True)
+        worker.start()
+        worker.join(self._send_timeout)
+        if worker.is_alive() or not box:
+            # Final, not retried: another attempt would only stack up hung threads, and the
+            # message may in fact have gone out.
+            _LOGGER.warning("notification send exceeded its overall timeout")
+            return SendResult("permanent", "SEND_TIMEOUT")
+        result = box[0]
+        if isinstance(result, Exception):
+            _LOGGER.warning(
+                "notification sender raised", extra={"error_type": type(result).__name__}
+            )
             return SendResult("retryable", "SENDER_ERROR")
         if result.status not in ("sent", "retryable", "permanent"):
             return SendResult("permanent", "SENDER_ERROR")
@@ -285,15 +321,20 @@ class NotificationDispatcher:
     def _record(
         self, notification: Notification, attempt: int, status: AttemptStatus, code: str
     ) -> None:
-        self._recorder.record(
-            DeliveryAttempt(
-                notification_id=notification.id,
-                alert_ref=notification.payload.alert_ref,
-                channel=notification.destination.kind,
-                destination=notification.destination.label,
-                attempt=attempt,
-                status=status,
-                code=code,
-                at=self._clock(),
+        try:
+            self._recorder.record(
+                DeliveryAttempt(
+                    notification_id=notification.id,
+                    alert_ref=notification.payload.alert_ref,
+                    channel=notification.destination.kind,
+                    destination=notification.destination.label,
+                    attempt=attempt,
+                    status=status,
+                    code=code,
+                    at=self._clock(),
+                )
             )
-        )
+        except Exception as exc:  # noqa: BLE001 - a bookkeeping failure must not stop delivery
+            _LOGGER.warning(
+                "delivery attempt not recorded", extra={"error_type": type(exc).__name__}
+            )

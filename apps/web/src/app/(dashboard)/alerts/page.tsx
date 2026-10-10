@@ -5,11 +5,12 @@ import { AlertTable } from '@/components/alert-table';
 import { AlertRulesCard, MaintenanceWindowsCard } from '@/components/alerting-sections';
 import { DataFailure, FreshnessNotice } from '@/components/data-state';
 import { apiGet } from '@/lib/api';
-import { parseAlertList } from '@/lib/api-contracts';
+import { parseAlertList, parseSessionInfo } from '@/lib/api-contracts';
 import { parseAlertRuleListResponse, parseMaintenanceWindowListResponse } from '@/lib/api-contracts-alert-rule-api';
 import { alertingListPath, parseAlertingOffsets } from '@/lib/alerting-view';
 import { formatUtcTimestamp } from '@/lib/format-time';
 import type { RawQuery } from '@/lib/incident-view';
+import { viewerFromSession } from '@/lib/viewer';
 
 const PAGE_SIZE = 50;
 
@@ -29,10 +30,12 @@ export default async function AlertsPage({
   const page = requestedPage(query.page);
   const offsets = parseAlertingOffsets(query);
   const nowMs = new Date().getTime();
-  const [rules, windows] = await Promise.all([
+  const [rules, windows, sessionState] = await Promise.all([
     apiGet(alertingListPath('rules', offsets.rules), parseAlertRuleListResponse),
     apiGet(alertingListPath('windows', offsets.windows), parseMaintenanceWindowListResponse),
+    apiGet('/api/v1/auth/session', parseSessionInfo),
   ]);
+  const viewer = sessionState.kind === 'ok' ? viewerFromSession(sessionState.data) : null;
   const paging = { offsets, alertsPage: page };
   const state = await apiGet(
     `/api/v1/alerts?page=${page}&page_size=${PAGE_SIZE}`,
@@ -45,8 +48,8 @@ export default async function AlertsPage({
       <div className="page-intro">
         <p className="text-body-secondary mb-0">
           Read-only alerts mapped from LibreNMS, plus the alert rules and maintenance windows
-          held by Netsight. Rule and window names, labels and reasons are operator-entered text
-          and are displayed as data only.
+          held by Netsight, which you can change as far as your role permits. Rule and window
+          names, labels and reasons are operator-entered text and are displayed as data only.
         </p>
       </div>
 
@@ -104,12 +107,13 @@ export default async function AlertsPage({
       )}
 
       <div className="mt-4">
-        <AlertRulesCard state={rules} paging={paging} retrievedAt={retrievedAt} />
+        <AlertRulesCard state={rules} paging={paging} retrievedAt={retrievedAt} viewer={viewer} />
         <MaintenanceWindowsCard
           state={windows}
           paging={paging}
           nowMs={nowMs}
           retrievedAt={retrievedAt}
+          viewer={viewer}
         />
       </div>
     </AppContent>

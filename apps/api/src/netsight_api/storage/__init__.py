@@ -15,17 +15,25 @@ from netsight_api.storage.errors import (
     StorageError,
     StorageUnavailableError,
 )
+from netsight_api.storage.links import (
+    AlertIncidentLinkRepository,
+    InMemoryAlertIncidentLinkRepository,
+    LinkKind,
+)
 from netsight_api.storage.memory import InMemoryAlertRuleRepository, InMemoryIncidentRepository
 from netsight_api.storage.repository import AlertRuleRepository, IncidentRepository, NoteKind
 
 __all__ = [
+    "AlertIncidentLinkRepository",
     "AlertRuleRepository",
     "IllegalTransitionError",
+    "InMemoryAlertIncidentLinkRepository",
     "InMemoryAlertRuleRepository",
     "InMemoryIncidentRepository",
     "IncidentRepository",
     "InvalidOperationError",
     "LimitExceededError",
+    "LinkKind",
     "NotFoundError",
     "NoteKind",
     "ScopeViolationError",

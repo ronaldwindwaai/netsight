@@ -7,13 +7,15 @@ closed and enforces the provider allow-lists.
 
 from __future__ import annotations
 
+import time
 from typing import Any
 
 from fastapi import APIRouter, Request, Response
 from fastapi.responses import RedirectResponse
 
+from netsight_api.audit import record_audit
 from netsight_api.auth.deps import get_session
-from netsight_api.auth.identity import build_identity
+from netsight_api.auth.identity import build_identity, mfa_age
 from netsight_api.auth.oidc import (
     OidcError,
     authorization_url,
@@ -34,6 +36,7 @@ from netsight_api.auth.settings import (
     provider_settings,
 )
 from netsight_api.errors import ApiError
+from netsight_api.rbac import Identity, PrincipalKind, permissions_for
 from netsight_api.schemas import AuthProvidersResponse, ProviderState
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -63,6 +66,32 @@ def _redirect_uri(request: Request) -> str:
 
 def _client_ip(request: Request) -> str:
     return request.client.host if request.client else "unknown"
+
+
+def _verified_mfa_age(
+    request: Request, raw: dict[str, Any], step_up_requested_at: float | None
+) -> float | None:
+    """The token's own MFA age (``auth_time``), or None; a rejected assertion is audited.
+
+    A token that never claimed MFA is normal and silent unless a step-up was requested; a
+    claimed-but-unusable one (missing, malformed, stale, future or replayed ``auth_time``) is
+    a denied, audited event with a static reason code.
+    """
+    age, reason = mfa_age(
+        raw,
+        now=time.time(),
+        max_age=float(auth_settings().step_up_max_age_seconds),
+        step_up_requested_at=step_up_requested_at,
+    )
+    if reason is not None and (reason != "mfa-not-asserted" or step_up_requested_at is not None):
+        record_audit(
+            "auth.mfa",
+            outcome="denied",
+            actor_id=None,
+            correlation_id=getattr(request.state, "correlation_id", "unknown"),
+            reason=reason,
+        )
+    return age
 
 
 def _rate_limit(request: Request, action: str) -> None:
@@ -97,7 +126,12 @@ async def providers() -> AuthProvidersResponse:
 
 
 @router.get("/login/{provider}")
-async def login(provider: str, request: Request, redirect_to: str = "/overview") -> Response:
+async def login(
+    provider: str,
+    request: Request,
+    redirect_to: str = "/overview",
+    step_up: bool = False,
+) -> Response:
     resolved = _provider_or_error(provider)
     settings = provider_settings(resolved)
     if not settings.enabled or not settings.client_id:
@@ -118,6 +152,7 @@ async def login(provider: str, request: Request, redirect_to: str = "/overview")
         nonce=nonce,
         code_verifier=code_verifier,
         redirect_to=_safe_redirect(redirect_to),
+        step_up_requested_at=time.time() if step_up else None,
     )
 
     try:
@@ -128,6 +163,7 @@ async def login(provider: str, request: Request, redirect_to: str = "/overview")
             state,
             nonce,
             code_verifier,
+            step_up=step_up,
         )
     except OidcError as exc:
         raise ApiError(502, "OIDC_UNAVAILABLE", exc.message) from exc
@@ -180,6 +216,7 @@ async def callback(
         provider=pending.provider.value,
         roles=identity.roles,
         email=claims.email,
+        mfa_age_seconds=_verified_mfa_age(request, claims.raw, pending.step_up_requested_at),
     )
 
     target = _safe_redirect(pending.redirect_to)
@@ -199,6 +236,9 @@ async def session_info(request: Request) -> dict[str, Any]:
         "provider": session.provider,
         "email": session.email,
         "roles": sorted(session.roles),
+        "permissions": permissions_for(
+            Identity(session.identity_id, session.roles, PrincipalKind.HUMAN)
+        ),
     }
 
 

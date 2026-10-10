@@ -580,6 +580,61 @@ paths:
           $ref: '#/components/responses/PermissionDenied'
         '422':
           $ref: '#/components/responses/ValidationError'
+  /incidents/summary:
+    get:
+      summary: List incident summaries (Management view, newest first; explicit store state)
+      description: Reduced rows for incidents:read-summary. No evidence ids, resolution text, timeline or
+        assignee identity are ever returned; assigned only says whether somebody holds the incident.
+      operationId: listIncidentSummaries
+      parameters:
+      - in: query
+        name: state
+        schema:
+          enum:
+          - open
+          - acknowledged
+          - investigating
+          - mitigated
+          - resolved
+          - closed
+      - in: query
+        name: severity
+        schema:
+          enum:
+          - low
+          - medium
+          - high
+          - critical
+      - in: query
+        name: limit
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 50
+      - in: query
+        name: offset
+        schema:
+          type: integer
+          minimum: 0
+          maximum: 10000
+          default: 0
+      responses:
+        '200':
+          description: Summary page, or an explicit not-connected/unknown state without rows
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IncidentSummaryListResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '422':
+          $ref: '#/components/responses/ValidationError'
   /incidents/{incident_id}:
     get:
       summary: Get one incident (explicit store state)
@@ -887,7 +942,9 @@ paths:
           $ref: '#/components/responses/StoreUnavailable'
   /incidents/{incident_id}/resolve:
     post:
-      summary: Resolve an incident (human principals only)
+      summary: Resolve an incident (human principals only; needs MFA within the step-up window)
+      description: Requires a second factor proven within NETSIGHT_STEP_UP_MAX_AGE_SECONDS (default 900).
+        Otherwise 403 with error code STEP_UP_REQUIRED, which is distinct from FORBIDDEN; sign in again.
       operationId: resolveIncident
       parameters:
       - in: path
@@ -934,7 +991,10 @@ paths:
           $ref: '#/components/responses/StoreUnavailable'
   /incidents/{incident_id}/reopen:
     post:
-      summary: Reopen a resolved or closed incident with a reason (human principals only)
+      summary: Reopen a resolved or closed incident with a reason (human principals only; needs MFA within
+        the step-up window)
+      description: Requires a second factor proven within NETSIGHT_STEP_UP_MAX_AGE_SECONDS (default 900).
+        Otherwise 403 with error code STEP_UP_REQUIRED, which is distinct from FORBIDDEN; sign in again.
       operationId: reopenIncident
       parameters:
       - in: path
@@ -1777,6 +1837,15 @@ components:
             $ref: '#/components/schemas/SecurityEvent'
         freshness:
           $ref: '#/components/schemas/Freshness'
+      allOf:
+      - if:
+          properties:
+            state:
+              enum: [not-connected, unknown]
+        then:
+          properties:
+            events:
+              maxItems: 0
     Incident:
       description: 'Canonical incident record (PostgreSQL-owned, see DATABASE-OWNERSHIP.md). State machine:
         open -> acknowledged -> investigating -> mitigated -> resolved -> closed; reopen (resolved|closed
@@ -2109,6 +2178,128 @@ components:
           maxItems: 100
           items:
             $ref: '#/components/schemas/Incident'
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 100
+        offset:
+          type: integer
+          minimum: 0
+          maximum: 10000
+        next_offset:
+          type:
+          - integer
+          - 'null'
+          minimum: 1
+          maximum: 10000
+      allOf:
+      - if:
+          properties:
+            state:
+              enum:
+              - not-connected
+              - unknown
+          required:
+          - state
+        then:
+          properties:
+            incidents:
+              maxItems: 0
+            next_offset:
+              type: 'null'
+    IncidentSummary:
+      description: Reduced incident view for the Management role. Omits evidence_ids, the resolution record
+        (free text and resolver identity) and assignee_id by design; assigned only says whether somebody
+        holds the incident. resolved_at is non-null exactly when state is resolved or closed.
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - title
+      - severity
+      - state
+      - created_at
+      - updated_at
+      - assigned
+      - resolved_at
+      properties:
+        id:
+          type: string
+          minLength: 45
+          maxLength: 45
+          pattern: ^incident-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+        title:
+          type: string
+          minLength: 1
+          maxLength: 255
+          pattern: \S
+        severity:
+          enum:
+          - low
+          - medium
+          - high
+          - critical
+        state:
+          enum:
+          - open
+          - acknowledged
+          - investigating
+          - mitigated
+          - resolved
+          - closed
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        assigned:
+          type: boolean
+        resolved_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+      allOf:
+      - if:
+          properties:
+            state:
+              enum:
+              - resolved
+              - closed
+          required:
+          - state
+        then:
+          properties:
+            resolved_at:
+              type: string
+        else:
+          properties:
+            resolved_at:
+              type: 'null'
+    IncidentSummaryListResponse:
+      description: One page of incident summaries, newest first (the Management view, incidents:read-summary).
+        Same paging and degraded-state rules as IncidentListResponse; rows carry no evidence ids, resolution
+        text, timeline or assignee identity.
+      type: object
+      additionalProperties: false
+      required:
+      - state
+      - incidents
+      - limit
+      - offset
+      - next_offset
+      properties:
+        state:
+          enum:
+          - not-connected
+          - ok
+          - unknown
+        incidents:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/IncidentSummary'
         limit:
           type: integer
           minimum: 1

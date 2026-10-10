@@ -29,6 +29,7 @@ from netsight_api.auth.deps import get_current_identity
 from netsight_api.auth.rate_limit import RateLimiter
 from netsight_api.errors import ApiError
 from netsight_api.rbac import Identity, Permission, is_allowed
+from netsight_api.read_limit import enforce_read_limit
 from netsight_api.schemas import (
     ALERT_RULE_ID_PATTERN,
     MAINTENANCE_WINDOW_ID_PATTERN,
@@ -138,12 +139,17 @@ def correlation_id(request: Request) -> str:
 # --- authorisation, CSRF, rate limiting ----------------------------------------------------------------
 
 
-def reader(permission: Permission) -> Callable[..., Identity]:
-    """Dependency: the caller must hold ``permission`` (403 otherwise)."""
+def reader(permission: Permission, family: str | None = None) -> Callable[..., Identity]:
+    """Dependency: the caller must hold ``permission`` (403 otherwise).
+
+    With ``family`` the read is also rate limited per identity, after authorisation.
+    """
 
     def dependency(identity: CurrentIdentity) -> Identity:
         if not is_allowed(identity, permission.value):
             raise ApiError(403, "FORBIDDEN", "Permission is required")
+        if family is not None:
+            enforce_read_limit(identity, family)
         return identity
 
     return dependency

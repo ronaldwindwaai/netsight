@@ -66,10 +66,10 @@ def test_auditor_reads_but_cannot_change_anything() -> None:
 
 @pytest.mark.parametrize("role", ["technician", "management"])
 def test_technician_and_management_hold_no_alerting_permission(role: str) -> None:
-    # RBAC-MATRIX 'Alert rules': No. Management keeps the S6-2 full incidents:read (open decision).
+    # RBAC-MATRIX 'Alert rules': No. Management has only the incident summary view (incidents:read-summary).
     for permission in ALL_NEW:
         assert not is_allowed(person(role), permission.value), permission
-    assert is_allowed(person(role), Permission.INCIDENTS_READ.value)
+    assert is_allowed(person(role), Permission.INCIDENTS_READ_SUMMARY.value)
 
 
 def test_unknown_roles_anonymous_and_unknown_permissions_are_denied() -> None:

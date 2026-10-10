@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import json
 import re
+import ssl
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import StrEnum
@@ -34,8 +35,11 @@ from netsight_api.schemas import AlertSeverity, SecurityEvent
 ADAPTER_VERSION = "wazuh-indexer/1"
 SOURCE_NAME = "wazuh"
 
-_INDEX_PATTERN = re.compile(r"^[a-z0-9][a-z0-9_*.-]{0,127}$")
+# Only Wazuh indices: an operator typo must not widen reads to other indexer data.
+_INDEX_PATTERN = re.compile(r"wazuh-[a-z0-9_*.-]{0,121}")
 _MAX_LIMIT = 500
+# 500 hits of the bounded field set are well under 1 MiB; this leaves ample headroom.
+_MAX_RESPONSE_BYTES = 8 * 1024 * 1024
 _SOURCE_FIELDS = [
     "timestamp",
     "rule.description",
@@ -97,11 +101,12 @@ def _suricata_severity(value: Any) -> AlertSeverity:
 
 
 def _optional_text(value: Any, field_name: str, maximum: int) -> str | None:
-    if value is None or value == "":
+    if value is None:
         return None
     if not isinstance(value, str):
         raise _invalid(f"invalid {field_name}")
-    return value[:maximum]
+    text = value.strip()
+    return text[:maximum] if text else None
 
 
 def _parse_timestamp(value: Any) -> datetime:
@@ -197,7 +202,9 @@ class WazuhIndexerClient:
 
     ``base_url``, ``user`` and ``password`` are excluded from ``repr`` so
     credentials can never leak through logging or test output. TLS
-    verification is on unless a CA bundle path is configured via ``verify``.
+    verification is on; a CA bundle path in ``verify`` adds a private trust
+    root. Credentials are only sent over https unless ``allow_insecure_http``
+    (a development-only flag) is set.
     """
 
     base_url: str = field(repr=False)
@@ -206,6 +213,8 @@ class WazuhIndexerClient:
     index_pattern: str = "wazuh-alerts-*"
     timeout_seconds: float = 10.0
     verify: bool | str = True
+    allow_insecure_http: bool = False
+    max_response_bytes: int = _MAX_RESPONSE_BYTES
     _transport: httpx.AsyncBaseTransport | None = field(default=None, repr=False)
 
     def _connection(self) -> tuple[str, str]:
@@ -221,11 +230,37 @@ class WazuhIndexerClient:
             or parsed.query
             or parsed.fragment
             or parsed.path not in ("", "/")
-            or not _INDEX_PATTERN.match(self.index_pattern)
+            or not _INDEX_PATTERN.fullmatch(self.index_pattern)
         ):
             raise AdapterError(AdapterStatus.UNAVAILABLE, "wazuh indexer is misconfigured")
+        if parsed.scheme == "http" and self.user and not self.allow_insecure_http:
+            raise AdapterError(
+                AdapterStatus.UNAVAILABLE, "wazuh indexer credentials require an https URL"
+            )
         host = f"[{parsed.hostname}]" if ":" in parsed.hostname else parsed.hostname
         return f"{parsed.scheme}://{host}{f':{port}' if port else ''}", self.index_pattern
+
+    def _tls_verify(self) -> bool | ssl.SSLContext:
+        """Verification setting for httpx; a CA bundle path becomes an ``SSLContext``."""
+        if not isinstance(self.verify, str):
+            return self.verify
+        try:
+            return ssl.create_default_context(cafile=self.verify)
+        except (OSError, ssl.SSLError) as exc:
+            raise AdapterError(
+                AdapterStatus.UNAVAILABLE, "wazuh indexer CA bundle is unusable"
+            ) from exc
+
+    async def _read_body(self, response: httpx.Response) -> bytes:
+        declared = response.headers.get("content-length", "")
+        if declared.isdigit() and int(declared) > self.max_response_bytes:
+            raise _invalid("wazuh response is too large")
+        body = bytearray()
+        async for chunk in response.aiter_bytes():
+            body.extend(chunk)
+            if len(body) > self.max_response_bytes:
+                raise _invalid("wazuh response is too large")
+        return bytes(body)
 
     @staticmethod
     def _query(start: datetime, end: datetime, limit: int) -> dict[str, Any]:
@@ -260,36 +295,41 @@ class WazuhIndexerClient:
         if start >= end:
             raise ValueError("security window must be ordered")
         base_url, index = self._connection()
+        verify = self._tls_verify()
         timeout = httpx.Timeout(self.timeout_seconds, connect=5.0)
         try:
-            async with httpx.AsyncClient(
-                base_url=base_url,
-                timeout=timeout,
-                auth=(self.user, self.password) if self.user else None,
-                transport=self._transport,
-                verify=self.verify,
-                # A redirect could resend the Authorization header elsewhere.
-                follow_redirects=False,
-            ) as client:
-                response = await client.post(
-                    f"/{index}/_search", json=self._query(start, end, limit)
-                )
+            async with (
+                httpx.AsyncClient(
+                    base_url=base_url,
+                    timeout=timeout,
+                    auth=(self.user, self.password) if self.user else None,
+                    transport=self._transport,
+                    verify=verify,
+                    # A redirect could resend the Authorization header elsewhere.
+                    follow_redirects=False,
+                    # The size cap counts decoded bytes, so refuse compressed bodies outright.
+                    headers={"Accept-Encoding": "identity"},
+                ) as client,
+                client.stream(
+                    "POST", f"/{index}/_search", json=self._query(start, end, limit)
+                ) as response,
+            ):
+                status_code = response.status_code
+                body = await self._read_body(response) if status_code < 300 else b""
         except httpx.TimeoutException as exc:
             raise AdapterError(AdapterStatus.UNAVAILABLE, "wazuh request timed out") from exc
         except httpx.HTTPError as exc:
             raise AdapterError(AdapterStatus.UNAVAILABLE, "wazuh request failed") from exc
 
-        if 300 <= response.status_code < 400:
+        if 300 <= status_code < 400:
             raise AdapterError(AdapterStatus.UNAVAILABLE, "wazuh returned an unexpected redirect")
-        if response.status_code in (401, 403):
-            raise AdapterError(
-                AdapterStatus.FORBIDDEN, "wazuh rejected the configured credentials"
-            )
-        if response.status_code >= 400:
+        if status_code in (401, 403):
+            raise AdapterError(AdapterStatus.FORBIDDEN, "wazuh rejected the configured credentials")
+        if status_code >= 400:
             raise AdapterError(AdapterStatus.UNAVAILABLE, "wazuh query failed")
         try:
-            payload = json.loads(response.text)
-        except json.JSONDecodeError as exc:
+            payload = json.loads(body)
+        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
             raise _invalid("wazuh returned invalid JSON") from exc
         hits = _dig(payload, "hits", "hits")
         if not isinstance(hits, list):

@@ -1,9 +1,9 @@
 """Security Centre read API (S5): explicit-state security events.
 
-Source-backed adapters (Wazuh, Suricata) arrive in S5-2; until one is wired
-the endpoint reports ``not-connected`` and never fabricates events. The
-Wazuh indexer (which also carries Suricata EVE alerts) is wired from
-``WAZUH_INDEXER_URL`` / ``_USER`` / ``_PASSWORD``.
+Events come from the read-only Wazuh indexer adapter (which also carries
+Suricata EVE alerts), wired from ``WAZUH_INDEXER_URL`` / ``_USER`` /
+``_PASSWORD``. While it is unset the endpoint reports ``not-connected`` and
+never fabricates events.
 """
 
 from __future__ import annotations
@@ -17,11 +17,12 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends, Query, Request
 from pydantic import ValidationError
 
-from netsight_api.adapters.wazuh import WazuhIndexerClient
+from netsight_api.adapters.wazuh import AdapterError, WazuhIndexerClient
 from netsight_api.auth.deps import get_current_identity
 from netsight_api.contracts import ContractViolation, validate
 from netsight_api.errors import ApiError
 from netsight_api.rbac import Identity, Permission, is_allowed
+from netsight_api.read_limit import enforce_read_limit
 from netsight_api.schemas import (
     ErrorEnvelope,
     Freshness,
@@ -74,12 +75,19 @@ def get_optional_security_source() -> SecuritySource | None:
     if not url:
         return None
     ca_bundle = os.environ.get("WAZUH_INDEXER_CA_BUNDLE", "").strip()
+    # Plain http with credentials is a development-only escape hatch: it needs the flag
+    # and NETSIGHT_ENV=development, so a production host can never enable it by flag alone.
+    allow_http = (
+        os.environ.get("WAZUH_INDEXER_ALLOW_HTTP", "").strip().lower() == "true"
+        and os.environ.get("NETSIGHT_ENV", "").strip().lower() == "development"
+    )
     return WazuhIndexerClient(
         base_url=url,
         user=os.environ.get("WAZUH_INDEXER_USER", "").strip(),
         password=os.environ.get("WAZUH_INDEXER_PASSWORD", ""),
         index_pattern=os.environ.get("WAZUH_ALERTS_INDEX", "").strip() or "wazuh-alerts-*",
         verify=ca_bundle or True,
+        allow_insecure_http=allow_http,
     )
 
 
@@ -92,6 +100,7 @@ CurrentIdentity = Annotated[Identity, Depends(get_current_identity)]
 def require_security_reader(identity: CurrentIdentity) -> Identity:
     if not is_allowed(identity, Permission.SECURITY_READ.value):
         raise ApiError(403, "FORBIDDEN", "Permission is required")
+    enforce_read_limit(identity, "security")
     return identity
 
 
@@ -168,6 +177,7 @@ async def security_events(
             extra={
                 "correlation_id": _correlation_id(request),
                 "error_type": type(exc).__name__,
+                "adapter_status": exc.status.value if isinstance(exc, AdapterError) else None,
             },
         )
         return _empty("unknown", degraded)

@@ -48,6 +48,11 @@ ENTITIES: dict[str, tuple[str, type[BaseModel], str]] = {
         schemas.IncidentListResponse,
         "IncidentListResponse",
     ),
+    "incident_summary_list_response": (
+        "incident_summary_list",
+        schemas.IncidentSummaryListResponse,
+        "IncidentSummaryListResponse",
+    ),
     "incident_detail_response": (
         "incident_detail",
         schemas.IncidentDetailResponse,
@@ -209,6 +214,8 @@ DEF_TO_COMPONENT = {
     },
     "incident-api.schema.json": {
         "#/$defs/listResponse": "IncidentListResponse",
+        "#/$defs/summary": "IncidentSummary",
+        "#/$defs/summaryListResponse": "IncidentSummaryListResponse",
         "#/$defs/detailResponse": "IncidentDetailResponse",
         "#/$defs/timelineResponse": "IncidentTimelineResponse",
         "#/$defs/transitionRequest": "IncidentTransitionRequest",
@@ -248,6 +255,8 @@ SCHEMA_PAIRS: list[tuple[str, str | None, str]] = [
     ("incident.schema.json", "resolution", "IncidentResolution"),
     ("incident.schema.json", "timelineEvent", "IncidentTimelineEvent"),
     ("incident-api.schema.json", "listResponse", "IncidentListResponse"),
+    ("incident-api.schema.json", "summary", "IncidentSummary"),
+    ("incident-api.schema.json", "summaryListResponse", "IncidentSummaryListResponse"),
     ("incident-api.schema.json", "detailResponse", "IncidentDetailResponse"),
     ("incident-api.schema.json", "timelineResponse", "IncidentTimelineResponse"),
     ("incident-api.schema.json", "transitionRequest", "IncidentTransitionRequest"),

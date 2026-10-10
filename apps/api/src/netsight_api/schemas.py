@@ -604,6 +604,58 @@ class IncidentTimelineResponse(ContractModel):
         return self
 
 
+class IncidentSummary(ContractModel):
+    """Management's reduced view of an incident (``incidents:read-summary``).
+
+    Deliberately omits evidence ids, the whole resolution record (free text and the
+    resolver's identity) and the assignee identity: only whether somebody is assigned and
+    when the incident was resolved. ``title`` is the headline operators and alert rules set.
+    """
+
+    id: str = Field(min_length=45, max_length=45, pattern=INCIDENT_ID_PATTERN)
+    title: str = Field(min_length=1, max_length=255, pattern=NON_BLANK)
+    severity: IncidentSeverity
+    state: IncidentState
+    created_at: AwareDatetime
+    updated_at: AwareDatetime
+    assigned: bool
+    resolved_at: AwareDatetime | None = Field(...)
+
+    @model_validator(mode="after")
+    def _resolved_at_matches_state(self) -> IncidentSummary:
+        if (self.state in ("resolved", "closed")) != (self.resolved_at is not None):
+            raise ValueError("resolved_at is required exactly when state is resolved or closed")
+        return self
+
+    @classmethod
+    def from_incident(cls, incident: Incident) -> IncidentSummary:
+        resolution = incident.resolution
+        return cls(
+            id=incident.id,
+            title=incident.title,
+            severity=incident.severity,
+            state=incident.state,
+            created_at=incident.created_at,
+            updated_at=incident.updated_at,
+            assigned=incident.assignee_id is not None,
+            resolved_at=None if resolution is None else resolution.resolved_at,
+        )
+
+
+class IncidentSummaryListResponse(ContractModel):
+    state: StoreState
+    incidents: list[IncidentSummary] = Field(max_length=MAX_INCIDENT_PAGE_SIZE)
+    limit: int = Field(ge=1, le=MAX_INCIDENT_PAGE_SIZE)
+    offset: int = Field(ge=0, le=MAX_INCIDENT_LIST_OFFSET)
+    next_offset: int | None = Field(..., ge=1, le=MAX_INCIDENT_LIST_OFFSET)
+
+    @model_validator(mode="after")
+    def _non_ok_carries_no_rows(self) -> IncidentSummaryListResponse:
+        if self.state != "ok" and (self.incidents or self.next_offset is not None):
+            raise ValueError("non-ok incident state must not carry incidents or a cursor")
+        return self
+
+
 class IncidentTransitionRequest(ApiModel):
     to_state: TransitionTarget
     reason: str | None = Field(None, min_length=1, max_length=1000, pattern=NON_BLANK)

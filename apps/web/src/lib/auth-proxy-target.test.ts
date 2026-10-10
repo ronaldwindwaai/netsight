@@ -80,3 +80,29 @@ test('rejects plain-HTTP non-loopback upstreams and embedded credentials', () =>
     assert.equal(target?.password, '');
   });
 });
+test('forwards only the allow-listed sign-in parameters to a provider login', () => {
+  const target = resolveAuthProxyTarget(
+    'login/microsoft',
+    '?redirect_to=%2Fincidents%2Fx&step_up=true&evil=1&state=forged',
+  );
+  assert.notEqual(target, null);
+  assert.equal(target?.searchParams.get('redirect_to'), '/incidents/x');
+  assert.equal(target?.searchParams.get('step_up'), 'true');
+  assert.equal(target?.searchParams.has('evil'), false);
+  assert.equal(target?.searchParams.has('state'), false);
+});
+
+test('drops an unsafe redirect_to or a non-boolean step_up instead of forwarding it', () => {
+  const target = resolveAuthProxyTarget(
+    'login/google',
+    '?redirect_to=https%3A%2F%2Fevil.example&step_up=maybe',
+  );
+  assert.notEqual(target, null);
+  assert.equal(target?.search, '');
+});
+
+test('never forwards a query string to any other auth path', () => {
+  for (const path of ['callback', 'session', 'csrf', 'providers', 'local/login']) {
+    assert.equal(resolveAuthProxyTarget(path, '?redirect_to=%2Fx&step_up=true')?.search, '', path);
+  }
+});

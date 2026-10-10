@@ -163,6 +163,11 @@ class AuthSettings(BaseSettings):
     auth_rate_limit_per_minute: int = Field(
         default=30, validation_alias="NETSIGHT_AUTH_RATE_LIMIT_PER_MINUTE"
     )
+    # Step-up: incident resolve/reopen need a second factor proven within this many seconds
+    # (default 15 minutes). A value outside 1-86400 is invalid, never "off".
+    step_up_max_age_seconds: int = Field(
+        default=900, ge=1, le=86_400, validation_alias="NETSIGHT_STEP_UP_MAX_AGE_SECONDS"
+    )
 
     @field_validator("allowed_origins", mode="before")
     @classmethod

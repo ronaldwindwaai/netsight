@@ -316,3 +316,40 @@ async def test_validate_id_token_rejects_unsupported_algorithm(
     with pytest.raises(OidcError) as excinfo:
         await validate_id_token(MICROSOFT, settings, token, "expected-nonce")
     assert excinfo.value.code == "OIDC_ALG_UNSUPPORTED"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("provider", [MICROSOFT, GOOGLE])
+async def test_authorization_url_asks_the_provider_to_choose_an_account_by_default(
+    provider_stubs: dict[str, Any], provider: Any
+) -> None:
+    from urllib.parse import parse_qs, urlsplit
+
+    url = await oidc.authorization_url(
+        provider, ProviderSettings(client_id="c"), "https://app/cb", "s", "n", "v" * 43
+    )
+    query = parse_qs(urlsplit(url).query)
+    assert query["prompt"] == ["select_account"]
+    assert "max_age" not in query
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("provider", [MICROSOFT, GOOGLE])
+async def test_a_step_up_authorization_forces_a_fresh_interactive_sign_in(
+    provider_stubs: dict[str, Any], provider: Any
+) -> None:
+    from urllib.parse import parse_qs, urlsplit
+
+    url = await oidc.authorization_url(
+        provider,
+        ProviderSettings(client_id="c"),
+        "https://app/cb",
+        "s",
+        "n",
+        "v" * 43,
+        step_up=True,
+    )
+    query = parse_qs(urlsplit(url).query)
+    assert query["prompt"] == ["login"]
+    assert query["max_age"] == ["0"]
+    assert query["code_challenge_method"] == ["S256"]  # the rest of the request is unchanged

@@ -190,3 +190,38 @@ def test_cookie_attributes() -> None:
 
 def test_global_session_manager_is_singleton() -> None:
     assert session_manager() is session_manager()
+
+
+# --- MFA recency (step-up) ------------------------------------------------------------
+
+
+class _Clock:
+    def __init__(self) -> None:
+        self.now = 1000.0
+
+    def __call__(self) -> float:
+        return self.now
+
+
+def test_a_session_has_no_mfa_stamp_unless_the_sign_in_proved_one() -> None:
+    manager = SessionManager(SessionStore(), SessionPolicy(secret="s" * 32))
+    session = manager.create_session("sub", "microsoft", ["administrator"])
+    assert session.mfa_verified_at is None
+    assert manager.mfa_age(session) is None
+
+
+def test_mfa_age_is_measured_from_the_sign_in_on_the_store_clock() -> None:
+    clock = _Clock()
+    manager = SessionManager(SessionStore(clock), SessionPolicy(secret="s" * 32))
+    session = manager.create_session("sub", "local", ["administrator"], mfa_age_seconds=0.0)
+    assert manager.mfa_age(session) == 0.0
+    clock.now += 125.5
+    assert manager.mfa_age(session) == 125.5
+
+
+def test_a_stamp_from_the_future_is_unknown_not_fresh() -> None:
+    clock = _Clock()
+    manager = SessionManager(SessionStore(clock), SessionPolicy(secret="s" * 32))
+    session = manager.create_session("sub", "local", ["administrator"], mfa_age_seconds=0.0)
+    session.mfa_verified_at = clock.now + 50
+    assert manager.mfa_age(session) is None

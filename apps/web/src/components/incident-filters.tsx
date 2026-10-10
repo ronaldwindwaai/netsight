@@ -11,8 +11,16 @@ import type { IncidentFilters } from '@/lib/incident-view';
  * Plain GET form: works without JavaScript, every control is natively keyboard
  * operable, and submitting always restarts paging at the first page.
  */
-export function IncidentFiltersForm({ filters }: { filters: IncidentFilters }) {
-  const active = filters.state !== null || filters.severity !== null || filters.assigneeId !== null;
+export function IncidentFiltersForm({
+  filters,
+  showAssignee = true,
+}: {
+  filters: IncidentFilters;
+  /** The summary view (Management) has no assignee filter: it would let a reader probe ownership. */
+  showAssignee?: boolean;
+}) {
+  const active =
+    filters.state !== null || filters.severity !== null || (showAssignee && filters.assigneeId !== null);
   return (
     <form
       method="get"
@@ -56,21 +64,23 @@ export function IncidentFiltersForm({ filters }: { filters: IncidentFilters }) {
           ))}
         </select>
       </div>
-      <div className="col-12 col-md-3">
-        <label htmlFor="incident-filter-assignee" className="form-label small mb-1">
-          Assignee
-        </label>
-        <input
-          id="incident-filter-assignee"
-          name="assignee_id"
-          type="text"
-          maxLength={255}
-          className="form-control form-control-sm"
-          defaultValue={filters.assigneeId ?? ''}
-          placeholder="Exact assignee id"
-          autoComplete="off"
-        />
-      </div>
+      {showAssignee ? (
+        <div className="col-12 col-md-3">
+          <label htmlFor="incident-filter-assignee" className="form-label small mb-1">
+            Assignee
+          </label>
+          <input
+            id="incident-filter-assignee"
+            name="assignee_id"
+            type="text"
+            maxLength={255}
+            className="form-control form-control-sm"
+            defaultValue={filters.assigneeId ?? ''}
+            placeholder="Exact assignee id"
+            autoComplete="off"
+          />
+        </div>
+      ) : null}
       <div className="col-12 col-md-3 d-flex gap-2">
         <button type="submit" className="btn btn-primary btn-sm">
           <i className="bi bi-funnel me-1" aria-hidden="true" />

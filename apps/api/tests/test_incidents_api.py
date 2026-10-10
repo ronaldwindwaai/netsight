@@ -88,7 +88,9 @@ class Caller:
 
     def __init__(self, role: str, subject: str = "sub-1") -> None:
         manager = session_manager()
-        self.session: Session = manager.create_session(subject, "microsoft", [role])
+        self.session: Session = manager.create_session(
+            subject, "microsoft", [role], mfa_age_seconds=0.0
+        )
         self.identity_id = self.session.identity_id
         self.http = TestClient(app, raise_server_exceptions=False)
         self.http.cookies.set(manager.policy.cookie_name, manager.cookie_value(self.session))
@@ -202,14 +204,29 @@ def test_the_dev_identity_bridge_does_not_apply_by_default(
 # --- authorisation matrix (deny by default) ------------------------------------------
 
 
-@pytest.mark.parametrize("role", ALL_ROLES)
+FULL_READ_ROLES = [role for role in ALL_ROLES if role != "management"]
+
+
+@pytest.mark.parametrize("role", FULL_READ_ROLES)
 @pytest.mark.parametrize("suffix", READ_PATHS)
-def test_every_role_may_read_incidents(
+def test_every_full_read_role_may_read_incidents(
     store: InMemoryIncidentRepository, role: str, suffix: str
 ) -> None:
     incident_id = seed(store)
     response = Caller(role).get(API + suffix.format(id=incident_id))
     assert response.status_code == 200
+
+
+@pytest.mark.parametrize("suffix", READ_PATHS)
+def test_management_cannot_read_full_incidents(
+    store: InMemoryIncidentRepository, suffix: str
+) -> None:
+    # Management has the summary view only (test_incidents_summary_api.py); decision 2026-10-10.
+    incident_id = seed(store, assignee="microsoft:somebody")
+    response = Caller("management").get(API + suffix.format(id=incident_id))
+    assert response.status_code == 403
+    assert response.json()["error"]["code"] == "FORBIDDEN"
+    assert "somebody" not in response.text
 
 
 @pytest.mark.parametrize("role", ["technician", "management", "auditor"])
@@ -432,7 +449,7 @@ def test_list_filters_by_state_severity_and_assignee(store: InMemoryIncidentRepo
     a = seed(store, severity="low")
     b = seed(store, severity="high", state="acknowledged", assignee="microsoft:sub-9")
     c = seed(store, severity="high")
-    caller = Caller("management")
+    caller = Caller("auditor")
 
     def ids(**params: Any) -> list[str]:
         return [i["id"] for i in caller.get(API, **params).json()["incidents"]]
@@ -1112,6 +1129,7 @@ def test_store_errors_map_to_statuses_without_leaking(
 
 EXPECTED_OPERATIONS = {
     ("get", "/api/v1/incidents"),
+    ("get", "/api/v1/incidents/summary"),
     ("get", "/api/v1/incidents/{incident_id}"),
     ("get", "/api/v1/incidents/{incident_id}/timeline"),
     ("post", "/api/v1/incidents/{incident_id}/acknowledge"),

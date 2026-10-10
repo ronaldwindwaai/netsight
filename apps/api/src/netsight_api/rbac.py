@@ -15,6 +15,9 @@ class Permission(StrEnum):
     DEVICES_READ = "devices:read"
     ALERTS_READ = "alerts:read"
     INCIDENTS_READ = "incidents:read"
+    # Reduced list view: no evidence ids, no free-text resolution/comments, no timeline and no
+    # assignee identity. Management holds this and not INCIDENTS_READ (RBAC-MATRIX "Summary").
+    INCIDENTS_READ_SUMMARY = "incidents:read-summary"
     # Acknowledge / investigate / mitigate / close any incident.
     INCIDENTS_TRANSITION = "incidents:transition"
     INCIDENTS_ASSIGN = "incidents:assign"
@@ -100,6 +103,7 @@ _ALL_READ = {
     Permission.DEVICES_READ,
     Permission.ALERTS_READ,
     Permission.INCIDENTS_READ,
+    Permission.INCIDENTS_READ_SUMMARY,
     Permission.TRAFFIC_READ,
     Permission.SECURITY_READ,
     Permission.DIAGNOSTICS_READ,
@@ -119,12 +123,16 @@ ROLE_PERMISSIONS: Mapping[Role, frozenset[Permission]] = {
             Permission.DEVICES_READ,
             Permission.ALERTS_READ,
             Permission.INCIDENTS_READ,
+            Permission.INCIDENTS_READ_SUMMARY,
             Permission.INCIDENTS_WRITE_ASSIGNED,
             Permission.DIAGNOSTICS_READ,
             Permission.ACTIONS_PROPOSE,
         }
     ),
-    Role.MANAGEMENT: frozenset(_ALL_READ | {Permission.AUDIT_READ}),
+    # Summary only: the full incident read is withheld (human decision 2026-10-10).
+    Role.MANAGEMENT: frozenset(
+        (_ALL_READ - {Permission.INCIDENTS_READ}) | {Permission.AUDIT_READ}
+    ),
     Role.AUDITOR: frozenset(_ALL_READ | _ALERTING_READ | {Permission.AUDIT_READ}),
 }
 
@@ -154,6 +162,15 @@ def is_allowed(identity: Identity | None, permission: str) -> bool:
         if perm in ROLE_PERMISSIONS[role]:
             return True
     return False
+
+
+def permissions_for(identity: Identity | None) -> list[str]:
+    """Every permission ``identity`` holds, sorted. For the UI to enable or explain actions.
+
+    Derived from ``is_allowed`` so it cannot drift from what the API enforces. It is advisory
+    to the browser: the server re-checks every request.
+    """
+    return sorted(p.value for p in Permission if is_allowed(identity, p.value))
 
 
 def require(identity: Identity | None, permission: str) -> None:

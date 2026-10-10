@@ -70,3 +70,28 @@ def test_administrator_has_all() -> None:
 def test_require_raises() -> None:
     with pytest.raises(PermissionError):
         require(Identity("u5", frozenset({"auditor"})), "admin:config")
+
+
+def test_permissions_for_lists_exactly_what_is_allowed_sorted() -> None:
+    from netsight_api.rbac import Permission, permissions_for
+
+    human = Identity("a", frozenset({"technician"}), PrincipalKind.HUMAN)
+    listed = permissions_for(human)
+    assert listed == sorted(listed)
+    assert set(listed) == {p.value for p in Permission if is_allowed(human, p.value)}
+    assert "incidents:write-assigned" in listed
+    assert "incidents:resolve" not in listed
+
+
+def test_permissions_for_a_service_principal_excludes_human_only_permissions() -> None:
+    from netsight_api.rbac import permissions_for
+
+    robot = Identity("svc", frozenset({"administrator"}), PrincipalKind.SERVICE)
+    assert "incidents:resolve" not in permissions_for(robot)
+    assert "incidents:read" in permissions_for(robot)
+
+
+def test_permissions_for_unknown_roles_is_empty() -> None:
+    from netsight_api.rbac import permissions_for
+
+    assert permissions_for(Identity("x", frozenset({"nope"}), PrincipalKind.HUMAN)) == []

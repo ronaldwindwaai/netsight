@@ -63,7 +63,7 @@ from netsight_api.storage import AlertRuleRepository, InvalidOperationError
 router = APIRouter(prefix="/maintenance-windows", tags=["maintenance-windows"])
 _NOUN = "Maintenance window"
 
-_WindowReader = Annotated[Identity, Depends(reader(Permission.MAINTENANCE_READ))]
+_WindowReader = Annotated[Identity, Depends(reader(Permission.MAINTENANCE_READ, "maintenance"))]
 _CreateActor = Annotated[
     Identity,
     Depends(collection_writer(Permission.MAINTENANCE_WRITE, action="maintenance.create")),

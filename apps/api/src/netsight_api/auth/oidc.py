@@ -178,7 +178,15 @@ async def authorization_url(
     state: str,
     nonce: str,
     code_verifier: str,
+    *,
+    step_up: bool = False,
 ) -> str:
+    """Build the authorization request.
+
+    ``step_up`` asks the provider for a fresh interactive sign-in (``prompt=login``,
+    ``max_age=0``) so the returned token can prove a *recent* second factor; the default
+    lets the provider reuse its session and merely offer the account chooser.
+    """
     metadata = await discover(provider, settings)
     endpoint = metadata.get("authorization_endpoint")
     if not isinstance(endpoint, str):
@@ -193,8 +201,10 @@ async def authorization_url(
         "nonce": nonce,
         "code_challenge": code_challenge(code_verifier),
         "code_challenge_method": "S256",
-        "prompt": "select_account",
+        "prompt": "login" if step_up else "select_account",
     }
+    if step_up:
+        params["max_age"] = "0"
     if provider is MICROSOFT:
         params["response_mode"] = "query"
 

@@ -52,13 +52,16 @@ from netsight_api.auth.deps import get_current_identity
 from netsight_api.auth.oidc import aclose as oidc_aclose
 from netsight_api.auth.routes import router as auth_router
 from netsight_api.auth.settings import session_policy
+from netsight_api.body_limit import BodySizeLimitMiddleware
 from netsight_api.contracts import ContractViolation, validate
 from netsight_api.diagnostic_routes import router as diagnostic_router
 from netsight_api.errors import ApiError
+from netsight_api.evaluation.wiring import build_evaluation_service, start_evaluation
 from netsight_api.incident_routes import router as incident_router
 from netsight_api.localauth.routes import router as localauth_router
 from netsight_api.maintenance_routes import router as maintenance_router
 from netsight_api.rbac import Identity, Permission, is_allowed
+from netsight_api.read_limit import enforce_read_limit
 from netsight_api.reconcile import reconcile
 from netsight_api.schemas import (
     Alert,
@@ -100,16 +103,27 @@ _LOGGER = logging.getLogger("netsight_api")
 
 
 @asynccontextmanager
-async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
-    # Fail fast on an unsafe session policy (for example SameSite=None without opt-in) and
-    # on an invalid audit-log setting, instead of failing on the first request.
+async def lifespan(app_: FastAPI) -> AsyncIterator[None]:
+    # Fail fast on an unsafe session policy (for example SameSite=None without opt-in), on an
+    # invalid audit-log setting and on an enabled-but-unbuildable evaluator, instead of failing
+    # on the first request (or, worse, running a weaker evaluator than configured).
     session_policy()
     configure_audit_logging()
-    yield
-    await oidc_aclose()
+    service = build_evaluation_service(librenms_client=get_optional_librenms_client)
+    evaluation = start_evaluation(service)
+    app_.state.evaluation_task = evaluation.task
+    try:
+        yield
+    finally:
+        await evaluation.shutdown()
+        app_.state.evaluation_task = None
+        await oidc_aclose()
 
 
 app = FastAPI(title="Netsight Platform API", version="0.1.0", lifespan=lifespan)
+# Registered before the correlation middleware below, so it runs inside it and its 413
+# responses carry the request's correlation id.
+app.add_middleware(BodySizeLimitMiddleware)
 api = APIRouter(prefix=API_PREFIX)
 
 
@@ -398,18 +412,21 @@ async def _absent() -> None:
 def require_device_reader(identity: CurrentIdentity) -> Identity:
     if not is_allowed(identity, Permission.DEVICES_READ.value):
         raise ApiError(403, "FORBIDDEN", "Permission is required")
+    enforce_read_limit(identity, "devices")
     return identity
 
 
 def require_alert_reader(identity: CurrentIdentity) -> Identity:
     if not is_allowed(identity, Permission.ALERTS_READ.value):
         raise ApiError(403, "FORBIDDEN", "Permission is required")
+    enforce_read_limit(identity, "alerts")
     return identity
 
 
 def require_traffic_reader(identity: CurrentIdentity) -> Identity:
     if not is_allowed(identity, Permission.TRAFFIC_READ.value):
         raise ApiError(403, "FORBIDDEN", "Permission is required")
+    enforce_read_limit(identity, "traffic")
     return identity
 
 

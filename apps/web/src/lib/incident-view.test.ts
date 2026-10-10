@@ -12,6 +12,8 @@ import {
   incidentHref,
   incidentListPath,
   incidentPageHrefs,
+  incidentReadMode,
+  incidentSummaryListPath,
   isIncidentId,
   parseIncidentFilters,
   parseTimelineCursor,
@@ -201,4 +203,28 @@ test('other kinds are labelled and reference their subject as text', () => {
   assert.equal(text.label, 'Evidence added');
   assert.equal(text.detail, 'ev-1');
   assert.equal(timelineEventSummary(event({ kind: 'comment' })).detail, null);
+});
+
+test('read mode follows the permissions the API reported for the session', () => {
+  assert.equal(incidentReadMode(['incidents:read', 'incidents:read-summary']), 'full');
+  assert.equal(incidentReadMode(['incidents:read']), 'full');
+  assert.equal(incidentReadMode(['incidents:read-summary']), 'summary');
+  assert.equal(incidentReadMode(['devices:read']), 'none');
+  assert.equal(incidentReadMode([]), 'none');
+});
+
+test('an unknown session is attempted as a full read so the API decides (401 or 403)', () => {
+  assert.equal(incidentReadMode(null), 'full');
+});
+
+test('the summary list path never carries an assignee filter', () => {
+  const filters = parseIncidentFilters({
+    state: 'open',
+    severity: 'high',
+    assignee_id: 'microsoft:ana',
+    offset: '50',
+  });
+  const path = incidentSummaryListPath(filters);
+  assert.equal(path, '/api/v1/incidents/summary?limit=50&offset=50&state=open&severity=high');
+  assert.equal(path.includes('assignee'), false);
 });

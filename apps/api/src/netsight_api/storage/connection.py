@@ -106,12 +106,13 @@ class PostgresSettings:
             flags.append(f"-c search_path={self.schema}")
         return " ".join(flags)
 
-    def connect(self) -> Connection:
+    def connect(self, *, autocommit: bool = False, **extra: Any) -> Connection:
         """Open a new connection (use as a context manager: commit or rollback).
 
         Raises raw psycopg errors; repositories use ``session()`` instead. timestamptz
         values come back as timezone-aware datetimes whatever the session time zone is,
-        so no session time zone is forced.
+        so no session time zone is forced. ``extra`` are further libpq parameters
+        (for example TCP keepalives for a long-lived session).
         """
         return psycopg.connect(
             self.dsn,
@@ -119,6 +120,8 @@ class PostgresSettings:
             options=self._options(),
             connect_timeout=_CONNECT_TIMEOUT_SECONDS,
             application_name="netsight-api",
+            autocommit=autocommit,
+            **extra,
         )
 
     @contextmanager

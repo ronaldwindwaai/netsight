@@ -41,9 +41,11 @@ from netsight_api.audit import AuditOutcome, fingerprint, record_audit
 from netsight_api.auth.csrf import write_refusal
 from netsight_api.auth.deps import get_current_identity
 from netsight_api.auth.rate_limit import RateLimiter
+from netsight_api.auth.step_up import step_up_refusal
 from netsight_api.contracts import validate
 from netsight_api.errors import ApiError
 from netsight_api.rbac import Identity, Permission, is_allowed
+from netsight_api.read_limit import enforce_read_limit
 from netsight_api.schemas import (
     INCIDENT_ID_PATTERN,
     MAX_INCIDENT_LIST_OFFSET,
@@ -61,6 +63,8 @@ from netsight_api.schemas import (
     IncidentResolveRequest,
     IncidentSeverity,
     IncidentState,
+    IncidentSummary,
+    IncidentSummaryListResponse,
     IncidentTimelineEvent,
     IncidentTimelineResponse,
     IncidentTransitionRequest,
@@ -101,6 +105,13 @@ _WRITE_ERRORS: dict[int | str, dict[str, Any]] = {
     409: {"model": ErrorEnvelope, "description": "Illegal transition or concurrent change"},
     429: {"model": ErrorEnvelope, "description": "Write rate limit exceeded"},
     503: {"model": ErrorEnvelope, "description": "Incident store not connected or unavailable"},
+}
+_STEP_UP_ERRORS: dict[int | str, dict[str, Any]] = {
+    **_WRITE_ERRORS,
+    403: {
+        "model": ErrorEnvelope,
+        "description": "Permission denied, or STEP_UP_REQUIRED: recent MFA is needed (sign in again)",
+    },
 }
 
 
@@ -159,10 +170,21 @@ def _correlation_id(request: Request) -> str:
 def require_incident_reader(identity: CurrentIdentity) -> Identity:
     if not is_allowed(identity, Permission.INCIDENTS_READ.value):
         raise ApiError(403, "FORBIDDEN", "Permission is required")
+    enforce_read_limit(identity, "incidents")
     return identity
 
 
 IncidentReader = Annotated[Identity, Depends(require_incident_reader)]
+
+
+def require_incident_summary_reader(identity: CurrentIdentity) -> Identity:
+    if not is_allowed(identity, Permission.INCIDENTS_READ_SUMMARY.value):
+        raise ApiError(403, "FORBIDDEN", "Permission is required")
+    enforce_read_limit(identity, "incidents")
+    return identity
+
+
+IncidentSummaryReader = Annotated[Identity, Depends(require_incident_summary_reader)]
 
 
 @dataclass(frozen=True)
@@ -200,10 +222,26 @@ def _guard_write(request: Request, action: str, identity: Identity, incident_id:
         raise ApiError(403, refusal.code, refusal.message)
 
 
+def _guard_step_up(request: Request, action: str, identity: Identity, incident_id: str) -> None:
+    """Recent-MFA check (``auth/step_up.py``); a distinct, audited 403 the UI can act on."""
+    refusal = step_up_refusal(request)
+    if refusal is not None:
+        _audit_refusal(request, action, identity, refusal.reason, incident_id)
+        raise ApiError(403, refusal.code, refusal.message)
+
+
 def incident_writer(
-    permission: Permission, *, action: str, assigned_scope: bool = False
+    permission: Permission,
+    *,
+    action: str,
+    assigned_scope: bool = False,
+    step_up: bool = False,
 ) -> Callable[..., IncidentActor]:
-    """Dependency: authorise, then CSRF-check, then rate-limit one write operation."""
+    """Dependency: authorise, CSRF-check, optionally require step-up, then rate-limit.
+
+    The order matters: a caller without the permission never learns anything about its MFA
+    recency, and a request that fails CSRF never reaches the step-up decision.
+    """
 
     def dependency(
         request: Request, identity: CurrentIdentity, incident_id: IncidentId
@@ -218,6 +256,8 @@ def incident_writer(
             _audit_refusal(request, action, identity, "permission", incident_id)
             raise ApiError(403, "FORBIDDEN", "Permission is required")
         _guard_write(request, action, identity, incident_id)
+        if step_up:
+            _guard_step_up(request, action, identity, incident_id)
         if not _write_limiter.allow(identity.id, WRITE_LIMIT_PER_MINUTE, _WRITE_WINDOW_SECONDS):
             _audit_refusal(request, action, identity, "rate-limit", incident_id)
             raise ApiError(429, "RATE_LIMITED", "Too many incident changes; slow down")
@@ -264,11 +304,13 @@ _EvidenceActor = Annotated[
 ]
 _ResolveActor = Annotated[
     IncidentActor,
-    Depends(incident_writer(Permission.INCIDENTS_RESOLVE, action="incident.resolve")),
+    Depends(
+        incident_writer(Permission.INCIDENTS_RESOLVE, action="incident.resolve", step_up=True)
+    ),
 ]
 _ReopenActor = Annotated[
     IncidentActor,
-    Depends(incident_writer(Permission.INCIDENTS_REOPEN, action="incident.reopen")),
+    Depends(incident_writer(Permission.INCIDENTS_REOPEN, action="incident.reopen", step_up=True)),
 ]
 
 
@@ -377,9 +419,12 @@ def _log_read_failure(request: Request, exc: Exception) -> None:
     )
 
 
-def _checked[M: IncidentListResponse | IncidentDetailResponse | IncidentTimelineResponse](
-    name: str, body: M
-) -> M:
+def _checked[
+    M: IncidentListResponse
+    | IncidentSummaryListResponse
+    | IncidentDetailResponse
+    | IncidentTimelineResponse
+](name: str, body: M) -> M:
     """Canonical boundary validation applied on every successful return path."""
     validate(name, body.model_dump(mode="json", by_alias=True))
     return body
@@ -440,6 +485,63 @@ async def list_incidents(
             IncidentListResponse(
                 state="ok",
                 incidents=rows,
+                limit=limit,
+                offset=offset,
+                next_offset=following if more else None,
+            ),
+        )
+    except Exception as exc:  # noqa: BLE001 — deliberate store/contract boundary
+        _log_read_failure(request, exc)
+        return empty("unknown")
+
+
+@router.get(
+    "/summary",
+    response_model=IncidentSummaryListResponse,
+    responses=_READ_ERRORS,
+    operation_id="listIncidentSummaries",
+)
+async def list_incident_summaries(
+    request: Request,
+    _identity: IncidentSummaryReader,
+    store: OptionalIncidentStore,
+    state: Annotated[IncidentState | None, Query()] = None,
+    severity: Annotated[IncidentSeverity | None, Query()] = None,
+    limit: Annotated[int, Query(ge=1, le=MAX_INCIDENT_PAGE_SIZE)] = 50,
+    offset: Annotated[int, Query(ge=0, le=MAX_INCIDENT_LIST_OFFSET)] = 0,
+) -> IncidentSummaryListResponse:
+    """Management's reduced incident list (``incidents:read-summary``).
+
+    Rows are projected from the stored incident into ``IncidentSummary`` here, so evidence
+    ids, resolution text and the assignee identity never reach the response model. There is
+    deliberately no assignee filter: it would let a summary reader probe who holds what.
+    Declared before ``/{incident_id}`` so the static path is never read as an id.
+    """
+
+    def empty(state_name: StoreState) -> IncidentSummaryListResponse:
+        return _checked(
+            "incident_summary_list",
+            IncidentSummaryListResponse(
+                state=state_name, incidents=[], limit=limit, offset=offset, next_offset=None
+            ),
+        )
+
+    if store is None:
+        return empty("not-connected")
+    incident_store = store
+    try:
+        rows = await run_in_threadpool(
+            lambda: incident_store.list_incidents(
+                state=state, severity=severity, assignee_id=None, limit=limit, offset=offset
+            )
+        )
+        following = offset + limit
+        more = len(rows) == limit and following <= MAX_INCIDENT_LIST_OFFSET
+        return _checked(
+            "incident_summary_list",
+            IncidentSummaryListResponse(
+                state="ok",
+                incidents=[IncidentSummary.from_incident(row) for row in rows],
                 limit=limit,
                 offset=offset,
                 next_offset=following if more else None,
@@ -698,7 +800,7 @@ async def add_incident_evidence(
 @router.post(
     "/{incident_id}/resolve",
     response_model=Incident,
-    responses=_WRITE_ERRORS,
+    responses=_STEP_UP_ERRORS,
     operation_id="resolveIncident",
 )
 async def resolve_incident(
@@ -732,7 +834,7 @@ async def resolve_incident(
 @router.post(
     "/{incident_id}/reopen",
     response_model=Incident,
-    responses=_WRITE_ERRORS,
+    responses=_STEP_UP_ERRORS,
     operation_id="reopenIncident",
 )
 async def reopen_incident(

@@ -70,7 +70,7 @@ from netsight_api.storage import AlertRuleRepository, NotFoundError
 router = APIRouter(prefix="/alert-rules", tags=["alert-rules"])
 _NOUN = "Alert rule"
 
-_RuleReader = Annotated[Identity, Depends(reader(Permission.ALERT_RULES_READ))]
+_RuleReader = Annotated[Identity, Depends(reader(Permission.ALERT_RULES_READ, "alert-rules"))]
 _CreateActor = Annotated[
     Identity,
     Depends(collection_writer(Permission.ALERT_RULES_WRITE, action="alert_rule.create")),

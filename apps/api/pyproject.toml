@@ -35,6 +35,8 @@ dev = [
   "mypy>=1.13,<2",
   "types-qrcode>=7.4,<9",
   "pyyaml>=6,<7",
+  # Tests use the bundled CA file as a known-good PEM (also a transitive dependency of httpx).
+  "certifi>=2024",
   # The untrusted-TLS SSRF test builds a throwaway server context and a CA. It arrives
   # transitively via `pyjwt[crypto]`, but is declared so the test environment is reproducible.
   "cryptography>=50,<51",

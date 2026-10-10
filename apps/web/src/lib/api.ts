@@ -65,6 +65,8 @@ export async function apiGet<T>(path: string, parse: ResponseParser<T>): Promise
 export interface ApiPostOptions {
   /** Overall budget for the CSRF token fetch and the write itself, in milliseconds. */
   timeoutMs?: number;
+  /** HTTP verb of the state-changing call; defaults to POST (PUT for full-replacement edits). */
+  method?: 'POST' | 'PUT';
 }
 
 /**
@@ -142,7 +144,7 @@ export async function apiPost<T, B>(
     }
 
     const response = await fetch(apiUrl(path), {
-      method: 'POST',
+      method: options.method ?? 'POST',
       cache: 'no-store',
       headers: {
         Accept: 'application/json',

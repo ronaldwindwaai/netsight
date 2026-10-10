@@ -8,10 +8,11 @@ import {
   IncidentSummary,
   ResolutionBlock,
 } from '@/components/incident-detail-view';
+import { IncidentActionsPanel } from '@/components/incident-actions-panel';
 import { IncidentTimeline } from '@/components/incident-timeline';
 import { StateSurface, StoreStateSurface } from '@/components/state-surface';
-import { UnavailableActions } from '@/components/unavailable-actions';
 import { apiGet } from '@/lib/api';
+import { parseSessionInfo } from '@/lib/api-contracts';
 import type { FetchState } from '@/lib/api';
 import {
   parseIncidentDetailResponse,
@@ -25,11 +26,12 @@ import { formatUtcTimestamp } from '@/lib/format-time';
 import {
   incidentDetailHref,
   incidentDetailPath,
+  incidentReadMode,
   parseTimelineCursor,
   timelinePath,
 } from '@/lib/incident-view';
-
-const WRITE_ACTIONS = ['Acknowledge', 'Assign', 'Comment', 'Resolve', 'Reopen'] as const;
+import type { Viewer } from '@/lib/incident-actions';
+import { viewerFromSession } from '@/lib/viewer';
 
 function TimelineBody({
   state,
@@ -90,10 +92,12 @@ function DetailBody({
   state,
   timeline,
   incidentId,
+  viewer,
 }: {
   state: FetchState<IncidentDetailResponse>;
   timeline: FetchState<IncidentTimelineResponse> | null;
   incidentId: string;
+  viewer: Viewer | null;
 }): ReactNode {
   if (state.kind !== 'ok') return <DataFailure state={state} />;
   const { incident } = state.data;
@@ -113,10 +117,10 @@ function DetailBody({
       <Card className="operational-card" title="Summary" variant="outline" theme="primary">
         <IncidentSummary incident={incident} />
         <div className="mt-3">
-          <UnavailableActions
-            id="incident-actions"
-            label="Incident actions (not available yet)"
-            actions={WRITE_ACTIONS}
+          <IncidentActionsPanel
+            incident={{ id: incident.id, state: incident.state, assignee_id: incident.assignee_id }}
+            viewer={viewer}
+            currentPath={incidentDetailHref(incidentId, 0) ?? '/incidents'}
           />
         </div>
       </Card>
@@ -154,8 +158,12 @@ export default async function IncidentDetailPage({
   const detailPath = incidentDetailPath(incidentId);
   const eventsPath = timelinePath(incidentId, afterSeq);
 
+  const sessionState = await apiGet('/api/v1/auth/session', parseSessionInfo);
+  const viewer = sessionState.kind === 'ok' ? viewerFromSession(sessionState.data) : null;
+  const mode = incidentReadMode(viewer === null ? null : viewer.permissions);
+
   const [detail, timeline] =
-    detailPath === null || eventsPath === null
+    detailPath === null || eventsPath === null || mode !== 'full'
       ? [null, null]
       : await Promise.all([
           apiGet(detailPath, parseIncidentDetailResponse),
@@ -176,9 +184,9 @@ export default async function IncidentDetailPage({
     >
       <div className="page-intro d-flex align-items-center justify-content-between gap-3">
         <p className="text-body-secondary mb-0">
-          Read-only incident record and append-only timeline. All text below is operator-entered
-          and displayed as data only. Retrieved {retrievedAt}; the incident API does not report a
-          freshness value.
+          Incident record and append-only timeline. Actions are limited to what your role permits
+          and every change is audited. All text below is operator-entered and displayed as data
+          only. Retrieved {retrievedAt}; the incident API does not report a freshness value.
         </p>
         <Link className="btn btn-outline-secondary btn-sm" href="/incidents">
           <i className="bi bi-arrow-left me-1" aria-hidden="true" />
@@ -186,7 +194,19 @@ export default async function IncidentDetailPage({
         </Link>
       </div>
 
-      {detail === null ? (
+      {mode !== 'full' ? (
+        <Card className="operational-card" bodyClass="p-0">
+          <StateSurface
+            icon="bi bi-shield-lock"
+            title={mode === 'summary' ? 'Summary view only' : 'Permission denied'}
+            detail={
+              mode === 'summary'
+                ? 'Your role can see incident summaries in the incident list, not the full record, evidence or timeline.'
+                : 'Your role does not include incident access. Access is enforced by the Netsight API.'
+            }
+          />
+        </Card>
+      ) : detail === null ? (
         <Card className="operational-card" bodyClass="p-0">
           <StateSurface
             icon="bi bi-question-circle"
@@ -195,7 +215,7 @@ export default async function IncidentDetailPage({
           />
         </Card>
       ) : (
-        <DetailBody state={detail} timeline={timeline} incidentId={incidentId} />
+        <DetailBody state={detail} timeline={timeline} incidentId={incidentId} viewer={viewer} />
       )}
     </AppContent>
   );

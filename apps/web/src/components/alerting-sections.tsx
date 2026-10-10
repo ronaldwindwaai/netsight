@@ -6,7 +6,7 @@ import { DataFailure } from '@/components/data-state';
 import { MaintenanceWindowsTable } from '@/components/maintenance-windows-table';
 import { Pager } from '@/components/pager';
 import { StateSurface, StoreStateSurface } from '@/components/state-surface';
-import { UnavailableActions } from '@/components/unavailable-actions';
+import { NewRuleButton, NewWindowButton } from '@/components/alerting-write-controls';
 import type { FetchState } from '@/lib/api';
 import type {
   AlertRuleListResponse,
@@ -15,6 +15,7 @@ import type {
 import { alertingPageHrefs, windowCounts } from '@/lib/alerting-view';
 import type { AlertingOffsets } from '@/lib/alerting-view';
 import { formatUtcTimestamp } from '@/lib/format-time';
+import type { Viewer } from '@/lib/incident-actions';
 
 interface PagingContext {
   offsets: AlertingOffsets;
@@ -33,10 +34,12 @@ function RulesBody({
   state,
   paging,
   retrievedAt,
+  viewer,
 }: {
   state: FetchState<AlertRuleListResponse>;
   paging: PagingContext;
   retrievedAt: string;
+  viewer: Viewer | null;
 }): ReactNode {
   if (state.kind !== 'ok') return <Failure state={state} />;
   const response = state.data;
@@ -59,7 +62,7 @@ function RulesBody({
         Status and approval are as recorded by the API; only an approved, active rule is evaluated.
         Retrieved {retrievedAt}; the alert-rule API does not report a freshness value.
       </p>
-      <AlertRulesTable rules={response.rules} />
+      <AlertRulesTable rules={response.rules} viewer={viewer} />
       <Pager
         label="Alert rule pages"
         hrefs={alertingPageHrefs(
@@ -79,11 +82,13 @@ function WindowsBody({
   paging,
   nowMs,
   retrievedAt,
+  viewer,
 }: {
   state: FetchState<MaintenanceWindowListResponse>;
   paging: PagingContext;
   nowMs: number;
   retrievedAt: string;
+  viewer: Viewer | null;
 }): ReactNode {
   if (state.kind !== 'ok') return <Failure state={state} />;
   const response = state.data;
@@ -115,7 +120,7 @@ function WindowsBody({
         {formatUtcTimestamp(new Date(nowMs).toISOString())}. Retrieved {retrievedAt}; the
         maintenance-window API does not report a freshness value.
       </p>
-      <MaintenanceWindowsTable windows={response.windows} nowMs={nowMs} />
+      <MaintenanceWindowsTable windows={response.windows} nowMs={nowMs} viewer={viewer} />
       <Pager
         label="Maintenance window pages"
         hrefs={alertingPageHrefs(
@@ -134,6 +139,7 @@ export function AlertRulesCard(props: {
   state: FetchState<AlertRuleListResponse>;
   paging: PagingContext;
   retrievedAt: string;
+  viewer: Viewer | null;
 }) {
   return (
     <Card
@@ -145,13 +151,14 @@ export function AlertRulesCard(props: {
       bodyClass="p-0"
     >
       <div className="p-3 border-bottom">
-        <UnavailableActions
-          id="rule-actions"
-          label="Alert rule actions (not available yet)"
-          actions={['Approve', 'Disable']}
-        />
+        <NewRuleButton viewer={props.viewer} />
       </div>
-      <RulesBody state={props.state} paging={props.paging} retrievedAt={props.retrievedAt} />
+      <RulesBody
+        state={props.state}
+        paging={props.paging}
+        retrievedAt={props.retrievedAt}
+        viewer={props.viewer}
+      />
     </Card>
   );
 }
@@ -161,6 +168,7 @@ export function MaintenanceWindowsCard(props: {
   paging: PagingContext;
   nowMs: number;
   retrievedAt: string;
+  viewer: Viewer | null;
 }) {
   return (
     <Card
@@ -172,17 +180,14 @@ export function MaintenanceWindowsCard(props: {
       bodyClass="p-0"
     >
       <div className="p-3 border-bottom">
-        <UnavailableActions
-          id="window-actions"
-          label="Maintenance window actions (not available yet)"
-          actions={['Create window', 'Cancel window']}
-        />
+        <NewWindowButton viewer={props.viewer} />
       </div>
       <WindowsBody
         state={props.state}
         paging={props.paging}
         nowMs={props.nowMs}
         retrievedAt={props.retrievedAt}
+        viewer={props.viewer}
       />
     </Card>
   );

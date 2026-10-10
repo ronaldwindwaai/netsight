@@ -35,7 +35,8 @@ The logger still propagates to the root logger: leave the root logger unconfigur
 ```
 
 - `outcome`: `success` (INFO), `denied` or `failure` (WARNING). `reason` carries a fixed code for
-  denials and failures: `permission`, `scope`, `csrf`, `origin`, `rate-limit`, `NOT_FOUND`,
+  denials and failures: `permission`, `scope`, `csrf`, `origin`, `step-up` (resolve/reopen without a recent
+  second factor; no MFA age or session detail is logged), `rate-limit`, `NOT_FOUND`,
   `ILLEGAL_TRANSITION`, `CONFLICT`, `INVALID_OPERATION`, `VALIDATION_ERROR`,
   `STORE_UNAVAILABLE`, `STORE_NOT_CONNECTED`, `INTERNAL`.
 - Never present: comment, reason or root-cause text, tokens, session values, connection strings.
@@ -67,3 +68,14 @@ windows. Extra `reason` codes: `RULE_INVALID`, `organisation-scope` (refusal: an
 `maintenance:write-organisation`), `disable-evaluation` (refusal: a window with `evaluation: "disable"` without the same
 permission, whatever its scope — it stops all rule evaluation). `alert_rule.evaluate` (the read-only dry-run) is audited
 only when refused (`permission`, `csrf`, `origin`, `rate-limit`, `busy`).
+
+## Evaluation service actions (S6 step 2)
+
+The background evaluator writes with the actor `service:alert-evaluator` and the correlation id of its cycle
+(`eval-<12 hex>`). `incident.auto_create` and `incident.auto_attach` carry `target` (the incident id), `rule_id`, `policy`
+(`create`, `group` or `race`) and `alert` (the 32-hex alert fingerprint); a failure is `incident.auto_create` with
+`outcome = failure` and `reason = <exception type>`, or `reason = CLAIM_LOST` (another writer claimed the key first; `target` is
+the surplus incident). `notification.send` is one record per destination attempted:
+`target` is the notification id, with `channel`, `destination` (a keyed hash or a host, never an address or token), `code`
+(a static code such as `OK`, `QUEUE_FULL`, `SMTP_5XX`), `attempts`, `alert` and `incident`; a send that could not be attempted
+carries `reason` (`no-public-url`); a page dropped because the backlog was full carries `code = BACKLOG_FULL` with `rule_id` and `alert`. Rule names, entity names, addresses and payload text are never logged.

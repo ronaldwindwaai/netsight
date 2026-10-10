@@ -26,7 +26,7 @@ const PROXY_TIMEOUT_MS = 10_000;
  * allow-list decision and the upstream call.
  */
 export async function proxyAuthRequest(path: string, request: Request): Promise<Response> {
-  const target = resolveAuthProxyTarget(path);
+  const target = resolveAuthProxyTarget(path, new URL(request.url).search);
   if (target === null) {
     return new Response('Not Found', { status: 404 });
   }

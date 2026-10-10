@@ -160,12 +160,13 @@ def test_denied_roles_change_nothing_and_learn_nothing(
     assert caller.get(f"{RULES}/{MISSING_RULE_ID}").status_code == 403
 
 
-def test_management_keeps_its_s6_2_incident_read_while_alert_rules_stay_denied(
+def test_management_has_the_incident_summary_only_while_alert_rules_stay_denied(
     store: InMemoryAlertRuleRepository,
 ) -> None:
     manager = Caller("management")
     assert manager.get(RULES).status_code == 403
-    assert manager.get("/api/v1/incidents").status_code != 403  # S6-2 decision unchanged
+    assert manager.get("/api/v1/incidents").status_code == 403  # full read removed (2026-10-10)
+    assert manager.get("/api/v1/incidents/summary").status_code != 403
 
 
 @pytest.mark.parametrize("kind", [PrincipalKind.SERVICE, PrincipalKind.AI])

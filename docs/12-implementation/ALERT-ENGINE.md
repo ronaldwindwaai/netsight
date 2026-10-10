@@ -101,12 +101,76 @@ threshold condition and the detector direction (`above`/`below`/`outside`), and 
 regular expression; `cooldown_seconds` spaces notifications of the same alert, it does not delay creating the alert.
 
 Grouping (`grouping.py`): alert fingerprint = (rule id, entity); group key = scope + sorted labels; `plan_incident`
-decides none/create/attach from `incident_policy` and the open incidents (wiring to the incident store is a later slice).
+decides none/create/attach from `incident_policy` and the open incidents (performed by the evaluation service below).
 Escalation lives with notification routing (`notifications/dispatcher.py`), not in the rule record.
 
 Dry-run: `POST /api/v1/alert-rules/evaluate` replays up to 200 supplied observations (strictly ascending times) through a
 supplied definition and up to 20 sample windows; it reads no store, sends nothing and creates nothing.
 
-Not implemented: dependency inhibition, silences/acknowledgement-based muting, a supported-metric catalogue (an unknown
+Not implemented in the engine: dependency inhibition, silences/acknowledgement-based muting, a supported-metric catalogue (an unknown
 metric is accepted and simply never receives observations), and the AI "propose" stub (no AI broker exists yet; any
 future proposal must produce a draft that only a human approval can activate).
+
+## Evaluation service (S6 step 2)
+
+Code: `apps/api/src/netsight_api/evaluation/` (the engine in `alerting/` stays pure and I/O-free).
+Off by default; `NETSIGHT_EVALUATION_ENABLED=true` starts one bounded cycle every
+`NETSIGHT_EVALUATION_INTERVAL_SECONDS` (30-3600, default 60) from the application lifespan. Enabled without
+`DATABASE_URL`, or with any invalid channel setting, the application refuses to start. **Exactly one evaluator may run per
+database - a hard requirement, enforced in code** (`leader.py`): the scheduler runs cycles only while it holds a PostgreSQL
+session-level advisory lock on a dedicated connection (TCP keepalives on); every other process idles and retries each
+interval. Before applying a cycle's effects the runner re-verifies the lock; a process that loses it (session died, database
+restart, a rival holds it) stops evaluating, applies nothing from that cycle and drops its in-memory engine state, so a later
+takeover starts clean. A lock backend failure means "not the leader" (fail closed).
+
+**Observation source** (`source.py`). `ObservationSource` is a Protocol: `supports(metric)` and
+`observe(metric, now) -> ObservationBatch`. A batch is `ok` (observations), `not-connected` (source not configured) or
+`unknown` (read failed, timed out, refused or unusable; also more than 5000 entities), and a non-ok batch cannot carry
+observations. A reading the source cannot state is an observation with `value = None`, which the engine treats as no data.
+Nothing is substituted or interpolated. `LibrenmsObservationSource` (built on the existing read-only adapter) supports
+`device.status` (1 up, 0 down, `None` when unknown or when LibreNMS has the device disabled/ignored) and
+`device.alert_count` (open, not acknowledged, LibreNMS alerts, 0 for quiet devices so a count can recover). Observations
+are scoped to `("device", id)` and `("organisation", "default")`; device names and alert titles are never copied in.
+
+**Runner** (`runner.py`). Per cycle: load `active` (approved) rules, drafts and disabled rules never evaluate; read each
+distinct metric once (bounded concurrency 4, per-read timeout 30 s); `not-connected`/`unknown`/timeout means the rule is
+not evaluated for that cycle and a gap is recorded (a pending debounce restarts, a firing alert is kept: a gap is not a
+recovery); run `evaluate_definition` with the injected clock; then apply effects. Bounds: 500 rules, 200 000 evaluations
+(shared fairly: each rule gets the ceiling of the remaining budget over the remaining rules, and a rule's entities are
+visited round-robin across cycles, so none starves; **running out of budget is not a data gap** - entities not reached keep
+their pending/firing state, only entities absent from the data restart a debounce),
+50 000 tracked (rule, version, entity) states (inactive ones are evicted first; pending or firing ones never are, so new
+entities are not tracked and the cycle reports `truncated`), 100 incident actions and 50 notifications per cycle
+(notifications over the cap, or still unsent when the 60 s notification-phase deadline passes, wait in a backlog of at most
+1000, ordered most severe first; overflow drops the least severe, is counted as failed and audited as `notification.send`
+`code = BACKLOG_FULL`; incident work is re-derived next cycle). More than 500 live maintenance windows marks the cycle
+`truncated`. A store failure
+loading rules evaluates nothing. Overlapping `run_cycle` calls return `overlapped` instead of queueing. Engine state is
+in memory: after a restart the phase is re-derived from fresh observations, incidents are protected by the durable links
+and repeat pages by the delivery ledger (see NOTIFICATION-ENGINE.md).
+
+**Maintenance suppresses availability alerts only.** Windows are passed to the engine only for availability metrics
+(`device.status`, `interface.oper_status`, `availability.*`); every other metric ignores them, so planned work never
+silences a traffic, security or count-based rule. `retain` holds back both the incident and the notification while the
+alert keeps firing (deferred, not lost: both happen at the first cycle after the window, if still firing); `disable` stops
+evaluation and leaves state untouched. Cancelled and expired windows never count.
+
+**Incidents** (`incidents.py`, migration 0003 `alert_incident_links`). A firing alert not held back by maintenance, with
+`incident_policy` other than `none`, gets exactly one incident per key: `create` keys on the alert fingerprint (one incident
+per alert), `group` on the group key (later alerts of the group attach with an `alert-linked` timeline event). A key points
+at an incident until a **human** resolves it; then a new firing opens a new one **once the alert has recovered**. The
+link records the recovery (`recovered_at`, written when the engine sees the alert resolve; a claim clears it), so a still-firing
+alert whose incident a human resolved gets no new incident - in the running process and after a restart alike. If the evaluator
+was down for the whole recovery and the re-fire, that one outage is attributed to the old resolved incident (conservative). The link is claimed by
+compare-and-set before the timeline note, so a crash never produces a duplicate on the next cycle. The leader lock prevents two
+evaluators; if they raced anyway the loser attaches to the winner, audits the surplus incident (`incident.auto_create` failure,
+`reason = CLAIM_LOST`) and leaves a "Superseded" comment on it (nothing is deleted). Claim results are checked everywhere. The writer is the service principal `service:alert-evaluator` (no roles, `PrincipalKind.SERVICE`): it can only
+create an incident, append `alert-linked`/`comment` notes and claim links, through a narrow `EvaluatorIncidents` Protocol
+(`create_incident`, `append_event`, `get_incident`) rather than the full repository. It never acknowledges, assigns, resolves,
+reopens or closes an incident, and never edits a rule or window (a static test enforces this). Severity maps
+`info,low -> low`, `medium`, `high`, `critical`. Audit: `incident.auto_create` / `incident.auto_attach` (success) and
+`incident.auto_create` with `reason = <error type>` (failure).
+
+Interpretations to confirm: a recovered alert does **not** resolve or annotate its incident (resolution is a human
+judgement); incident creation is tied to the alert firing and not being held back by maintenance, not only to the first
+notification; the `webhook` channel is not reachable from rule `actions` (the contract names `create_alert`, `email`, `push`).

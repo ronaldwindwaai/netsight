@@ -1,12 +1,18 @@
+import { isRfc3339 } from './api-contracts.ts';
 import {
   hasExactKeys,
   isIntegerInRange,
+  isNonBlankText,
   isPlainRecord,
   isOneOf,
   parseArray,
 } from './contract-guards.ts';
 import {
+  INCIDENT_SEVERITIES,
+  INCIDENT_STATES,
   parseIncident,
+  type IncidentSeverity,
+  type IncidentState,
   parseIncidentTimelineEvent,
   type Incident,
   type IncidentTimelineEvent,
@@ -30,6 +36,29 @@ export interface IncidentListResponse {
   next_offset: number | null;
 }
 
+/**
+ * Management's reduced incident row: no evidence ids, no resolution text, no assignee identity.
+ * `assigned` only says whether somebody holds the incident.
+ */
+export interface IncidentSummary {
+  id: string;
+  title: string;
+  severity: IncidentSeverity;
+  state: IncidentState;
+  created_at: string;
+  updated_at: string;
+  assigned: boolean;
+  resolved_at: string | null;
+}
+
+export interface IncidentSummaryListResponse {
+  state: IncidentApiState;
+  incidents: IncidentSummary[];
+  limit: number;
+  offset: number;
+  next_offset: number | null;
+}
+
 export interface IncidentDetailResponse {
   state: IncidentApiState;
   incident: Incident | null;
@@ -44,6 +73,16 @@ export interface IncidentTimelineResponse {
 }
 
 const LIST_KEYS = ['state', 'incidents', 'limit', 'offset', 'next_offset'] as const;
+const SUMMARY_KEYS = [
+  'id',
+  'title',
+  'severity',
+  'state',
+  'created_at',
+  'updated_at',
+  'assigned',
+  'resolved_at',
+] as const;
 const DETAIL_KEYS = ['state', 'incident'] as const;
 const TIMELINE_KEYS = ['state', 'incident_id', 'events', 'after_seq', 'next_after_seq'] as const;
 const INCIDENT_ID =
@@ -65,6 +104,65 @@ export function parseIncidentListResponse(value: unknown): IncidentListResponse 
     return null;
   }
   const incidents = parseArray(value.incidents, 0, MAX_INCIDENT_PAGE_SIZE, parseIncident);
+  if (incidents === null) return null;
+  if (value.state !== 'ok' && (incidents.length > 0 || value.next_offset !== null)) return null;
+  return {
+    state: value.state,
+    incidents,
+    limit: value.limit,
+    offset: value.offset,
+    next_offset: value.next_offset,
+  };
+}
+
+function isTimestamp(value: unknown): value is string {
+  return typeof value === 'string' && isRfc3339(value);
+}
+
+export function parseIncidentSummary(value: unknown): IncidentSummary | null {
+  if (!isPlainRecord(value) || !hasExactKeys(value, SUMMARY_KEYS)) return null;
+  if (
+    typeof value.id !== 'string' ||
+    !INCIDENT_ID.test(value.id) ||
+    !isNonBlankText(value.title, 255) ||
+    !isOneOf(value.severity, INCIDENT_SEVERITIES) ||
+    !isOneOf(value.state, INCIDENT_STATES) ||
+    !isTimestamp(value.created_at) ||
+    !isTimestamp(value.updated_at) ||
+    typeof value.assigned !== 'boolean' ||
+    !(value.resolved_at === null || isTimestamp(value.resolved_at))
+  ) {
+    return null;
+  }
+  // resolved_at present <=> state is resolved or closed.
+  const resolved = value.state === 'resolved' || value.state === 'closed';
+  if (resolved !== (value.resolved_at !== null)) return null;
+  return {
+    id: value.id,
+    title: value.title,
+    severity: value.severity,
+    state: value.state,
+    created_at: value.created_at,
+    updated_at: value.updated_at,
+    assigned: value.assigned,
+    resolved_at: value.resolved_at,
+  };
+}
+
+/** Fail closed: a non-ok state never carries rows or a cursor, whatever the payload says. */
+export function parseIncidentSummaryListResponse(
+  value: unknown,
+): IncidentSummaryListResponse | null {
+  if (!isPlainRecord(value) || !hasExactKeys(value, LIST_KEYS)) return null;
+  if (
+    !isOneOf(value.state, INCIDENT_API_STATES) ||
+    !isIntegerInRange(value.limit, 1, MAX_INCIDENT_PAGE_SIZE) ||
+    !isIntegerInRange(value.offset, 0, MAX_INCIDENT_LIST_OFFSET) ||
+    !isNullableCursor(value.next_offset, MAX_INCIDENT_LIST_OFFSET)
+  ) {
+    return null;
+  }
+  const incidents = parseArray(value.incidents, 0, MAX_INCIDENT_PAGE_SIZE, parseIncidentSummary);
   if (incidents === null) return null;
   if (value.state !== 'ok' && (incidents.length > 0 || value.next_offset !== null)) return null;
   return {

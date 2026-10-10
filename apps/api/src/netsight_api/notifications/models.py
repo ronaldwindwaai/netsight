@@ -67,7 +67,8 @@ _BIDI: Final = frozenset(chr(c) for c in (*range(0x202A, 0x202F), *range(0x2066,
 
 
 def sanitize_line(text: str, limit: int) -> str:
-    """One printable line: control characters and bidi overrides become nothing or a space."""
+    """One printable line: control and format (Cf: bidi, zero-width, BOM, tag) characters become
+    nothing, line breaks and tabs become a space."""
     out: list[str] = []
     for char in text:
         if char in _BIDI:
@@ -75,7 +76,7 @@ def sanitize_line(text: str, limit: int) -> str:
         category = unicodedata.category(char)
         if char in "\r\n\t" or category == "Zl" or category == "Zp":
             out.append(" ")
-        elif category == "Cc":
+        elif category in ("Cc", "Cf"):
             continue
         else:
             out.append(char)

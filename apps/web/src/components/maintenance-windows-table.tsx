@@ -1,4 +1,6 @@
+import { WindowRowActions } from '@/components/alerting-write-controls';
 import type { MaintenanceWindow } from '@/lib/api-contracts-alert-rule';
+import type { Viewer } from '@/lib/incident-actions';
 import { describeScope, windowPhase, windowPhaseLabel } from '@/lib/alerting-view';
 import type { WindowPhase } from '@/lib/alerting-view';
 import { formatUtcTimestamp } from '@/lib/format-time';
@@ -17,15 +19,17 @@ const EVALUATION_TEXT: Record<MaintenanceWindow['evaluation'], string> = {
 };
 
 /**
- * Read-only maintenance windows. The phase is derived from the stored start and
+ * Maintenance windows with the actions the viewer may take. The phase is derived from the stored start and
  * end against the clock passed in (the render time), never stored client-side.
  */
 export function MaintenanceWindowsTable({
   windows,
   nowMs,
+  viewer,
 }: {
   windows: readonly MaintenanceWindow[];
   nowMs: number;
+  viewer: Viewer | null;
 }) {
   return (
     <div className="table-responsive">
@@ -39,6 +43,7 @@ export function MaintenanceWindowsTable({
             <th scope="col">Ends</th>
             <th scope="col">Effect</th>
             <th scope="col">Reason</th>
+            <th scope="col">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -71,6 +76,9 @@ export function MaintenanceWindowsTable({
                 <td className="text-nowrap">{formatUtcTimestamp(window.ends_at)}</td>
                 <td className="small">{EVALUATION_TEXT[window.evaluation]}</td>
                 <td className="text-break">{window.reason}</td>
+                <td>
+                  <WindowRowActions window={window} viewer={viewer} nowMs={nowMs} />
+                </td>
               </tr>
             );
           })}

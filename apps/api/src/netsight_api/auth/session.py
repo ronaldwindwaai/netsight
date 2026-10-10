@@ -41,6 +41,9 @@ class Session:
     created_at: float = field(default_factory=time.monotonic)
     last_activity: float = field(default_factory=time.monotonic)
     csrf_token: str = field(default_factory=lambda: secrets.token_urlsafe(24))
+    # Store-clock time at which the sign-in proved a second factor; None when it did not or
+    # when that cannot be established (step-up checks then fail closed).
+    mfa_verified_at: float | None = None
 
     @property
     def identity_id(self) -> str:
@@ -67,7 +70,19 @@ class SessionStore:
         self._sessions: dict[str, Session] = {}
         self._clock = clock
 
-    def create(self, subject: str, provider: str, roles: Iterable[str], email: str | None = None) -> Session:
+    def now(self) -> float:
+        """The store clock; MFA ages are measured on it, never on a different clock."""
+        return self._clock()
+
+    def create(
+        self,
+        subject: str,
+        provider: str,
+        roles: Iterable[str],
+        email: str | None = None,
+        *,
+        mfa_age_seconds: float | None = None,
+    ) -> Session:
         session_id = secrets.token_urlsafe(32)
         stamped_at = self._clock()
         session = Session(
@@ -78,6 +93,7 @@ class SessionStore:
             email=email,
             created_at=stamped_at,
             last_activity=stamped_at,
+            mfa_verified_at=None if mfa_age_seconds is None else stamped_at - mfa_age_seconds,
         )
         with self._lock:
             self._sessions[session_id] = session
@@ -145,8 +161,22 @@ class SessionManager:
         provider: str,
         roles: Iterable[str],
         email: str | None = None,
+        *,
+        mfa_age_seconds: float | None = None,
     ) -> Session:
-        return self.store.create(subject, provider, roles, email)
+        """``mfa_age_seconds``: how long ago the sign-in's second factor happened (the token's
+        own ``auth_time``), mapped onto the store clock; None when it is not proven."""
+        return self.store.create(
+            subject, provider, roles, email, mfa_age_seconds=mfa_age_seconds
+        )
+
+    def mfa_age(self, session: Session) -> float | None:
+        """Seconds since the second factor; None when unknown (never, or a stamp from the future)."""
+        stamped_at = session.mfa_verified_at
+        if stamped_at is None:
+            return None
+        age = self.store.now() - stamped_at
+        return age if age >= 0 else None
 
     def cookie_value(self, session: Session) -> str:
         """Return the signed, opaque cookie value for a session."""

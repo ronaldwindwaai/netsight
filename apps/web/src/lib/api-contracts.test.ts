@@ -494,6 +494,7 @@ test('parseSessionInfo accepts a valid session response', () => {
       provider: 'microsoft',
       email: 'ops@example.test',
       roles: ['operator'],
+      permissions: ['incidents:read'],
     }),
     {
       authenticated: true,
@@ -501,8 +502,24 @@ test('parseSessionInfo accepts a valid session response', () => {
       provider: 'microsoft',
       email: 'ops@example.test',
       roles: ['operator'],
+      permissions: ['incidents:read'],
     },
   );
+});
+
+test('parseSessionInfo rejects a session without a well-formed permission list', () => {
+  const base = {
+    authenticated: true,
+    identity_id: 'microsoft:subject-1',
+    provider: 'microsoft',
+    email: null,
+    roles: [],
+  };
+  assert.equal(parseSessionInfo(base), null);
+  assert.equal(parseSessionInfo({ ...base, permissions: 'incidents:read' }), null);
+  assert.equal(parseSessionInfo({ ...base, permissions: [1] }), null);
+  assert.equal(parseSessionInfo({ ...base, permissions: ['x'.repeat(65)] }), null);
+  assert.equal(parseSessionInfo({ ...base, permissions: Array(257).fill('a:b') }), null);
 });
 
 test('parseSessionInfo rejects malformed session responses', () => {
@@ -515,6 +532,7 @@ test('parseSessionInfo rejects malformed session responses', () => {
       provider: 'microsoft',
       email: null,
       roles: [],
+      permissions: [],
     }),
     null,
   );
@@ -525,6 +543,7 @@ test('parseSessionInfo rejects malformed session responses', () => {
       provider: 'microsoft',
       email: null,
       roles: 'operator',
+      permissions: [],
     }),
     null,
   );
@@ -535,6 +554,7 @@ test('parseSessionInfo rejects malformed session responses', () => {
       provider: 'microsoft',
       email: null,
       roles: [],
+      permissions: [],
       extra: true,
     }),
     null,

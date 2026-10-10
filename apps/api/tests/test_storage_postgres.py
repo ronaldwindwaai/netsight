@@ -37,6 +37,7 @@ from netsight_api.storage.postgres import PostgresIncidentRepository
 
 STORAGE_DIR = Path(migrate.__file__).parent
 APP_TABLES = {"incidents", "incident_timeline_events", "alert_rules", "maintenance_windows"}
+EVALUATION_TABLES = {"alert_incident_links", "notification_delivery_attempts"}
 
 
 # --- offline -----------------------------------------------------------------
@@ -163,18 +164,18 @@ def functions_in_schema(settings: PostgresSettings) -> set[str]:
 def test_migrations_apply_idempotently_and_reverse_cleanly(pg: PostgresSettings) -> None:
     with pg.connect() as conn:
         applied = migrate.apply_up(conn)
-        assert applied == ["0001", "0002"]
+        assert applied == ["0001", "0002", "0003"]
         assert migrate.apply_up(conn) == []
-    assert APP_TABLES <= tables_in_schema(pg)
+    assert (APP_TABLES | EVALUATION_TABLES) <= tables_in_schema(pg)
 
     with pg.connect() as conn:
-        assert migrate.apply_down(conn, steps=2, allow_destructive=True) == ["0002", "0001"]
+        assert migrate.apply_down(conn, steps=3, allow_destructive=True) == ["0003", "0002", "0001"]
         assert migrate.apply_down(conn, allow_destructive=True) == []
-    assert not (APP_TABLES & tables_in_schema(pg))
+    assert not ((APP_TABLES | EVALUATION_TABLES) & tables_in_schema(pg))
     assert not any(name.startswith("netsight_") for name in functions_in_schema(pg))
 
     with pg.connect() as conn:
-        assert migrate.apply_up(conn) == ["0001", "0002"]
+        assert migrate.apply_up(conn) == ["0001", "0002", "0003"]
     assert APP_TABLES <= tables_in_schema(pg)
 
 

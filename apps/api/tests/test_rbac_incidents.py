@@ -1,7 +1,8 @@
 """RBAC for the incident surface (docs/02-security/RBAC-MATRIX.md, 'Incidents' row).
 
 Admin / Network Engineer / Security Analyst: Full. Technician: Assigned (acts only on
-incidents assigned to them). Management: Summary and Auditor: Read (read only).
+incidents assigned to them). Management: Summary (a reduced, personal-data-free view under
+``incidents:read-summary``, human decision 2026-10-10) and Auditor: Read (read only).
 Resolve and reopen additionally require a human principal: a root cause is never
 recorded by an AI or service identity (INCIDENT-ENGINE.md, 'Resolution').
 """
@@ -41,9 +42,31 @@ def test_full_roles_hold_every_incident_write_permission(role: str, permission: 
 
 @pytest.mark.parametrize("role", ["management", "auditor"])
 def test_read_only_roles_hold_no_incident_write_permission(role: str) -> None:
-    assert is_allowed(person(role), Permission.INCIDENTS_READ.value)
+    assert is_allowed(person(role), Permission.INCIDENTS_READ_SUMMARY.value)
     for permission in [*FULL_WRITE, Permission.INCIDENTS_WRITE_ASSIGNED]:
         assert not is_allowed(person(role), permission.value)
+
+
+def test_management_holds_the_summary_view_and_not_the_full_read() -> None:
+    manager = person("management")
+    assert is_allowed(manager, Permission.INCIDENTS_READ_SUMMARY.value)
+    assert not is_allowed(manager, Permission.INCIDENTS_READ.value)
+
+
+@pytest.mark.parametrize(
+    "role", ["administrator", "network_engineer", "security_analyst", "technician", "auditor"]
+)
+def test_every_full_reader_can_also_see_the_summary(role: str) -> None:
+    assert is_allowed(person(role), Permission.INCIDENTS_READ.value)
+    assert is_allowed(person(role), Permission.INCIDENTS_READ_SUMMARY.value)
+
+
+@pytest.mark.parametrize("kind", [PrincipalKind.SERVICE, PrincipalKind.AI])
+def test_summary_is_not_a_human_only_permission(kind: PrincipalKind) -> None:
+    # Reading is not a human judgement; only writes that record one are human-only.
+    assert Permission.INCIDENTS_READ_SUMMARY not in HUMAN_ONLY_PERMISSIONS
+    robot = Identity("svc:x", frozenset({"management"}), kind)
+    assert is_allowed(robot, Permission.INCIDENTS_READ_SUMMARY.value)
 
 
 def test_technician_is_limited_to_assigned_incident_work() -> None:

@@ -2013,6 +2013,253 @@
    }
   ]
  },
+ "incident_summary_list_response": {
+  "base": {
+   "state": "ok",
+   "incidents": [
+    {
+     "id": "incident-3f2b8a40-1c2d-4e5f-8a9b-0c1d2e3f4a5b",
+     "title": "Perimeter outage",
+     "severity": "critical",
+     "state": "open",
+     "created_at": "2026-10-08T08:00:00Z",
+     "updated_at": "2026-10-08T08:00:00Z",
+     "assigned": false,
+     "resolved_at": null
+    }
+   ],
+   "limit": 50,
+   "offset": 0,
+   "next_offset": null
+  },
+  "cases": [
+   {
+    "name": "ok page with one summary",
+    "valid": true
+   },
+   {
+    "name": "ok page with an assigned incident",
+    "valid": true,
+    "set": {
+     "incidents.0.assigned": true
+    }
+   },
+   {
+    "name": "resolved summary carries resolved_at",
+    "valid": true,
+    "set": {
+     "incidents.0.state": "resolved",
+     "incidents.0.resolved_at": "2026-10-08T09:00:00Z"
+    }
+   },
+   {
+    "name": "closed summary carries resolved_at",
+    "valid": true,
+    "set": {
+     "incidents.0.state": "closed",
+     "incidents.0.resolved_at": "2026-10-08T09:00:00Z"
+    }
+   },
+   {
+    "name": "ok empty page",
+    "valid": true,
+    "set": {
+     "incidents": []
+    }
+   },
+   {
+    "name": "ok page with a continuation offset",
+    "valid": true,
+    "set": {
+     "limit": 1,
+     "next_offset": 1
+    }
+   },
+   {
+    "name": "not-connected is empty",
+    "valid": true,
+    "set": {
+     "state": "not-connected",
+     "incidents": []
+    }
+   },
+   {
+    "name": "unknown is empty",
+    "valid": true,
+    "set": {
+     "state": "unknown",
+     "incidents": []
+    }
+   },
+   {
+    "name": "not-connected must not carry rows",
+    "valid": false,
+    "set": {
+     "state": "not-connected"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "unknown must not carry rows",
+    "valid": false,
+    "set": {
+     "state": "unknown"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "unknown must not offer a continuation",
+    "valid": false,
+    "set": {
+     "state": "unknown",
+     "incidents": [],
+     "next_offset": 50
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "state outside the enum",
+    "valid": false,
+    "set": {
+     "state": "degraded",
+     "incidents": []
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "limit above the server cap",
+    "valid": false,
+    "set": {
+     "limit": 101
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "offset above the cap",
+    "valid": false,
+    "set": {
+     "offset": 10001,
+     "incidents": []
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "unknown top-level field",
+    "valid": false,
+    "set": {
+     "extra": 1
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "missing incidents",
+    "valid": false,
+    "delete": [
+     "incidents"
+    ],
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "missing next_offset",
+    "valid": false,
+    "delete": [
+     "next_offset"
+    ],
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "summary must not leak the assignee identity",
+    "valid": false,
+    "set": {
+     "incidents.0.assignee_id": "identity-ronald"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "summary must not leak evidence ids",
+    "valid": false,
+    "set": {
+     "incidents.0.evidence_ids": [
+      "ev-1"
+     ]
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "summary must not leak the resolution",
+    "valid": false,
+    "set": {
+     "incidents.0.resolution": null
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "summary missing assigned",
+    "valid": false,
+    "delete": [
+     "incidents.0.assigned"
+    ],
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "assigned as a string",
+    "valid": false,
+    "set": {
+     "incidents.0.assigned": "yes"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "summary missing resolved_at",
+    "valid": false,
+    "delete": [
+     "incidents.0.resolved_at"
+    ],
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "resolved without resolved_at",
+    "valid": false,
+    "set": {
+     "incidents.0.state": "resolved"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "open with resolved_at",
+    "valid": false,
+    "set": {
+     "incidents.0.resolved_at": "2026-10-08T09:00:00Z"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "resolved_at is not a timestamp",
+    "valid": false,
+    "set": {
+     "incidents.0.state": "resolved",
+     "incidents.0.resolved_at": "yesterday"
+    },
+    "jsonschema_rejects": false
+   },
+   {
+    "name": "severity outside the enum",
+    "valid": false,
+    "set": {
+     "incidents.0.severity": "urgent"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "blank title",
+    "valid": false,
+    "set": {
+     "incidents.0.title": "   "
+    },
+    "jsonschema_rejects": true
+   }
+  ]
+ },
  "incident_detail_response": {
   "base": {
    "state": "ok",

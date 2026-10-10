@@ -120,7 +120,8 @@ class HttpxWebhookTransport:
             raise ConnectionError("webhook connection failed") from None
 
 
-def _classify(status: int) -> SendResult:
+def classify_status(status: int) -> SendResult:
+    """Static outcome for an HTTP status (shared by the webhook and push senders)."""
     if 200 <= status < 300:
         return SendResult("sent", "OK")
     if 300 <= status < 400:
@@ -180,4 +181,4 @@ class WebhookSender:
         except Exception as exc:  # noqa: BLE001 - contained: only the type is logged
             _LOGGER.warning("webhook transport failed", extra={"error_type": type(exc).__name__})
             return SendResult("retryable", "TRANSPORT_ERROR")
-        return _classify(response.status)
+        return classify_status(response.status)

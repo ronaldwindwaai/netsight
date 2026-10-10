@@ -94,6 +94,8 @@ def _issue_session(response: Response, username: str, roles: frozenset[str], ema
         provider="local",
         roles=roles,
         email=email,
+        # Only reachable after a redeemed challenge and a verified second factor.
+        mfa_age_seconds=0.0,
     )
     response.set_cookie(value=manager.cookie_value(session), **manager.cookie_attributes())
 

@@ -148,6 +148,8 @@ export interface SessionInfo {
   provider: string;
   email: string | null;
   roles: string[];
+  /** Permission names the API grants this identity; advisory for the UI, re-checked on every request. */
+  permissions: string[];
 }
 
 export interface DeviceStatusCount {
@@ -323,7 +325,9 @@ const SESSION_INFO_KEYS = [
   'provider',
   'email',
   'roles',
+  'permissions',
 ] as const;
+const MAX_SESSION_PERMISSIONS = 256;
 
 export function isRecord(value: unknown): value is UnknownRecord {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -776,7 +780,12 @@ export function parseSessionInfo(value: unknown): SessionInfo | null {
     !isBoundedString(value.provider, 1, 32) ||
     !isNullableString(value.email) ||
     !Array.isArray(value.roles) ||
-    value.roles.some((role) => typeof role !== 'string')
+    value.roles.some((role) => typeof role !== 'string') ||
+    !Array.isArray(value.permissions) ||
+    value.permissions.length > MAX_SESSION_PERMISSIONS ||
+    value.permissions.some(
+      (permission) => typeof permission !== 'string' || !isBoundedString(permission, 1, 64),
+    )
   ) {
     return null;
   }
@@ -787,6 +796,7 @@ export function parseSessionInfo(value: unknown): SessionInfo | null {
     provider: value.provider,
     email: value.email,
     roles: [...value.roles],
+    permissions: [...(value.permissions as string[])],
   };
 }
 

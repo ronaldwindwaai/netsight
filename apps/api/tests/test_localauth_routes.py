@@ -139,6 +139,26 @@ def test_full_login_requires_and_accepts_the_second_factor() -> None:
     assert "netsight_session" in second.cookies
 
 
+def test_the_local_session_is_stamped_with_the_time_of_the_second_factor() -> None:
+    from netsight_api.auth.session import session_manager
+
+    secret = _create_account()
+    client = _client()
+    first = client.post(
+        "/api/v1/auth/local/login", json={"username": USERNAME, "password": PASSWORD}
+    )
+    second = client.post(
+        "/api/v1/auth/local/mfa/verify",
+        json={"challenge_id": _challenge_id(first), "code": totp.generate_code(secret)},
+    )
+    manager = session_manager()
+    session = manager.validate_cookie(second.cookies.get(manager.policy.cookie_name))
+    assert session is not None
+    age = manager.mfa_age(session)
+    assert age is not None
+    assert 0 <= age < 5
+
+
 # --- enumeration resistance ------------------------------------------------
 
 

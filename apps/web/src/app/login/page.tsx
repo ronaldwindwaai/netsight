@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { LocalSignIn } from '@/components/local-signin';
 import { apiGet } from '@/lib/api';
 import { parseAuthProviders } from '@/lib/api-contracts';
+import { providerLoginHref, safeNextPath } from '@/lib/sign-in-redirect';
 
 const PROVIDERS = [
   {
@@ -53,7 +54,12 @@ function LoginSidebar() {
   );
 }
 
-export default async function LoginPage() {
+type LoginSearch = Promise<{ step_up?: string | string[]; next?: string | string[] }>;
+
+export default async function LoginPage({ searchParams }: { searchParams: LoginSearch }) {
+  const query = await searchParams;
+  const stepUp = (Array.isArray(query.step_up) ? query.step_up[0] : query.step_up) === 'true';
+  const next = safeNextPath(query.next);
   const providersState = await apiGet('/api/v1/auth/providers', parseAuthProviders);
   const providers = providersState.kind === 'ok' ? providersState.data.providers : null;
   const configured = PROVIDERS.filter((provider) => providers?.[provider.id].configured);
@@ -76,6 +82,13 @@ export default async function LoginPage() {
           <h1 id="login-title" className="login-card__title">
             Sign in with your organisation account
           </h1>
+          {stepUp ? (
+            <p className="login-card__subtitle" role="status">
+              <i className="bi bi-shield-lock me-1" aria-hidden="true" />
+              This action needs a recent multi-factor sign-in. Sign in again to continue; you will
+              return to where you were.
+            </p>
+          ) : null}
           <p className="login-card__subtitle">
             Access Netsight to monitor, secure and operate your network infrastructure.
           </p>
@@ -83,7 +96,7 @@ export default async function LoginPage() {
           {configured.length > 0 ? (
             <div className="login-card__actions">
               {configured.map((provider) => (
-                <a key={provider.id} className="login-sso-btn" href={provider.href}>
+                <a key={provider.id} className="login-sso-btn" href={providerLoginHref(provider.href, next, stepUp)}>
                   <i className={provider.icon} aria-hidden="true" />
                   <span>Continue with {provider.name}</span>
                   <i className="bi bi-arrow-right" aria-hidden="true" />
@@ -101,7 +114,7 @@ export default async function LoginPage() {
           ) : null}
 
           <div className="login-card__local">
-            <LocalSignIn />
+            <LocalSignIn redirectTo={next ?? '/overview'} />
           </div>
 
           {configured.length === 0 ? (

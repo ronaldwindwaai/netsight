@@ -83,7 +83,9 @@ export interface IncidentCounts {
  * Counts over the listed page only, never a total reported by the store.
  * Callers must label them "of the listed incidents".
  */
-export function incidentCounts(incidents: readonly Incident[]): IncidentCounts {
+export function incidentCounts(
+  incidents: ReadonlyArray<Pick<Incident, 'severity' | 'state'>>,
+): IncidentCounts {
   const bySeverity = Object.fromEntries(
     INCIDENT_SEVERITIES.map((severity) => [severity, 0]),
   ) as Record<IncidentSeverity, number>;
@@ -154,6 +156,30 @@ export function incidentListPath(filters: IncidentFilters): string {
     ...filterPairs(filters),
   ];
   return `/api/v1/incidents?${encodePairs(pairs)}`;
+}
+
+export type IncidentReadMode = 'full' | 'summary' | 'none';
+
+/**
+ * Which incident surface the session may read, from the permissions the API reported. Management
+ * holds only the summary view. An unknown session is attempted as a full read so the API's own
+ * 401/403 is what the operator sees; this is advisory and never replaces the server check.
+ */
+export function incidentReadMode(permissions: readonly string[] | null): IncidentReadMode {
+  if (permissions === null) return 'full';
+  if (permissions.includes('incidents:read')) return 'full';
+  return permissions.includes('incidents:read-summary') ? 'summary' : 'none';
+}
+
+/** Summary list path: the same filters minus the assignee, which the summary view never offers. */
+export function incidentSummaryListPath(filters: IncidentFilters): string {
+  const pairs: Array<readonly [string, string]> = [
+    ['limit', String(DEFAULT_INCIDENT_PAGE_SIZE)],
+    ['offset', String(filters.offset)],
+  ];
+  if (filters.state) pairs.push(['state', filters.state]);
+  if (filters.severity) pairs.push(['severity', filters.severity]);
+  return `/api/v1/incidents/summary?${encodePairs(pairs)}`;
 }
 
 function listHref(filters: IncidentFilters, offset: number): string {

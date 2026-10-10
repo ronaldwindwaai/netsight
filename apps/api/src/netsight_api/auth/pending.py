@@ -22,6 +22,9 @@ class PendingAuth:
     code_verifier: str
     redirect_to: str
     created_at: float
+    # Wall-clock time (epoch seconds) a step-up was requested; the returning token must have
+    # authenticated after it, so an older token cannot be replayed to satisfy a step-up.
+    step_up_requested_at: float | None = None
 
 
 class PendingAuthStore:
@@ -36,6 +39,7 @@ class PendingAuthStore:
         nonce: str,
         code_verifier: str,
         redirect_to: str,
+        step_up_requested_at: float | None = None,
     ) -> None:
         with self._lock:
             self._prune_locked()
@@ -45,6 +49,7 @@ class PendingAuthStore:
                 code_verifier=code_verifier,
                 redirect_to=redirect_to,
                 created_at=time.monotonic(),
+                step_up_requested_at=step_up_requested_at,
             )
 
     def take(self, state: str) -> PendingAuth | None:
