@@ -20,13 +20,20 @@ import pytest
 import yaml  # type: ignore[import-untyped]
 from pydantic import BaseModel, ValidationError
 
-from netsight_api import schemas_diagnostics
+from netsight_api import schemas_diagnostic_session, schemas_diagnostics
 from netsight_api.contracts import SCHEMA_DIR, ContractViolation, validate
 
 REPO_ROOT = SCHEMA_DIR.parents[1]
-VECTORS: dict[str, Any] = json.loads(
-    (REPO_ROOT / "contracts" / "test-vectors" / "diagnostic.vectors.json").read_text("utf-8")
-)
+VECTORS: dict[str, Any] = {
+    **json.loads(
+        (REPO_ROOT / "contracts" / "test-vectors" / "diagnostic.vectors.json").read_text("utf-8")
+    ),
+    **json.loads(
+        (REPO_ROOT / "contracts" / "test-vectors" / "diagnostic-session.vectors.json").read_text(
+            "utf-8"
+        )
+    ),
+}
 OPENAPI: dict[str, Any] = yaml.safe_load(
     (REPO_ROOT / "contracts" / "openapi" / "netsight-api.yaml").read_text("utf-8")
 )
@@ -57,6 +64,41 @@ ENTITIES: dict[str, tuple[str, type[BaseModel], str]] = {
         "diagnostic_run_response",
         schemas_diagnostics.DiagnosticRunResponse,
         "DiagnosticRunResponse",
+    ),
+    "diagnostic_location_result": (
+        "diagnostic_location_result",
+        schemas_diagnostic_session.DiagnosticLocationResult,
+        "DiagnosticLocationResult",
+    ),
+    "diagnostic_probable_cause": (
+        "diagnostic_probable_cause",
+        schemas_diagnostic_session.DiagnosticProbableCause,
+        "DiagnosticProbableCause",
+    ),
+    "diagnostic_recent_changes": (
+        "diagnostic_recent_changes",
+        schemas_diagnostic_session.DiagnosticRecentChanges,
+        "DiagnosticRecentChanges",
+    ),
+    "diagnostic_path": (
+        "diagnostic_path",
+        schemas_diagnostic_session.DiagnosticPath,
+        "DiagnosticPath",
+    ),
+    "diagnostic_session": (
+        "diagnostic_session",
+        schemas_diagnostic_session.DiagnosticSession,
+        "DiagnosticSession",
+    ),
+    "diagnostic_session_response": (
+        "diagnostic_session_response",
+        schemas_diagnostic_session.DiagnosticSessionResponse,
+        "DiagnosticSessionResponse",
+    ),
+    "diagnostic_session_list_response": (
+        "diagnostic_session_list_response",
+        schemas_diagnostic_session.DiagnosticSessionListResponse,
+        "DiagnosticSessionListResponse",
     ),
 }
 
@@ -150,8 +192,22 @@ DEF_TO_COMPONENT = {
         "#/$defs/finding": "DiagnosticFinding",
         "#/$defs/probeResult": "DiagnosticProbeResult",
     },
+    "diagnostic-session.schema.json": {
+        "diagnostic.schema.json": "DiagnosticRun",
+        "#/$defs/locationResult": "DiagnosticLocationResult",
+        "#/$defs/evidenceItem": "DiagnosticEvidenceItem",
+        "#/$defs/probableCause": "DiagnosticProbableCause",
+        "#/$defs/changeSource": "DiagnosticChangeSource",
+        "#/$defs/changeItem": "DiagnosticChangeItem",
+        "#/$defs/recentChanges": "DiagnosticRecentChanges",
+        "#/$defs/pathHop": "DiagnosticPathHop",
+        "#/$defs/pathLink": "DiagnosticPathLink",
+        "#/$defs/path": "DiagnosticPath",
+    },
     "diagnostic-api.schema.json": {
         "diagnostic.schema.json": "DiagnosticRun",
+        "diagnostic-session.schema.json": "DiagnosticSession",
+        "#/$defs/sessionSummary": "DiagnosticSessionSummary",
     },
 }
 # (schema file, def name or None for the root) -> OpenAPI component.
@@ -161,6 +217,19 @@ SCHEMA_PAIRS: list[tuple[str, str | None, str]] = [
     ("diagnostic.schema.json", "probeResult", "DiagnosticProbeResult"),
     ("diagnostic-api.schema.json", "runRequest", "DiagnosticRunRequest"),
     ("diagnostic-api.schema.json", "runResponse", "DiagnosticRunResponse"),
+    ("diagnostic-session.schema.json", None, "DiagnosticSession"),
+    ("diagnostic-session.schema.json", "locationResult", "DiagnosticLocationResult"),
+    ("diagnostic-session.schema.json", "evidenceItem", "DiagnosticEvidenceItem"),
+    ("diagnostic-session.schema.json", "probableCause", "DiagnosticProbableCause"),
+    ("diagnostic-session.schema.json", "changeSource", "DiagnosticChangeSource"),
+    ("diagnostic-session.schema.json", "changeItem", "DiagnosticChangeItem"),
+    ("diagnostic-session.schema.json", "recentChanges", "DiagnosticRecentChanges"),
+    ("diagnostic-session.schema.json", "pathHop", "DiagnosticPathHop"),
+    ("diagnostic-session.schema.json", "pathLink", "DiagnosticPathLink"),
+    ("diagnostic-session.schema.json", "path", "DiagnosticPath"),
+    ("diagnostic-api.schema.json", "sessionSummary", "DiagnosticSessionSummary"),
+    ("diagnostic-api.schema.json", "sessionResponse", "DiagnosticSessionResponse"),
+    ("diagnostic-api.schema.json", "sessionListResponse", "DiagnosticSessionListResponse"),
 ]
 _DROPPED_KEYS = {"$schema", "title", "description", "$defs"}
 _ORDER_INSENSITIVE = {"required", "enum"}
@@ -210,13 +279,15 @@ def test_openapi_component_equals_json_schema(
 
 def test_every_openapi_component_in_this_slice_is_paired() -> None:
     paired = {pair[2] for pair in SCHEMA_PAIRS}
-    declared = {
-        name for name in OPENAPI["components"]["schemas"] if name.startswith("Diagnostic")
-    }
+    declared = {name for name in OPENAPI["components"]["schemas"] if name.startswith("Diagnostic")}
     assert declared == paired
 
 
 def test_diagnostics_operation_is_documented_with_every_error_status() -> None:
     paths = OPENAPI["paths"]
     assert {"200", "401", "403", "422", "429"} <= set(paths["/diagnostics"]["post"]["responses"])
-    assert "get" not in paths["/diagnostics"], "a run is created by a POST, not read by id yet"
+    assert {"200", "401", "403", "422"} <= set(paths["/diagnostics"]["get"]["responses"])
+    by_id = paths["/diagnostics/{diagnostic_id}"]["get"]["responses"]
+    assert {"200", "401", "403", "404", "422"} <= set(by_id)
+    assert set(paths["/diagnostics/{diagnostic_id}"]) == {"get"}, "a stored session is immutable"
+    assert "put" not in paths["/diagnostics"] and "delete" not in paths["/diagnostics"]

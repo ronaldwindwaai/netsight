@@ -4,7 +4,9 @@
 // server actions. Each test file is therefore bundled with esbuild into `.test-build/` with:
 //   - `@/` resolved through tsconfig paths,
 //   - `next/navigation` and the server actions replaced by the controllable stubs in src/test/,
-//   - jsdom left external (it is resolved from apps/web/node_modules at run time).
+//   - jsdom left external (it is resolved from apps/web/node_modules at run time),
+//   - the optional widget libraries @adminlte/react loads lazily (charts, editors, pickers) left
+//     external: no tested component mounts those widgets, so they are never resolved at run time.
 // The bundles are then executed by `node --test`; nothing here touches the network or a server.
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, readdirSync, rmSync } from 'node:fs';
@@ -20,11 +22,18 @@ const outDir = join(root, '.test-build');
 const STUBS = [
   [/^next\/navigation$/, join(srcDir, 'test', 'next-navigation-stub.ts')],
   [/^@\/app\/\(dashboard\)\/(incidents\/\[incidentId\]|alerts)\/actions$/, join(srcDir, 'test', 'server-actions-stub.ts')],
+  [/^@\/app\/\(dashboard\)\/diagnostics\/actions$/, join(srcDir, 'test', 'diagnostics-actions-stub.ts')],
 ];
+
+const OPTIONAL_WIDGET_LIBRARIES = /^(flatpickr|tom-select|sortablejs|tabulator-tables|quill|chart\.js)(\/.*)?$/;
 
 const stubPlugin = {
   name: 'netsight-test-stubs',
   setup(pluginBuild) {
+    pluginBuild.onResolve({ filter: OPTIONAL_WIDGET_LIBRARIES }, (args) => ({
+      path: args.path,
+      external: true,
+    }));
     for (const [filter, path] of STUBS) {
       pluginBuild.onResolve({ filter }, () => ({ path }));
     }

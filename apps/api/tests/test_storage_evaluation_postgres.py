@@ -51,7 +51,9 @@ def test_the_notification_lookup_index_ends_with_id_to_match_its_ordering() -> N
 
 def test_grants_allow_the_evaluator_to_record_recovery_on_links_only() -> None:
     grants = migrate.GRANTS_PATH.read_text("utf-8")
-    assert "UPDATE (incident_id, linked_at, recovered_at) ON TABLE %I.alert_incident_links" in grants
+    assert (
+        "UPDATE (incident_id, linked_at, recovered_at) ON TABLE %I.alert_incident_links" in grants
+    )
 
 
 def test_down_drops_exactly_the_new_objects_and_is_visible_to_the_data_guard() -> None:
@@ -201,13 +203,13 @@ def test_a_link_cannot_outlive_a_missing_incident(env: Env) -> None:
 def test_down_refuses_while_the_new_tables_hold_rows_and_succeeds_with_consent(env: Env) -> None:
     _seed(env)
     with env.owner.connect() as conn, pytest.raises(migrate.DestructiveMigrationError) as raised:
-        migrate.apply_down(conn, allow_destructive=True, env={})
+        migrate.apply_down(conn, steps=2, allow_destructive=True, env={})
     message = str(raised.value)
     assert "alert_incident_links" in message and "notification_delivery_attempts" in message
     with env.owner.connect() as conn:
         assert migrate.apply_down(
-            conn, allow_destructive=True, env={migrate.DESTRUCTIVE_ENV: "1"}
-        ) == ["0003"]
+            conn, steps=2, allow_destructive=True, env={migrate.DESTRUCTIVE_ENV: "1"}
+        ) == ["0004", "0003"]
         row = conn.execute(
             "SELECT to_regclass('alert_incident_links') AS l, "
             "to_regclass('notification_delivery_attempts') AS a"
@@ -220,4 +222,4 @@ def test_down_refuses_while_the_new_tables_hold_rows_and_succeeds_with_consent(e
 @requires_pg
 def test_down_on_empty_tables_needs_no_environment_override(env: Env) -> None:
     with env.owner.connect() as conn:
-        assert migrate.apply_down(conn, allow_destructive=True, env={}) == ["0003"]
+        assert migrate.apply_down(conn, steps=2, allow_destructive=True, env={}) == ["0004", "0003"]

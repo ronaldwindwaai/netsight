@@ -28,6 +28,7 @@ from netsight_api.schemas_diagnostics import (
     DiagnosticProbeResult,
     DiagnosticRun,
     FaultDomain,
+    ProbeLocation,
 )
 
 # A vantage is a free-form label; these name the two classes the engine can reason about. An
@@ -37,6 +38,12 @@ EXTERNAL_VANTAGES = frozenset({"internet", "external", "wan", "public"})
 INTERNAL_VANTAGES = frozenset(
     {"internal", "server-vlan", "lan", "management", "campus", "datacentre", "datacenter"}
 )
+# A configured probe location is provenance the engine can trust more than a free-form label. Only
+# locations on the service's side of the network count as "internal" evidence: a branch or remote
+# site reaches the service across the WAN, so its result says little about the service itself and
+# never narrows on its own.
+EXTERNAL_LOCATIONS: frozenset[ProbeLocation] = frozenset({"cloud-external"})
+INTERNAL_LOCATIONS: frozenset[ProbeLocation] = frozenset({"server-vlan", "user-lan", "wifi"})
 _PORT_KINDS = frozenset({"tcp", "http", "https", "service"})
 _PORT_LABEL_KINDS = frozenset({"tcp", "http", "https"})
 _REACHABILITY_KINDS = frozenset({"icmp", "tcp", "http", "https"})
@@ -50,6 +57,7 @@ class Observation:
     label: str
     status: DiagnosticCheckStatus
     vantage: str | None = None
+    location: ProbeLocation | None = None
     port: int | None = None
     latency_ms: float | None = None
     detail: str | None = None
@@ -89,8 +97,13 @@ def _finding(statement: str, evidence: Sequence[str] = ()) -> DiagnosticFinding:
     return DiagnosticFinding(statement=statement, evidence_ids=list(evidence))
 
 
-def _classify(vantage: str | None) -> str:
-    value = (vantage or "").strip().lower()
+def _classify(observation: Observation) -> str:
+    """external / internal / other; a configured location wins over a free-form vantage label."""
+    if observation.location is not None:
+        if observation.location in EXTERNAL_LOCATIONS:
+            return "external"
+        return "internal" if observation.location in INTERNAL_LOCATIONS else "other"
+    value = (observation.vantage or "").strip().lower()
     if value in EXTERNAL_VANTAGES:
         return "external"
     if value in INTERNAL_VANTAGES:
@@ -147,8 +160,68 @@ def _contradictions(observations: Sequence[Observation]) -> list[DiagnosticFindi
     return found
 
 
-def infer(observations: Sequence[Observation]) -> Inference:
-    """Infer the result shape from bounded probe observations."""
+@dataclass(frozen=True)
+class _Verdict:
+    """The outcome of the one rule that matched: a domain with its competing hypotheses."""
+
+    domain: FaultDomain
+    alternatives: tuple[str, ...]
+    next_checks: tuple[str, ...]
+
+
+_SERVICE_VERDICT = _Verdict(
+    "service",
+    (
+        "The application is not listening on the probed port",
+        "A local host firewall filters the port while the host is reachable",
+    ),
+    (
+        "Confirm the listening socket and service state on the host",
+        "Query the service's own health endpoint",
+    ),
+)
+_DNS_VERDICT = _Verdict(
+    "wan-dns-external",
+    (
+        "The local resolver or forwarder is the failing component",
+        "A split-horizon or policy view answers differently per vantage",
+    ),
+    (
+        "Resolve the name from a second, independent resolver",
+        "Query the authoritative zone directly for the record",
+    ),
+)
+# Narrowing, not proof: ROOT-CAUSE-ENGINE explicitly warns against asserting a firewall.
+_FIREWALL_VERDICT = _Verdict(
+    "firewall",
+    (
+        "An upstream or ISP routing change, not the firewall",
+        "An external policy/ACL change or an asymmetric return path",
+    ),
+    (
+        "Compare the firewall and NAT rule set against the last change",
+        "Check the WAN uplink and upstream reachability from the edge",
+        "Repeat the external check from a second vantage",
+    ),
+)
+_TARGET_VERDICT = _Verdict(
+    "target",
+    (
+        "A host-level firewall or ACL is dropping the probes",
+        "The target is genuinely down (ICMP failure alone does not prove this)",
+    ),
+    (
+        "Confirm the target through an out-of-band management path",
+        "Compare against the last known-good baseline state",
+        "Review recent configuration changes on the target",
+    ),
+)
+
+
+def _findings(
+    observations: Sequence[Observation],
+) -> tuple[list[DiagnosticFinding], list[DiagnosticFinding]]:
+    """(facts, unknowns): an answered check is a fact, an unanswered one is an explicit unknown."""
     facts: list[DiagnosticFinding] = []
     unknowns: list[DiagnosticFinding] = []
     for observation in observations:
@@ -159,95 +232,77 @@ def infer(observations: Sequence[Observation]) -> Inference:
             )
         else:
             facts.append(_finding(_statement(observation), _evidence(observation)))
+    return facts, unknowns
 
-    domain: FaultDomain | None = None
-    confidence: DiagnosticConfidence = "unknown"
-    alternatives: list[DiagnosticFinding] = []
-    next_checks: list[DiagnosticFinding] = []
 
+def _matching_verdict(observations: Sequence[Observation]) -> _Verdict | None:
+    """The first narrow, well-supported pattern the observations match, else None."""
     dns = [o for o in observations if o.kind == "dns"]
     reachability = [o for o in observations if o.kind in _REACHABILITY_KINDS]
-    external = [o for o in reachability if _classify(o.vantage) == "external"]
-    internal = [o for o in reachability if _classify(o.vantage) == "internal"]
-    services = [o for o in observations if o.kind in _PORT_KINDS]
-
-    dns_fail = any(o.status == "fail" for o in dns)
-    dns_pass = any(o.status == "pass" for o in dns)
-    external_fail = any(o.status == "fail" for o in external)
+    external = [o for o in reachability if _classify(o) == "external"]
+    internal = [o for o in reachability if _classify(o) == "internal"]
+    # Only the server's own VLAN (or an unlocated internal vantage) speaks for the target itself: a
+    # failing user LAN or Wi-Fi says nothing about whether the host is down.
+    target_basis = [o for o in internal if o.location in (None, "server-vlan")]
+    at_server = [o for o in reachability if o.location == "server-vlan"]
+    server_service_fail = any(o.kind in _PORT_KINDS and o.status == "fail" for o in at_server)
+    server_reachable = any(o.status == "pass" for o in at_server)
     internal_pass = any(o.status == "pass" for o in internal)
-    internal_all_fail = bool(internal) and all(o.status == "fail" for o in internal)
     icmp_pass = any(o.kind == "icmp" and o.status == "pass" for o in reachability)
-    service_fail = any(o.status == "fail" for o in services)
+    service_fail = any(o.kind in _PORT_KINDS and o.status == "fail" for o in observations)
 
+    if dns and any(o.status == "fail" for o in dns) and not any(o.status == "pass" for o in dns):
+        return _DNS_VERDICT
+    if server_service_fail and server_reachable:
+        # The service fails even from its own VLAN while that VLAN reaches the host: the service
+        # itself is failing, which an internal pass elsewhere must not mask.
+        return _SERVICE_VERDICT
+    if any(o.status == "fail" for o in external) and internal_pass:
+        return _FIREWALL_VERDICT
+    if target_basis and all(o.status == "fail" for o in target_basis):
+        return _TARGET_VERDICT
+    if service_fail and (icmp_pass or internal_pass):
+        return _SERVICE_VERDICT
+    return None
+
+
+def _closing_unknown(
+    observations: Sequence[Observation], domain: FaultDomain | None, has_unknowns: bool
+) -> DiagnosticFinding | None:
+    """The honest closing line when the observations narrowed nothing."""
+    if not observations or domain is not None:
+        return None
+    if any(o.status == "fail" for o in observations):
+        return _finding("The available evidence did not narrow the fault to a single domain")
+    if not has_unknowns:
+        return _finding("The reported symptom was not reproduced by the requested checks")
+    return None
+
+
+def infer(observations: Sequence[Observation]) -> Inference:
+    """Infer the result shape from bounded probe observations."""
+    facts, unknowns = _findings(observations)
     if not observations:
         unknowns.append(_finding("No diagnostic check could be run against the target"))
-    elif dns and dns_fail and not dns_pass:
-        domain, confidence = "wan-dns-external", "low"
-        alternatives = [
-            _finding("The local resolver or forwarder is the failing component"),
-            _finding("A split-horizon or policy view answers differently per vantage"),
-        ]
-        next_checks = [
-            _finding("Resolve the name from a second, independent resolver"),
-            _finding("Query the authoritative zone directly for the record"),
-        ]
-    elif external_fail and internal_pass:
-        # Narrowing, not proof: ROOT-CAUSE-ENGINE explicitly warns against asserting a firewall.
-        domain, confidence = "firewall", "low"
-        alternatives = [
-            _finding("An upstream or ISP routing change, not the firewall"),
-            _finding("An external policy/ACL change or an asymmetric return path"),
-        ]
-        next_checks = [
-            _finding("Compare the firewall and NAT rule set against the last change"),
-            _finding("Check the WAN uplink and upstream reachability from the edge"),
-            _finding("Repeat the external check from a second vantage"),
-        ]
-    elif internal_all_fail:
-        domain, confidence = "target", "low"
-        alternatives = [
-            _finding("A host-level firewall or ACL is dropping the probes"),
-            _finding("The target is genuinely down (ICMP failure alone does not prove this)"),
-        ]
-        next_checks = [
-            _finding("Confirm the target through an out-of-band management path"),
-            _finding("Compare against the last known-good baseline state"),
-            _finding("Review recent configuration changes on the target"),
-        ]
-    elif service_fail and (icmp_pass or internal_pass):
-        domain, confidence = "service", "low"
-        alternatives = [
-            _finding("The application is not listening on the probed port"),
-            _finding("A local host firewall filters the port while the host is reachable"),
-        ]
-        next_checks = [
-            _finding("Confirm the listening socket and service state on the host"),
-            _finding("Query the service's own health endpoint"),
-        ]
-
-    has_failures = any(o.status == "fail" for o in observations)
-    if observations and domain is None and not has_failures and not unknowns:
-        unknowns.append(
-            _finding("The reported symptom was not reproduced by the requested checks")
-        )
-    elif observations and domain is None and has_failures:
-        unknowns.append(
-            _finding("The available evidence did not narrow the fault to a single domain")
-        )
-
+    verdict = _matching_verdict(observations)
+    domain = None if verdict is None else verdict.domain
+    closing = _closing_unknown(observations, domain, bool(unknowns))
+    if closing is not None:
+        unknowns.append(closing)
+    alternatives = [_finding(text) for text in (verdict.alternatives if verdict else ())]
+    next_checks = [_finding(text) for text in (verdict.next_checks if verdict else ())]
     evidence_ids = _ordered_unique(
         [
             *[o.evidence_id for o in observations if o.evidence_id is not None],
             *[e for f in (*facts, *alternatives, *next_checks, *unknowns) for e in f.evidence_ids],
         ]
     )[:MAX_DIAGNOSTIC_EVIDENCE]
-
     return Inference(
         facts=facts,
         contradictions=_contradictions(observations),
         unknowns=unknowns,
         probable_fault_domain=domain,
-        confidence=confidence,
+        confidence="unknown" if verdict is None else "low",
         alternative_hypotheses=alternatives,
         recommended_next_checks=next_checks,
         evidence_ids=evidence_ids,
@@ -273,6 +328,7 @@ def build_run(
             label=observation.label,
             status=observation.status,
             vantage=observation.vantage,
+            location=observation.location,
             port=observation.port,
             latency_ms=observation.latency_ms,
             detail=observation.detail,

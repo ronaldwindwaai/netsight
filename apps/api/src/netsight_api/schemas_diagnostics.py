@@ -56,10 +56,20 @@ FaultDomain = Literal[
     "wan-dns-external",
 ]
 DiagnosticConfidence = Literal["low", "medium", "high", "unknown"]
-
-DIAGNOSTIC_ID_PATTERN = (
-    r"^diagnostic-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+# Where a check ran: the configured probe source's location. Never inferred from a vantage label.
+ProbeLocation = Literal[
+    "cloud-external", "user-lan", "server-vlan", "branch", "wifi", "remote-site"
+]
+PROBE_LOCATIONS: tuple[ProbeLocation, ...] = (
+    "cloud-external",
+    "user-lan",
+    "server-vlan",
+    "branch",
+    "wifi",
+    "remote-site",
 )
+
+DIAGNOSTIC_ID_PATTERN = r"^diagnostic-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
 DIAGNOSTIC_RUN_ID_LENGTH = 47
 MAX_DIAGNOSTIC_CHECKS = 64
 MAX_DIAGNOSTIC_FINDINGS = 64
@@ -90,7 +100,8 @@ class DiagnosticProbeResult(ContractModel):
 
     ``status`` never asserts more than the check measured: a successful ping is not application
     availability and an ICMP failure is not host failure, so an unresolved check is ``unknown``.
-    ``port`` is set only for tcp/http/https checks.
+    ``port`` is set only for tcp/http/https checks. ``location`` is the configured probe source the
+    check ran from, or None when the prober has no configured location.
     """
 
     id: str = Field(min_length=1, max_length=128)
@@ -98,6 +109,7 @@ class DiagnosticProbeResult(ContractModel):
     label: str = Field(min_length=1, max_length=255, pattern=NON_BLANK)
     status: DiagnosticCheckStatus
     vantage: str | None = Field(..., min_length=1, max_length=128, pattern=NON_BLANK)
+    location: ProbeLocation | None = Field(...)
     port: int | None = Field(..., ge=1, le=65535)
     latency_ms: float | None = Field(..., ge=0, le=3_600_000, allow_inf_nan=False)
     detail: str | None = Field(..., min_length=1, max_length=1000, pattern=NON_BLANK)
@@ -120,9 +132,7 @@ class DiagnosticRun(ContractModel):
         pattern=DIAGNOSTIC_ID_PATTERN,
     )
     target: str = Field(min_length=1, max_length=255, pattern=NON_BLANK)
-    target_id: str | None = Field(
-        ..., min_length=43, max_length=43, pattern=_DEVICE_ID_PATTERN
-    )
+    target_id: str | None = Field(..., min_length=43, max_length=43, pattern=_DEVICE_ID_PATTERN)
     symptom: str | None = Field(..., min_length=1, max_length=1000, pattern=NON_BLANK)
     vantage: str | None = Field(..., min_length=1, max_length=128, pattern=NON_BLANK)
     started_at: AwareDatetime
@@ -148,9 +158,7 @@ class DiagnosticRun(ContractModel):
         """A named fault domain carries a real confidence; no domain means unknown."""
         named = self.probable_fault_domain is not None
         if named != (self.confidence != "unknown"):
-            raise ValueError(
-                "confidence is unknown exactly when no probable fault domain is named"
-            )
+            raise ValueError("confidence is unknown exactly when no probable fault domain is named")
         return self
 
     @model_validator(mode="after")
@@ -177,13 +185,19 @@ class DiagnosticRunRequest(ApiModel):
 
 
 class DiagnosticRunResponse(ContractModel):
-    """POST /api/v1/diagnostics result; the run is present exactly when the state is ok."""
+    """POST /api/v1/diagnostics result; the run is present exactly when the state is ok.
+
+    ``stored`` is true only when the run was persisted as a session that can be revisited.
+    """
 
     state: StoreState
     run: DiagnosticRun | None = Field(...)
+    stored: bool
 
     @model_validator(mode="after")
     def _run_exactly_when_ok(self) -> DiagnosticRunResponse:
         if (self.state == "ok") != (self.run is not None):
             raise ValueError("run is present exactly when state is ok")
+        if self.stored and self.state != "ok":
+            raise ValueError("only an ok run can be stored")
         return self

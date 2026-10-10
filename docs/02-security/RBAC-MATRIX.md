@@ -107,3 +107,17 @@ human-only, CSRF- and origin-checked, rate-limited and audited with the actor, a
 `is_allowed` the routes use). The web UI uses it only to enable, disable and explain controls and to choose the summary or
 full incident surface. It is advisory: the API enforces every permission, scope, state, CSRF/origin and step-up rule on each
 request, and the UI shows the API's refusal (409 conflict, 422, 503, 403 `STEP_UP_REQUIRED`) if the page was stale.
+
+## Diagnostic permissions (S7 Step 4)
+
+One permission, `diagnostics:read`, governs starting a read-only run (`POST /diagnostics`, which also needs CSRF and the run rate limit), listing stored sessions (`GET /diagnostics`) and reading one (`GET /diagnostics/{id}`). No role can change or delete a session: there is no such route and the database refuses it.
+
+| Permission | Admin | Network Engineer | Security Analyst | Technician | Management | Auditor |
+|---|---|---|---|---|---|---|
+| `diagnostics:read` (run, list, read a session) | Yes | Yes | Yes (see scoping) | Yes ("Basic", see scoping) | **No** | **No** |
+
+**Decision record (2026-10-11, code and matrix now agree; fixes security review finding H1).** Until this pass `rbac.py` granted `diagnostics:read` to every role while the matrix row says Management and Auditor have no Diagnostics access. The grant is narrowed to the matrix: Management and Auditor receive `403 FORBIDDEN` on all three routes (the run is audited as a `permission` refusal), the web menu hides Diagnostics for a session without the permission and `/diagnostics` renders an access-denied surface without calling the API. Reason: a session names targets and devices and references incidents, and Management lost `incidents:read` by human decision (above), so it must not reach incident information through a diagnostic either.
+
+"Security scope" (Security Analyst) and "Basic" (Technician) are not yet distinct: no site or security scoping exists and there is no reduced run surface, so those roles hold the same read-only diagnostics permission as Full roles. This is recorded as an open decision (what "Basic" removes: free-text symptom, stored-session history of others, a reduced check set), not as an implemented restriction. Sessions are still not scoped per owner or per site: any holder can read any session.
+
+**Incident titles (second control, independent of the role table).** A stored session keeps an incident change only as a reference (`id`, `kind`, `severity`, `time`) and never its title; the database refuses a document that carries one. `GET /diagnostics/{id}` joins the current title at read time **only for a caller who holds `incidents:read` at that moment**; any other caller, an unreadable incident store and a missing incident all get the fixed placeholder (`title_redacted: true`). The `POST /diagnostics` response carries the run only (no change items), so it never carries an incident title. Alert titles are stored (every diagnostics role holds `alerts:read`).

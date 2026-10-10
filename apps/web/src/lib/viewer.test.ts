@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import type { SessionInfo } from './api-contracts.ts';
-import { canChangeAnything, viewerFromSession } from './viewer.ts';
+import { canChangeAnything, canUseDiagnostics, viewerFromSession } from './viewer.ts';
 
 function session(permissions: string[]): SessionInfo {
   return {
@@ -52,4 +52,12 @@ test('read-only roles cannot change anything; any write permission can', () => {
   ]) {
     assert.equal(canChangeAnything(viewerFromSession(session([permission]))), true, permission);
   }
+});
+
+test('diagnostics are available only to a viewer holding diagnostics:read', () => {
+  assert.equal(canUseDiagnostics(null), false);
+  assert.equal(canUseDiagnostics(viewerFromSession(session([]))), false);
+  // Management and Auditor read other things but hold no diagnostics permission.
+  assert.equal(canUseDiagnostics(viewerFromSession(session(['incidents:read-summary', 'audit:read']))), false);
+  assert.equal(canUseDiagnostics(viewerFromSession(session(['diagnostics:read']))), true);
 });

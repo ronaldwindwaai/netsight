@@ -106,17 +106,21 @@ _ALL_READ = {
     Permission.INCIDENTS_READ_SUMMARY,
     Permission.TRAFFIC_READ,
     Permission.SECURITY_READ,
-    Permission.DIAGNOSTICS_READ,
     Permission.REPORTS_READ,
 }
+# RBAC-MATRIX "Diagnostics": Admin / Network Engineer Full, Security Analyst "Security scope",
+# Technician "Basic"; Management and Auditor have none. Site / security scoping does not exist
+# yet, so every holder gets the same read-only surface. Held on its own (not in _ALL_READ) so a
+# role that reads everything else is not given diagnostics by accident.
+_DIAGNOSTICS = {Permission.DIAGNOSTICS_READ}
 
 ROLE_PERMISSIONS: Mapping[Role, frozenset[Permission]] = {
     Role.ADMINISTRATOR: frozenset(Permission),
     Role.NETWORK_ENGINEER: frozenset(
-        _ALL_READ | _INCIDENT_FULL | _ALERTING_AUTHOR | {Permission.ACTIONS_PROPOSE}
+        _ALL_READ | _DIAGNOSTICS | _INCIDENT_FULL | _ALERTING_AUTHOR | {Permission.ACTIONS_PROPOSE}
     ),
     Role.SECURITY_ANALYST: frozenset(
-        _ALL_READ | _INCIDENT_FULL | _ALERTING_AUTHOR | {Permission.ACTIONS_PROPOSE}
+        _ALL_READ | _DIAGNOSTICS | _INCIDENT_FULL | _ALERTING_AUTHOR | {Permission.ACTIONS_PROPOSE}
     ),
     Role.TECHNICIAN: frozenset(
         {
@@ -130,9 +134,7 @@ ROLE_PERMISSIONS: Mapping[Role, frozenset[Permission]] = {
         }
     ),
     # Summary only: the full incident read is withheld (human decision 2026-10-10).
-    Role.MANAGEMENT: frozenset(
-        (_ALL_READ - {Permission.INCIDENTS_READ}) | {Permission.AUDIT_READ}
-    ),
+    Role.MANAGEMENT: frozenset((_ALL_READ - {Permission.INCIDENTS_READ}) | {Permission.AUDIT_READ}),
     Role.AUDITOR: frozenset(_ALL_READ | _ALERTING_READ | {Permission.AUDIT_READ}),
 }
 

@@ -57,6 +57,7 @@ function probe(
     label: kind,
     status,
     vantage: 'internal',
+    location: null,
     port: kind === 'tcp' ? 443 : null,
     latency_ms: status === 'unknown' ? null : 5,
     detail: status === 'unknown' ? 'no source' : kind,

@@ -1513,6 +1513,78 @@ paths:
           $ref: '#/components/responses/ValidationError'
         '429':
           $ref: '#/components/responses/RateLimited'
+    get:
+      summary: List stored diagnostic sessions, newest first, bounded and paged
+      operationId: listDiagnosticSessions
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 10000
+            default: 0
+      responses:
+        '200':
+          description: Stored sessions, or an explicit not-connected/unknown state without rows
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiagnosticSessionListResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /diagnostics/{diagnostic_id}:
+    get:
+      summary: Read one stored, immutable diagnostic session by its run id
+      operationId: getDiagnosticSession
+      parameters:
+        - in: path
+          name: diagnostic_id
+          required: true
+          schema:
+            type: string
+            minLength: 47
+            maxLength: 47
+            pattern: '^diagnostic-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+      responses:
+        '200':
+          description: The stored session, or an explicit not-connected/unknown state without one
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiagnosticSessionResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '404':
+          description: No stored session has this id
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '422':
+          $ref: '#/components/responses/ValidationError'
   /action-requests:
     post:
       summary: Propose a controlled remote action
@@ -3634,26 +3706,21 @@ components:
     DiagnosticProbeResult:
       type: object
       additionalProperties: false
-      required: [id, kind, label, status, vantage, port, latency_ms, detail, observed_at, evidence_id]
+      required: [id, kind, label, status, vantage, location, port, latency_ms, detail, observed_at, evidence_id]
       properties:
-        id:
-          type: string
-          minLength: 1
-          maxLength: 128
+        id: {type: string, minLength: 1, maxLength: 128}
         kind:
           enum: [identity, source-freshness, target-health, dns, icmp, tcp, http, https, service, dependencies, recent-changes, baseline]
-        label:
-          type: string
-          minLength: 1
-          maxLength: 255
-          pattern: '\S'
+        label: {type: string, minLength: 1, maxLength: 255, pattern: \S}
         status:
           enum: [pass, fail, unknown]
         vantage:
           type: [string, 'null']
           minLength: 1
           maxLength: 128
-          pattern: '\S'
+          pattern: \S
+        location:
+          enum: [cloud-external, user-lan, server-vlan, branch, wifi, remote-site, null]
         port:
           type: [integer, 'null']
           minimum: 1
@@ -3666,7 +3733,7 @@ components:
           type: [string, 'null']
           minLength: 1
           maxLength: 1000
-          pattern: '\S'
+          pattern: \S
         observed_at:
           type: [string, 'null']
           format: date-time
@@ -3683,8 +3750,7 @@ components:
           required: [kind]
         then:
           properties:
-            port:
-              type: 'null'
+            port: {type: 'null'}
     DiagnosticRun:
       type: object
       additionalProperties: false
@@ -3791,28 +3857,288 @@ components:
     DiagnosticRunResponse:
       type: object
       additionalProperties: false
-      required: [state, run]
+      required: [state, run, stored]
       properties:
         state:
           enum: [not-connected, ok, unknown]
         run:
           oneOf:
-          - type: 'null'
-          - $ref: '#/components/schemas/DiagnosticRun'
+          - {type: 'null'}
+          - {$ref: '#/components/schemas/DiagnosticRun'}
+        stored: {type: boolean}
       allOf:
       - if:
           properties:
-            state:
-              const: ok
+            state: {const: ok}
           required: [state]
         then:
           properties:
-            run:
-              type: object
+            run: {type: object}
         else:
           properties:
-            run:
-              type: 'null'
+            run: {type: 'null'}
+      - if:
+          properties:
+            state: {const: ok}
+          required: [state]
+        else:
+          properties:
+            stored: {const: false}
+    DiagnosticSession:
+      type: object
+      additionalProperties: false
+      required: [run, locations, probable_cause, recent_changes, path]
+      properties:
+        run: {$ref: '#/components/schemas/DiagnosticRun'}
+        locations:
+          type: array
+          minItems: 6
+          maxItems: 6
+          items: {$ref: '#/components/schemas/DiagnosticLocationResult'}
+        probable_cause: {$ref: '#/components/schemas/DiagnosticProbableCause'}
+        recent_changes: {$ref: '#/components/schemas/DiagnosticRecentChanges'}
+        path: {$ref: '#/components/schemas/DiagnosticPath'}
+    DiagnosticLocationResult:
+      type: object
+      additionalProperties: false
+      required: [location, state, status, passed, failed, unknown_checks, check_ids]
+      properties:
+        location:
+          enum: [cloud-external, user-lan, server-vlan, branch, wifi, remote-site]
+        state:
+          enum: [observed, unknown, not-connected]
+        status:
+          enum: [pass, fail, null]
+        passed: {type: integer, minimum: 0, maximum: 64}
+        failed: {type: integer, minimum: 0, maximum: 64}
+        unknown_checks: {type: integer, minimum: 0, maximum: 64}
+        check_ids:
+          type: array
+          maxItems: 64
+          items: {type: string, minLength: 1, maxLength: 128}
+    DiagnosticEvidenceItem:
+      type: object
+      additionalProperties: false
+      required: [basis, statement, check_ids]
+      properties:
+        basis:
+          enum: [observed, inferred, unknown]
+        statement: {type: string, minLength: 1, maxLength: 1000, pattern: \S}
+        check_ids:
+          type: array
+          maxItems: 64
+          items: {type: string, minLength: 1, maxLength: 128}
+    DiagnosticProbableCause:
+      type: object
+      additionalProperties: false
+      required: [domain, confidence, basis, pattern, summary, evidence]
+      properties:
+        domain:
+          enum: [target, service, host, interface, access-device, core, firewall, wan-dns-external, null]
+        confidence:
+          enum: [low, medium, high, unknown]
+        basis:
+          enum: [inferred, unknown]
+        pattern:
+          enum: [external-only-failure, service-failure, other, none]
+        summary: {type: string, minLength: 1, maxLength: 1000, pattern: \S}
+        evidence:
+          type: array
+          maxItems: 32
+          items: {$ref: '#/components/schemas/DiagnosticEvidenceItem'}
+    DiagnosticChangeSource:
+      type: object
+      additionalProperties: false
+      required: [source, state]
+      properties:
+        source:
+          enum: [incidents, alerts, configuration-changes]
+        state:
+          enum: [not-connected, ok, unknown]
+    DiagnosticChangeItem:
+      type: object
+      additionalProperties: false
+      required: [kind, ref_id, severity, title, title_redacted, occurred_at, scope, relation]
+      properties:
+        kind:
+          enum: [incident, alert]
+        ref_id: {type: string, minLength: 1, maxLength: 128}
+        severity:
+          enum: [low, medium, high, critical, null]
+        title: {type: string, minLength: 1, maxLength: 255, pattern: \S}
+        title_redacted: {type: boolean}
+        occurred_at: {type: string, format: date-time}
+        scope:
+          enum: [target, time-window]
+        relation: {const: may-correlate}
+      description: >-
+        An incident carries its severity; its title is never stored with the session. It is joined
+        at read time only for a caller holding incidents:read, otherwise title is a fixed
+        placeholder and title_redacted is true. An alert has no severity and a stored title.
+      allOf:
+      - if:
+          properties:
+            kind: {const: incident}
+          required: [kind]
+        then:
+          properties:
+            severity: {type: string}
+        else:
+          properties:
+            severity: {type: 'null'}
+            title_redacted: {const: false}
+    DiagnosticRecentChanges:
+      type: object
+      additionalProperties: false
+      required: [state, window_start, window_end, sources, items]
+      properties:
+        state:
+          enum: [not-connected, ok, unknown]
+        window_start: {type: string, format: date-time}
+        window_end: {type: string, format: date-time}
+        sources:
+          type: array
+          minItems: 3
+          maxItems: 3
+          items: {$ref: '#/components/schemas/DiagnosticChangeSource'}
+        items:
+          type: array
+          maxItems: 20
+          items: {$ref: '#/components/schemas/DiagnosticChangeItem'}
+      allOf:
+      - if:
+          properties:
+            state: {const: ok}
+          required: [state]
+        else:
+          properties:
+            items: {maxItems: 0}
+    DiagnosticPathHop:
+      type: object
+      additionalProperties: false
+      required: [tier, state, device_id, name, highlight]
+      properties:
+        tier:
+          enum: [user, access-point, access-switch, core, firewall, server]
+        state:
+          enum: [known, unknown]
+        device_id:
+          type: [string, 'null']
+          minLength: 43
+          maxLength: 43
+          pattern: ^device-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+        name:
+          type: [string, 'null']
+          minLength: 1
+          maxLength: 255
+          pattern: \S
+        highlight:
+          enum: [suspected, null]
+    DiagnosticPathLink:
+      type: object
+      additionalProperties: false
+      required: [from_tier, to_tier, state]
+      properties:
+        from_tier:
+          enum: [user, access-point, access-switch, core, firewall, server]
+        to_tier:
+          enum: [user, access-point, access-switch, core, firewall, server]
+        state:
+          enum: [known, unknown]
+    DiagnosticPath:
+      type: object
+      additionalProperties: false
+      required: [state, observed_at, hops, links]
+      properties:
+        state:
+          enum: [not-connected, ok, unknown]
+        observed_at:
+          type: [string, 'null']
+          format: date-time
+        hops:
+          type: array
+          maxItems: 6
+          items: {$ref: '#/components/schemas/DiagnosticPathHop'}
+        links:
+          type: array
+          maxItems: 5
+          items: {$ref: '#/components/schemas/DiagnosticPathLink'}
+      allOf:
+      - if:
+          properties:
+            state: {const: ok}
+          required: [state]
+        then:
+          properties:
+            observed_at: {type: string}
+            hops: {minItems: 6}
+            links: {minItems: 5}
+        else:
+          properties:
+            observed_at: {type: 'null'}
+            hops: {maxItems: 0}
+            links: {maxItems: 0}
+    DiagnosticSessionSummary:
+      type: object
+      additionalProperties: false
+      required: [id, target, started_at, completed_at, probable_fault_domain, confidence]
+      properties:
+        id: {type: string, minLength: 47, maxLength: 47, pattern: '^diagnostic-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'}
+        target: {type: string, minLength: 1, maxLength: 255, pattern: \S}
+        started_at: {type: string, format: date-time}
+        completed_at: {type: string, format: date-time}
+        probable_fault_domain:
+          enum: [target, service, host, interface, access-device, core, firewall, wan-dns-external, null]
+        confidence:
+          enum: [low, medium, high, unknown]
+    DiagnosticSessionResponse:
+      type: object
+      additionalProperties: false
+      required: [state, session]
+      properties:
+        state:
+          enum: [not-connected, ok, unknown]
+        session:
+          oneOf:
+          - {type: 'null'}
+          - {$ref: '#/components/schemas/DiagnosticSession'}
+      allOf:
+      - if:
+          properties:
+            state: {const: ok}
+          required: [state]
+        then:
+          properties:
+            session: {type: object}
+        else:
+          properties:
+            session: {type: 'null'}
+    DiagnosticSessionListResponse:
+      type: object
+      additionalProperties: false
+      required: [state, sessions, limit, offset, next_offset]
+      properties:
+        state:
+          enum: [not-connected, ok, unknown]
+        sessions:
+          type: array
+          maxItems: 100
+          items: {$ref: '#/components/schemas/DiagnosticSessionSummary'}
+        limit: {type: integer, minimum: 1, maximum: 100}
+        offset: {type: integer, minimum: 0, maximum: 10000}
+        next_offset:
+          type: [integer, 'null']
+          minimum: 1
+          maximum: 10100
+      allOf:
+      - if:
+          properties:
+            state: {const: ok}
+          required: [state]
+        else:
+          properties:
+            sessions: {maxItems: 0}
+            next_offset: {type: 'null'}
   responses:
     AuthenticationRequired:
       description: Authentication required

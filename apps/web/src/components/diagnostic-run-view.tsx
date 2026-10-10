@@ -20,6 +20,7 @@ import {
   noFaultNarrative,
   runCheckSummary,
 } from '@/lib/diagnostic-view';
+import { LOCATION_LABELS } from '@/lib/diagnostic-session-view';
 import { formatUtcTimestamp } from '@/lib/format-time';
 
 const STATUS_PILL: Record<DiagnosticCheckStatus, string> = {
@@ -41,7 +42,7 @@ function latencyText(milliseconds: number | null): string {
   return `${Math.round(milliseconds)} ms`;
 }
 
-function CheckRow({ index, check }: { index: number; check: DiagnosticProbeResult }) {
+export function CheckRow({ index, check }: { index: number; check: DiagnosticProbeResult }) {
   return (
     <li className="list-group-item">
       <details>
@@ -79,6 +80,10 @@ function CheckRow({ index, check }: { index: number; check: DiagnosticProbeResul
               <dd>{check.vantage ?? 'not stated'}</dd>
             </div>
             <div className="col-auto">
+              <dt>Location</dt>
+              <dd>{check.location !== null ? LOCATION_LABELS[check.location] : 'not stated'}</dd>
+            </div>
+            <div className="col-auto">
               <dt>Observed at</dt>
               <dd>{check.observed_at !== null ? formatUtcTimestamp(check.observed_at) : 'not stated'}</dd>
             </div>
@@ -89,7 +94,7 @@ function CheckRow({ index, check }: { index: number; check: DiagnosticProbeResul
   );
 }
 
-function FindingList({ heading, items, tone }: { heading: string; items: readonly DiagnosticFinding[]; tone?: string }) {
+export function FindingList({ heading, items, tone }: { heading: string; items: readonly DiagnosticFinding[]; tone?: string }) {
   if (items.length === 0) return null;
   return (
     <section aria-label={heading}>

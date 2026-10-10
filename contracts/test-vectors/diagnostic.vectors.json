@@ -112,6 +112,7 @@
    "label": "TCP 443 from internet",
    "status": "fail",
    "vantage": "internet",
+   "location": "cloud-external",
    "port": 443,
    "latency_ms": null,
    "detail": "connection timed out",
@@ -246,6 +247,36 @@
      "observed_at": "just now"
     },
     "jsonschema_rejects": false
+   },
+   {
+    "name": "no configured location",
+    "valid": true,
+    "set": {
+     "location": null
+    }
+   },
+   {
+    "name": "every named location",
+    "valid": true,
+    "set": {
+     "location": "remote-site"
+    }
+   },
+   {
+    "name": "location outside the enum",
+    "valid": false,
+    "set": {
+     "location": "datacentre"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "missing location",
+    "valid": false,
+    "delete": [
+     "location"
+    ],
+    "jsonschema_rejects": true
    }
   ]
  },
@@ -265,6 +296,7 @@
      "label": "TCP 443 from internet",
      "status": "fail",
      "vantage": "internet",
+     "location": "cloud-external",
      "port": 443,
      "latency_ms": null,
      "detail": "connection timed out",
@@ -346,6 +378,7 @@
        "label": "Target identity resolved",
        "status": "pass",
        "vantage": null,
+       "location": null,
        "port": null,
        "latency_ms": null,
        "detail": null,
@@ -358,6 +391,7 @@
        "label": "ICMP from server VLAN",
        "status": "pass",
        "vantage": "server-vlan",
+       "location": null,
        "port": null,
        "latency_ms": 1.8,
        "detail": null,
@@ -402,6 +436,7 @@
        "label": "DNS",
        "status": "pass",
        "vantage": null,
+       "location": null,
        "port": null,
        "latency_ms": null,
        "detail": null,
@@ -414,6 +449,7 @@
        "label": "ICMP",
        "status": "pass",
        "vantage": null,
+       "location": null,
        "port": null,
        "latency_ms": null,
        "detail": null,
@@ -764,7 +800,8 @@
  "diagnostic_run_response": {
   "base": {
    "state": "ok",
-   "run": null
+   "run": null,
+   "stored": false
   },
   "cases": [
    {
@@ -802,7 +839,8 @@
       "alternative_hypotheses": [],
       "recommended_next_checks": [],
       "evidence_ids": []
-     }
+     },
+     "stored": true
     }
    },
    {
@@ -883,6 +921,66 @@
     "valid": false,
     "set": {
      "correlation_id": "x"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "ok with a run that was not stored",
+    "valid": true,
+    "set": {
+     "run": {
+      "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d",
+      "target": "SERVER01",
+      "target_id": null,
+      "symptom": "External users cannot reach the service",
+      "vantage": "internet",
+      "started_at": "2026-10-10T08:00:00Z",
+      "completed_at": "2026-10-10T08:00:05Z",
+      "checks": [],
+      "facts": [],
+      "contradictions": [],
+      "unknowns": [],
+      "probable_fault_domain": null,
+      "confidence": "unknown",
+      "alternative_hypotheses": [],
+      "recommended_next_checks": [],
+      "evidence_ids": []
+     },
+     "stored": false
+    }
+   },
+   {
+    "name": "stored without a run",
+    "valid": false,
+    "set": {
+     "state": "ok",
+     "stored": true
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "stored while not-connected",
+    "valid": false,
+    "set": {
+     "state": "not-connected",
+     "stored": true
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "missing stored",
+    "valid": false,
+    "delete": [
+     "stored"
+    ],
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "stored is not a boolean",
+    "valid": false,
+    "set": {
+     "state": "not-connected",
+     "stored": "yes"
     },
     "jsonschema_rejects": true
    }

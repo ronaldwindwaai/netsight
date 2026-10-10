@@ -1,13 +1,36 @@
 import type { MenuNode } from '@adminlte/react';
 
-export const menuItems: MenuNode[] = [
-  { type: 'header', text: 'Main' },
-  { type: 'item', text: 'Overview', href: '/overview', icon: 'bi-speedometer2' },
-  { type: 'item', text: 'Network Map', href: '/network/map', icon: 'bi-diagram-3' },
-  { type: 'item', text: 'Devices', href: '/devices', icon: 'bi-hdd-network' },
-  { type: 'item', text: 'Traffic', href: '/traffic', icon: 'bi-bar-chart-line' },
-  { type: 'item', text: 'Security', href: '/security', icon: 'bi-shield-exclamation' },
-  { type: 'item', text: 'Diagnostics', href: '/diagnostics', icon: 'bi-clipboard2-pulse' },
-  { type: 'item', text: 'Incidents', href: '/incidents', icon: 'bi-exclamation-triangle' },
-  { type: 'item', text: 'Alerts', href: '/alerts', icon: 'bi-bell' },
+const DIAGNOSTICS_PERMISSION = 'diagnostics:read';
+
+interface MenuEntry {
+  node: MenuNode;
+  /** Shown only to a session holding this permission; absent means always shown. */
+  requires?: string;
+}
+
+const MENU_ENTRIES: readonly MenuEntry[] = [
+  { node: { type: 'header', text: 'Main' } },
+  { node: { type: 'item', text: 'Overview', href: '/overview', icon: 'bi-speedometer2' } },
+  { node: { type: 'item', text: 'Network Map', href: '/network/map', icon: 'bi-diagram-3' } },
+  { node: { type: 'item', text: 'Devices', href: '/devices', icon: 'bi-hdd-network' } },
+  { node: { type: 'item', text: 'Traffic', href: '/traffic', icon: 'bi-bar-chart-line' } },
+  { node: { type: 'item', text: 'Security', href: '/security', icon: 'bi-shield-exclamation' } },
+  {
+    node: { type: 'item', text: 'Diagnostics', href: '/diagnostics', icon: 'bi-clipboard2-pulse' },
+    requires: DIAGNOSTICS_PERMISSION,
+  },
+  { node: { type: 'item', text: 'Incidents', href: '/incidents', icon: 'bi-exclamation-triangle' } },
+  { node: { type: 'item', text: 'Alerts', href: '/alerts', icon: 'bi-bell' } },
 ];
+
+/**
+ * The sidebar for a session's permissions. An entry that names a permission is shown only to a
+ * session that holds it; no session (null) holds nothing, so it fails closed. Advisory: the API
+ * enforces every permission on every request.
+ */
+export function menuItemsFor(permissions: readonly string[] | null): MenuNode[] {
+  const held = new Set(permissions ?? []);
+  return MENU_ENTRIES.filter((entry) => entry.requires === undefined || held.has(entry.requires)).map(
+    (entry) => entry.node,
+  );
+}

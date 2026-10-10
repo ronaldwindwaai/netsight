@@ -4,7 +4,7 @@ import { IdentityMenu } from '@/components/identity-menu';
 import { AppLink } from '@/components/app-link';
 import { apiGet } from '@/lib/api';
 import { parseSessionInfo } from '@/lib/api-contracts';
-import { menuItems } from '@/lib/menu';
+import { menuItemsFor } from '@/lib/menu';
 import { canChangeAnything, viewerFromSession } from '@/lib/viewer';
 
 export default async function Layout({ children }: { children: React.ReactNode }) {
@@ -23,7 +23,7 @@ export default async function Layout({ children }: { children: React.ReactNode }
       linkComponent={AppLink}
       logo={<span className="fw-bold">Netsight</span>}
       logoHref="/overview"
-      menuItems={menuItems}
+      menuItems={menuItemsFor(session === null ? null : session.permissions)}
       sidebarMini
       sidebarTheme="dark"
       topbarEnd={

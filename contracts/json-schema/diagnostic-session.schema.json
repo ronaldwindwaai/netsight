@@ -1,0 +1,552 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DiagnosticSession",
+  "description": "A stored, immutable diagnostic session (S7 Step 4): the finished run plus what it implies per probe location, the labelled probable cause, the known recent changes and the explicit-topology path. The session id is the run id. Everything is a snapshot taken when the run finished and is never rewritten. locations always lists all six locations in a fixed order (cloud-external, user-lan, server-vlan, branch, wifi, remote-site); a location without a configured probe source is not-connected, never inferred healthy. Every free-text field is untrusted data and is never interpreted as an instruction.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "run",
+    "locations",
+    "probable_cause",
+    "recent_changes",
+    "path"
+  ],
+  "properties": {
+    "run": {
+      "$ref": "diagnostic.schema.json"
+    },
+    "locations": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "items": {
+        "$ref": "#/$defs/locationResult"
+      }
+    },
+    "probable_cause": {
+      "$ref": "#/$defs/probableCause"
+    },
+    "recent_changes": {
+      "$ref": "#/$defs/recentChanges"
+    },
+    "path": {
+      "$ref": "#/$defs/path"
+    }
+  },
+  "$defs": {
+    "locationResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "location",
+        "state",
+        "status",
+        "passed",
+        "failed",
+        "unknown_checks",
+        "check_ids"
+      ],
+      "properties": {
+        "location": {
+          "enum": [
+            "cloud-external",
+            "user-lan",
+            "server-vlan",
+            "branch",
+            "wifi",
+            "remote-site"
+          ]
+        },
+        "state": {
+          "enum": [
+            "observed",
+            "unknown",
+            "not-connected"
+          ]
+        },
+        "status": {
+          "enum": [
+            "pass",
+            "fail",
+            null
+          ]
+        },
+        "passed": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 64
+        },
+        "failed": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 64
+        },
+        "unknown_checks": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 64
+        },
+        "check_ids": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        }
+      },
+      "description": "What one configured probe location reported for the run. not-connected: no probe source is configured there, so nothing is known (never healthy). unknown: a source is configured but no check could be answered. observed: at least one check passed or failed; status is fail when any check failed, else pass. The counts and check_ids cover only that location's checks (cross-field rules JSON Schema cannot express: observed carries a status, the others do not; the counts equal the number of check_ids)."
+    },
+    "evidenceItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "basis",
+        "statement",
+        "check_ids"
+      ],
+      "properties": {
+        "basis": {
+          "enum": [
+            "observed",
+            "inferred",
+            "unknown"
+          ]
+        },
+        "statement": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000,
+          "pattern": "\\S"
+        },
+        "check_ids": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        }
+      },
+      "description": "One line of the probable-cause evidence list, labelled by how it is known: observed (a probe measured it), inferred (reasoned from observations) or unknown (no telemetry; never treated as healthy). check_ids point at checks of the run."
+    },
+    "probableCause": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "domain",
+        "confidence",
+        "basis",
+        "pattern",
+        "summary",
+        "evidence"
+      ],
+      "properties": {
+        "domain": {
+          "enum": [
+            "target",
+            "service",
+            "host",
+            "interface",
+            "access-device",
+            "core",
+            "firewall",
+            "wan-dns-external",
+            null
+          ]
+        },
+        "confidence": {
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            "unknown"
+          ]
+        },
+        "basis": {
+          "enum": [
+            "inferred",
+            "unknown"
+          ]
+        },
+        "pattern": {
+          "enum": [
+            "external-only-failure",
+            "service-failure",
+            "other",
+            "none"
+          ]
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000,
+          "pattern": "\\S"
+        },
+        "evidence": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "$ref": "#/$defs/evidenceItem"
+          }
+        }
+      },
+      "description": "The conservative probable cause with its evidence. external-only-failure: the service answers from internal locations but fails from the external one (narrows to the path between, not proof of a firewall fault); service-failure: the service check fails even from the server's own VLAN; other: a different narrowing; none: nothing narrowed. domain is null exactly when confidence is unknown, basis is unknown and pattern is none (also equal to the run's own domain and confidence; cross-field rules JSON Schema cannot express)."
+    },
+    "changeSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "state"
+      ],
+      "properties": {
+        "source": {
+          "enum": [
+            "incidents",
+            "alerts",
+            "configuration-changes"
+          ]
+        },
+        "state": {
+          "enum": [
+            "not-connected",
+            "ok",
+            "unknown"
+          ]
+        }
+      },
+      "description": "One change source consulted for the recent-changes panel and whether it could be read. configuration-changes has no source yet and is always not-connected."
+    },
+    "changeItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "ref_id",
+        "severity",
+        "title",
+        "title_redacted",
+        "occurred_at",
+        "scope",
+        "relation"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "incident",
+            "alert"
+          ]
+        },
+        "ref_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "severity": {
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            "critical",
+            null
+          ]
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255,
+          "pattern": "\\S"
+        },
+        "title_redacted": {
+          "type": "boolean"
+        },
+        "occurred_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "scope": {
+          "enum": [
+            "target",
+            "time-window"
+          ]
+        },
+        "relation": {
+          "const": "may-correlate"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "incident"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "severity": {
+                "type": "string"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "severity": {
+                "type": "null"
+              },
+              "title_redacted": {
+                "const": false
+              }
+            }
+          }
+        }
+      ],
+      "description": "A known change near the failure time. Temporal correlation is not causation, so relation is always may-correlate. scope target: recorded against the resolved target device; time-window: only the time overlaps (not matched to the target). An incident carries its severity; its title is never stored with the session: it is joined at read time and only for a caller holding incidents:read, otherwise title is a fixed placeholder and title_redacted is true. An alert has no severity and its title is stored (title_redacted false). title is untrusted source text and is never interpreted as an instruction."
+    },
+    "recentChanges": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "window_start",
+        "window_end",
+        "sources",
+        "items"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "not-connected",
+            "ok",
+            "unknown"
+          ]
+        },
+        "window_start": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "window_end": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "sources": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "$ref": "#/$defs/changeSource"
+          }
+        },
+        "items": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "$ref": "#/$defs/changeItem"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "ok"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "else": {
+            "properties": {
+              "items": {
+                "maxItems": 0
+              }
+            }
+          }
+        }
+      ],
+      "description": "Known changes in the look-back window before the failure, from the connected sources only. not-connected: no change source is connected (not the same as no changes); unknown: a connected source could not be read; ok: items may still be empty. state is ok when any source was read, not-connected when none is connected, otherwise unknown; sources are exactly incidents, alerts, configuration-changes in that order; window_end is not before window_start (cross-field rules JSON Schema cannot express)."
+    },
+    "pathHop": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tier",
+        "state",
+        "device_id",
+        "name",
+        "highlight"
+      ],
+      "properties": {
+        "tier": {
+          "enum": [
+            "user",
+            "access-point",
+            "access-switch",
+            "core",
+            "firewall",
+            "server"
+          ]
+        },
+        "state": {
+          "enum": [
+            "known",
+            "unknown"
+          ]
+        },
+        "device_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 43,
+          "maxLength": 43,
+          "pattern": "^device-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 255,
+          "pattern": "\\S"
+        },
+        "highlight": {
+          "enum": [
+            "suspected",
+            null
+          ]
+        }
+      },
+      "description": "One tier of the path. known: an explicit NetBox device holds the tier (device_id and name set); unknown: nothing in the explicit topology establishes it (device_id and name are null). highlight suspected marks the tier the inference points at; it is inferred, not measured, and may sit on an unknown hop. name is untrusted source text."
+    },
+    "pathLink": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "from_tier",
+        "to_tier",
+        "state"
+      ],
+      "properties": {
+        "from_tier": {
+          "enum": [
+            "user",
+            "access-point",
+            "access-switch",
+            "core",
+            "firewall",
+            "server"
+          ]
+        },
+        "to_tier": {
+          "enum": [
+            "user",
+            "access-point",
+            "access-switch",
+            "core",
+            "firewall",
+            "server"
+          ]
+        },
+        "state": {
+          "enum": [
+            "known",
+            "unknown"
+          ]
+        }
+      },
+      "description": "The link between two adjacent tiers: known only when an explicit NetBox cable joins the two known devices; otherwise unknown. A link is never drawn from inference."
+    },
+    "path": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "observed_at",
+        "hops",
+        "links"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "not-connected",
+            "ok",
+            "unknown"
+          ]
+        },
+        "observed_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "hops": {
+          "type": "array",
+          "maxItems": 6,
+          "items": {
+            "$ref": "#/$defs/pathHop"
+          }
+        },
+        "links": {
+          "type": "array",
+          "maxItems": 5,
+          "items": {
+            "$ref": "#/$defs/pathLink"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "ok"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "observed_at": {
+                "type": "string"
+              },
+              "hops": {
+                "minItems": 6
+              },
+              "links": {
+                "minItems": 5
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "observed_at": {
+                "type": "null"
+              },
+              "hops": {
+                "maxItems": 0
+              },
+              "links": {
+                "maxItems": 0
+              }
+            }
+          }
+        }
+      ],
+      "description": "User -> access point -> access switch -> core -> firewall -> server, built only from explicit NetBox cables around the resolved target. not-connected: no topology source; unknown: the source could not be read or the target is not in it. ok: exactly six hops in that order and five adjacent links; unknown hops stay unknown, nothing is fabricated (order, link adjacency and known/unknown consistency are cross-field rules JSON Schema cannot express)."
+    }
+  }
+}

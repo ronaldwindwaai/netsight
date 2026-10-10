@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useState } from 'react';
 import { Alert, Card, Spinner } from '@adminlte/react';
 
@@ -7,12 +8,32 @@ import { createDiagnosticRun, type DiagnosticActionResult } from '@/app/(dashboa
 import { DataFailure } from '@/components/data-state';
 import { DiagnosticRunView } from '@/components/diagnostic-run-view';
 import { StateSurface } from '@/components/state-surface';
+import { sessionHref } from '@/lib/diagnostic-session-view';
 import {
   DEFAULT_DIAGNOSTIC_CHECKS,
   DIAGNOSTIC_CHECK_OPTIONS,
   checkDetail,
 } from '@/lib/diagnostic-view';
 import type { DiagnosticCheckKind } from '@/lib/api-contracts-diagnostic';
+
+const FREE_TEXT_NOTICE_ID = 'diagnostic-free-text-notice';
+
+/** The target and symptom are free text that is stored with the session and shown to its readers. */
+function FreeTextNotice() {
+  return (
+    <p
+      id={FREE_TEXT_NOTICE_ID}
+      role="note"
+      aria-label="Free text warning"
+      className="form-text mb-0"
+    >
+      <i className="bi bi-exclamation-triangle me-1" aria-hidden="true" />
+      Do not paste secrets (passwords, tokens, keys) or personal data into the target or symptom.
+      Both are stored with the session and shown to everyone who can read diagnostics; how long
+      sessions are kept has not been decided yet.
+    </p>
+  );
+}
 
 function NotConnectedSurface() {
   return (
@@ -105,7 +126,26 @@ function Results({ result, running }: { result: DiagnosticActionResult | null; r
       </div>
     );
   }
-  return <DiagnosticRunView run={result.state.data.run} />;
+  const run = result.state.data.run;
+  const href = result.state.data.stored ? sessionHref(run.id) : null;
+  return (
+    <>
+      <div className="px-3 pt-3">
+        {href !== null ? (
+          <Link className="btn btn-outline-primary btn-sm" href={href}>
+            <i className="bi bi-journal-text me-1" aria-hidden="true" />
+            Open stored session (probable cause, locations, path, recent changes)
+          </Link>
+        ) : (
+          <p className="small text-body-secondary mb-0">
+            This run was not stored, so it cannot be revisited: no session store is connected or it
+            could not be written.
+          </p>
+        )}
+      </div>
+      <DiagnosticRunView run={run} />
+    </>
+  );
 }
 
 export function DiagnosticsRunner({
@@ -166,6 +206,7 @@ export function DiagnosticsRunner({
                 autoComplete="off"
                 spellCheck={false}
                 placeholder="hostname, FQDN or IP address"
+                aria-describedby={FREE_TEXT_NOTICE_ID}
                 value={target}
                 onChange={(event) => setTarget(event.target.value)}
                 disabled={running}
@@ -186,10 +227,12 @@ export function DiagnosticsRunner({
                 rows={2}
                 maxLength={1000}
                 placeholder="What is the failure the operator observed?"
+                aria-describedby={FREE_TEXT_NOTICE_ID}
                 value={symptom}
                 onChange={(event) => setSymptom(event.target.value)}
                 disabled={running}
               />
+              <FreeTextNotice />
             </div>
           </div>
 

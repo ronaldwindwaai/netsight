@@ -20,3 +20,8 @@ const router = {
 export function useRouter(): typeof router {
   return router;
 }
+
+/** The library's sidebar reads the current path; no tested component mounts it. */
+export function usePathname(): string {
+  return '/';
+}

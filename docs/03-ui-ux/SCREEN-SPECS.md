@@ -29,8 +29,17 @@ Guided "Why?" workflows. Device/service selector, internal/external probes, path
 Implemented in S7-3: `/diagnostics` runs a bounded, read-only check set against an operator
 allow-list from the deployment's single vantage, with an honest state matrix and a conservative
 probable-cause narrative (no vantage selector is offered because a single prober serves one vantage;
-the run reports where checks actually ran). Deferred: internal/external vantage selection
-(multi-prober), the path view, and dependency/recent-change evidence sources — see
+the run reports where checks actually ran). Step 4 adds stored sessions: `/diagnostics` lists
+recent sessions (newest first, paged; states: not-connected, unknown, empty, permission, error) and a
+run offers "Open stored session"; `/diagnostics/[id]` is a read-only session page with the probable
+cause (confidence, Observed/Inferred/Unknown evidence lines), results for all six probe locations
+(unconfigured = Not connected, never passing), the User -> AP -> Access switch -> Core -> Firewall ->
+Server path from explicit NetBox cables (unknown hops stay unknown, the suspected tier is marked
+"Suspected (inferred)"), recent changes phrased "May correlate", the checks, and the full state matrix:
+loading (`loading.tsx`), empty (no checks), not-connected, unknown, partial (named sections), stale
+(snapshot older than 15 minutes), permission, unauthenticated, not found, rate limited and API errors.
+It has no button, form or remediation control; all session text is rendered as data. Review fix pass: the run form warns (next to the target and symptom inputs) not to paste secrets or personal data because both are stored with the session; incident changes show kind, severity and time with the title replaced by a "withheld" note unless the API revealed it (it does only for `incidents:read` holders); checks from a prober with no configured location are not in any location row, and the location card says they are listed under Checks. Sessions are for roles holding `diagnostics:read` (Admin, Network Engineer, Security Analyst, Technician): the sidebar hides Diagnostics for other roles and `/diagnostics` and `/diagnostics/[id]` show an access-denied surface (no form, no API call). Deferred:
+dependency/baseline evidence sources and configuration-change correlation — see
 `docs/04-integrations/BLACKBOX.md`.
 
 ## Configuration

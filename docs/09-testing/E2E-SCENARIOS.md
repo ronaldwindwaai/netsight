@@ -25,6 +25,11 @@
   `apps/api/tests/test_diagnostics_api.py` proves the conservative fault-domain inference
   (external fail + internal pass -> `firewall`, confidence never above `low`) and that the run
   reports observed provenance rather than the requested vantage.
+- Scenario 8 sessions (Step 4): `apps/api/tests/test_diagnostic_sessions_api.py` proves a run is
+  stored and revisited by id (per-location results, labelled cause, path, may-correlate changes),
+  the degraded states (no store, failing store, failing context sources) and bounded/RBAC'd reads;
+  the e2e harness (no `DATABASE_URL`) proves a run reports `stored: false` and the id reads
+  `not-connected`; live PostgreSQL suites prove the INSERT/SELECT-only path as the app role.
 - Scenario 11 (prompt-injection string in hostname) is covered for diagnostics by
   `test_target_is_echoed_verbatim_never_interpreted`: the target is echoed verbatim and never
   interpreted.

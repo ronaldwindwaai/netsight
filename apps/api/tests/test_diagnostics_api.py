@@ -13,7 +13,8 @@ from datetime import UTC, datetime
 from typing import Any
 
 import pytest
-from alerting_support import ALL_ROLES, Caller, audit_records
+from alerting_support import Caller, audit_records
+from diagnostic_support import DIAGNOSTIC_ROLES, NO_DIAGNOSTIC_ROLES
 from fastapi.testclient import TestClient
 
 from netsight_api import diagnostic_routes
@@ -22,6 +23,12 @@ from netsight_api.auth.deps import get_current_identity
 from netsight_api.auth.rate_limit import RateLimiter
 from netsight_api.auth.settings import session_policy
 from netsight_api.contracts import validate
+from netsight_api.diagnostic_changes import SourceRead
+from netsight_api.diagnostic_context import (
+    get_context_sources,
+    get_optional_diagnostic_session_store,
+)
+from netsight_api.diagnostic_path import TopologyRead
 from netsight_api.diagnostics import Observation
 from netsight_api.main import app
 from netsight_api.rbac import Identity, PrincipalKind
@@ -78,6 +85,14 @@ class FakeProbeClient:
         )
 
 
+class _NoContext:
+    async def topology(self) -> TopologyRead:
+        return TopologyRead("not-connected", (), (), None)
+
+    async def changes(self, **_kwargs: Any) -> tuple[SourceRead, SourceRead]:
+        return SourceRead("not-connected"), SourceRead("not-connected")
+
+
 @pytest.fixture(autouse=True)
 def _clean(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     for name in _BLACKBOX_ENV:
@@ -86,6 +101,9 @@ def _clean(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     session_policy.cache_clear()
     monkeypatch.setattr(diagnostic_routes, "_run_limiter", RateLimiter())
     app.dependency_overrides[diagnostic_routes.get_now] = lambda: NOW
+    # Hermetic: no session store, topology or change source is reachable from these tests.
+    app.dependency_overrides[get_optional_diagnostic_session_store] = lambda: None
+    app.dependency_overrides[get_context_sources] = lambda: _NoContext()
     yield
     app.dependency_overrides.clear()
     session_policy.cache_clear()
@@ -99,11 +117,23 @@ def test_anonymous_is_refused() -> None:
     assert response.status_code == 401
 
 
-@pytest.mark.parametrize("role", ALL_ROLES)
-def test_every_role_may_start_a_read_only_run(role: str) -> None:
+@pytest.mark.parametrize("role", DIAGNOSTIC_ROLES)
+def test_roles_with_a_diagnostics_row_may_start_a_read_only_run(role: str) -> None:
     response = Caller(role).post(DIAGNOSTICS, _body())
     assert response.status_code == 200, response.text
-    assert response.json() == {"state": "not-connected", "run": None}
+    assert response.json() == {"state": "not-connected", "run": None, "stored": False}
+
+
+@pytest.mark.parametrize("role", NO_DIAGNOSTIC_ROLES)
+def test_management_and_auditor_cannot_start_a_run(
+    role: str, caplog: pytest.LogCaptureFixture
+) -> None:
+    caplog.set_level(logging.INFO)
+    response = Caller(role).post(DIAGNOSTICS, _body())
+    assert response.status_code == 403
+    assert response.json()["error"]["code"] == "FORBIDDEN"
+    refusals = [r for r in audit_records(caplog) if r["action"] == "diagnostic.run"]
+    assert refusals and refusals[-1]["outcome"] == "denied"
 
 
 def test_identity_without_the_permission_is_refused() -> None:
@@ -127,7 +157,7 @@ def test_missing_csrf_token_is_refused() -> None:
 def test_not_connected_when_no_probe_capability_is_configured() -> None:
     body = Caller("administrator").post(DIAGNOSTICS, _body()).json()
     validate("diagnostic_run_response", body)
-    assert body == {"state": "not-connected", "run": None}
+    assert body == {"state": "not-connected", "run": None, "stored": False}
 
 
 def test_ok_run_matches_the_contract_and_reports_its_checks() -> None:
@@ -154,9 +184,7 @@ def test_a_failing_external_check_with_internal_success_narrows_the_domain() -> 
         vantages={"icmp": "internet", "tcp": "internal"},
     )
     app.dependency_overrides[get_optional_blackbox_client] = lambda: client
-    body = Caller("administrator").post(
-        DIAGNOSTICS, _body(requested_checks=["icmp", "tcp"])
-    ).json()
+    body = Caller("administrator").post(DIAGNOSTICS, _body(requested_checks=["icmp", "tcp"])).json()
     validate("diagnostic_run_response", body)
     assert body["run"]["probable_fault_domain"] == "firewall"
     assert body["run"]["confidence"] == "low"
@@ -178,10 +206,12 @@ def test_the_run_reports_where_the_checks_ran_not_the_requested_vantage() -> Non
 
 def test_probe_failure_degrades_to_an_explicit_unknown(caplog: pytest.LogCaptureFixture) -> None:
     caplog.set_level(logging.INFO)
-    app.dependency_overrides[get_optional_blackbox_client] = lambda: FakeProbeClient({}, raises=True)
+    app.dependency_overrides[get_optional_blackbox_client] = lambda: FakeProbeClient(
+        {}, raises=True
+    )
     response = Caller("administrator").post(DIAGNOSTICS, _body())
     assert response.status_code == 200
-    assert response.json() == {"state": "unknown", "run": None}
+    assert response.json() == {"state": "unknown", "run": None, "stored": False}
     failed = [r for r in audit_records(caplog) if r["action"] == "diagnostic.run"]
     assert failed and failed[-1]["outcome"] == "failure"
 
@@ -240,7 +270,12 @@ def test_openapi_exposes_exactly_the_diagnostic_operations() -> None:
         if path.startswith("/api/v1/diagnostics")
         for method in item
     }
-    assert operations == {("/api/v1/diagnostics", "post")}
+    # The session reads are covered in test_diagnostic_sessions_api; a run is still only created by POST.
+    assert operations == {
+        ("/api/v1/diagnostics", "post"),
+        ("/api/v1/diagnostics", "get"),
+        ("/api/v1/diagnostics/{diagnostic_id}", "get"),
+    }
     assert {"200", "401", "403", "422", "429"} <= set(
         paths["/api/v1/diagnostics"]["post"]["responses"]
     )

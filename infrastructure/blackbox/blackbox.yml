@@ -1,0 +1,38 @@
+# Reference Prometheus Blackbox exporter modules for Netsight diagnostics (S7 Step 4).
+#
+# Netsight asks an exporter for exactly three modules by name (adapters/blackbox_exporter.py,
+# REQUIRED_EXPORTER_MODULES): icmp, tcp_connect and http_2xx. They must exist in every exporter that
+# is listed in BLACKBOX_EXPORTER_SOURCES, with at least the safety settings below.
+#
+# SECURITY: the exporter, not Netsight, follows HTTP redirects while probing. A module that follows
+# them lets an allow-listed web server bounce the probe to an address Netsight never allow-listed
+# (cloud metadata, an internal admin interface) from the exporter's network position. http_2xx MUST
+# keep `no_follow_redirects: true`. A test (tests/test_blackbox_exporter.py) fails if this file stops
+# saying so. If you maintain your own exporter config, keep the same setting there.
+#
+# Also run each exporter on a network segment that can reach only what it is meant to probe, and
+# bind it to an internal interface (see docs/04-integrations/BLACKBOX.md, "Exporter network policy").
+modules:
+  icmp:
+    prober: icmp
+    timeout: 5s
+    icmp:
+      preferred_ip_protocol: ip4
+      ip_protocol_fallback: false
+
+  tcp_connect:
+    prober: tcp
+    timeout: 5s
+    tcp:
+      preferred_ip_protocol: ip4
+      ip_protocol_fallback: false
+
+  http_2xx:
+    prober: http
+    timeout: 5s
+    http:
+      method: GET
+      valid_status_codes: []  # any 2xx
+      no_follow_redirects: true
+      preferred_ip_protocol: ip4
+      ip_protocol_fallback: false

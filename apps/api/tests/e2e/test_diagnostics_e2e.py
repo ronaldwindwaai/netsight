@@ -21,9 +21,7 @@ def _csrf(api_url: str, cookie: str) -> str:
     return body["csrf_token"]
 
 
-def _run(
-    api_url: str, cookie: str, body: dict[str, object]
-) -> tuple[int, object, str]:
+def _run(api_url: str, cookie: str, body: dict[str, object]) -> tuple[int, object, str]:
     token = _csrf(api_url, cookie)
     return http_request(
         f"{api_url}/api/v1/diagnostics",
@@ -115,3 +113,28 @@ def test_a_requested_vantage_without_a_prober_is_unknown(
     assert check["vantage"] == "internal"
     assert "vantage" in (check["detail"] or "")
     assert run["vantage"] == "internal"
+
+
+def test_a_run_without_a_session_store_is_not_stored_and_reads_not_connected(
+    e2e_api: dict[str, str], signed_in: SignIn
+) -> None:
+    # The harness API has no DATABASE_URL: the run completes, says it was not stored, and the
+    # session read answers an explicit not-connected state rather than a 404 or an invented session.
+    status, body, _ = _run(
+        e2e_api["apiUrl"],
+        signed_in.cookie,
+        {"target": "localhost", "symptom": None, "vantage": None, "requested_checks": ["dns"]},
+    )
+    assert status == 200 and isinstance(body, dict), body
+    assert body["state"] == "ok" and body["stored"] is False
+    run_id = body["run"]["id"]
+    status, session, _ = http_request(
+        f"{e2e_api['apiUrl']}/api/v1/diagnostics/{run_id}", cookie=signed_in.cookie
+    )
+    assert status == 200, session
+    assert session == {"state": "not-connected", "session": None}
+    status, page, _ = http_request(
+        f"{e2e_api['apiUrl']}/api/v1/diagnostics", cookie=signed_in.cookie
+    )
+    assert status == 200 and isinstance(page, dict)
+    assert page["state"] == "not-connected" and page["sessions"] == []

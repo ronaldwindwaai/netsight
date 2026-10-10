@@ -14,3 +14,8 @@ const WRITE_PERMISSION =
 export function canChangeAnything(viewer: Viewer | null): boolean {
   return viewer !== null && viewer.permissions.some((permission) => WRITE_PERMISSION.test(permission));
 }
+
+/** True when the viewer holds diagnostics:read (Management and Auditor do not). Advisory only. */
+export function canUseDiagnostics(viewer: Viewer | null): boolean {
+  return viewer !== null && viewer.permissions.includes('diagnostics:read');
+}

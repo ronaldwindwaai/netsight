@@ -54,6 +54,13 @@ SCHEMA_FILES = {
     "diagnostic_finding": "diagnostic.schema.json#/$defs/finding",
     "diagnostic_run_request": "diagnostic-api.schema.json#/$defs/runRequest",
     "diagnostic_run_response": "diagnostic-api.schema.json#/$defs/runResponse",
+    "diagnostic_session": "diagnostic-session.schema.json",
+    "diagnostic_location_result": "diagnostic-session.schema.json#/$defs/locationResult",
+    "diagnostic_probable_cause": "diagnostic-session.schema.json#/$defs/probableCause",
+    "diagnostic_recent_changes": "diagnostic-session.schema.json#/$defs/recentChanges",
+    "diagnostic_path": "diagnostic-session.schema.json#/$defs/path",
+    "diagnostic_session_response": "diagnostic-api.schema.json#/$defs/sessionResponse",
+    "diagnostic_session_list_response": "diagnostic-api.schema.json#/$defs/sessionListResponse",
 }
 
 

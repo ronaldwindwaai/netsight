@@ -46,12 +46,22 @@ export const FAULT_DOMAINS = [
   'wan-dns-external',
 ] as const;
 export const DIAGNOSTIC_CONFIDENCES = ['low', 'medium', 'high', 'unknown'] as const;
+/** Where a check ran: the configured probe source's location, never inferred from a vantage label. */
+export const PROBE_LOCATIONS = [
+  'cloud-external',
+  'user-lan',
+  'server-vlan',
+  'branch',
+  'wifi',
+  'remote-site',
+] as const;
 
 export type DiagnosticState = (typeof DIAGNOSTIC_STATES)[number];
 export type DiagnosticCheckKind = (typeof DIAGNOSTIC_CHECK_KINDS)[number];
 export type DiagnosticCheckStatus = (typeof DIAGNOSTIC_CHECK_STATUSES)[number];
 export type FaultDomain = (typeof FAULT_DOMAINS)[number];
 export type DiagnosticConfidence = (typeof DIAGNOSTIC_CONFIDENCES)[number];
+export type ProbeLocation = (typeof PROBE_LOCATIONS)[number];
 
 export const MAX_DIAGNOSTIC_CHECKS = 64;
 export const MAX_DIAGNOSTIC_FINDINGS = 64;
@@ -74,6 +84,7 @@ export interface DiagnosticProbeResult {
   label: string;
   status: DiagnosticCheckStatus;
   vantage: string | null;
+  location: ProbeLocation | null;
   port: number | null;
   latency_ms: number | null;
   detail: string | null;
@@ -110,6 +121,8 @@ export interface DiagnosticRunRequest {
 export interface DiagnosticRunResponse {
   state: DiagnosticState;
   run: DiagnosticRun | null;
+  /** True exactly when the run was persisted as a session that can be revisited. */
+  stored: boolean;
 }
 
 const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
@@ -123,6 +136,7 @@ const CHECK_KEYS = [
   'label',
   'status',
   'vantage',
+  'location',
   'port',
   'latency_ms',
   'detail',
@@ -148,7 +162,7 @@ const RUN_KEYS = [
   'evidence_ids',
 ] as const;
 const RUN_REQUEST_KEYS = ['target', 'symptom', 'vantage', 'requested_checks'] as const;
-const RUN_RESPONSE_KEYS = ['state', 'run'] as const;
+const RUN_RESPONSE_KEYS = ['state', 'run', 'stored'] as const;
 const PORT_CHECK_KINDS: readonly DiagnosticCheckKind[] = ['tcp', 'http', 'https'];
 
 function isTimestamp(value: unknown): value is string {
@@ -203,6 +217,7 @@ export function parseDiagnosticProbeResult(value: unknown): DiagnosticProbeResul
     !isNonBlankText(value.label, 255) ||
     !isOneOf(value.status, DIAGNOSTIC_CHECK_STATUSES) ||
     !isNullableNonBlankText(value.vantage, 128) ||
+    !(value.location === null || isOneOf(value.location, PROBE_LOCATIONS)) ||
     !isNullablePort(value.port) ||
     !isNullableNumberInRange(value.latency_ms, 0, 3_600_000) ||
     !isNullableNonBlankText(value.detail, 1000) ||
@@ -218,6 +233,7 @@ export function parseDiagnosticProbeResult(value: unknown): DiagnosticProbeResul
     label: value.label,
     status: value.status,
     vantage: value.vantage,
+    location: value.location,
     port: value.port,
     latency_ms: value.latency_ms,
     detail: value.detail,
@@ -329,12 +345,13 @@ export function parseDiagnosticRunRequest(value: unknown): DiagnosticRunRequest 
   };
 }
 
-/** Fail-closed parse; the run is present exactly when the state is ok. */
+/** Fail-closed parse; the run is present exactly when the state is ok, and only an ok run is stored. */
 export function parseDiagnosticRunResponse(value: unknown): DiagnosticRunResponse | null {
   if (!isPlainRecord(value) || !hasExactKeys(value, RUN_RESPONSE_KEYS)) return null;
-  if (!isOneOf(value.state, DIAGNOSTIC_STATES)) return null;
+  if (!isOneOf(value.state, DIAGNOSTIC_STATES) || typeof value.stored !== 'boolean') return null;
   const run = value.run === null ? null : parseDiagnosticRun(value.run);
   if (value.run !== null && run === null) return null;
   if ((value.state === 'ok') !== (run !== null)) return null;
-  return { state: value.state, run };
+  if (value.stored && value.state !== 'ok') return null;
+  return { state: value.state, run, stored: value.stored };
 }

@@ -14,7 +14,9 @@ message. Every network operation is bounded by a timeout so one run cannot pin t
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
+import re
 import ssl
 import time
 from collections.abc import Sequence
@@ -23,7 +25,21 @@ from datetime import UTC, datetime
 from typing import Protocol
 
 from netsight_api.diagnostics import Observation
-from netsight_api.schemas_diagnostics import DiagnosticCheckKind, DiagnosticCheckStatus
+from netsight_api.schemas_diagnostics import (
+    PROBE_LOCATIONS,
+    DiagnosticCheckKind,
+    DiagnosticCheckStatus,
+    ProbeLocation,
+)
+
+_LOGGER = logging.getLogger("netsight_api")
+
+# An allow-list entry is an operator-chosen host name or address: letters, digits and . _ : -
+# only, starting and ending with a letter or digit, no empty label. Wildcards, CIDR blocks, URLs,
+# userinfo, paths, whitespace and non-ASCII are all invalid (they could widen or steer the probe).
+TARGET_PATTERN = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9._:-]{0,251}[A-Za-z0-9])?")
+MAX_ALLOWED_TARGETS = 256
+ALLOWED_TARGETS_ENV = "BLACKBOX_ALLOWED_TARGETS"
 
 DEFAULT_PORTS: dict[str, int] = {"tcp": 443, "http": 80, "https": 443}
 _PORT_KINDS = ("tcp", "http", "https")
@@ -33,7 +49,11 @@ _DEFAULT_TIMEOUT_SECONDS = 5.0
 
 
 class BlackboxClient(Protocol):
-    """A bounded, read-only probe source. Implementations never raise on a probe outcome."""
+    """A bounded, read-only probe source. Implementations never raise on a probe outcome.
+
+    A source may declare ``probe_kinds`` (the checks it can run); ``run_checks`` then asks it for
+    those only, so a source that can probe four things does not add a pile of "cannot" unknowns.
+    """
 
     async def probe(
         self, *, kind: DiagnosticCheckKind, target: str, vantage: str | None
@@ -66,10 +86,16 @@ class AllowlistedBlackboxClient:
     """Real probe client. Deny by default: only allow-listed targets are ever contacted."""
 
     def __init__(
-        self, *, allowed: list[str], vantage: str | None = None, timeout: float = _DEFAULT_TIMEOUT_SECONDS
+        self,
+        *,
+        allowed: list[str],
+        vantage: str | None = None,
+        timeout: float = _DEFAULT_TIMEOUT_SECONDS,
+        location: ProbeLocation | None = None,
     ) -> None:
         self._allowed = frozenset(item.strip().lower() for item in allowed if item.strip())
         self._vantage = vantage
+        self._location = location
         self._timeout = min(max(timeout, _MIN_TIMEOUT_SECONDS), _MAX_TIMEOUT_SECONDS)
 
     async def probe(
@@ -95,15 +121,11 @@ class AllowlistedBlackboxClient:
         if kind == "dns":
             outcome = await self._dns(target)
         elif kind == "icmp":
-            outcome = _Outcome(
-                "unknown", None, "ICMP probing is not available in this deployment"
-            )
+            outcome = _Outcome("unknown", None, "ICMP probing is not available in this deployment")
         elif kind in _PORT_KINDS:
             outcome = await self._connect(target, kind)
         else:
-            outcome = _Outcome(
-                "unknown", None, "the check needs a source that is not connected"
-            )
+            outcome = _Outcome("unknown", None, "the check needs a source that is not connected")
         return self._observation(kind, target, self._vantage, outcome)
 
     def _observation(
@@ -119,6 +141,7 @@ class AllowlistedBlackboxClient:
             label=f"{kind.upper()} check of {target}"[:255],
             status=outcome.status,
             vantage=vantage,
+            location=self._location,
             port=port,
             latency_ms=outcome.latency_ms,
             detail=outcome.detail,
@@ -130,9 +153,7 @@ class AllowlistedBlackboxClient:
         loop = asyncio.get_running_loop()
         start = time.monotonic()
         try:
-            infos = await asyncio.wait_for(
-                loop.getaddrinfo(target, None), timeout=self._timeout
-            )
+            infos = await asyncio.wait_for(loop.getaddrinfo(target, None), timeout=self._timeout)
         except (TimeoutError, OSError):
             return _Outcome("fail", _elapsed_ms(start), "name resolution failed")
         if not infos:
@@ -208,34 +229,83 @@ def _env_float(name: str, default: float) -> float:
         return default
 
 
+def _valid_target(entry: str) -> bool:
+    return TARGET_PATTERN.fullmatch(entry) is not None and ".." not in entry
+
+
+def parse_allowed_targets(raw: str) -> list[str]:
+    """The validated, lower-cased, de-duplicated allow-list from its comma-separated form.
+
+    Fail closed: an entry that is not a plain operator-chosen name or address is dropped (never
+    repaired) and so can never be probed; entries beyond ``MAX_ALLOWED_TARGETS`` are dropped too.
+    Dropped entries are counted in the log without their content. Empty means no probing at all.
+    """
+    valid: list[str] = []
+    invalid = 0
+    for entry in raw.split(","):
+        item = entry.strip()
+        if not item:
+            continue
+        if not _valid_target(item):
+            invalid += 1
+        elif item.lower() not in valid:
+            if len(valid) >= MAX_ALLOWED_TARGETS:
+                invalid += 1
+            else:
+                valid.append(item.lower())
+    if invalid:
+        _LOGGER.warning("ignored invalid probe allow-list entries", extra={"count": invalid})
+    return valid
+
+
 def get_optional_blackbox_client() -> BlackboxClient | None:
     """Probe client when at least one target is allow-listed; ``None`` means not-connected.
 
     A deployment with no allow-list has no probe capability, so the endpoint answers an explicit
     ``not-connected`` state rather than pretending a check ran.
     """
-    raw = os.environ.get("BLACKBOX_ALLOWED_TARGETS", "")
-    allowed = [item.strip() for item in raw.split(",") if item.strip()]
+    allowed = parse_allowed_targets(os.environ.get(ALLOWED_TARGETS_ENV, ""))
     if not allowed:
         return None
     vantage = os.environ.get("BLACKBOX_VANTAGE", "").strip() or None
     timeout = _env_float("BLACKBOX_TIMEOUT_SECONDS", _DEFAULT_TIMEOUT_SECONDS)
-    return AllowlistedBlackboxClient(allowed=allowed, vantage=vantage, timeout=timeout)
+    return AllowlistedBlackboxClient(
+        allowed=allowed, vantage=vantage, timeout=timeout, location=_env_location()
+    )
+
+
+def _env_location() -> ProbeLocation | None:
+    """The location this prober is deployed at; an unrecognised value is ignored, never trusted."""
+    raw = os.environ.get("BLACKBOX_LOCATION", "").strip()
+    if not raw:
+        return None
+    for location in PROBE_LOCATIONS:
+        if raw == location:
+            return location
+    _LOGGER.warning("ignored unrecognised BLACKBOX_LOCATION")
+    return None
 
 
 async def run_checks(
-    client: BlackboxClient,
+    clients: BlackboxClient | Sequence[BlackboxClient],
     *,
     target: str,
     vantage: str | None,
     checks: Sequence[DiagnosticCheckKind],
 ) -> list[Observation]:
-    """Run the requested checks in order; each probe is bounded by the client's own timeout.
+    """Run the requested checks against each probe source in order, bounded by their timeouts.
 
-    Sequential on purpose: a run is capped at twelve checks and must not burst a target with
-    concurrent connections. The caller bounds the whole sequence with ``asyncio.wait_for``.
+    Sequential on purpose: a run is capped at twelve checks per source and must not burst a target
+    with concurrent connections. A source that declares ``probe_kinds`` is asked only for those, so
+    a run holds at most twelve checks from the local prober plus four per exporter location. The
+    caller bounds the whole sequence with ``asyncio.wait_for``.
     """
+    sources = [clients] if not isinstance(clients, Sequence) else list(clients)
     observations: list[Observation] = []
-    for kind in checks:
-        observations.append(await client.probe(kind=kind, target=target, vantage=vantage))
+    for client in sources:
+        kinds = getattr(client, "probe_kinds", None)
+        for kind in checks:
+            if kinds is not None and kind not in kinds:
+                continue
+            observations.append(await client.probe(kind=kind, target=target, vantage=vantage))
     return observations

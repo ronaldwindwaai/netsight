@@ -171,7 +171,7 @@
       }
     },
     "probeResult": {
-      "description": "One bounded read-only diagnostic check (the canonical ProbeResult). A successful ping is not application availability and an ICMP failure is not host failure, so status pass/fail never asserts more than the check measured; a check that could not run is unknown. port is set only for tcp, http and https checks. label, vantage and detail are untrusted source text.",
+      "description": "One bounded read-only diagnostic check (the canonical ProbeResult). A successful ping is not application availability and an ICMP failure is not host failure, so status pass/fail never asserts more than the check measured; a check that could not run is unknown. port is set only for tcp, http and https checks. label, vantage and detail are untrusted source text. location is the configured probe source the check ran from (cloud-external, user-lan, server-vlan, branch, wifi, remote-site) or null when the prober has no configured location; it is never inferred from the vantage label.",
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -180,6 +180,7 @@
         "label",
         "status",
         "vantage",
+        "location",
         "port",
         "latency_ms",
         "detail",
@@ -229,6 +230,17 @@
           "minLength": 1,
           "maxLength": 128,
           "pattern": "\\S"
+        },
+        "location": {
+          "enum": [
+            "cloud-external",
+            "user-lan",
+            "server-vlan",
+            "branch",
+            "wifi",
+            "remote-site",
+            null
+          ]
         },
         "port": {
           "type": [

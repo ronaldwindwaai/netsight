@@ -62,12 +62,13 @@
       }
     },
     "runResponse": {
-      "description": "The completed run, or an explicit not-connected/unknown state without one. run is non-null exactly when state is ok.",
+      "description": "The completed run, or an explicit not-connected/unknown state without one. run is non-null exactly when state is ok. stored is true exactly when the run was persisted as a session (state ok and a session store connected); a run that was not stored cannot be revisited.",
       "type": "object",
       "additionalProperties": false,
       "required": [
         "state",
-        "run"
+        "run",
+        "stored"
       ],
       "properties": {
         "state": {
@@ -86,6 +87,9 @@
               "$ref": "diagnostic.schema.json"
             }
           ]
+        },
+        "stored": {
+          "type": "boolean"
         }
       },
       "allOf": [
@@ -114,8 +118,209 @@
               }
             }
           }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "ok"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "else": {
+            "properties": {
+              "stored": {
+                "const": false
+              }
+            }
+          }
         }
       ]
+    },
+    "sessionSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "target",
+        "started_at",
+        "completed_at",
+        "probable_fault_domain",
+        "confidence"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 47,
+          "maxLength": 47,
+          "pattern": "^diagnostic-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "target": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255,
+          "pattern": "\\S"
+        },
+        "started_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "completed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "probable_fault_domain": {
+          "enum": [
+            "target",
+            "service",
+            "host",
+            "interface",
+            "access-device",
+            "core",
+            "firewall",
+            "wan-dns-external",
+            null
+          ]
+        },
+        "confidence": {
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            "unknown"
+          ]
+        }
+      },
+      "description": "One stored session in the list. target is untrusted request text; the domain is null exactly when confidence is unknown."
+    },
+    "sessionResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "session"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "not-connected",
+            "ok",
+            "unknown"
+          ]
+        },
+        "session": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "diagnostic-session.schema.json"
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "ok"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "session": {
+                "type": "object"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "session": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ],
+      "description": "One stored session, or an explicit not-connected (no session store configured) / unknown (the store could not be read) state without one. session is non-null exactly when state is ok. An unknown id is an HTTP 404, not a state."
+    },
+    "sessionListResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "sessions",
+        "limit",
+        "offset",
+        "next_offset"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "not-connected",
+            "ok",
+            "unknown"
+          ]
+        },
+        "sessions": {
+          "type": "array",
+          "maxItems": 100,
+          "items": {
+            "$ref": "#/$defs/sessionSummary"
+          }
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "next_offset": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1,
+          "maximum": 10100
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "ok"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "else": {
+            "properties": {
+              "sessions": {
+                "maxItems": 0
+              },
+              "next_offset": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ],
+      "description": "Stored sessions newest first with an explicit store state; only ok carries rows. The offset is server-capped; next_offset is set when the page was full and the capped offset allows another page."
     }
   }
 }

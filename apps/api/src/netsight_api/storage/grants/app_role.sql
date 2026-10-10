@@ -17,6 +17,7 @@
 --   maintenance_windows        SELECT, INSERT, UPDATE (status, cancelled_by, cancelled_at)
 --   alert_incident_links       SELECT, INSERT, UPDATE (incident_id, linked_at, recovered_at)
 --   notification_delivery_attempts  SELECT, INSERT only (append-only)
+--   diagnostic_sessions        SELECT, INSERT only (a finished session is immutable)
 --   netsight_schema_migrations nothing
 -- It gets no DELETE, TRUNCATE, REFERENCES, TRIGGER, CREATE or ownership anywhere.
 
@@ -43,7 +44,8 @@ BEGIN
         WHERE relnamespace = schema_name::regnamespace
           AND relname IN ('incidents', 'incident_timeline_events', 'alert_rules',
                           'maintenance_windows', 'netsight_schema_migrations',
-                          'alert_incident_links', 'notification_delivery_attempts')
+                          'alert_incident_links', 'notification_delivery_attempts',
+                          'diagnostic_sessions')
           AND pg_has_role(app_role, relowner, 'USAGE')
     ) THEN
         RAISE EXCEPTION 'application role % owns (or inherits ownership of) the tables; '
@@ -57,7 +59,8 @@ BEGIN
     EXECUTE format(
         'REVOKE ALL ON TABLE %1$I.incidents, %1$I.incident_timeline_events, '
         '%1$I.alert_rules, %1$I.maintenance_windows, %1$I.netsight_schema_migrations, '
-        '%1$I.alert_incident_links, %1$I.notification_delivery_attempts FROM %2$I',
+        '%1$I.alert_incident_links, %1$I.notification_delivery_attempts, '
+        '%1$I.diagnostic_sessions FROM %2$I',
         schema_name, app_role);
 
     EXECUTE format('GRANT SELECT, INSERT ON TABLE %I.incidents TO %I', schema_name, app_role);
@@ -90,5 +93,8 @@ BEGIN
     EXECUTE format(
         'GRANT SELECT, INSERT ON TABLE %I.notification_delivery_attempts TO %I',
         schema_name, app_role);
+
+    EXECUTE format(
+        'GRANT SELECT, INSERT ON TABLE %I.diagnostic_sessions TO %I', schema_name, app_role);
 END
 $grants$;

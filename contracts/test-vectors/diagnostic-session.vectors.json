@@ -1,0 +1,3888 @@
+{
+ "diagnostic_location_result": {
+  "base": {
+   "location": "cloud-external",
+   "state": "observed",
+   "status": "fail",
+   "passed": 0,
+   "failed": 1,
+   "unknown_checks": 0,
+   "check_ids": [
+    "check-tcp-internet-443"
+   ]
+  },
+  "cases": [
+   {
+    "name": "observed failing location",
+    "valid": true
+   },
+   {
+    "name": "observed passing location",
+    "valid": true,
+    "set": {
+     "status": "pass",
+     "passed": 2,
+     "failed": 0,
+     "check_ids": [
+      "c1",
+      "c2"
+     ]
+    }
+   },
+   {
+    "name": "not-connected location",
+    "valid": true,
+    "set": {
+     "state": "not-connected",
+     "status": null,
+     "failed": 0,
+     "check_ids": []
+    }
+   },
+   {
+    "name": "unknown location with only unanswered checks",
+    "valid": true,
+    "set": {
+     "state": "unknown",
+     "status": null,
+     "failed": 0,
+     "unknown_checks": 2,
+     "check_ids": [
+      "c1",
+      "c2"
+     ]
+    }
+   },
+   {
+    "name": "observed without a status (cross-field)",
+    "valid": false,
+    "set": {
+     "status": null
+    },
+    "jsonschema_rejects": false
+   },
+   {
+    "name": "not-connected carrying a status (cross-field)",
+    "valid": false,
+    "set": {
+     "state": "not-connected",
+     "failed": 0,
+     "check_ids": []
+    },
+    "jsonschema_rejects": false
+   },
+   {
+    "name": "fail status without a failed check (cross-field)",
+    "valid": false,
+    "set": {
+     "failed": 0,
+     "passed": 1
+    },
+    "jsonschema_rejects": false
+   },
+   {
+    "name": "pass status with a failed check (cross-field)",
+    "valid": false,
+    "set": {
+     "status": "pass"
+    },
+    "jsonschema_rejects": false
+   },
+   {
+    "name": "counts disagree with check ids (cross-field)",
+    "valid": false,
+    "set": {
+     "failed": 2
+    },
+    "jsonschema_rejects": false
+   },
+   {
+    "name": "duplicate check ids (cross-field)",
+    "valid": false,
+    "set": {
+     "failed": 2,
+     "check_ids": [
+      "c1",
+      "c1"
+     ]
+    },
+    "jsonschema_rejects": false
+   },
+   {
+    "name": "unknown location name",
+    "valid": false,
+    "set": {
+     "location": "datacentre"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "negative count",
+    "valid": false,
+    "set": {
+     "failed": -1
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "65 check ids",
+    "valid": false,
+    "set": {
+     "failed": 65,
+     "check_ids": [
+      "c0",
+      "c1",
+      "c2",
+      "c3",
+      "c4",
+      "c5",
+      "c6",
+      "c7",
+      "c8",
+      "c9",
+      "c10",
+      "c11",
+      "c12",
+      "c13",
+      "c14",
+      "c15",
+      "c16",
+      "c17",
+      "c18",
+      "c19",
+      "c20",
+      "c21",
+      "c22",
+      "c23",
+      "c24",
+      "c25",
+      "c26",
+      "c27",
+      "c28",
+      "c29",
+      "c30",
+      "c31",
+      "c32",
+      "c33",
+      "c34",
+      "c35",
+      "c36",
+      "c37",
+      "c38",
+      "c39",
+      "c40",
+      "c41",
+      "c42",
+      "c43",
+      "c44",
+      "c45",
+      "c46",
+      "c47",
+      "c48",
+      "c49",
+      "c50",
+      "c51",
+      "c52",
+      "c53",
+      "c54",
+      "c55",
+      "c56",
+      "c57",
+      "c58",
+      "c59",
+      "c60",
+      "c61",
+      "c62",
+      "c63",
+      "c64"
+     ]
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "missing status",
+    "valid": false,
+    "delete": [
+     "status"
+    ],
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "extra field",
+    "valid": false,
+    "set": {
+     "detail": "x"
+    },
+    "jsonschema_rejects": true
+   }
+  ]
+ },
+ "diagnostic_probable_cause": {
+  "base": {
+   "domain": "firewall",
+   "confidence": "medium",
+   "basis": "inferred",
+   "pattern": "external-only-failure",
+   "summary": "The service answers from the server VLAN but not from the external location, which narrows the fault to the path between them without proving a firewall fault.",
+   "evidence": [
+    {
+     "basis": "observed",
+     "statement": "TCP 443 from the external location failed",
+     "check_ids": [
+      "check-tcp-internet-443"
+     ]
+    },
+    {
+     "basis": "observed",
+     "statement": "TCP 443 from the server VLAN passed",
+     "check_ids": [
+      "check-tcp-server-vlan-443"
+     ]
+    },
+    {
+     "basis": "inferred",
+     "statement": "Internal success with external failure narrows the fault to the path between them; it does not prove which device is at fault",
+     "check_ids": [
+      "check-tcp-internet-443",
+      "check-tcp-server-vlan-443"
+     ]
+    },
+    {
+     "basis": "unknown",
+     "statement": "No probe source is connected for the user LAN, branch, Wi-Fi and remote site; they are not assumed healthy",
+     "check_ids": []
+    }
+   ]
+  },
+  "cases": [
+   {
+    "name": "inferred external-only failure",
+    "valid": true
+   },
+   {
+    "name": "service itself failing",
+    "valid": true,
+    "set": {
+     "domain": "service",
+     "pattern": "service-failure",
+     "confidence": "low"
+    }
+   },
+   {
+    "name": "nothing narrowed",
+    "valid": true,
+    "set": {
+     "domain": null,
+     "confidence": "unknown",
+     "basis": "unknown",
+     "pattern": "none",
+     "summary": "The evidence did not narrow the fault to a single domain."
+    }
+   },
+   {
+    "name": "no evidence lines",
+    "valid": true,
+    "set": {
+     "evidence": []
+    }
+   },
+   {
+    "name": "domain with unknown confidence (cross-field)",
+    "valid": false,
+    "set": {
+     "confidence": "unknown"
+    },
+    "jsonschema_rejects": false
+   },
+   {
+    "name": "no domain with a real confidence (cross-field)",
+    "valid": false,
+    "set": {
+     "domain": null,
+     "basis": "unknown",
+     "pattern": "none"
+    },
+    "jsonschema_rejects": false
+   },
+   {
+    "name": "domain with unknown basis (cross-field)",
+    "valid": false,
+    "set": {
+     "basis": "unknown"
+    },
+    "jsonschema_rejects": false
+   },
+   {
+    "name": "domain with pattern none (cross-field)",
+    "valid": false,
+    "set": {
+     "pattern": "none"
+    },
+    "jsonschema_rejects": false
+   },
+   {
+    "name": "pattern outside the enum",
+    "valid": false,
+    "set": {
+     "pattern": "guess"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "evidence basis outside the enum",
+    "valid": false,
+    "set": {
+     "evidence.0.basis": "known"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "blank summary",
+    "valid": false,
+    "set": {
+     "summary": "   "
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "blank evidence statement",
+    "valid": false,
+    "set": {
+     "evidence.0.statement": " "
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "33 evidence lines",
+    "valid": false,
+    "set": {
+     "evidence": [
+      {
+       "basis": "unknown",
+       "statement": "s0",
+       "check_ids": []
+      },
+      {
+       "basis": "unknown",
+       "statement": "s1",
+       "check_ids": []
+      },
+      {
+       "basis": "unknown",
+       "statement": "s2",
+       "check_ids": []
+      },
+      {
+       "basis": "unknown",
+       "statement": "s3",
+       "check_ids": []
+      },
+      {
+       "basis": "unknown",
+       "statement": "s4",
+       "check_ids": []
+      },
+      {
+       "basis": "unknown",
+       "statement": "s5",
+       "check_ids": []
+      },
+      {
+       "basis": "unknown",
+       "statement": "s6",
+       "check_ids": []
+      },
+      {
+       "basis": "unknown",
+       "statement": "s7",
+       "check_ids": []
+      },
+      {
+       "basis": "unknown",
+       "statement": "s8",
+       "check_ids": []
+      },
+      {
+       "basis": "unknown",
+       "statement": "s9",
+       "check_ids": []
+      },
+      {
+       "basis": "unknown",
+       "statement": "s10",
+       "check_ids": []
+      },
+      {
+       "basis": "unknown",
+       "statement": "s11",
+       "check_ids": []
+      },
+      {
+       "basis": "unknown",
+       "statement": "s12",
+       "check_ids": []
+      },
+      {
+       "basis": "unknown",
+       "statement": "s13",
+       "check_ids": []
+      },
+      {
+       "basis": "unknown",
+       "statement": "s14",
+       "check_ids": []
+      },
+      {
+       "basis": "unknown",
+       "statement": "s15",
+       "check_ids": []
+      },
+      {
+       "basis": "unknown",
+       "statement": "s16",
+       "check_ids": []
+      },
+      {
+       "basis": "unknown",
+       "statement": "s17",
+       "check_ids": []
+      },
+      {
+       "basis": "unknown",
+       "statement": "s18",
+       "check_ids": []
+      },
+      {
+       "basis": "unknown",
+       "statement": "s19",
+       "check_ids": []
+      },
+      {
+       "basis": "unknown",
+       "statement": "s20",
+       "check_ids": []
+      },
+      {
+       "basis": "unknown",
+       "statement": "s21",
+       "check_ids": []
+      },
+      {
+       "basis": "unknown",
+       "statement": "s22",
+       "check_ids": []
+      },
+      {
+       "basis": "unknown",
+       "statement": "s23",
+       "check_ids": []
+      },
+      {
+       "basis": "unknown",
+       "statement": "s24",
+       "check_ids": []
+      },
+      {
+       "basis": "unknown",
+       "statement": "s25",
+       "check_ids": []
+      },
+      {
+       "basis": "unknown",
+       "statement": "s26",
+       "check_ids": []
+      },
+      {
+       "basis": "unknown",
+       "statement": "s27",
+       "check_ids": []
+      },
+      {
+       "basis": "unknown",
+       "statement": "s28",
+       "check_ids": []
+      },
+      {
+       "basis": "unknown",
+       "statement": "s29",
+       "check_ids": []
+      },
+      {
+       "basis": "unknown",
+       "statement": "s30",
+       "check_ids": []
+      },
+      {
+       "basis": "unknown",
+       "statement": "s31",
+       "check_ids": []
+      },
+      {
+       "basis": "unknown",
+       "statement": "s32",
+       "check_ids": []
+      }
+     ]
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "evidence line with an extra field",
+    "valid": false,
+    "set": {
+     "evidence.0.confidence": "high"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "missing evidence",
+    "valid": false,
+    "delete": [
+     "evidence"
+    ],
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "missing pattern",
+    "valid": false,
+    "delete": [
+     "pattern"
+    ],
+    "jsonschema_rejects": true
+   }
+  ]
+ },
+ "diagnostic_recent_changes": {
+  "base": {
+   "state": "ok",
+   "window_start": "2026-10-09T08:00:00Z",
+   "window_end": "2026-10-10T08:00:05Z",
+   "sources": [
+    {
+     "source": "incidents",
+     "state": "ok"
+    },
+    {
+     "source": "alerts",
+     "state": "ok"
+    },
+    {
+     "source": "configuration-changes",
+     "state": "not-connected"
+    }
+   ],
+   "items": [
+    {
+     "kind": "incident",
+     "ref_id": "incident-1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d",
+     "severity": "high",
+     "title": "Incident title withheld",
+     "title_redacted": true,
+     "occurred_at": "2026-10-10T07:40:00Z",
+     "scope": "time-window",
+     "relation": "may-correlate"
+    }
+   ]
+  },
+  "cases": [
+   {
+    "name": "ok with one item",
+    "valid": true
+   },
+   {
+    "name": "ok with no items",
+    "valid": true,
+    "set": {
+     "items": []
+    }
+   },
+   {
+    "name": "not-connected",
+    "valid": true,
+    "set": {
+     "state": "not-connected",
+     "items": [],
+     "sources": [
+      {
+       "source": "incidents",
+       "state": "not-connected"
+      },
+      {
+       "source": "alerts",
+       "state": "not-connected"
+      },
+      {
+       "source": "configuration-changes",
+       "state": "not-connected"
+      }
+     ]
+    }
+   },
+   {
+    "name": "unknown",
+    "valid": true,
+    "set": {
+     "state": "unknown",
+     "items": [],
+     "sources": [
+      {
+       "source": "incidents",
+       "state": "unknown"
+      },
+      {
+       "source": "alerts",
+       "state": "not-connected"
+      },
+      {
+       "source": "configuration-changes",
+       "state": "not-connected"
+      }
+     ]
+    }
+   },
+   {
+    "name": "an alert item",
+    "valid": true,
+    "set": {
+     "items.0.kind": "alert",
+     "items.0.scope": "target",
+     "items.0.ref_id": "alert-7",
+     "items.0.severity": null,
+     "items.0.title": "Link down on core-01",
+     "items.0.title_redacted": false
+    }
+   },
+   {
+    "name": "an incident whose title was revealed to an authorised reader",
+    "valid": true,
+    "set": {
+     "items.0.title": "Firewall policy push",
+     "items.0.title_redacted": false
+    }
+   },
+   {
+    "name": "an incident without a severity",
+    "valid": false,
+    "set": {
+     "items.0.severity": null
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "a severity outside the enum",
+    "valid": false,
+    "set": {
+     "items.0.severity": "urgent"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "an alert carrying a severity",
+    "valid": false,
+    "set": {
+     "items.0.kind": "alert",
+     "items.0.ref_id": "alert-7"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "an alert whose title is marked redacted",
+    "valid": false,
+    "set": {
+     "items.0.kind": "alert",
+     "items.0.ref_id": "alert-7",
+     "items.0.severity": null
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "items while not ok",
+    "valid": false,
+    "set": {
+     "state": "unknown",
+     "sources": [
+      {
+       "source": "incidents",
+       "state": "unknown"
+      },
+      {
+       "source": "alerts",
+       "state": "not-connected"
+      },
+      {
+       "source": "configuration-changes",
+       "state": "not-connected"
+      }
+     ]
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "a causal relation",
+    "valid": false,
+    "set": {
+     "items.0.relation": "caused-by"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "scope outside the enum",
+    "valid": false,
+    "set": {
+     "items.0.scope": "device"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "blank title",
+    "valid": false,
+    "set": {
+     "items.0.title": "  "
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "21 items",
+    "valid": false,
+    "set": {
+     "items": [
+      {
+       "kind": "incident",
+       "ref_id": "incident-0",
+       "severity": "high",
+       "title": "Incident title withheld",
+       "title_redacted": true,
+       "occurred_at": "2026-10-10T07:40:00Z",
+       "scope": "time-window",
+       "relation": "may-correlate"
+      },
+      {
+       "kind": "incident",
+       "ref_id": "incident-1",
+       "severity": "high",
+       "title": "Incident title withheld",
+       "title_redacted": true,
+       "occurred_at": "2026-10-10T07:40:00Z",
+       "scope": "time-window",
+       "relation": "may-correlate"
+      },
+      {
+       "kind": "incident",
+       "ref_id": "incident-2",
+       "severity": "high",
+       "title": "Incident title withheld",
+       "title_redacted": true,
+       "occurred_at": "2026-10-10T07:40:00Z",
+       "scope": "time-window",
+       "relation": "may-correlate"
+      },
+      {
+       "kind": "incident",
+       "ref_id": "incident-3",
+       "severity": "high",
+       "title": "Incident title withheld",
+       "title_redacted": true,
+       "occurred_at": "2026-10-10T07:40:00Z",
+       "scope": "time-window",
+       "relation": "may-correlate"
+      },
+      {
+       "kind": "incident",
+       "ref_id": "incident-4",
+       "severity": "high",
+       "title": "Incident title withheld",
+       "title_redacted": true,
+       "occurred_at": "2026-10-10T07:40:00Z",
+       "scope": "time-window",
+       "relation": "may-correlate"
+      },
+      {
+       "kind": "incident",
+       "ref_id": "incident-5",
+       "severity": "high",
+       "title": "Incident title withheld",
+       "title_redacted": true,
+       "occurred_at": "2026-10-10T07:40:00Z",
+       "scope": "time-window",
+       "relation": "may-correlate"
+      },
+      {
+       "kind": "incident",
+       "ref_id": "incident-6",
+       "severity": "high",
+       "title": "Incident title withheld",
+       "title_redacted": true,
+       "occurred_at": "2026-10-10T07:40:00Z",
+       "scope": "time-window",
+       "relation": "may-correlate"
+      },
+      {
+       "kind": "incident",
+       "ref_id": "incident-7",
+       "severity": "high",
+       "title": "Incident title withheld",
+       "title_redacted": true,
+       "occurred_at": "2026-10-10T07:40:00Z",
+       "scope": "time-window",
+       "relation": "may-correlate"
+      },
+      {
+       "kind": "incident",
+       "ref_id": "incident-8",
+       "severity": "high",
+       "title": "Incident title withheld",
+       "title_redacted": true,
+       "occurred_at": "2026-10-10T07:40:00Z",
+       "scope": "time-window",
+       "relation": "may-correlate"
+      },
+      {
+       "kind": "incident",
+       "ref_id": "incident-9",
+       "severity": "high",
+       "title": "Incident title withheld",
+       "title_redacted": true,
+       "occurred_at": "2026-10-10T07:40:00Z",
+       "scope": "time-window",
+       "relation": "may-correlate"
+      },
+      {
+       "kind": "incident",
+       "ref_id": "incident-10",
+       "severity": "high",
+       "title": "Incident title withheld",
+       "title_redacted": true,
+       "occurred_at": "2026-10-10T07:40:00Z",
+       "scope": "time-window",
+       "relation": "may-correlate"
+      },
+      {
+       "kind": "incident",
+       "ref_id": "incident-11",
+       "severity": "high",
+       "title": "Incident title withheld",
+       "title_redacted": true,
+       "occurred_at": "2026-10-10T07:40:00Z",
+       "scope": "time-window",
+       "relation": "may-correlate"
+      },
+      {
+       "kind": "incident",
+       "ref_id": "incident-12",
+       "severity": "high",
+       "title": "Incident title withheld",
+       "title_redacted": true,
+       "occurred_at": "2026-10-10T07:40:00Z",
+       "scope": "time-window",
+       "relation": "may-correlate"
+      },
+      {
+       "kind": "incident",
+       "ref_id": "incident-13",
+       "severity": "high",
+       "title": "Incident title withheld",
+       "title_redacted": true,
+       "occurred_at": "2026-10-10T07:40:00Z",
+       "scope": "time-window",
+       "relation": "may-correlate"
+      },
+      {
+       "kind": "incident",
+       "ref_id": "incident-14",
+       "severity": "high",
+       "title": "Incident title withheld",
+       "title_redacted": true,
+       "occurred_at": "2026-10-10T07:40:00Z",
+       "scope": "time-window",
+       "relation": "may-correlate"
+      },
+      {
+       "kind": "incident",
+       "ref_id": "incident-15",
+       "severity": "high",
+       "title": "Incident title withheld",
+       "title_redacted": true,
+       "occurred_at": "2026-10-10T07:40:00Z",
+       "scope": "time-window",
+       "relation": "may-correlate"
+      },
+      {
+       "kind": "incident",
+       "ref_id": "incident-16",
+       "severity": "high",
+       "title": "Incident title withheld",
+       "title_redacted": true,
+       "occurred_at": "2026-10-10T07:40:00Z",
+       "scope": "time-window",
+       "relation": "may-correlate"
+      },
+      {
+       "kind": "incident",
+       "ref_id": "incident-17",
+       "severity": "high",
+       "title": "Incident title withheld",
+       "title_redacted": true,
+       "occurred_at": "2026-10-10T07:40:00Z",
+       "scope": "time-window",
+       "relation": "may-correlate"
+      },
+      {
+       "kind": "incident",
+       "ref_id": "incident-18",
+       "severity": "high",
+       "title": "Incident title withheld",
+       "title_redacted": true,
+       "occurred_at": "2026-10-10T07:40:00Z",
+       "scope": "time-window",
+       "relation": "may-correlate"
+      },
+      {
+       "kind": "incident",
+       "ref_id": "incident-19",
+       "severity": "high",
+       "title": "Incident title withheld",
+       "title_redacted": true,
+       "occurred_at": "2026-10-10T07:40:00Z",
+       "scope": "time-window",
+       "relation": "may-correlate"
+      },
+      {
+       "kind": "incident",
+       "ref_id": "incident-20",
+       "severity": "high",
+       "title": "Incident title withheld",
+       "title_redacted": true,
+       "occurred_at": "2026-10-10T07:40:00Z",
+       "scope": "time-window",
+       "relation": "may-correlate"
+      }
+     ]
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "two sources",
+    "valid": false,
+    "set": {
+     "sources": [
+      {
+       "source": "incidents",
+       "state": "ok"
+      },
+      {
+       "source": "alerts",
+       "state": "ok"
+      }
+     ]
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "sources out of order (cross-field)",
+    "valid": false,
+    "set": {
+     "sources": [
+      {
+       "source": "alerts",
+       "state": "ok"
+      },
+      {
+       "source": "incidents",
+       "state": "ok"
+      },
+      {
+       "source": "configuration-changes",
+       "state": "not-connected"
+      }
+     ]
+    },
+    "jsonschema_rejects": false
+   },
+   {
+    "name": "duplicate source (cross-field)",
+    "valid": false,
+    "set": {
+     "sources": [
+      {
+       "source": "incidents",
+       "state": "ok"
+      },
+      {
+       "source": "incidents",
+       "state": "ok"
+      },
+      {
+       "source": "configuration-changes",
+       "state": "not-connected"
+      }
+     ]
+    },
+    "jsonschema_rejects": false
+   },
+   {
+    "name": "ok while no source was read (cross-field)",
+    "valid": false,
+    "set": {
+     "items": [],
+     "sources": [
+      {
+       "source": "incidents",
+       "state": "not-connected"
+      },
+      {
+       "source": "alerts",
+       "state": "not-connected"
+      },
+      {
+       "source": "configuration-changes",
+       "state": "not-connected"
+      }
+     ]
+    },
+    "jsonschema_rejects": false
+   },
+   {
+    "name": "not-connected while a source was read (cross-field)",
+    "valid": false,
+    "set": {
+     "state": "not-connected",
+     "items": []
+    },
+    "jsonschema_rejects": false
+   },
+   {
+    "name": "item from a source that was not read (cross-field)",
+    "valid": false,
+    "set": {
+     "sources": [
+      {
+       "source": "incidents",
+       "state": "not-connected"
+      },
+      {
+       "source": "alerts",
+       "state": "ok"
+      },
+      {
+       "source": "configuration-changes",
+       "state": "not-connected"
+      }
+     ]
+    },
+    "jsonschema_rejects": false
+   },
+   {
+    "name": "window ends before it starts (cross-field)",
+    "valid": false,
+    "set": {
+     "window_end": "2026-10-08T00:00:00Z"
+    },
+    "jsonschema_rejects": false
+   },
+   {
+    "name": "extra field",
+    "valid": false,
+    "set": {
+     "cause": "change"
+    },
+    "jsonschema_rejects": true
+   }
+  ]
+ },
+ "diagnostic_path": {
+  "base": {
+   "state": "ok",
+   "observed_at": "2026-10-10T08:00:04Z",
+   "hops": [
+    {
+     "tier": "user",
+     "state": "unknown",
+     "device_id": null,
+     "name": null,
+     "highlight": null
+    },
+    {
+     "tier": "access-point",
+     "state": "unknown",
+     "device_id": null,
+     "name": null,
+     "highlight": null
+    },
+    {
+     "tier": "access-switch",
+     "state": "known",
+     "device_id": "device-0f8a1b2c-3d4e-5f60-7a8b-9c0d1e2f3a4b",
+     "name": "sw-access-01",
+     "highlight": null
+    },
+    {
+     "tier": "core",
+     "state": "known",
+     "device_id": "device-1f8a1b2c-3d4e-5f60-7a8b-9c0d1e2f3a4b",
+     "name": "core-01",
+     "highlight": null
+    },
+    {
+     "tier": "firewall",
+     "state": "known",
+     "device_id": "device-2f8a1b2c-3d4e-5f60-7a8b-9c0d1e2f3a4b",
+     "name": "fw-01",
+     "highlight": "suspected"
+    },
+    {
+     "tier": "server",
+     "state": "known",
+     "device_id": "device-3f8a1b2c-3d4e-5f60-7a8b-9c0d1e2f3a4b",
+     "name": "SERVER01",
+     "highlight": null
+    }
+   ],
+   "links": [
+    {
+     "from_tier": "user",
+     "to_tier": "access-point",
+     "state": "unknown"
+    },
+    {
+     "from_tier": "access-point",
+     "to_tier": "access-switch",
+     "state": "unknown"
+    },
+    {
+     "from_tier": "access-switch",
+     "to_tier": "core",
+     "state": "known"
+    },
+    {
+     "from_tier": "core",
+     "to_tier": "firewall",
+     "state": "known"
+    },
+    {
+     "from_tier": "firewall",
+     "to_tier": "server",
+     "state": "known"
+    }
+   ]
+  },
+  "cases": [
+   {
+    "name": "full explicit path",
+    "valid": true
+   },
+   {
+    "name": "only the target is known",
+    "valid": true,
+    "set": {
+     "hops": [
+      {
+       "tier": "user",
+       "state": "unknown",
+       "device_id": null,
+       "name": null,
+       "highlight": null
+      },
+      {
+       "tier": "access-point",
+       "state": "unknown",
+       "device_id": null,
+       "name": null,
+       "highlight": null
+      },
+      {
+       "tier": "access-switch",
+       "state": "unknown",
+       "device_id": null,
+       "name": null,
+       "highlight": null
+      },
+      {
+       "tier": "core",
+       "state": "unknown",
+       "device_id": null,
+       "name": null,
+       "highlight": null
+      },
+      {
+       "tier": "firewall",
+       "state": "unknown",
+       "device_id": null,
+       "name": null,
+       "highlight": null
+      },
+      {
+       "tier": "server",
+       "state": "known",
+       "device_id": "device-3f8a1b2c-3d4e-5f60-7a8b-9c0d1e2f3a4b",
+       "name": "SERVER01",
+       "highlight": null
+      }
+     ],
+     "links": [
+      {
+       "from_tier": "user",
+       "to_tier": "access-point",
+       "state": "unknown"
+      },
+      {
+       "from_tier": "access-point",
+       "to_tier": "access-switch",
+       "state": "unknown"
+      },
+      {
+       "from_tier": "access-switch",
+       "to_tier": "core",
+       "state": "unknown"
+      },
+      {
+       "from_tier": "core",
+       "to_tier": "firewall",
+       "state": "unknown"
+      },
+      {
+       "from_tier": "firewall",
+       "to_tier": "server",
+       "state": "unknown"
+      }
+     ]
+    }
+   },
+   {
+    "name": "suspected hop that is unknown",
+    "valid": true,
+    "set": {
+     "hops": [
+      {
+       "tier": "user",
+       "state": "unknown",
+       "device_id": null,
+       "name": null,
+       "highlight": null
+      },
+      {
+       "tier": "access-point",
+       "state": "unknown",
+       "device_id": null,
+       "name": null,
+       "highlight": null
+      },
+      {
+       "tier": "access-switch",
+       "state": "unknown",
+       "device_id": null,
+       "name": null,
+       "highlight": null
+      },
+      {
+       "tier": "core",
+       "state": "unknown",
+       "device_id": null,
+       "name": null,
+       "highlight": "suspected"
+      },
+      {
+       "tier": "firewall",
+       "state": "unknown",
+       "device_id": null,
+       "name": null,
+       "highlight": null
+      },
+      {
+       "tier": "server",
+       "state": "known",
+       "device_id": "device-3f8a1b2c-3d4e-5f60-7a8b-9c0d1e2f3a4b",
+       "name": "SERVER01",
+       "highlight": null
+      }
+     ],
+     "links": [
+      {
+       "from_tier": "user",
+       "to_tier": "access-point",
+       "state": "unknown"
+      },
+      {
+       "from_tier": "access-point",
+       "to_tier": "access-switch",
+       "state": "unknown"
+      },
+      {
+       "from_tier": "access-switch",
+       "to_tier": "core",
+       "state": "unknown"
+      },
+      {
+       "from_tier": "core",
+       "to_tier": "firewall",
+       "state": "unknown"
+      },
+      {
+       "from_tier": "firewall",
+       "to_tier": "server",
+       "state": "unknown"
+      }
+     ]
+    }
+   },
+   {
+    "name": "not-connected",
+    "valid": true,
+    "set": {
+     "state": "not-connected",
+     "observed_at": null,
+     "hops": [],
+     "links": []
+    }
+   },
+   {
+    "name": "unknown",
+    "valid": true,
+    "set": {
+     "state": "unknown",
+     "observed_at": null,
+     "hops": [],
+     "links": []
+    }
+   },
+   {
+    "name": "hops while not ok",
+    "valid": false,
+    "set": {
+     "state": "unknown",
+     "observed_at": null,
+     "links": []
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "five hops",
+    "valid": false,
+    "set": {
+     "hops": [
+      {
+       "tier": "user",
+       "state": "unknown",
+       "device_id": null,
+       "name": null,
+       "highlight": null
+      },
+      {
+       "tier": "access-point",
+       "state": "unknown",
+       "device_id": null,
+       "name": null,
+       "highlight": null
+      },
+      {
+       "tier": "access-switch",
+       "state": "known",
+       "device_id": "device-0f8a1b2c-3d4e-5f60-7a8b-9c0d1e2f3a4b",
+       "name": "sw-access-01",
+       "highlight": null
+      },
+      {
+       "tier": "core",
+       "state": "known",
+       "device_id": "device-1f8a1b2c-3d4e-5f60-7a8b-9c0d1e2f3a4b",
+       "name": "core-01",
+       "highlight": null
+      },
+      {
+       "tier": "firewall",
+       "state": "known",
+       "device_id": "device-2f8a1b2c-3d4e-5f60-7a8b-9c0d1e2f3a4b",
+       "name": "fw-01",
+       "highlight": "suspected"
+      }
+     ],
+     "links": [
+      {
+       "from_tier": "user",
+       "to_tier": "access-point",
+       "state": "unknown"
+      },
+      {
+       "from_tier": "access-point",
+       "to_tier": "access-switch",
+       "state": "unknown"
+      },
+      {
+       "from_tier": "access-switch",
+       "to_tier": "core",
+       "state": "known"
+      },
+      {
+       "from_tier": "core",
+       "to_tier": "firewall",
+       "state": "known"
+      }
+     ]
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "ok without a topology time",
+    "valid": false,
+    "set": {
+     "observed_at": null
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "hop tier outside the enum",
+    "valid": false,
+    "set": {
+     "hops.0.tier": "wan"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "malformed device id",
+    "valid": false,
+    "set": {
+     "hops.2.device_id": "device-1"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "blank hop name",
+    "valid": false,
+    "set": {
+     "hops.2.name": " "
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "tiers out of order (cross-field)",
+    "valid": false,
+    "set": {
+     "hops.2.tier": "core",
+     "hops.3.tier": "access-switch"
+    },
+    "jsonschema_rejects": false
+   },
+   {
+    "name": "known hop without a device (cross-field)",
+    "valid": false,
+    "set": {
+     "hops.2.device_id": null
+    },
+    "jsonschema_rejects": false
+   },
+   {
+    "name": "unknown hop that names a device (cross-field)",
+    "valid": false,
+    "set": {
+     "hops.0.device_id": "device-0f8a1b2c-3d4e-5f60-7a8b-9c0d1e2f3a4b"
+    },
+    "jsonschema_rejects": false
+   },
+   {
+    "name": "known link to an unknown hop (cross-field)",
+    "valid": false,
+    "set": {
+     "links.1.state": "known"
+    },
+    "jsonschema_rejects": false
+   },
+   {
+    "name": "link that skips a tier (cross-field)",
+    "valid": false,
+    "set": {
+     "links.2.to_tier": "firewall"
+    },
+    "jsonschema_rejects": false
+   },
+   {
+    "name": "two suspected hops (cross-field)",
+    "valid": false,
+    "set": {
+     "hops.3.highlight": "suspected"
+    },
+    "jsonschema_rejects": false
+   },
+   {
+    "name": "target hop unknown while ok (cross-field)",
+    "valid": false,
+    "set": {
+     "hops.5.device_id": null,
+     "hops.5.name": null,
+     "hops.5.state": "unknown",
+     "links.4.state": "unknown"
+    },
+    "jsonschema_rejects": false
+   },
+   {
+    "name": "extra field",
+    "valid": false,
+    "set": {
+     "route": "x"
+    },
+    "jsonschema_rejects": true
+   }
+  ]
+ },
+ "diagnostic_session": {
+  "base": {
+   "run": {
+    "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d",
+    "target": "SERVER01",
+    "target_id": null,
+    "symptom": "External users cannot reach the service",
+    "vantage": "internet",
+    "started_at": "2026-10-10T08:00:00Z",
+    "completed_at": "2026-10-10T08:00:05Z",
+    "checks": [
+     {
+      "id": "check-tcp-internet-443",
+      "kind": "tcp",
+      "label": "TCP 443 from internet",
+      "status": "fail",
+      "vantage": "internet",
+      "location": "cloud-external",
+      "port": 443,
+      "latency_ms": null,
+      "detail": "connection timed out",
+      "observed_at": "2026-10-10T08:00:03Z",
+      "evidence_id": "ev-2"
+     },
+     {
+      "id": "check-tcp-server-vlan-443",
+      "kind": "tcp",
+      "label": "TCP 443 from the server VLAN",
+      "status": "pass",
+      "vantage": "server-vlan",
+      "location": "server-vlan",
+      "port": 443,
+      "latency_ms": 1.8,
+      "detail": "the port accepted a connection",
+      "observed_at": "2026-10-10T08:00:02Z",
+      "evidence_id": "ev-1"
+     }
+    ],
+    "facts": [
+     {
+      "statement": "Internal TCP 443 to the host passes",
+      "evidence_ids": [
+       "ev-1"
+      ]
+     }
+    ],
+    "contradictions": [],
+    "unknowns": [
+     {
+      "statement": "No flow telemetry for the perimeter link",
+      "evidence_ids": []
+     }
+    ],
+    "probable_fault_domain": "firewall",
+    "confidence": "medium",
+    "alternative_hypotheses": [
+     {
+      "statement": "Upstream routing change",
+      "evidence_ids": [
+       "ev-2"
+      ]
+     }
+    ],
+    "recommended_next_checks": [
+     {
+      "statement": "Compare the firewall rule set against the last change",
+      "evidence_ids": []
+     }
+    ],
+    "evidence_ids": [
+     "ev-1",
+     "ev-2"
+    ]
+   },
+   "locations": [
+    {
+     "location": "cloud-external",
+     "state": "observed",
+     "status": "fail",
+     "passed": 0,
+     "failed": 1,
+     "unknown_checks": 0,
+     "check_ids": [
+      "check-tcp-internet-443"
+     ]
+    },
+    {
+     "location": "user-lan",
+     "state": "not-connected",
+     "status": null,
+     "passed": 0,
+     "failed": 0,
+     "unknown_checks": 0,
+     "check_ids": []
+    },
+    {
+     "location": "server-vlan",
+     "state": "observed",
+     "status": "pass",
+     "passed": 1,
+     "failed": 0,
+     "unknown_checks": 0,
+     "check_ids": [
+      "check-tcp-server-vlan-443"
+     ]
+    },
+    {
+     "location": "branch",
+     "state": "not-connected",
+     "status": null,
+     "passed": 0,
+     "failed": 0,
+     "unknown_checks": 0,
+     "check_ids": []
+    },
+    {
+     "location": "wifi",
+     "state": "not-connected",
+     "status": null,
+     "passed": 0,
+     "failed": 0,
+     "unknown_checks": 0,
+     "check_ids": []
+    },
+    {
+     "location": "remote-site",
+     "state": "not-connected",
+     "status": null,
+     "passed": 0,
+     "failed": 0,
+     "unknown_checks": 0,
+     "check_ids": []
+    }
+   ],
+   "probable_cause": {
+    "domain": "firewall",
+    "confidence": "medium",
+    "basis": "inferred",
+    "pattern": "external-only-failure",
+    "summary": "The service answers from the server VLAN but not from the external location, which narrows the fault to the path between them without proving a firewall fault.",
+    "evidence": [
+     {
+      "basis": "observed",
+      "statement": "TCP 443 from the external location failed",
+      "check_ids": [
+       "check-tcp-internet-443"
+      ]
+     },
+     {
+      "basis": "observed",
+      "statement": "TCP 443 from the server VLAN passed",
+      "check_ids": [
+       "check-tcp-server-vlan-443"
+      ]
+     },
+     {
+      "basis": "inferred",
+      "statement": "Internal success with external failure narrows the fault to the path between them; it does not prove which device is at fault",
+      "check_ids": [
+       "check-tcp-internet-443",
+       "check-tcp-server-vlan-443"
+      ]
+     },
+     {
+      "basis": "unknown",
+      "statement": "No probe source is connected for the user LAN, branch, Wi-Fi and remote site; they are not assumed healthy",
+      "check_ids": []
+     }
+    ]
+   },
+   "recent_changes": {
+    "state": "ok",
+    "window_start": "2026-10-09T08:00:00Z",
+    "window_end": "2026-10-10T08:00:05Z",
+    "sources": [
+     {
+      "source": "incidents",
+      "state": "ok"
+     },
+     {
+      "source": "alerts",
+      "state": "ok"
+     },
+     {
+      "source": "configuration-changes",
+      "state": "not-connected"
+     }
+    ],
+    "items": [
+     {
+      "kind": "incident",
+      "ref_id": "incident-1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d",
+      "severity": "high",
+      "title": "Incident title withheld",
+      "title_redacted": true,
+      "occurred_at": "2026-10-10T07:40:00Z",
+      "scope": "time-window",
+      "relation": "may-correlate"
+     }
+    ]
+   },
+   "path": {
+    "state": "ok",
+    "observed_at": "2026-10-10T08:00:04Z",
+    "hops": [
+     {
+      "tier": "user",
+      "state": "unknown",
+      "device_id": null,
+      "name": null,
+      "highlight": null
+     },
+     {
+      "tier": "access-point",
+      "state": "unknown",
+      "device_id": null,
+      "name": null,
+      "highlight": null
+     },
+     {
+      "tier": "access-switch",
+      "state": "known",
+      "device_id": "device-0f8a1b2c-3d4e-5f60-7a8b-9c0d1e2f3a4b",
+      "name": "sw-access-01",
+      "highlight": null
+     },
+     {
+      "tier": "core",
+      "state": "known",
+      "device_id": "device-1f8a1b2c-3d4e-5f60-7a8b-9c0d1e2f3a4b",
+      "name": "core-01",
+      "highlight": null
+     },
+     {
+      "tier": "firewall",
+      "state": "known",
+      "device_id": "device-2f8a1b2c-3d4e-5f60-7a8b-9c0d1e2f3a4b",
+      "name": "fw-01",
+      "highlight": "suspected"
+     },
+     {
+      "tier": "server",
+      "state": "known",
+      "device_id": "device-3f8a1b2c-3d4e-5f60-7a8b-9c0d1e2f3a4b",
+      "name": "SERVER01",
+      "highlight": null
+     }
+    ],
+    "links": [
+     {
+      "from_tier": "user",
+      "to_tier": "access-point",
+      "state": "unknown"
+     },
+     {
+      "from_tier": "access-point",
+      "to_tier": "access-switch",
+      "state": "unknown"
+     },
+     {
+      "from_tier": "access-switch",
+      "to_tier": "core",
+      "state": "known"
+     },
+     {
+      "from_tier": "core",
+      "to_tier": "firewall",
+      "state": "known"
+     },
+     {
+      "from_tier": "firewall",
+      "to_tier": "server",
+      "state": "known"
+     }
+    ]
+   }
+  },
+  "cases": [
+   {
+    "name": "session with every section",
+    "valid": true
+   },
+   {
+    "name": "path not connected",
+    "valid": true,
+    "set": {
+     "path": {
+      "state": "not-connected",
+      "observed_at": null,
+      "hops": [],
+      "links": []
+     }
+    }
+   },
+   {
+    "name": "changes not connected",
+    "valid": true,
+    "set": {
+     "recent_changes": {
+      "state": "not-connected",
+      "window_start": "2026-10-09T08:00:00Z",
+      "window_end": "2026-10-10T08:00:05Z",
+      "sources": [
+       {
+        "source": "incidents",
+        "state": "not-connected"
+       },
+       {
+        "source": "alerts",
+        "state": "not-connected"
+       },
+       {
+        "source": "configuration-changes",
+        "state": "not-connected"
+       }
+      ],
+      "items": []
+     }
+    }
+   },
+   {
+    "name": "run with nothing narrowed",
+    "valid": true,
+    "set": {
+     "run.probable_fault_domain": null,
+     "run.confidence": "unknown",
+     "probable_cause": {
+      "domain": null,
+      "confidence": "unknown",
+      "basis": "unknown",
+      "pattern": "none",
+      "summary": "The evidence did not narrow the fault to a single domain.",
+      "evidence": [
+       {
+        "basis": "unknown",
+        "statement": "Four locations have no connected probe source",
+        "check_ids": []
+       }
+      ]
+     },
+     "path.hops.4.highlight": null
+    }
+   },
+   {
+    "name": "five locations",
+    "valid": false,
+    "set": {
+     "locations": [
+      {
+       "location": "cloud-external",
+       "state": "observed",
+       "status": "fail",
+       "passed": 0,
+       "failed": 1,
+       "unknown_checks": 0,
+       "check_ids": [
+        "check-tcp-internet-443"
+       ]
+      },
+      {
+       "location": "user-lan",
+       "state": "not-connected",
+       "status": null,
+       "passed": 0,
+       "failed": 0,
+       "unknown_checks": 0,
+       "check_ids": []
+      },
+      {
+       "location": "server-vlan",
+       "state": "observed",
+       "status": "pass",
+       "passed": 1,
+       "failed": 0,
+       "unknown_checks": 0,
+       "check_ids": [
+        "check-tcp-server-vlan-443"
+       ]
+      },
+      {
+       "location": "branch",
+       "state": "not-connected",
+       "status": null,
+       "passed": 0,
+       "failed": 0,
+       "unknown_checks": 0,
+       "check_ids": []
+      },
+      {
+       "location": "wifi",
+       "state": "not-connected",
+       "status": null,
+       "passed": 0,
+       "failed": 0,
+       "unknown_checks": 0,
+       "check_ids": []
+      }
+     ]
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "missing path",
+    "valid": false,
+    "delete": [
+     "path"
+    ],
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "extra field",
+    "valid": false,
+    "set": {
+     "actor": "x"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "cause domain differs from the run (cross-field)",
+    "valid": false,
+    "set": {
+     "probable_cause.domain": "service",
+     "probable_cause.pattern": "service-failure"
+    },
+    "jsonschema_rejects": false
+   },
+   {
+    "name": "cause confidence differs from the run (cross-field)",
+    "valid": false,
+    "set": {
+     "probable_cause.confidence": "low"
+    },
+    "jsonschema_rejects": false
+   },
+   {
+    "name": "location lists another location's check (cross-field)",
+    "valid": false,
+    "set": {
+     "locations.0.check_ids": [
+      "check-tcp-server-vlan-443"
+     ]
+    },
+    "jsonschema_rejects": false
+   },
+   {
+    "name": "evidence points at a check that does not exist (cross-field)",
+    "valid": false,
+    "set": {
+     "probable_cause.evidence.0.check_ids": [
+      "no-such-check"
+     ]
+    },
+    "jsonschema_rejects": false
+   },
+   {
+    "name": "locations out of order (cross-field)",
+    "valid": false,
+    "set": {
+     "locations.0.location": "user-lan",
+     "locations.1.location": "cloud-external"
+    },
+    "jsonschema_rejects": false
+   },
+   {
+    "name": "location counts disagree with the run (cross-field)",
+    "valid": false,
+    "set": {
+     "locations.2.state": "not-connected",
+     "locations.2.status": null,
+     "locations.2.passed": 0,
+     "locations.2.check_ids": []
+    },
+    "jsonschema_rejects": false
+   },
+   {
+    "name": "suspected hop that disagrees with the cause (cross-field)",
+    "valid": false,
+    "set": {
+     "path.hops.4.highlight": null,
+     "path.hops.3.highlight": "suspected"
+    },
+    "jsonschema_rejects": false
+   }
+  ]
+ },
+ "diagnostic_session_response": {
+  "base": {
+   "state": "not-connected",
+   "session": null
+  },
+  "cases": [
+   {
+    "name": "not-connected without a session",
+    "valid": true
+   },
+   {
+    "name": "unknown without a session",
+    "valid": true,
+    "set": {
+     "state": "unknown"
+    }
+   },
+   {
+    "name": "ok with a session",
+    "valid": true,
+    "set": {
+     "state": "ok",
+     "session": {
+      "run": {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d",
+       "target": "SERVER01",
+       "target_id": null,
+       "symptom": "External users cannot reach the service",
+       "vantage": "internet",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "checks": [
+        {
+         "id": "check-tcp-internet-443",
+         "kind": "tcp",
+         "label": "TCP 443 from internet",
+         "status": "fail",
+         "vantage": "internet",
+         "location": "cloud-external",
+         "port": 443,
+         "latency_ms": null,
+         "detail": "connection timed out",
+         "observed_at": "2026-10-10T08:00:03Z",
+         "evidence_id": "ev-2"
+        },
+        {
+         "id": "check-tcp-server-vlan-443",
+         "kind": "tcp",
+         "label": "TCP 443 from the server VLAN",
+         "status": "pass",
+         "vantage": "server-vlan",
+         "location": "server-vlan",
+         "port": 443,
+         "latency_ms": 1.8,
+         "detail": "the port accepted a connection",
+         "observed_at": "2026-10-10T08:00:02Z",
+         "evidence_id": "ev-1"
+        }
+       ],
+       "facts": [
+        {
+         "statement": "Internal TCP 443 to the host passes",
+         "evidence_ids": [
+          "ev-1"
+         ]
+        }
+       ],
+       "contradictions": [],
+       "unknowns": [
+        {
+         "statement": "No flow telemetry for the perimeter link",
+         "evidence_ids": []
+        }
+       ],
+       "probable_fault_domain": "firewall",
+       "confidence": "medium",
+       "alternative_hypotheses": [
+        {
+         "statement": "Upstream routing change",
+         "evidence_ids": [
+          "ev-2"
+         ]
+        }
+       ],
+       "recommended_next_checks": [
+        {
+         "statement": "Compare the firewall rule set against the last change",
+         "evidence_ids": []
+        }
+       ],
+       "evidence_ids": [
+        "ev-1",
+        "ev-2"
+       ]
+      },
+      "locations": [
+       {
+        "location": "cloud-external",
+        "state": "observed",
+        "status": "fail",
+        "passed": 0,
+        "failed": 1,
+        "unknown_checks": 0,
+        "check_ids": [
+         "check-tcp-internet-443"
+        ]
+       },
+       {
+        "location": "user-lan",
+        "state": "not-connected",
+        "status": null,
+        "passed": 0,
+        "failed": 0,
+        "unknown_checks": 0,
+        "check_ids": []
+       },
+       {
+        "location": "server-vlan",
+        "state": "observed",
+        "status": "pass",
+        "passed": 1,
+        "failed": 0,
+        "unknown_checks": 0,
+        "check_ids": [
+         "check-tcp-server-vlan-443"
+        ]
+       },
+       {
+        "location": "branch",
+        "state": "not-connected",
+        "status": null,
+        "passed": 0,
+        "failed": 0,
+        "unknown_checks": 0,
+        "check_ids": []
+       },
+       {
+        "location": "wifi",
+        "state": "not-connected",
+        "status": null,
+        "passed": 0,
+        "failed": 0,
+        "unknown_checks": 0,
+        "check_ids": []
+       },
+       {
+        "location": "remote-site",
+        "state": "not-connected",
+        "status": null,
+        "passed": 0,
+        "failed": 0,
+        "unknown_checks": 0,
+        "check_ids": []
+       }
+      ],
+      "probable_cause": {
+       "domain": "firewall",
+       "confidence": "medium",
+       "basis": "inferred",
+       "pattern": "external-only-failure",
+       "summary": "The service answers from the server VLAN but not from the external location, which narrows the fault to the path between them without proving a firewall fault.",
+       "evidence": [
+        {
+         "basis": "observed",
+         "statement": "TCP 443 from the external location failed",
+         "check_ids": [
+          "check-tcp-internet-443"
+         ]
+        },
+        {
+         "basis": "observed",
+         "statement": "TCP 443 from the server VLAN passed",
+         "check_ids": [
+          "check-tcp-server-vlan-443"
+         ]
+        },
+        {
+         "basis": "inferred",
+         "statement": "Internal success with external failure narrows the fault to the path between them; it does not prove which device is at fault",
+         "check_ids": [
+          "check-tcp-internet-443",
+          "check-tcp-server-vlan-443"
+         ]
+        },
+        {
+         "basis": "unknown",
+         "statement": "No probe source is connected for the user LAN, branch, Wi-Fi and remote site; they are not assumed healthy",
+         "check_ids": []
+        }
+       ]
+      },
+      "recent_changes": {
+       "state": "ok",
+       "window_start": "2026-10-09T08:00:00Z",
+       "window_end": "2026-10-10T08:00:05Z",
+       "sources": [
+        {
+         "source": "incidents",
+         "state": "ok"
+        },
+        {
+         "source": "alerts",
+         "state": "ok"
+        },
+        {
+         "source": "configuration-changes",
+         "state": "not-connected"
+        }
+       ],
+       "items": [
+        {
+         "kind": "incident",
+         "ref_id": "incident-1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d",
+         "severity": "high",
+         "title": "Incident title withheld",
+         "title_redacted": true,
+         "occurred_at": "2026-10-10T07:40:00Z",
+         "scope": "time-window",
+         "relation": "may-correlate"
+        }
+       ]
+      },
+      "path": {
+       "state": "ok",
+       "observed_at": "2026-10-10T08:00:04Z",
+       "hops": [
+        {
+         "tier": "user",
+         "state": "unknown",
+         "device_id": null,
+         "name": null,
+         "highlight": null
+        },
+        {
+         "tier": "access-point",
+         "state": "unknown",
+         "device_id": null,
+         "name": null,
+         "highlight": null
+        },
+        {
+         "tier": "access-switch",
+         "state": "known",
+         "device_id": "device-0f8a1b2c-3d4e-5f60-7a8b-9c0d1e2f3a4b",
+         "name": "sw-access-01",
+         "highlight": null
+        },
+        {
+         "tier": "core",
+         "state": "known",
+         "device_id": "device-1f8a1b2c-3d4e-5f60-7a8b-9c0d1e2f3a4b",
+         "name": "core-01",
+         "highlight": null
+        },
+        {
+         "tier": "firewall",
+         "state": "known",
+         "device_id": "device-2f8a1b2c-3d4e-5f60-7a8b-9c0d1e2f3a4b",
+         "name": "fw-01",
+         "highlight": "suspected"
+        },
+        {
+         "tier": "server",
+         "state": "known",
+         "device_id": "device-3f8a1b2c-3d4e-5f60-7a8b-9c0d1e2f3a4b",
+         "name": "SERVER01",
+         "highlight": null
+        }
+       ],
+       "links": [
+        {
+         "from_tier": "user",
+         "to_tier": "access-point",
+         "state": "unknown"
+        },
+        {
+         "from_tier": "access-point",
+         "to_tier": "access-switch",
+         "state": "unknown"
+        },
+        {
+         "from_tier": "access-switch",
+         "to_tier": "core",
+         "state": "known"
+        },
+        {
+         "from_tier": "core",
+         "to_tier": "firewall",
+         "state": "known"
+        },
+        {
+         "from_tier": "firewall",
+         "to_tier": "server",
+         "state": "known"
+        }
+       ]
+      }
+     }
+    }
+   },
+   {
+    "name": "ok without a session",
+    "valid": false,
+    "set": {
+     "state": "ok"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "not-connected with a session",
+    "valid": false,
+    "set": {
+     "session": {
+      "run": {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d",
+       "target": "SERVER01",
+       "target_id": null,
+       "symptom": "External users cannot reach the service",
+       "vantage": "internet",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "checks": [
+        {
+         "id": "check-tcp-internet-443",
+         "kind": "tcp",
+         "label": "TCP 443 from internet",
+         "status": "fail",
+         "vantage": "internet",
+         "location": "cloud-external",
+         "port": 443,
+         "latency_ms": null,
+         "detail": "connection timed out",
+         "observed_at": "2026-10-10T08:00:03Z",
+         "evidence_id": "ev-2"
+        },
+        {
+         "id": "check-tcp-server-vlan-443",
+         "kind": "tcp",
+         "label": "TCP 443 from the server VLAN",
+         "status": "pass",
+         "vantage": "server-vlan",
+         "location": "server-vlan",
+         "port": 443,
+         "latency_ms": 1.8,
+         "detail": "the port accepted a connection",
+         "observed_at": "2026-10-10T08:00:02Z",
+         "evidence_id": "ev-1"
+        }
+       ],
+       "facts": [
+        {
+         "statement": "Internal TCP 443 to the host passes",
+         "evidence_ids": [
+          "ev-1"
+         ]
+        }
+       ],
+       "contradictions": [],
+       "unknowns": [
+        {
+         "statement": "No flow telemetry for the perimeter link",
+         "evidence_ids": []
+        }
+       ],
+       "probable_fault_domain": "firewall",
+       "confidence": "medium",
+       "alternative_hypotheses": [
+        {
+         "statement": "Upstream routing change",
+         "evidence_ids": [
+          "ev-2"
+         ]
+        }
+       ],
+       "recommended_next_checks": [
+        {
+         "statement": "Compare the firewall rule set against the last change",
+         "evidence_ids": []
+        }
+       ],
+       "evidence_ids": [
+        "ev-1",
+        "ev-2"
+       ]
+      },
+      "locations": [
+       {
+        "location": "cloud-external",
+        "state": "observed",
+        "status": "fail",
+        "passed": 0,
+        "failed": 1,
+        "unknown_checks": 0,
+        "check_ids": [
+         "check-tcp-internet-443"
+        ]
+       },
+       {
+        "location": "user-lan",
+        "state": "not-connected",
+        "status": null,
+        "passed": 0,
+        "failed": 0,
+        "unknown_checks": 0,
+        "check_ids": []
+       },
+       {
+        "location": "server-vlan",
+        "state": "observed",
+        "status": "pass",
+        "passed": 1,
+        "failed": 0,
+        "unknown_checks": 0,
+        "check_ids": [
+         "check-tcp-server-vlan-443"
+        ]
+       },
+       {
+        "location": "branch",
+        "state": "not-connected",
+        "status": null,
+        "passed": 0,
+        "failed": 0,
+        "unknown_checks": 0,
+        "check_ids": []
+       },
+       {
+        "location": "wifi",
+        "state": "not-connected",
+        "status": null,
+        "passed": 0,
+        "failed": 0,
+        "unknown_checks": 0,
+        "check_ids": []
+       },
+       {
+        "location": "remote-site",
+        "state": "not-connected",
+        "status": null,
+        "passed": 0,
+        "failed": 0,
+        "unknown_checks": 0,
+        "check_ids": []
+       }
+      ],
+      "probable_cause": {
+       "domain": "firewall",
+       "confidence": "medium",
+       "basis": "inferred",
+       "pattern": "external-only-failure",
+       "summary": "The service answers from the server VLAN but not from the external location, which narrows the fault to the path between them without proving a firewall fault.",
+       "evidence": [
+        {
+         "basis": "observed",
+         "statement": "TCP 443 from the external location failed",
+         "check_ids": [
+          "check-tcp-internet-443"
+         ]
+        },
+        {
+         "basis": "observed",
+         "statement": "TCP 443 from the server VLAN passed",
+         "check_ids": [
+          "check-tcp-server-vlan-443"
+         ]
+        },
+        {
+         "basis": "inferred",
+         "statement": "Internal success with external failure narrows the fault to the path between them; it does not prove which device is at fault",
+         "check_ids": [
+          "check-tcp-internet-443",
+          "check-tcp-server-vlan-443"
+         ]
+        },
+        {
+         "basis": "unknown",
+         "statement": "No probe source is connected for the user LAN, branch, Wi-Fi and remote site; they are not assumed healthy",
+         "check_ids": []
+        }
+       ]
+      },
+      "recent_changes": {
+       "state": "ok",
+       "window_start": "2026-10-09T08:00:00Z",
+       "window_end": "2026-10-10T08:00:05Z",
+       "sources": [
+        {
+         "source": "incidents",
+         "state": "ok"
+        },
+        {
+         "source": "alerts",
+         "state": "ok"
+        },
+        {
+         "source": "configuration-changes",
+         "state": "not-connected"
+        }
+       ],
+       "items": [
+        {
+         "kind": "incident",
+         "ref_id": "incident-1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d",
+         "severity": "high",
+         "title": "Incident title withheld",
+         "title_redacted": true,
+         "occurred_at": "2026-10-10T07:40:00Z",
+         "scope": "time-window",
+         "relation": "may-correlate"
+        }
+       ]
+      },
+      "path": {
+       "state": "ok",
+       "observed_at": "2026-10-10T08:00:04Z",
+       "hops": [
+        {
+         "tier": "user",
+         "state": "unknown",
+         "device_id": null,
+         "name": null,
+         "highlight": null
+        },
+        {
+         "tier": "access-point",
+         "state": "unknown",
+         "device_id": null,
+         "name": null,
+         "highlight": null
+        },
+        {
+         "tier": "access-switch",
+         "state": "known",
+         "device_id": "device-0f8a1b2c-3d4e-5f60-7a8b-9c0d1e2f3a4b",
+         "name": "sw-access-01",
+         "highlight": null
+        },
+        {
+         "tier": "core",
+         "state": "known",
+         "device_id": "device-1f8a1b2c-3d4e-5f60-7a8b-9c0d1e2f3a4b",
+         "name": "core-01",
+         "highlight": null
+        },
+        {
+         "tier": "firewall",
+         "state": "known",
+         "device_id": "device-2f8a1b2c-3d4e-5f60-7a8b-9c0d1e2f3a4b",
+         "name": "fw-01",
+         "highlight": "suspected"
+        },
+        {
+         "tier": "server",
+         "state": "known",
+         "device_id": "device-3f8a1b2c-3d4e-5f60-7a8b-9c0d1e2f3a4b",
+         "name": "SERVER01",
+         "highlight": null
+        }
+       ],
+       "links": [
+        {
+         "from_tier": "user",
+         "to_tier": "access-point",
+         "state": "unknown"
+        },
+        {
+         "from_tier": "access-point",
+         "to_tier": "access-switch",
+         "state": "unknown"
+        },
+        {
+         "from_tier": "access-switch",
+         "to_tier": "core",
+         "state": "known"
+        },
+        {
+         "from_tier": "core",
+         "to_tier": "firewall",
+         "state": "known"
+        },
+        {
+         "from_tier": "firewall",
+         "to_tier": "server",
+         "state": "known"
+        }
+       ]
+      }
+     }
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "unknown with a session",
+    "valid": false,
+    "set": {
+     "state": "unknown",
+     "session": {
+      "run": {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d",
+       "target": "SERVER01",
+       "target_id": null,
+       "symptom": "External users cannot reach the service",
+       "vantage": "internet",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "checks": [
+        {
+         "id": "check-tcp-internet-443",
+         "kind": "tcp",
+         "label": "TCP 443 from internet",
+         "status": "fail",
+         "vantage": "internet",
+         "location": "cloud-external",
+         "port": 443,
+         "latency_ms": null,
+         "detail": "connection timed out",
+         "observed_at": "2026-10-10T08:00:03Z",
+         "evidence_id": "ev-2"
+        },
+        {
+         "id": "check-tcp-server-vlan-443",
+         "kind": "tcp",
+         "label": "TCP 443 from the server VLAN",
+         "status": "pass",
+         "vantage": "server-vlan",
+         "location": "server-vlan",
+         "port": 443,
+         "latency_ms": 1.8,
+         "detail": "the port accepted a connection",
+         "observed_at": "2026-10-10T08:00:02Z",
+         "evidence_id": "ev-1"
+        }
+       ],
+       "facts": [
+        {
+         "statement": "Internal TCP 443 to the host passes",
+         "evidence_ids": [
+          "ev-1"
+         ]
+        }
+       ],
+       "contradictions": [],
+       "unknowns": [
+        {
+         "statement": "No flow telemetry for the perimeter link",
+         "evidence_ids": []
+        }
+       ],
+       "probable_fault_domain": "firewall",
+       "confidence": "medium",
+       "alternative_hypotheses": [
+        {
+         "statement": "Upstream routing change",
+         "evidence_ids": [
+          "ev-2"
+         ]
+        }
+       ],
+       "recommended_next_checks": [
+        {
+         "statement": "Compare the firewall rule set against the last change",
+         "evidence_ids": []
+        }
+       ],
+       "evidence_ids": [
+        "ev-1",
+        "ev-2"
+       ]
+      },
+      "locations": [
+       {
+        "location": "cloud-external",
+        "state": "observed",
+        "status": "fail",
+        "passed": 0,
+        "failed": 1,
+        "unknown_checks": 0,
+        "check_ids": [
+         "check-tcp-internet-443"
+        ]
+       },
+       {
+        "location": "user-lan",
+        "state": "not-connected",
+        "status": null,
+        "passed": 0,
+        "failed": 0,
+        "unknown_checks": 0,
+        "check_ids": []
+       },
+       {
+        "location": "server-vlan",
+        "state": "observed",
+        "status": "pass",
+        "passed": 1,
+        "failed": 0,
+        "unknown_checks": 0,
+        "check_ids": [
+         "check-tcp-server-vlan-443"
+        ]
+       },
+       {
+        "location": "branch",
+        "state": "not-connected",
+        "status": null,
+        "passed": 0,
+        "failed": 0,
+        "unknown_checks": 0,
+        "check_ids": []
+       },
+       {
+        "location": "wifi",
+        "state": "not-connected",
+        "status": null,
+        "passed": 0,
+        "failed": 0,
+        "unknown_checks": 0,
+        "check_ids": []
+       },
+       {
+        "location": "remote-site",
+        "state": "not-connected",
+        "status": null,
+        "passed": 0,
+        "failed": 0,
+        "unknown_checks": 0,
+        "check_ids": []
+       }
+      ],
+      "probable_cause": {
+       "domain": "firewall",
+       "confidence": "medium",
+       "basis": "inferred",
+       "pattern": "external-only-failure",
+       "summary": "The service answers from the server VLAN but not from the external location, which narrows the fault to the path between them without proving a firewall fault.",
+       "evidence": [
+        {
+         "basis": "observed",
+         "statement": "TCP 443 from the external location failed",
+         "check_ids": [
+          "check-tcp-internet-443"
+         ]
+        },
+        {
+         "basis": "observed",
+         "statement": "TCP 443 from the server VLAN passed",
+         "check_ids": [
+          "check-tcp-server-vlan-443"
+         ]
+        },
+        {
+         "basis": "inferred",
+         "statement": "Internal success with external failure narrows the fault to the path between them; it does not prove which device is at fault",
+         "check_ids": [
+          "check-tcp-internet-443",
+          "check-tcp-server-vlan-443"
+         ]
+        },
+        {
+         "basis": "unknown",
+         "statement": "No probe source is connected for the user LAN, branch, Wi-Fi and remote site; they are not assumed healthy",
+         "check_ids": []
+        }
+       ]
+      },
+      "recent_changes": {
+       "state": "ok",
+       "window_start": "2026-10-09T08:00:00Z",
+       "window_end": "2026-10-10T08:00:05Z",
+       "sources": [
+        {
+         "source": "incidents",
+         "state": "ok"
+        },
+        {
+         "source": "alerts",
+         "state": "ok"
+        },
+        {
+         "source": "configuration-changes",
+         "state": "not-connected"
+        }
+       ],
+       "items": [
+        {
+         "kind": "incident",
+         "ref_id": "incident-1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d",
+         "severity": "high",
+         "title": "Incident title withheld",
+         "title_redacted": true,
+         "occurred_at": "2026-10-10T07:40:00Z",
+         "scope": "time-window",
+         "relation": "may-correlate"
+        }
+       ]
+      },
+      "path": {
+       "state": "ok",
+       "observed_at": "2026-10-10T08:00:04Z",
+       "hops": [
+        {
+         "tier": "user",
+         "state": "unknown",
+         "device_id": null,
+         "name": null,
+         "highlight": null
+        },
+        {
+         "tier": "access-point",
+         "state": "unknown",
+         "device_id": null,
+         "name": null,
+         "highlight": null
+        },
+        {
+         "tier": "access-switch",
+         "state": "known",
+         "device_id": "device-0f8a1b2c-3d4e-5f60-7a8b-9c0d1e2f3a4b",
+         "name": "sw-access-01",
+         "highlight": null
+        },
+        {
+         "tier": "core",
+         "state": "known",
+         "device_id": "device-1f8a1b2c-3d4e-5f60-7a8b-9c0d1e2f3a4b",
+         "name": "core-01",
+         "highlight": null
+        },
+        {
+         "tier": "firewall",
+         "state": "known",
+         "device_id": "device-2f8a1b2c-3d4e-5f60-7a8b-9c0d1e2f3a4b",
+         "name": "fw-01",
+         "highlight": "suspected"
+        },
+        {
+         "tier": "server",
+         "state": "known",
+         "device_id": "device-3f8a1b2c-3d4e-5f60-7a8b-9c0d1e2f3a4b",
+         "name": "SERVER01",
+         "highlight": null
+        }
+       ],
+       "links": [
+        {
+         "from_tier": "user",
+         "to_tier": "access-point",
+         "state": "unknown"
+        },
+        {
+         "from_tier": "access-point",
+         "to_tier": "access-switch",
+         "state": "unknown"
+        },
+        {
+         "from_tier": "access-switch",
+         "to_tier": "core",
+         "state": "known"
+        },
+        {
+         "from_tier": "core",
+         "to_tier": "firewall",
+         "state": "known"
+        },
+        {
+         "from_tier": "firewall",
+         "to_tier": "server",
+         "state": "known"
+        }
+       ]
+      }
+     }
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "state outside the enum",
+    "valid": false,
+    "set": {
+     "state": "degraded"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "missing session",
+    "valid": false,
+    "delete": [
+     "session"
+    ],
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "extra field",
+    "valid": false,
+    "set": {
+     "correlation_id": "x"
+    },
+    "jsonschema_rejects": true
+   }
+  ]
+ },
+ "diagnostic_session_list_response": {
+  "base": {
+   "state": "ok",
+   "sessions": [
+    {
+     "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d",
+     "target": "SERVER01",
+     "started_at": "2026-10-10T08:00:00Z",
+     "completed_at": "2026-10-10T08:00:05Z",
+     "probable_fault_domain": "firewall",
+     "confidence": "medium"
+    }
+   ],
+   "limit": 50,
+   "offset": 0,
+   "next_offset": null
+  },
+  "cases": [
+   {
+    "name": "one session",
+    "valid": true
+   },
+   {
+    "name": "empty page",
+    "valid": true,
+    "set": {
+     "sessions": []
+    }
+   },
+   {
+    "name": "a following page",
+    "valid": true,
+    "set": {
+     "next_offset": 50
+    }
+   },
+   {
+    "name": "session with nothing narrowed",
+    "valid": true,
+    "set": {
+     "sessions.0.probable_fault_domain": null,
+     "sessions.0.confidence": "unknown"
+    }
+   },
+   {
+    "name": "not-connected",
+    "valid": true,
+    "set": {
+     "state": "not-connected",
+     "sessions": []
+    }
+   },
+   {
+    "name": "unknown",
+    "valid": true,
+    "set": {
+     "state": "unknown",
+     "sessions": []
+    }
+   },
+   {
+    "name": "rows while not-connected",
+    "valid": false,
+    "set": {
+     "state": "not-connected"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "a following page while unknown",
+    "valid": false,
+    "set": {
+     "state": "unknown",
+     "sessions": [],
+     "next_offset": 50
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "limit zero",
+    "valid": false,
+    "set": {
+     "limit": 0
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "limit above the cap",
+    "valid": false,
+    "set": {
+     "limit": 101
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "offset above the cap",
+    "valid": false,
+    "set": {
+     "offset": 10001
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "101 sessions",
+    "valid": false,
+    "set": {
+     "sessions": [
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000000",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000001",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000002",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000003",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000004",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000005",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000006",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000007",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000008",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000009",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-00000000000a",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-00000000000b",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-00000000000c",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-00000000000d",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-00000000000e",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-00000000000f",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000010",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000011",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000012",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000013",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000014",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000015",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000016",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000017",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000018",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000019",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-00000000001a",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-00000000001b",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-00000000001c",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-00000000001d",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-00000000001e",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-00000000001f",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000020",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000021",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000022",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000023",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000024",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000025",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000026",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000027",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000028",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000029",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-00000000002a",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-00000000002b",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-00000000002c",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-00000000002d",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-00000000002e",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-00000000002f",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000030",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000031",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000032",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000033",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000034",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000035",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000036",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000037",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000038",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000039",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-00000000003a",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-00000000003b",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-00000000003c",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-00000000003d",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-00000000003e",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-00000000003f",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000040",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000041",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000042",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000043",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000044",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000045",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000046",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000047",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000048",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000049",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-00000000004a",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-00000000004b",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-00000000004c",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-00000000004d",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-00000000004e",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-00000000004f",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000050",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000051",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000052",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000053",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000054",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000055",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000056",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000057",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000058",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000059",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-00000000005a",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-00000000005b",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-00000000005c",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-00000000005d",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-00000000005e",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-00000000005f",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000060",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000061",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000062",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000063",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      },
+      {
+       "id": "diagnostic-1a2b3c4d-5e6f-4a7b-8c9d-000000000064",
+       "target": "SERVER01",
+       "started_at": "2026-10-10T08:00:00Z",
+       "completed_at": "2026-10-10T08:00:05Z",
+       "probable_fault_domain": "firewall",
+       "confidence": "medium"
+      }
+     ]
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "malformed session id",
+    "valid": false,
+    "set": {
+     "sessions.0.id": "diagnostic-1"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "missing target",
+    "valid": false,
+    "delete": [
+     "sessions.0.target"
+    ],
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "domain outside the enum",
+    "valid": false,
+    "set": {
+     "sessions.0.probable_fault_domain": "dns"
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "no domain with a real confidence (cross-field)",
+    "valid": false,
+    "set": {
+     "sessions.0.probable_fault_domain": null
+    },
+    "jsonschema_rejects": false
+   },
+   {
+    "name": "domain with unknown confidence (cross-field)",
+    "valid": false,
+    "set": {
+     "sessions.0.confidence": "unknown"
+    },
+    "jsonschema_rejects": false
+   },
+   {
+    "name": "summary with an extra field",
+    "valid": false,
+    "set": {
+     "sessions.0.checks": []
+    },
+    "jsonschema_rejects": true
+   },
+   {
+    "name": "missing next_offset",
+    "valid": false,
+    "delete": [
+     "next_offset"
+    ],
+    "jsonschema_rejects": true
+   }
+  ]
+ }
+}
