@@ -26,6 +26,12 @@ Active alerts, rule builder, notification routing, maintenance windows, escalati
 
 ## Diagnostics
 Guided "Why?" workflows. Device/service selector, internal/external probes, path, dependency status, findings.
+Implemented in S7-3: `/diagnostics` runs a bounded, read-only check set against an operator
+allow-list from the deployment's single vantage, with an honest state matrix and a conservative
+probable-cause narrative (no vantage selector is offered because a single prober serves one vantage;
+the run reports where checks actually ran). Deferred: internal/external vantage selection
+(multi-prober), the path view, and dependency/recent-change evidence sources — see
+`docs/04-integrations/BLACKBOX.md`.
 
 ## Configuration
 Device config versions, diffs, change timeline, drift, correlation to incidents.

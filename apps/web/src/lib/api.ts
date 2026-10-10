@@ -2,33 +2,15 @@ import 'server-only';
 
 import { cookies } from 'next/headers';
 
-import { parseApiError } from '@/lib/api-contracts';
+import { stateFromResponse } from '@/lib/api-response';
+import type { FetchState, ResponseParser } from '@/lib/api-response';
+
+export type { FetchFailureKind, FetchState, ResponseParser } from '@/lib/api-response';
 
 const DEFAULT_API_URL = 'http://127.0.0.1:8000';
 const API_TIMEOUT_MS = 10_000;
 const SESSION_COOKIE = 'netsight_session';
-
-export type FetchFailureKind =
-  | 'unauthenticated'
-  | 'forbidden'
-  | 'not_found'
-  | 'invalid_source_data'
-  | 'source_unavailable'
-  | 'maintenance'
-  | 'invalid_response'
-  | 'error';
-
-export type FetchState<T> =
-  | { kind: 'ok'; data: T; correlationId: string }
-  | {
-      kind: FetchFailureKind;
-      code: string;
-      message: string;
-      correlationId: string;
-      status: number | null;
-    };
-
-export type ResponseParser<T> = (value: unknown) => T | null;
+const CSRF_HEADER = 'X-CSRF-Token';
 
 function apiUrl(path: string): URL {
   if (!path.startsWith('/api/v1/') || path.startsWith('//')) {
@@ -50,18 +32,6 @@ function apiUrl(path: string): URL {
   return resolved;
 }
 
-function failureKind(status: number, code: string): FetchFailureKind {
-  if (status === 401) return 'unauthenticated';
-  if (status === 403) return 'forbidden';
-  if (status === 404) return 'not_found';
-  if (code === 'SOURCE_INVALID_DATA') return 'invalid_source_data';
-  if (code === 'SOURCE_MAINTENANCE') return 'maintenance';
-  if (code.startsWith('SOURCE_') || status === 502 || status === 503 || status === 504) {
-    return 'source_unavailable';
-  }
-  return 'error';
-}
-
 export async function apiGet<T>(path: string, parse: ResponseParser<T>): Promise<FetchState<T>> {
   const requestCorrelationId = crypto.randomUUID();
 
@@ -77,53 +47,115 @@ export async function apiGet<T>(path: string, parse: ResponseParser<T>): Promise
       redirect: 'error',
       signal: AbortSignal.timeout(API_TIMEOUT_MS),
     });
-    const correlationId = response.headers.get('x-correlation-id') ?? requestCorrelationId;
-    let payload: unknown;
+    return await stateFromResponse(response, requestCorrelationId, parse);
+  } catch (error) {
+    return {
+      kind: 'error',
+      code: error instanceof Error && error.name === 'TimeoutError' ? 'API_TIMEOUT' : 'API_UNAVAILABLE',
+      message:
+        error instanceof Error && error.name === 'TimeoutError'
+          ? 'The Netsight API did not respond in time.'
+          : 'The Netsight API is unavailable.',
+      correlationId: requestCorrelationId,
+      status: null,
+    };
+  }
+}
 
-    try {
-      payload = await response.json();
-    } catch {
+export interface ApiPostOptions {
+  /** Overall budget for the CSRF token fetch and the write itself, in milliseconds. */
+  timeoutMs?: number;
+}
+
+/**
+ * Server-side state-changing call. The API is loopback-only and its write guard
+ * needs the session CSRF token, so the token is fetched with the same session
+ * cookie immediately before the call (a browser-driven client could never be
+ * forced to do this — it would need CORS, which the API never grants).
+ */
+export async function apiPost<T, B>(
+  path: string,
+  body: B,
+  parse: ResponseParser<T>,
+  options: ApiPostOptions = {},
+): Promise<FetchState<T>> {
+  const requestCorrelationId = crypto.randomUUID();
+  const timeoutMs = options.timeoutMs ?? API_TIMEOUT_MS;
+  // One deadline for the whole operation: the token fetch and the write share the budget, so a slow
+  // API cannot hold a server-action worker for twice the documented timeout.
+  const deadline = Date.now() + timeoutMs;
+  const remainingMs = (): number => Math.max(1, deadline - Date.now());
+
+  try {
+    const session = (await cookies()).get(SESSION_COOKIE)?.value;
+    if (session === undefined) {
       return {
-        kind: 'invalid_response',
-        code: 'INVALID_API_RESPONSE',
-        message: 'The Netsight API returned an unreadable response.',
-        correlationId,
-        status: response.status,
+        kind: 'unauthenticated',
+        code: 'AUTHENTICATION_REQUIRED',
+        message: 'A Netsight session is required.',
+        correlationId: requestCorrelationId,
+        status: 401,
       };
     }
+    const cookieHeader = `${SESSION_COOKIE}=${encodeURIComponent(session)}`;
 
-    if (!response.ok) {
-      const error = parseApiError(payload);
-      if (error === null) {
+    const csrfResponse = await fetch(apiUrl('/api/v1/auth/csrf'), {
+      cache: 'no-store',
+      headers: { Accept: 'application/json', Cookie: cookieHeader },
+      redirect: 'error',
+      signal: AbortSignal.timeout(remainingMs()),
+    });
+    if (!csrfResponse.ok) {
+      // Only a rejected session means "sign in again"; a server-side fault is not the user's to fix.
+      if (csrfResponse.status === 401 || csrfResponse.status === 403) {
         return {
-          kind: 'invalid_response',
-          code: 'INVALID_API_RESPONSE',
-          message: 'The Netsight API returned an invalid error response.',
-          correlationId,
-          status: response.status,
+          kind: 'unauthenticated',
+          code: 'AUTHENTICATION_REQUIRED',
+          message: 'A Netsight session is required.',
+          correlationId: requestCorrelationId,
+          status: csrfResponse.status,
         };
       }
       return {
-        kind: failureKind(response.status, error.code),
-        code: error.code,
-        message: error.message,
-        correlationId: error.correlationId,
-        status: response.status,
+        kind: 'source_unavailable',
+        code: 'TOKEN_UNAVAILABLE',
+        message: 'The Netsight API could not issue a session token for this request.',
+        correlationId: requestCorrelationId,
+        status: csrfResponse.status,
       };
     }
-
-    const data = parse(payload);
-    if (data === null) {
+    let payload: unknown;
+    try {
+      payload = await csrfResponse.json();
+    } catch {
+      payload = null;
+    }
+    const token = (payload as { csrf_token?: unknown } | null)?.csrf_token;
+    if (typeof token !== 'string' || token.length === 0) {
       return {
         kind: 'invalid_response',
         code: 'INVALID_API_RESPONSE',
-        message: 'The Netsight API response did not match the canonical contract.',
-        correlationId,
-        status: response.status,
+        message: 'The Netsight API returned an unusable session token.',
+        correlationId: requestCorrelationId,
+        status: csrfResponse.status,
       };
     }
 
-    return { kind: 'ok', data, correlationId };
+    const response = await fetch(apiUrl(path), {
+      method: 'POST',
+      cache: 'no-store',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        'X-Correlation-ID': requestCorrelationId,
+        [CSRF_HEADER]: token,
+        Cookie: cookieHeader,
+      },
+      body: JSON.stringify(body),
+      redirect: 'error',
+      signal: AbortSignal.timeout(remainingMs()),
+    });
+    return await stateFromResponse(response, requestCorrelationId, parse);
   } catch (error) {
     return {
       kind: 'error',

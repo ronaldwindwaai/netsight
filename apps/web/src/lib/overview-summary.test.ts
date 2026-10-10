@@ -166,6 +166,7 @@ test('does not infer a LibreNMS outage from auth or API failures', () => {
     'unauthenticated',
     'forbidden',
     'not_found',
+    'rate_limited',
     'invalid_response',
     'error',
   ];

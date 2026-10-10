@@ -595,6 +595,36 @@ body {
   text-align: center;
 }
 
+/* ------------------------------------------------------------------
+   Read-only diagnostics (per design 09_04_06 AM-9)
+   ------------------------------------------------------------------ */
+
+.diagnostic-checks {
+  list-style: none;
+}
+
+.diagnostic-check-index {
+  flex: 0 0 1.5rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.diagnostic-check-meta dt {
+  color: var(--bs-secondary-color);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.diagnostic-check-meta dd {
+  margin-bottom: 0;
+  font-size: 0.82rem;
+}
+
+.diagnostic-checks details > summary {
+  cursor: pointer;
+}
+
 @media (max-width: 767.98px) {
   .login-page {
     grid-template-columns: 1fr;

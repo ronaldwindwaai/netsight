@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import Annotated, Any
 
@@ -31,7 +32,7 @@ from netsight_api.audit import record_audit
 from netsight_api.auth.csrf import write_refusal
 from netsight_api.auth.deps import get_current_identity
 from netsight_api.auth.rate_limit import RateLimiter
-from netsight_api.diagnostics import build_run
+from netsight_api.diagnostics import Observation, build_run
 from netsight_api.errors import ApiError
 from netsight_api.rbac import Identity, Permission, is_allowed
 from netsight_api.schemas import ErrorEnvelope
@@ -63,6 +64,17 @@ def get_now() -> datetime:
 
 
 Now = Annotated[datetime, Depends(get_now)]
+
+
+def _observed_vantage(observations: Sequence[Observation]) -> str | None:
+    """The vantage a run reports is where its checks actually ran, never the requested one.
+
+    All checks in a run come from the same prober, so the distinct set is either empty (no vantage
+    configured) or a single value. A mixed set can only mean observations from different probers,
+    which this endpoint cannot produce; report ``None`` rather than pick one.
+    """
+    distinct = {observation.vantage for observation in observations}
+    return distinct.pop() if len(distinct) == 1 else None
 
 
 def require_run_permission(request: Request, identity: CurrentIdentity) -> Identity:
@@ -128,7 +140,7 @@ async def create_diagnostic_run(
         target=body.target,
         target_id=None,
         symptom=body.symptom,
-        vantage=body.vantage,
+        vantage=_observed_vantage(observations),
         observations=observations,
         started_at=started_at,
         completed_at=completed_at,

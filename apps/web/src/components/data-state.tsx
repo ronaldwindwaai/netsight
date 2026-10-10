@@ -54,6 +54,19 @@ export function DataFailure<T>({ state }: { state: Exclude<FetchState<T>, { kind
     );
   }
 
+  if (state.kind === 'rate_limited') {
+    return (
+      <Alert theme="warning" title="Too many requests" icon="bi bi-hourglass-split">
+        {' '}
+        <span>
+          {state.message ||
+            'This action was rate limited. Wait a moment and try again.'}
+        </span>
+        <Reference correlationId={state.correlationId} />
+      </Alert>
+    );
+  }
+
   if (state.kind === 'maintenance') {
     return (
       <Alert theme="info" title="Source under maintenance" icon="bi bi-tools">

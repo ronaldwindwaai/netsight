@@ -32,7 +32,7 @@ def test_factory_builds_a_client_from_a_blank_ridden_allowlist(monkeypatch) -> N
 
 
 def test_a_non_allowlisted_target_is_unknown_without_connecting() -> None:
-    client = AllowlistedBlackboxClient(allowed=["srv-db-01"])
+    client = AllowlistedBlackboxClient(allowed=["srv-db-01"], vantage="internal")
     observation = asyncio.run(
         client.probe(kind="tcp", target="evil.example.com", vantage="internal")
     )
@@ -42,7 +42,7 @@ def test_a_non_allowlisted_target_is_unknown_without_connecting() -> None:
 
 
 def test_the_allowlist_match_is_case_and_whitespace_insensitive() -> None:
-    client = AllowlistedBlackboxClient(allowed=[" SRV-DB-01 "])
+    client = AllowlistedBlackboxClient(allowed=[" SRV-DB-01 "], vantage="internal")
     observation = asyncio.run(client.probe(kind="icmp", target="srv-db-01", vantage="internal"))
     # Matched the allow-list, then honestly reported ICMP as unavailable (not refused).
     assert observation.status == "unknown"
@@ -50,14 +50,14 @@ def test_the_allowlist_match_is_case_and_whitespace_insensitive() -> None:
 
 
 def test_icmp_is_reported_unknown() -> None:
-    client = AllowlistedBlackboxClient(allowed=["srv-db-01"])
+    client = AllowlistedBlackboxClient(allowed=["srv-db-01"], vantage="internal")
     observation = asyncio.run(client.probe(kind="icmp", target="srv-db-01", vantage="internal"))
     assert observation.status == "unknown"
     assert "ICMP" in (observation.detail or "")
 
 
 def test_a_source_dependent_check_is_unknown() -> None:
-    client = AllowlistedBlackboxClient(allowed=["srv-db-01"])
+    client = AllowlistedBlackboxClient(allowed=["srv-db-01"], vantage="internal")
     observation = asyncio.run(
         client.probe(kind="dependencies", target="srv-db-01", vantage="internal")
     )
@@ -100,10 +100,28 @@ def test_tcp_connect_fails_against_a_closed_port() -> None:
 
 
 def test_dns_resolves_localhost_without_leaving_the_machine() -> None:
-    client = AllowlistedBlackboxClient(allowed=["localhost"])
+    client = AllowlistedBlackboxClient(allowed=["localhost"], vantage="internal")
     observation = asyncio.run(client.probe(kind="dns", target="localhost", vantage="internal"))
     assert observation.status == "pass"
     assert "resolved to" in (observation.detail or "")
+
+
+def test_a_requested_vantage_the_prober_does_not_serve_is_unknown() -> None:
+    """Provenance is not the caller's to choose: an unserved vantage is unknown, not a relabel."""
+
+    client = AllowlistedBlackboxClient(allowed=["localhost"], vantage="internal")
+    observation = asyncio.run(client.probe(kind="dns", target="localhost", vantage="internet"))
+    assert observation.status == "unknown"
+    assert observation.vantage == "internal"
+    assert "vantage" in (observation.detail or "")
+
+
+def test_a_requested_vantage_is_unknown_when_the_prober_has_none_configured() -> None:
+    client = AllowlistedBlackboxClient(allowed=["localhost"])
+    observation = asyncio.run(client.probe(kind="dns", target="localhost", vantage="internal"))
+    assert observation.status == "unknown"
+    assert observation.vantage is None
+    assert "vantage" in (observation.detail or "")
 
 
 def test_dns_failure_is_reported(monkeypatch) -> None:

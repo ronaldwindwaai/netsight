@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { Tabs } from '@adminlte/react';
 
 import { DataFailure } from '@/components/data-state';
@@ -17,6 +18,39 @@ function Pending({ label }: { label: string }) {
     <div className="py-4 text-body-secondary">
       <i className="bi bi-plug me-2" aria-hidden="true" />
       {label} is not yet connected for this device.
+    </div>
+  );
+}
+
+/**
+ * Diagnostics tab: read-only blackbox runs open on the diagnostics page with
+ * this device's hostname pre-selected. No run is ever started from the device
+ * page itself.
+ */
+function DiagnosticsTab({ device }: { device: Device }) {
+  const hostname = device.hostname;
+  if (hostname === null) {
+    return (
+      <div className="py-4 text-body-secondary">
+        <i className="bi bi-slash-circle me-2" aria-hidden="true" />
+        This device has no hostname or address recorded, so there is nothing to diagnose. The
+        monitoring source did not report one.
+      </div>
+    );
+  }
+  return (
+    <div className="py-3">
+      <p className="text-body-secondary">
+        Run a read-only blackbox diagnostic for {hostname}. Checks are bounded and only probe the
+        configured allow-list.
+      </p>
+      <Link
+        className="btn btn-sm btn-outline-primary"
+        href={`/diagnostics?target=${encodeURIComponent(hostname)}`}
+      >
+        <i className="bi bi-clipboard2-pulse me-1" aria-hidden="true" />
+        Run diagnostics
+      </Link>
     </div>
   );
 }
@@ -102,7 +136,7 @@ export function DeviceDetailTabs({
         { label: 'Security', children: <Pending label="Security evidence" /> },
         { label: 'Config', children: <Pending label="Configuration history" /> },
         { label: 'Incidents', children: <Pending label="Incident linkage" /> },
-        { label: 'Diagnostics', children: <Pending label="Read-only diagnostics" /> },
+        { label: 'Diagnostics', children: <DiagnosticsTab device={device} /> },
       ]}
     />
   );

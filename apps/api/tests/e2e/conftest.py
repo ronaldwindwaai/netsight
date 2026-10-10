@@ -19,7 +19,9 @@ import time
 import urllib.error
 import urllib.request
 from collections.abc import Iterator
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -31,7 +33,8 @@ E2E_DIR = Path(__file__).resolve().parent
 # Both live under the system temp directory; neither is a credential.
 E2E_WORK_DIR = Path(tempfile.gettempdir()) / "netsight-e2e"
 E2E_ACCOUNT_FILE = E2E_WORK_DIR / "local-accounts.json"
-E2E_SESSION_SECRET = "e2e-session-secret-not-used-anywhere-else-8833"
+# Generated per run: never a literal secret in the tree, and never reused across runs.
+E2E_SESSION_SECRET = secrets.token_urlsafe(48)
 
 
 def _free_port() -> int:
@@ -142,6 +145,11 @@ def e2e_api(e2e_account: E2EAccount, tmp_path_factory: pytest.TempPathFactory) -
         # literal credential sits in the source tree, which
         # scripts/security-verify.sh would fail on.
         "LIBRENMS_TOKEN": secrets.token_urlsafe(24),
+        # Enable the read-only probe capability so the diagnostics scenario exercises the real
+        # allowlisted adapter end to end. `localhost` resolves from the hosts file, so the `dns`
+        # check passes without a privileged port and without traffic leaving the machine.
+        "BLACKBOX_ALLOWED_TARGETS": "localhost",
+        "BLACKBOX_VANTAGE": "internal",
     }
 
     stub = subprocess.Popen(
@@ -181,3 +189,111 @@ def e2e_api(e2e_account: E2EAccount, tmp_path_factory: pytest.TempPathFactory) -
                 process.wait(timeout=10)
             except subprocess.TimeoutExpired:  # pragma: no cover
                 process.kill()
+
+
+# --- shared HTTP sign-in harness ---------------------------------------------------------------
+#
+# Lives here (not in a single test module) so every E2E scenario reuses one real sign-in: a TOTP
+# code is single-use within its 30-second window and local sign-in is rate-limited, so a second
+# sign-in inside the same window is rejected as a replay.
+
+
+def http_request(
+    url: str,
+    *,
+    method: str = "GET",
+    body: Any = None,
+    cookie: str | None = None,
+    headers: dict[str, str] | None = None,
+) -> tuple[int, Any, str]:
+    """Perform one request; return (status, parsed body, raw set-cookie)."""
+
+    data = None
+    request_headers = dict(headers or {})
+    if body is not None:
+        data = json.dumps(body).encode()
+        request_headers["Content-Type"] = "application/json"
+    if cookie:
+        request_headers["Cookie"] = cookie
+
+    message = urllib.request.Request(url, data=data, method=method, headers=request_headers)
+    try:
+        with urllib.request.urlopen(message, timeout=15) as response:
+            raw = response.read().decode()
+            parsed = json.loads(raw) if raw else None
+            return response.status, parsed, response.headers.get("set-cookie", "")
+    except urllib.error.HTTPError as error:
+        raw = error.read().decode()
+        parsed = json.loads(raw) if raw else None
+        return error.code, parsed, error.headers.get("set-cookie", "")
+
+
+def _session_cookie(set_cookie: str) -> str | None:
+    for part in set_cookie.split(";"):
+        if part.strip().startswith("netsight_session="):
+            return part.strip()
+    return None
+
+
+# A TOTP code is single-use per 30-second step (localauth/totp.py); the suite signs in once per
+# session, so this hands out the current step at most once and fails loudly on a second attempt.
+_CONSUMED_STEPS: set[int] = set()
+
+
+def _totp_code(secret: str) -> str:
+    from netsight_api.localauth.totp import PERIOD_SECONDS, generate_code
+
+    step = int(time.time() // PERIOD_SECONDS)
+    if step in _CONSUMED_STEPS:
+        pytest.fail(
+            "the TOTP step for this window was already consumed; "
+            "reuse the session-scoped `signed_in` fixture instead of signing in twice"
+        )
+    _CONSUMED_STEPS.add(step)
+    return generate_code(secret, for_time=step * PERIOD_SECONDS)
+
+
+@dataclass(frozen=True)
+class SignIn:
+    """The observable result of one real two-step sign-in."""
+
+    cookie: str
+    challenge_status: int
+    challenge: dict[str, Any]
+    verify_status: int
+    verified: dict[str, Any]
+
+
+@pytest.fixture(scope="session")
+def signed_in(e2e_api: dict[str, str], e2e_account: E2EAccount) -> Iterator[SignIn]:
+    """One real sign-in for the whole session; every test reuses this cookie."""
+
+    challenge_status, challenge, _ = http_request(
+        f"{e2e_api['apiUrl']}/api/v1/auth/local/login",
+        method="POST",
+        body={"username": e2e_account.username, "password": e2e_account.password},
+    )
+    verify_status: int
+    verified: dict[str, Any]
+    set_cookie: str
+    if challenge_status == 202:
+        verify_status, verified, set_cookie = http_request(
+            f"{e2e_api['apiUrl']}/api/v1/auth/local/mfa/verify",
+            method="POST",
+            body={
+                "challenge_id": challenge["challenge_id"],
+                "code": _totp_code(e2e_account.totp_secret),
+            },
+        )
+    else:
+        # Surface the failure through the assertions below, not here, so the report names the
+        # actual status and body.
+        verify_status, verified, set_cookie = challenge_status, challenge, ""
+
+    yield SignIn(
+        cookie=_session_cookie(set_cookie) or "",
+        challenge_status=challenge_status,
+        challenge=challenge,
+        verify_status=verify_status,
+        verified=verified,
+    )

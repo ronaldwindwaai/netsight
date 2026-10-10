@@ -75,12 +75,21 @@ class AllowlistedBlackboxClient:
     async def probe(
         self, *, kind: DiagnosticCheckKind, target: str, vantage: str | None
     ) -> Observation:
-        resolved_vantage = vantage if vantage is not None else self._vantage
+        # The vantage is provenance, not a label the caller may choose: a probe only ever ran at the
+        # point this prober is deployed. A request for a vantage this prober does not serve is an
+        # explicit unknown; the check is never relabelled as if it ran somewhere else.
+        if vantage is not None and vantage != self._vantage:
+            return self._observation(
+                kind,
+                target,
+                self._vantage,
+                _Outcome("unknown", None, "no prober is connected for the requested vantage"),
+            )
         if target.strip().lower() not in self._allowed:
             return self._observation(
                 kind,
                 target,
-                resolved_vantage,
+                self._vantage,
                 _Outcome("unknown", None, "the target is not in the configured probe allow-list"),
             )
         if kind == "dns":
@@ -95,7 +104,7 @@ class AllowlistedBlackboxClient:
             outcome = _Outcome(
                 "unknown", None, "the check needs a source that is not connected"
             )
-        return self._observation(kind, target, resolved_vantage, outcome)
+        return self._observation(kind, target, self._vantage, outcome)
 
     def _observation(
         self,

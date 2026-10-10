@@ -5,6 +5,7 @@ export type OverviewFetchKind =
   | 'unauthenticated'
   | 'forbidden'
   | 'not_found'
+  | 'rate_limited'
   | 'invalid_source_data'
   | 'source_unavailable'
   | 'maintenance'
@@ -72,6 +73,7 @@ export function sourceProvenance(
     unauthenticated: 'Source status unknown · sign-in required',
     forbidden: 'Source status unknown · access restricted',
     not_found: 'Source status unknown · inventory endpoint missing',
+    rate_limited: 'Source status unknown · request was rate limited',
     invalid_source_data: 'LibreNMS data rejected',
     source_unavailable: 'LibreNMS unavailable',
     maintenance: 'LibreNMS maintenance',

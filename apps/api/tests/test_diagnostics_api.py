@@ -162,6 +162,20 @@ def test_a_failing_external_check_with_internal_success_narrows_the_domain() -> 
     assert body["run"]["confidence"] == "low"
 
 
+def test_the_run_reports_where_the_checks_ran_not_the_requested_vantage() -> None:
+    # The client reports a single vantage ("internet") that differs from the requested one
+    # ("internal"): provenance must come from the observations, never the request text.
+    client = FakeProbeClient(
+        {"icmp": ("pass", None), "tcp": ("pass", 443)},
+        vantages={"icmp": "internet", "tcp": "internet"},
+    )
+    app.dependency_overrides[get_optional_blackbox_client] = lambda: client
+    body = Caller("administrator").post(DIAGNOSTICS, _body(vantage="internal")).json()
+    validate("diagnostic_run_response", body)
+    assert body["run"]["vantage"] == "internet"
+    assert {check["vantage"] for check in body["run"]["checks"]} == {"internet"}
+
+
 def test_probe_failure_degrades_to_an_explicit_unknown(caplog: pytest.LogCaptureFixture) -> None:
     caplog.set_level(logging.INFO)
     app.dependency_overrides[get_optional_blackbox_client] = lambda: FakeProbeClient({}, raises=True)
