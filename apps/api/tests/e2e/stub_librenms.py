@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import time
 from collections.abc import Iterator
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
@@ -58,6 +59,9 @@ _PORTS: list[dict[str, Any]] = [
         "ifOperStatus": "up",
         "ifType": "ethernetCsmacd",
         "ifHighSpeed": 1000,
+        # Counters the WAN reading uses: octets per second (the adapter converts to bits).
+        "ifInOctets_rate": 12_500_000,
+        "ifOutOctets_rate": 2_500_000,
     },
     {
         "port_id": 2,
@@ -132,9 +136,7 @@ class _Handler(BaseHTTPRequestHandler):
         # /api/v0/devices/{id}[/ports]
         if len(parts) >= 4 and parts[:3] == ["api", "v0", "devices"]:
             native_id = parts[3]
-            match = next(
-                (d for d in _DEVICES if str(d["device_id"]) == native_id), None
-            )
+            match = next((d for d in _DEVICES if str(d["device_id"]) == native_id), None)
             if match is None:
                 self._send(404, _envelope(status="error"))
                 return
@@ -142,8 +144,17 @@ class _Handler(BaseHTTPRequestHandler):
                 self._send(200, _envelope(count=1, devices=[match]))
                 return
             if len(parts) == 5 and parts[4] == "ports":
-                self._send(200, _envelope(count=len(_PORTS), ports=_PORTS))
+                # poll_time is the source's own poll instant: fresh on every request.
+                now = int(time.time())
+                ports = [{**port, "poll_time": now} for port in _PORTS]
+                self._send(200, _envelope(count=len(ports), ports=ports))
                 return
+
+        # /api/v0/ports/{port_id}/ip: one global IPv4 address on the WAN port.
+        if parts == ["api", "v0", "ports", "1", "ip"]:
+            address = {"ipv4_address": "8.8.4.4", "ipv4_prefixlen": 30, "port_id": 1}
+            self._send(200, _envelope(addresses=[address]))
+            return
 
         self._send(404, _envelope(status="error"))
 

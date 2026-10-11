@@ -28,6 +28,7 @@ UP_FILES = {
     "0002_harden_privileges.up.sql",
     "0003_evaluation_links_and_delivery.up.sql",
     "0004_diagnostic_sessions.up.sql",
+    "0005_wan_probe_samples.up.sql",
 }
 
 
@@ -79,14 +80,20 @@ def test_apply_down_refuses_to_drop_populated_tables_without_the_environment_ove
 ) -> None:
     new_incident(PostgresIncidentRepository(migrated_pg, clock=FakeClock()))
     with migrated_pg.connect() as conn, pytest.raises(migrate.DestructiveMigrationError) as raised:
-        migrate.apply_down(conn, steps=4, allow_destructive=True, env={})
+        migrate.apply_down(conn, steps=5, allow_destructive=True, env={})
     assert "incidents" in str(raised.value)
     for wrong in ("0", "true", "yes", ""):
         with migrated_pg.connect() as conn, pytest.raises(migrate.DestructiveMigrationError):
             migrate.apply_down(
-                conn, steps=4, allow_destructive=True, env={migrate.DESTRUCTIVE_ENV: wrong}
+                conn, steps=5, allow_destructive=True, env={migrate.DESTRUCTIVE_ENV: wrong}
             )
-    assert _version_rows(migrated_pg) == ["0001", "0002", "0003", "0004"]  # nothing was reversed
+    assert _version_rows(migrated_pg) == [
+        "0001",
+        "0002",
+        "0003",
+        "0004",
+        "0005",
+    ]  # nothing was reversed
 
 
 @requires_pg
@@ -96,9 +103,9 @@ def test_apply_down_on_populated_tables_needs_both_flag_and_environment(
     new_incident(PostgresIncidentRepository(migrated_pg, clock=FakeClock()))
     with migrated_pg.connect() as conn:
         reversed_versions = migrate.apply_down(
-            conn, steps=4, allow_destructive=True, env={migrate.DESTRUCTIVE_ENV: "1"}
+            conn, steps=5, allow_destructive=True, env={migrate.DESTRUCTIVE_ENV: "1"}
         )
-    assert reversed_versions == ["0004", "0003", "0002", "0001"]
+    assert reversed_versions == ["0005", "0004", "0003", "0002", "0001"]
 
 
 @requires_pg
@@ -107,7 +114,8 @@ def test_apply_down_of_the_privilege_migration_never_touches_data(
 ) -> None:
     new_incident(PostgresIncidentRepository(migrated_pg, clock=FakeClock()))
     with migrated_pg.connect() as conn:
-        assert migrate.apply_down(conn, steps=3, allow_destructive=True, env={}) == [
+        assert migrate.apply_down(conn, steps=4, allow_destructive=True, env={}) == [
+            "0005",
             "0004",
             "0003",
             "0002",
@@ -146,6 +154,48 @@ def test_grants_refuse_a_role_that_owns_the_tables(migrated_pg: PostgresSettings
             migrate.apply_grants(conn, role)
         assert "owns" in str(raised.value)
         conn.rollback()
+
+
+# --- WAN collector role and month partitions (Step 5 database/security reviews) -------------------
+
+
+@pytest.mark.parametrize("role", ["", "Role", "x;drop", "a b", "1abc", 'q"uote'])
+def test_invalid_collector_role_names_are_rejected_before_any_sql(role: str) -> None:
+    with pytest.raises(ValueError, match="collector"):
+        migrate.apply_grants(_ExplodingConnection(), "nsapp", role)  # type: ignore[arg-type]
+
+
+def test_the_collector_role_must_differ_from_the_application_role() -> None:
+    with pytest.raises(ValueError, match="differ"):
+        migrate.apply_grants(_ExplodingConnection(), "nsapp", "nsapp")  # type: ignore[arg-type]
+
+
+def test_partition_months_are_the_current_utc_month_and_the_ones_after_it() -> None:
+    from datetime import UTC, date, datetime, timedelta, timezone
+
+    assert migrate.wan_partition_months(datetime(2026, 10, 11, 12, tzinfo=UTC)) == [
+        date(2026, 10, 1),
+        date(2026, 11, 1),
+    ]
+    assert migrate.wan_partition_months(datetime(2026, 12, 31, 23, 59, tzinfo=UTC), 2) == [
+        date(2026, 12, 1),
+        date(2027, 1, 1),
+        date(2027, 2, 1),
+    ]
+    assert migrate.wan_partition_months(datetime(2026, 10, 11, tzinfo=UTC), 0) == [
+        date(2026, 10, 1)
+    ]
+    # the month is the UTC month, whatever zone the clock is in
+    late_in_utc_plus_2 = datetime(2026, 11, 1, 1, 0, tzinfo=timezone(timedelta(hours=2)))
+    assert migrate.wan_partition_months(late_in_utc_plus_2)[0] == date(2026, 10, 1)
+
+
+@pytest.mark.parametrize("ahead", [-1, migrate.MAX_PARTITION_MONTHS_AHEAD + 1])
+def test_partition_months_ahead_is_bounded(ahead: int) -> None:
+    from datetime import UTC, datetime
+
+    with pytest.raises(ValueError, match="ahead"):
+        migrate.wan_partition_months(datetime(2026, 10, 11, tzinfo=UTC), ahead)
 
 
 # --- CLI (H3) --------------------------------------------------------------------------
@@ -207,11 +257,15 @@ def test_cli_up_and_status_round_trip_with_grants() -> None:
 
         before = run_cli("status", *schema_args, env=base)
         assert before.returncode == 0, before.stderr
-        assert all(f"pending: {v}" in before.stdout for v in ("0001", "0002", "0003", "0004"))
+        assert all(
+            f"pending: {v}" in before.stdout for v in ("0001", "0002", "0003", "0004", "0005")
+        )
 
         first = run_cli("up", "--app-role", role, *schema_args, env=base)
         assert first.returncode == 0, first.stderr
-        assert all(f"applied: {v}" in first.stdout for v in ("0001", "0002", "0003", "0004"))
+        assert all(
+            f"applied: {v}" in first.stdout for v in ("0001", "0002", "0003", "0004", "0005")
+        )
         assert "grants applied" in first.stdout
 
         again = run_cli("up", *schema_args, env={**base, "DATABASE_APP_ROLE": role})
@@ -226,6 +280,108 @@ def test_cli_up_and_status_round_trip_with_grants() -> None:
         assert incident.state == "open"
         for output in (first.stdout, first.stderr, again.stdout, after.stdout):
             assert role_dsn not in output
+
+
+def test_cli_partitions_needs_a_migration_dsn_and_a_sane_range() -> None:
+    assert run_cli("partitions", env={}).returncode == 2
+    result = run_cli(
+        "partitions",
+        "--months-ahead",
+        "99",
+        env={"DATABASE_MIGRATION_URL": "postgresql://m@127.0.0.1:1/db"},
+    )
+    assert result.returncode == 2 and "months-ahead" in result.stderr
+
+
+def test_cli_rejects_a_collector_role_equal_to_the_application_role() -> None:
+    result = run_cli(
+        "up",
+        "--app-role",
+        "nsapp",
+        "--wan-collector-role",
+        "nsapp",
+        env={"DATABASE_MIGRATION_URL": "postgresql://m@127.0.0.1:1/db"},
+    )
+    assert result.returncode == 2 and "differ" in result.stderr
+
+
+@requires_pg
+def test_cli_up_creates_the_partitions_and_both_runtime_grants() -> None:
+    from datetime import UTC, datetime
+
+    with (
+        isolated_schema() as schema,
+        app_role() as (api_role, api_dsn),
+        app_role() as (writer_role, writer_dsn),
+    ):
+        base = _schema_dsn(schema)
+        schema_args = ["--schema", schema]
+        first = run_cli(
+            "up",
+            "--app-role",
+            api_role,
+            "--wan-collector-role",
+            writer_role,
+            *schema_args,
+            env=base,
+        )
+        assert first.returncode == 0, first.stderr
+        now = datetime.now(UTC)
+        assert f"WAN partitions ready: {now:%Y-%m}" in first.stdout
+        assert f"WAN collector grants applied for role {writer_role}" in first.stdout
+        for secret in (api_dsn, writer_dsn):
+            assert secret not in first.stdout + first.stderr
+
+        # idempotent, and the role may also come from the environment
+        again = run_cli(
+            "up",
+            "--app-role",
+            api_role,
+            *schema_args,
+            env={**base, "DATABASE_WAN_COLLECTOR_ROLE": writer_role},
+        )
+        assert again.returncode == 0, again.stderr
+
+        writer = PostgresSettings(dsn=writer_dsn, schema=schema)
+        with writer.connect() as conn:
+            conn.execute(
+                "INSERT INTO wan_link_cycles VALUES ('wan-a', %s, 60, 0, 0, 0, 'unknown')",
+                (now.replace(microsecond=0),),
+            )
+        with (
+            PostgresSettings(dsn=api_dsn, schema=schema).connect() as conn,
+            pytest.raises(psycopg.errors.InsufficientPrivilege),
+        ):
+            conn.execute(
+                "INSERT INTO wan_link_cycles VALUES ('wan-a', now(), 60, 0, 0, 0, 'unknown')"
+            )
+
+
+@requires_pg
+def test_cli_partitions_is_idempotent_and_reports_the_months() -> None:
+    from datetime import UTC, datetime
+
+    with isolated_schema() as schema:
+        base = _schema_dsn(schema)
+        up = run_cli("up", "--no-grants", "--schema", schema, env=base)
+        assert up.returncode == 0, up.stderr
+        for _ in range(2):
+            result = run_cli("partitions", "--months-ahead", "2", "--schema", schema, env=base)
+            assert result.returncode == 0, result.stderr
+            assert f"{datetime.now(UTC):%Y-%m}" in result.stdout
+        assert result.stdout.count("-") >= 3  # three months listed
+
+
+@requires_pg
+def test_grants_refuse_unsafe_collector_roles(migrated_pg: PostgresSettings) -> None:
+    with app_role() as (api_role, _dsn):
+        with migrated_pg.connect() as conn, pytest.raises(migrate.MigrationError):
+            migrate.apply_grants(conn, api_role, "nsapp_does_not_exist")
+        with migrated_pg.connect() as conn:
+            row = conn.execute("SELECT current_user AS name").fetchone()
+        assert row is not None
+        with migrated_pg.connect() as conn, pytest.raises(migrate.MigrationError):
+            migrate.apply_grants(conn, api_role, row["name"])  # the owner / a superuser
 
 
 @requires_pg
@@ -327,8 +483,8 @@ def test_installed_wheel_finds_its_up_migrations_and_cannot_roll_back(
     )
     assert result.returncode == 0, result.stderr
     report = json.loads(result.stdout)
-    assert report["versions"] == ["0001", "0002", "0003", "0004"]
-    assert report["applied"] == ["0001", "0002", "0003", "0004"]
+    assert report["versions"] == ["0001", "0002", "0003", "0004", "0005"]
+    assert report["applied"] == ["0001", "0002", "0003", "0004", "0005"]
     assert report["ran_ddl"] is True
     assert report["down_error"] == "MigrationError"
 

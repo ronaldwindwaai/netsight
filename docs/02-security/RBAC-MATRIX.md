@@ -9,6 +9,8 @@
 | Incidents | Full | Full | Full | Assigned | Summary | Read |
 | Alert rules | Full | Scoped | Scoped | No | No | Read |
 | Diagnostics | Full | Full | Security scope | Basic | No | No |
+| Internet / WAN | Full | Full | Read | Read | Summary | Read |
+| WAN evidence export | Yes | Yes | No | No | No | Yes |
 | Config history | Full | Full | Read | Read | No | Read |
 | Propose action | Yes | Scoped | Scoped | Limited | No | No |
 | Approve high risk | Policy | Policy | Policy | No | No | No |
@@ -121,3 +123,39 @@ One permission, `diagnostics:read`, governs starting a read-only run (`POST /dia
 "Security scope" (Security Analyst) and "Basic" (Technician) are not yet distinct: no site or security scoping exists and there is no reduced run surface, so those roles hold the same read-only diagnostics permission as Full roles. This is recorded as an open decision (what "Basic" removes: free-text symptom, stored-session history of others, a reduced check set), not as an implemented restriction. Sessions are still not scoped per owner or per site: any holder can read any session.
 
 **Incident titles (second control, independent of the role table).** A stored session keeps an incident change only as a reference (`id`, `kind`, `severity`, `time`) and never its title; the database refuses a document that carries one. `GET /diagnostics/{id}` joins the current title at read time **only for a caller who holds `incidents:read` at that moment**; any other caller, an unreadable incident store and a missing incident all get the fixed placeholder (`title_redacted: true`). The `POST /diagnostics` response carries the run only (no change items), so it never carries an incident title. Alert titles are stored (every diagnostics role holds `alerts:read`).
+
+## Internet / WAN permissions (Step 5)
+
+Three permissions; no role can change anything (there is no write route). Fail closed: unknown roles, no identity and unknown
+permission names are denied (`rbac.py`, `test_rbac_internet.py`).
+
+| Permission | Admin | Network Engineer | Security Analyst | Technician | Management | Auditor |
+|---|---|---|---|---|---|---|
+| `internet:read` (`GET /internet`, `GET /internet/sla`, the `/internet` page, the overview Internet card) | Yes | Yes | Yes | Yes | Yes | Yes |
+| `internet:read_detail` (the ISP name, gateway, public IP and per-link throughput; without it they are `null` with `detail_redacted`) | Yes | Yes | Yes | **No** | **No** | **No** |
+| `internet:export` (`GET /internet/sla/export`: outage-window evidence for ISP disputes, CSV/JSON) | Yes | Yes | **No** | **No** | **No** | Yes |
+
+**Decision record (2026-10-11; interpretation, to be confirmed by the human owner).** The matrix has no "Internet" row. The WAN card is an
+Overview widget (PRD 6) and the matrix grants Overview to every role (Full, Summary or Read), so every role holds `internet:read`
+(Technician included: it is not "Limited" like Traffic, which Technician cannot read). The evidence export is narrower on purpose: it is
+a dispute artefact naming links, ISP, probe targets and outage windows, so it is held by Admin, Network Engineer and Auditor (read-only
+evidence), not by Security Analyst, Technician or Management. Every route needs the permission first, then a per-identity rate limit (status 300/min, SLA 30/min, export 10/min;
+authorisation first so a denied caller never learns limiter state). A denied export attempt is audited (`internet.export`, `denied`).
+The session lists the names in `permissions` for the UI (advisory; the API enforces them). Not human-only: reads may be performed by
+service principals.
+
+**Decision record - `internet:read_detail` (2026-10-11, security review M2; interpretation, to be confirmed by the human owner).** The matrix row
+"Internet / WAN" reads Full / Full / Read / Read / Summary / Read and cannot tell a role that sees the public IP, the gateway, the ISP and live
+throughput from one that sees status and the SLA. The public IP and gateway are reconnaissance material (they name the organisation's Internet
+edge) and the ISP and throughput describe its commercial relationships and usage, so they are split into their own permission, granted to the roles
+that operate or defend the network: **Administrator ("Full"), Network Engineer ("Full") and Security Analyst ("Read": a Security Analyst correlates
+external addresses with events)**. **Technician ("Read"), Management ("Summary") and Auditor ("Read")** keep `internet:read` and so see link
+status, quality, availability and the SLA summary, and are told the rest is restricted. The withholding is done by the API (the fields are `null`
+and `detail_redacted` is `true`), never only by the browser, and the export withholds the ISP name the same way (an Auditor can still export the
+evidence). This resolves the earlier open question about a reduced Management view. Capacity is kept (it is the link's rating, not usage). Open for
+the owner: whether Technician and Auditor should also hold the detail, whether Management should hold the export, and whether probe targets in the
+export should be withheld too (they are operator-declared host names, kept today).
+
+| Capability (RBAC-MATRIX table above) | Admin | Network Engineer | Security Analyst | Technician | Management | Auditor |
+|---|---|---|---|---|---|---|
+| Internet / WAN detail (public IP, gateway, ISP, throughput) | Full | Full | Read | **No** | **No** | **No** |

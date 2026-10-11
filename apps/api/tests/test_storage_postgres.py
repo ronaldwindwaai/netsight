@@ -168,12 +168,13 @@ def functions_in_schema(settings: PostgresSettings) -> set[str]:
 def test_migrations_apply_idempotently_and_reverse_cleanly(pg: PostgresSettings) -> None:
     with pg.connect() as conn:
         applied = migrate.apply_up(conn)
-        assert applied == ["0001", "0002", "0003", "0004"]
+        assert applied == ["0001", "0002", "0003", "0004", "0005"]
         assert migrate.apply_up(conn) == []
     assert (APP_TABLES | EVALUATION_TABLES) <= tables_in_schema(pg)
 
     with pg.connect() as conn:
-        assert migrate.apply_down(conn, steps=4, allow_destructive=True) == [
+        assert migrate.apply_down(conn, steps=5, allow_destructive=True) == [
+            "0005",
             "0004",
             "0003",
             "0002",
@@ -184,7 +185,7 @@ def test_migrations_apply_idempotently_and_reverse_cleanly(pg: PostgresSettings)
     assert not any(name.startswith("netsight_") for name in functions_in_schema(pg))
 
     with pg.connect() as conn:
-        assert migrate.apply_up(conn) == ["0001", "0002", "0003", "0004"]
+        assert migrate.apply_up(conn) == ["0001", "0002", "0003", "0004", "0005"]
     assert APP_TABLES <= tables_in_schema(pg)
 
 

@@ -25,3 +25,18 @@ test('every other entry is unaffected by the diagnostics permission', () => {
   assert.deepEqual(without, withIt);
   assert.ok(without.includes('Incidents') && without.includes('Overview'));
 });
+
+test('the menu offers Internet only to a session holding internet:read, and fails closed without one', () => {
+  assert.ok(labels(menuItemsFor(['internet:read'])).includes('Internet'));
+  assert.ok(!labels(menuItemsFor(['incidents:read', 'diagnostics:read'])).includes('Internet'));
+  assert.ok(!labels(menuItemsFor([])).includes('Internet'));
+  assert.ok(!labels(menuItemsFor(null)).includes('Internet'));
+});
+
+test('the Internet entry points at /internet, next to Traffic', () => {
+  const items = menuItemsFor(['internet:read']);
+  const entry = items.find((item) => item.type === 'item' && item.text === 'Internet');
+  assert.ok(entry && entry.type === 'item' && entry.href === '/internet');
+  const order = labels(items);
+  assert.equal(order.indexOf('Internet'), order.indexOf('Traffic') + 1);
+});

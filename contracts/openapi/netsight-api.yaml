@@ -1485,6 +1485,88 @@ paths:
           $ref: '#/components/responses/RateLimited'
         '503':
           $ref: '#/components/responses/AlertingStoreUnavailable'
+  /internet:
+    get:
+      summary: Internet/WAN status from LibreNMS interface metrics and stored probe samples (explicit source state)
+      operationId: getInternet
+      responses:
+        '200':
+          description: Per-link status, throughput, quality and availability, or an explicit not-connected/unknown state without links
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InternetResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+  /internet/sla:
+    get:
+      summary: Monthly uptime, downtime, degraded periods and violations computed from stored probe samples
+      operationId: getInternetSla
+      parameters:
+        - in: query
+          name: month
+          description: UTC calendar month; the current month back to 24 months ago (default the current month)
+          schema:
+            type: string
+            pattern: '^[0-9]{4}-(0[1-9]|1[0-2])$'
+      responses:
+        '200':
+          description: The month's figures per link, or an explicit not-connected/unknown state without links
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InternetSlaResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /internet/sla/export:
+    get:
+      summary: Bounded read-only evidence export of outage, degraded and unknown windows for an ISP dispute
+      operationId: exportInternetSla
+      parameters:
+        - in: query
+          name: month
+          schema:
+            type: string
+            pattern: '^[0-9]{4}-(0[1-9]|1[0-2])$'
+        - in: query
+          name: format
+          schema:
+            enum: [json, csv]
+            default: json
+      responses:
+        '200':
+          description: The evidence as JSON or CSV (one row per window); gaps in sampling are unknown windows
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            Content-Disposition:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InternetSlaExport'
+            text/csv:
+              schema:
+                type: string
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '422':
+          $ref: '#/components/responses/ValidationError'
   /diagnostics:
     post:
       summary: Start a bounded read-only diagnostic run and return its result
@@ -4139,6 +4221,811 @@ components:
           properties:
             sessions: {maxItems: 0}
             next_offset: {type: 'null'}
+    InternetResponse:
+      description: GET /api/v1/internet. A non-ok state carries no links; per-link blocks carry their own state so a missing source never reads as a healthy link.
+      type: object
+      additionalProperties: false
+      required:
+      - state
+      - generated_at
+      - links
+      - failover
+      - detail_redacted
+      properties:
+        state:
+          enum:
+          - not-connected
+          - unknown
+          - ok
+        generated_at:
+          type: string
+          format: date-time
+        links:
+          type: array
+          maxItems: 8
+          items:
+            $ref: '#/components/schemas/WanLink'
+        failover:
+          $ref: '#/components/schemas/WanFailover'
+        detail_redacted:
+          type: boolean
+          description: "True when the caller lacks internet:read_detail: the ISP name, gateway, public IP and per-link throughput are withheld (null). A null there then means restricted, not 'not reported' (cross-field: a redacted response carries none of them)."
+      allOf:
+      - if:
+          properties:
+            state:
+              enum:
+              - not-connected
+              - unknown
+        then:
+          properties:
+            links:
+              maxItems: 0
+            failover:
+              properties:
+                state:
+                  const: unknown
+    WanConfigured:
+      type: object
+      additionalProperties: false
+      required:
+      - isp
+      - gateway
+      - probe_location
+      properties:
+        isp:
+          minLength: 1
+          maxLength: 128
+          type:
+          - string
+          - 'null'
+        gateway:
+          minLength: 1
+          maxLength: 45
+          type:
+          - string
+          - 'null'
+        probe_location:
+          oneOf:
+          - type: 'null'
+          - enum:
+            - cloud-external
+            - user-lan
+            - server-vlan
+            - branch
+            - wifi
+            - remote-site
+      description: Operator declarations (not telemetry); the UI labels them as configured.
+    WanInterfaceReading:
+      type: object
+      additionalProperties: false
+      required:
+      - state
+      - oper_status
+      - capacity_bps
+      - rx_bps
+      - tx_bps
+      - utilisation_pct
+      - public_ip
+      - freshness
+      properties:
+        state:
+          enum:
+          - not-connected
+          - unknown
+          - ok
+        oper_status:
+          oneOf:
+          - type: 'null'
+          - enum:
+            - up
+            - down
+            - testing
+            - dormant
+            - notPresent
+            - lowerLayerDown
+            - unknown
+        capacity_bps:
+          minimum: 0
+          type:
+          - integer
+          - 'null'
+        rx_bps:
+          minimum: 0
+          type:
+          - integer
+          - 'null'
+        tx_bps:
+          minimum: 0
+          type:
+          - integer
+          - 'null'
+        utilisation_pct:
+          minimum: 0
+          maximum: 1000
+          type:
+          - number
+          - 'null'
+        public_ip:
+          minLength: 1
+          maxLength: 45
+          type:
+          - string
+          - 'null'
+        freshness:
+          $ref: '#/components/schemas/Freshness'
+      description: LibreNMS interface metrics for the declared WAN port. Every value is reported or null; utilisation_pct is derived (larger of rx/tx over capacity) and only when all are known.
+      allOf:
+      - if:
+          properties:
+            state:
+              enum:
+              - not-connected
+              - unknown
+        then:
+          properties:
+            oper_status:
+              type: 'null'
+            capacity_bps:
+              type: 'null'
+            rx_bps:
+              type: 'null'
+            tx_bps:
+              type: 'null'
+            utilisation_pct:
+              type: 'null'
+            public_ip:
+              type: 'null'
+    WanQuality:
+      type: object
+      additionalProperties: false
+      required:
+      - state
+      - latency_ms
+      - jitter_ms
+      - loss_pct
+      - dns_status
+      - dns_latency_ms
+      - sample_count
+      - window_seconds
+      - freshness
+      properties:
+        state:
+          enum:
+          - not-connected
+          - unknown
+          - ok
+        latency_ms:
+          minimum: 0
+          maximum: 3600000
+          type:
+          - number
+          - 'null'
+        jitter_ms:
+          minimum: 0
+          maximum: 3600000
+          type:
+          - number
+          - 'null'
+        loss_pct:
+          minimum: 0
+          maximum: 100
+          type:
+          - number
+          - 'null'
+        dns_status:
+          oneOf:
+          - type: 'null'
+          - enum:
+            - pass
+            - fail
+            - unknown
+        dns_latency_ms:
+          minimum: 0
+          maximum: 3600000
+          type:
+          - number
+          - 'null'
+        sample_count:
+          type: integer
+          minimum: 0
+          maximum: 100000
+        window_seconds:
+          type: integer
+          minimum: 0
+          maximum: 10000000
+        freshness:
+          $ref: '#/components/schemas/Freshness'
+      description: Latency, jitter, loss and DNS computed from the stored probe samples of the window.
+      allOf:
+      - if:
+          properties:
+            state:
+              enum:
+              - not-connected
+              - unknown
+        then:
+          properties:
+            latency_ms:
+              type: 'null'
+            jitter_ms:
+              type: 'null'
+            loss_pct:
+              type: 'null'
+            dns_status:
+              type: 'null'
+            dns_latency_ms:
+              type: 'null'
+            sample_count:
+              const: 0
+    WanAvailability:
+      type: object
+      additionalProperties: false
+      required:
+      - state
+      - period_start
+      - period_end
+      - uptime_pct
+      - coverage_pct
+      - current_outage_started_at
+      - current_outage_seconds
+      - freshness
+      properties:
+        state:
+          enum:
+          - not-connected
+          - unknown
+          - ok
+        period_start:
+          format: date-time
+          type:
+          - string
+          - 'null'
+        period_end:
+          format: date-time
+          type:
+          - string
+          - 'null'
+        uptime_pct:
+          minimum: 0
+          maximum: 100
+          type:
+          - number
+          - 'null'
+        coverage_pct:
+          minimum: 0
+          maximum: 100
+          type:
+          - number
+          - 'null'
+        current_outage_started_at:
+          format: date-time
+          type:
+          - string
+          - 'null'
+        current_outage_seconds:
+          minimum: 0
+          maximum: 10000000
+          type:
+          - integer
+          - 'null'
+        freshness:
+          $ref: '#/components/schemas/Freshness'
+      description: Month-to-date availability and the outage in progress, from stored probe cycles. current_outage_started_at and current_outage_seconds are both set or both null (cross-field, not expressible here).
+      allOf:
+      - if:
+          properties:
+            state:
+              enum:
+              - not-connected
+              - unknown
+        then:
+          properties:
+            period_start:
+              type: 'null'
+            period_end:
+              type: 'null'
+            uptime_pct:
+              type: 'null'
+            coverage_pct:
+              type: 'null'
+            current_outage_started_at:
+              type: 'null'
+            current_outage_seconds:
+              type: 'null'
+    WanLink:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - name
+      - role
+      - configured
+      - status
+      - interface
+      - quality
+      - availability
+      properties:
+        id:
+          type: string
+          pattern: ^[a-z0-9][a-z0-9-]{0,47}$
+          minLength: 1
+          maxLength: 48
+        name:
+          type: string
+          minLength: 1
+          maxLength: 128
+        role:
+          enum:
+          - primary
+          - backup
+        configured:
+          $ref: '#/components/schemas/WanConfigured'
+        status:
+          enum:
+          - up
+          - degraded
+          - down
+          - unknown
+        interface:
+          $ref: '#/components/schemas/WanInterfaceReading'
+        quality:
+          $ref: '#/components/schemas/WanQuality'
+        availability:
+          $ref: '#/components/schemas/WanAvailability'
+      description: status is inferred from the interface state and the latest probe round; unknown when a source is silent.
+    WanFailover:
+      type: object
+      additionalProperties: false
+      required:
+      - state
+      - basis
+      properties:
+        state:
+          enum:
+          - single-link
+          - normal
+          - failed-over
+          - all-down
+          - unknown
+        basis:
+          enum:
+          - inferred
+          - unknown
+      description: Derived from link status only (routing is not read); basis says so.
+      allOf:
+      - if:
+          properties:
+            state:
+              const: unknown
+        then:
+          properties:
+            basis:
+              const: unknown
+        else:
+          properties:
+            basis:
+              const: inferred
+    InternetSlaResponse:
+      description: GET /api/v1/internet/sla?month=YYYY-MM. Server-bounded months; a non-ok state carries no links.
+      type: object
+      additionalProperties: false
+      required:
+      - state
+      - month
+      - period_start
+      - period_end
+      - generated_at
+      - links
+      properties:
+        state:
+          enum:
+          - not-connected
+          - unknown
+          - ok
+        month:
+          type: string
+          pattern: ^[0-9]{4}-(0[1-9]|1[0-2])$
+          minLength: 7
+          maxLength: 7
+        period_start:
+          format: date-time
+          type:
+          - string
+          - 'null'
+        period_end:
+          format: date-time
+          type:
+          - string
+          - 'null'
+        generated_at:
+          type: string
+          format: date-time
+        links:
+          type: array
+          maxItems: 8
+          items:
+            $ref: '#/components/schemas/InternetSlaLink'
+      allOf:
+      - if:
+          properties:
+            state:
+              enum:
+              - not-connected
+              - unknown
+        then:
+          properties:
+            links:
+              maxItems: 0
+            period_start:
+              type: 'null'
+            period_end:
+              type: 'null'
+        else:
+          properties:
+            period_start:
+              type: string
+            period_end:
+              type: string
+    InternetSlaViolation:
+      type: object
+      additionalProperties: false
+      required:
+      - kind
+      - target_pct
+      - actual_pct
+      properties:
+        kind:
+          const: uptime-below-target
+        target_pct:
+          type: number
+          minimum: 0
+          maximum: 100
+        actual_pct:
+          type: number
+          minimum: 0
+          maximum: 100
+    InternetSlaLink:
+      type: object
+      additionalProperties: false
+      required:
+      - link_id
+      - name
+      - state
+      - uptime_target_pct
+      - total_seconds
+      - up_seconds
+      - degraded_seconds
+      - down_seconds
+      - unknown_seconds
+      - uptime_pct
+      - coverage_pct
+      - outage_count
+      - longest_outage_seconds
+      - cycle_count
+      - windows_truncated
+      - violations
+      properties:
+        link_id:
+          type: string
+          pattern: ^[a-z0-9][a-z0-9-]{0,47}$
+          minLength: 1
+          maxLength: 48
+        name:
+          type: string
+          minLength: 1
+          maxLength: 128
+        state:
+          enum:
+          - not-connected
+          - unknown
+          - ok
+        uptime_target_pct:
+          exclusiveMinimum: 0
+          maximum: 100
+          type:
+          - number
+          - 'null'
+        total_seconds:
+          minimum: 0
+          maximum: 10000000
+          type:
+          - integer
+          - 'null'
+        up_seconds:
+          minimum: 0
+          maximum: 10000000
+          type:
+          - integer
+          - 'null'
+        degraded_seconds:
+          minimum: 0
+          maximum: 10000000
+          type:
+          - integer
+          - 'null'
+        down_seconds:
+          minimum: 0
+          maximum: 10000000
+          type:
+          - integer
+          - 'null'
+        unknown_seconds:
+          minimum: 0
+          maximum: 10000000
+          type:
+          - integer
+          - 'null'
+        uptime_pct:
+          minimum: 0
+          maximum: 100
+          type:
+          - number
+          - 'null'
+        coverage_pct:
+          minimum: 0
+          maximum: 100
+          type:
+          - number
+          - 'null'
+        outage_count:
+          minimum: 0
+          maximum: 1000000
+          type:
+          - integer
+          - 'null'
+        longest_outage_seconds:
+          minimum: 0
+          maximum: 10000000
+          type:
+          - integer
+          - 'null'
+        cycle_count:
+          minimum: 0
+          maximum: 1000000
+          type:
+          - integer
+          - 'null'
+        windows_truncated:
+          type:
+          - boolean
+          - 'null'
+          description: "True when the evidence export lists fewer windows than the month holds; the figures are never truncated. Null when the link is not ok."
+        violations:
+          type: array
+          maxItems: 8
+          items:
+            $ref: '#/components/schemas/InternetSlaViolation'
+      description: Deterministic month figures from stored probe cycles. up + degraded + down + unknown seconds equal total_seconds (cross-field). uptime_pct is (up + degraded) over known time and null when nothing was known. Time with no probe round is unknown, never up or down.
+      allOf:
+      - if:
+          properties:
+            state:
+              enum:
+              - not-connected
+              - unknown
+        then:
+          properties:
+            total_seconds:
+              type: 'null'
+            up_seconds:
+              type: 'null'
+            degraded_seconds:
+              type: 'null'
+            down_seconds:
+              type: 'null'
+            unknown_seconds:
+              type: 'null'
+            uptime_pct:
+              type: 'null'
+            coverage_pct:
+              type: 'null'
+            outage_count:
+              type: 'null'
+            longest_outage_seconds:
+              type: 'null'
+            cycle_count:
+              type: 'null'
+            windows_truncated:
+              type: 'null'
+            violations:
+              maxItems: 0
+        else:
+          properties:
+            total_seconds:
+              type: integer
+            up_seconds:
+              type: integer
+            degraded_seconds:
+              type: integer
+            down_seconds:
+              type: integer
+            unknown_seconds:
+              type: integer
+            coverage_pct:
+              type: number
+            outage_count:
+              type: integer
+            longest_outage_seconds:
+              type: integer
+            cycle_count:
+              type: integer
+            windows_truncated:
+              type: boolean
+    InternetSlaExportWindow:
+      type: object
+      additionalProperties: false
+      required:
+      - kind
+      - started_at
+      - ended_at
+      - duration_seconds
+      - sample_count
+      properties:
+        kind:
+          enum:
+          - down
+          - degraded
+          - unknown
+        started_at:
+          type: string
+          format: date-time
+        ended_at:
+          type: string
+          format: date-time
+        duration_seconds:
+          type: integer
+          minimum: 0
+          maximum: 10000000
+        sample_count:
+          type: integer
+          minimum: 0
+          maximum: 1000000
+      description: ended_at is after started_at (cross-field). sample_count 0 is a gap in sampling.
+    InternetSlaExportSource:
+      type: object
+      additionalProperties: false
+      required:
+      - probe
+      - target
+      - location
+      properties:
+        probe:
+          enum:
+          - icmp
+          - tcp
+          - dns
+        target:
+          type: string
+          minLength: 1
+          maxLength: 253
+        location:
+          oneOf:
+          - type: 'null'
+          - enum:
+            - cloud-external
+            - user-lan
+            - server-vlan
+            - branch
+            - wifi
+            - remote-site
+    InternetSlaExportLink:
+      type: object
+      additionalProperties: false
+      required:
+      - link
+      - isp
+      - sources
+      - windows
+      - windows_truncated
+      properties:
+        link:
+          $ref: '#/components/schemas/InternetSlaLink'
+        isp:
+          minLength: 1
+          maxLength: 128
+          type:
+          - string
+          - 'null'
+        sources:
+          type: array
+          maxItems: 64
+          items:
+            $ref: '#/components/schemas/InternetSlaExportSource'
+        windows:
+          type: array
+          maxItems: 2000
+          items:
+            $ref: '#/components/schemas/InternetSlaExportWindow'
+        windows_truncated:
+          type: boolean
+      allOf:
+      - if:
+          properties:
+            link:
+              properties:
+                state:
+                  enum:
+                  - not-connected
+                  - unknown
+        then:
+          properties:
+            sources:
+              maxItems: 0
+            windows:
+              maxItems: 0
+            windows_truncated:
+              const: false
+    InternetSlaExport:
+      description: GET /api/v1/internet/sla/export?format=json. Outage, degraded and unknown windows with probe sources and round counts; nothing is inferred beyond the samples.
+      type: object
+      additionalProperties: false
+      required:
+      - state
+      - month
+      - period_start
+      - period_end
+      - generated_at
+      - basis
+      - detail_redacted
+      - links
+      properties:
+        state:
+          enum:
+          - not-connected
+          - unknown
+          - ok
+        month:
+          type: string
+          pattern: ^[0-9]{4}-(0[1-9]|1[0-2])$
+          minLength: 7
+          maxLength: 7
+        period_start:
+          format: date-time
+          type:
+          - string
+          - 'null'
+        period_end:
+          format: date-time
+          type:
+          - string
+          - 'null'
+        generated_at:
+          type: string
+          format: date-time
+        basis:
+          type: string
+          minLength: 1
+          maxLength: 1000
+        detail_redacted:
+          type: boolean
+          description: "True when the caller lacks internet:read_detail: the ISP name is withheld (null)."
+        links:
+          type: array
+          maxItems: 8
+          items:
+            $ref: '#/components/schemas/InternetSlaExportLink'
+      allOf:
+      - if:
+          properties:
+            state:
+              enum:
+              - not-connected
+              - unknown
+        then:
+          properties:
+            links:
+              maxItems: 0
+            period_start:
+              type: 'null'
+            period_end:
+              type: 'null'
+        else:
+          properties:
+            period_start:
+              type: string
+            period_end:
+              type: string
   responses:
     AuthenticationRequired:
       description: Authentication required

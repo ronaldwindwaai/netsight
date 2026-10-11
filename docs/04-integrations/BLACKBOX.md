@@ -80,6 +80,13 @@ Netsight cannot see or change how an exporter behaves, so these are requirements
 - **Transport.** Use `https` between Netsight and the exporter where the exporter or its proxy can terminate TLS.
 - **Timeouts.** Set the module `timeout` below `BLACKBOX_TIMEOUT_SECONDS` so a probe finishes before Netsight's deadline.
 
+### WAN sampling (Step 5)
+
+The Internet/WAN collector (`NETSIGHT_WAN_SAMPLING_ENABLED`, off by default) reuses these probe clients and adds no probe capability: a link's `probe_targets`
+must be in `BLACKBOX_ALLOWED_TARGETS` (an unlisted target answers `unknown`), the exporter at the link's `probe_location` runs `icmp`, or the local prober runs
+`tcp` (and `dns`) when the link names no location or the prober sits there. Results are stored as append-only samples (see
+`docs/12-implementation/INTERNET-WAN.md`); probe detail text is never stored. DNS is probed by the local prober only, so it reflects the API host's resolver.
+
 ### Free text and retention
 
 The target and the optional symptom are free text stored with the session. The `/diagnostics` form warns not to paste secrets or personal data; the text cannot be screened. The session **retention period is a pending human decision** (see `docs/06-data/DATA-RETENTION-MATRIX.md`): no period is set and no prune path is built.

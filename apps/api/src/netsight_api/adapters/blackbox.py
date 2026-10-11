@@ -98,6 +98,11 @@ class AllowlistedBlackboxClient:
         self._location = location
         self._timeout = min(max(timeout, _MIN_TIMEOUT_SECONDS), _MAX_TIMEOUT_SECONDS)
 
+    @property
+    def location(self) -> ProbeLocation | None:
+        """Where this prober is deployed (``BLACKBOX_LOCATION``), or ``None`` when unlocated."""
+        return self._location
+
     async def probe(
         self, *, kind: DiagnosticCheckKind, target: str, vantage: str | None
     ) -> Observation:

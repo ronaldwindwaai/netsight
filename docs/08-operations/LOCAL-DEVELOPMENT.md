@@ -19,22 +19,30 @@ Do not connect development directly to production monitoring systems.
 
 ## Database migrations and roles (API)
 
-Two database credentials, never the same one:
+Separate database credentials, never the same one:
 
 | Variable | Role | Used by |
 |---|---|---|
-| `DATABASE_MIGRATION_URL` | owner / migrator (DDL, grants) | `python -m netsight_api.storage.migrate` only |
-| `DATABASE_URL` | least-privilege application role | the running API |
+| `DATABASE_MIGRATION_URL` | owner / migrator (DDL, grants, WAN month partitions) | `python -m netsight_api.storage.migrate` only |
+| `DATABASE_URL` | least-privilege application role (SELECT only on the WAN evidence tables) | the running API |
 | `DATABASE_APP_ROLE` | name of that application role | the migrator, to apply its grants |
+| `NETSIGHT_WAN_COLLECTOR_DATABASE_URL` | WAN collector role (INSERT only on the WAN evidence tables, nothing else) | the sampling collector, only when `NETSIGHT_WAN_SAMPLING_ENABLED` is on |
+| `DATABASE_WAN_COLLECTOR_ROLE` | name of that collector role (must differ from the application role) | the migrator, to apply its grants |
 
 Create the application role out of band (login, no superuser/createdb/createrole, password from
 the secrets manager, not owner of anything), then from `apps/api`:
 
 ```
 python -m netsight_api.storage.migrate status
-python -m netsight_api.storage.migrate up          # migrations, then grants for $DATABASE_APP_ROLE
+python -m netsight_api.storage.migrate up          # migrations, WAN partitions (this and next month), then grants
+                                                   # for $DATABASE_APP_ROLE (and $DATABASE_WAN_COLLECTOR_ROLE if set)
 python -m netsight_api.storage.migrate up --no-grants
+python -m netsight_api.storage.migrate partitions  # WAN month partitions; schedule it monthly (idempotent)
 ```
+
+The WAN evidence tables are partitioned by month and the runtime roles cannot create partitions, so schedule
+`partitions` (cron, a systemd timer or Task Scheduler, as the migrator) at least monthly. If next month's
+partition is missing the collector logs an error and records nothing until it exists (a gap, shown as unknown).
 
 Exit codes: 0 ok, 1 migration/database failure, 2 usage or configuration error. The DSN and
 database error text are never printed. `up` is idempotent and re-applies the grants each run.

@@ -1,0 +1,2822 @@
+{
+  "internet_interface": {
+    "base": {
+      "state": "ok",
+      "oper_status": "up",
+      "capacity_bps": 1000000000,
+      "rx_bps": 100000000,
+      "tx_bps": 20000000,
+      "utilisation_pct": 10.0,
+      "public_ip": "8.8.8.8",
+      "freshness": {
+        "state": "fresh",
+        "observed_at": "2026-10-11T10:00:00Z",
+        "source": "librenms"
+      }
+    },
+    "cases": [
+      {
+        "name": "ok with every value reported",
+        "valid": true
+      },
+      {
+        "name": "ok with unreported values stays ok",
+        "valid": true,
+        "set": {
+          "oper_status": null,
+          "capacity_bps": null,
+          "rx_bps": null,
+          "tx_bps": null,
+          "utilisation_pct": null,
+          "public_ip": null,
+          "freshness": {
+            "state": "fresh",
+            "observed_at": "2026-10-11T10:00:00Z",
+            "source": "librenms"
+          }
+        }
+      },
+      {
+        "name": "ok with a zero rate (a measured zero)",
+        "valid": true,
+        "set": {
+          "rx_bps": 0,
+          "tx_bps": 0,
+          "utilisation_pct": 0.0
+        }
+      },
+      {
+        "name": "not-connected carries nothing",
+        "valid": true,
+        "set": {
+          "state": "not-connected",
+          "oper_status": null,
+          "capacity_bps": null,
+          "rx_bps": null,
+          "tx_bps": null,
+          "utilisation_pct": null,
+          "public_ip": null,
+          "freshness": {
+            "state": "unknown",
+            "observed_at": null,
+            "source": null
+          }
+        }
+      },
+      {
+        "name": "unknown carries nothing",
+        "valid": true,
+        "set": {
+          "state": "unknown",
+          "oper_status": null,
+          "capacity_bps": null,
+          "rx_bps": null,
+          "tx_bps": null,
+          "utilisation_pct": null,
+          "public_ip": null,
+          "freshness": {
+            "state": "unknown",
+            "observed_at": null,
+            "source": null
+          }
+        }
+      },
+      {
+        "name": "stale freshness is allowed with values",
+        "valid": true,
+        "set": {
+          "freshness": {
+            "state": "stale",
+            "observed_at": "2026-10-11T09:00:00Z",
+            "source": "librenms"
+          }
+        }
+      },
+      {
+        "name": "not-connected carrying a rate",
+        "valid": false,
+        "set": {
+          "state": "not-connected",
+          "oper_status": null,
+          "capacity_bps": null,
+          "utilisation_pct": null,
+          "public_ip": null,
+          "tx_bps": null
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "unknown carrying a status",
+        "valid": false,
+        "set": {
+          "state": "unknown",
+          "capacity_bps": null,
+          "rx_bps": null,
+          "tx_bps": null,
+          "utilisation_pct": null,
+          "public_ip": null
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "unknown carrying a public ip",
+        "valid": false,
+        "set": {
+          "state": "unknown",
+          "oper_status": null,
+          "capacity_bps": null,
+          "rx_bps": null,
+          "tx_bps": null,
+          "utilisation_pct": null
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "unrecognised oper status",
+        "valid": false,
+        "set": {
+          "oper_status": "sideways"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "negative rate",
+        "valid": false,
+        "set": {
+          "rx_bps": -1
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "fractional rate",
+        "valid": false,
+        "set": {
+          "tx_bps": 1.5
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "utilisation above the bound",
+        "valid": false,
+        "set": {
+          "utilisation_pct": 1000.5
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "empty public ip",
+        "valid": false,
+        "set": {
+          "public_ip": ""
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "missing field",
+        "valid": false,
+        "delete": [
+          "rx_bps"
+        ],
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "unexpected field",
+        "valid": false,
+        "set": {
+          "extra": 1
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "unknown state",
+        "valid": false,
+        "set": {
+          "state": "healthy"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "freshness with an unknown state value",
+        "valid": false,
+        "set": {
+          "freshness.state": "recent"
+        },
+        "jsonschema_rejects": true
+      }
+    ]
+  },
+  "internet_quality": {
+    "base": {
+      "state": "ok",
+      "latency_ms": 12.5,
+      "jitter_ms": 1.5,
+      "loss_pct": 0.0,
+      "dns_status": "pass",
+      "dns_latency_ms": 20.1,
+      "sample_count": 30,
+      "window_seconds": 900,
+      "freshness": {
+        "state": "fresh",
+        "observed_at": "2026-10-11T10:00:00Z",
+        "source": "blackbox-probes"
+      }
+    },
+    "cases": [
+      {
+        "name": "ok with every value",
+        "valid": true
+      },
+      {
+        "name": "ok with no samples is empty, not zero",
+        "valid": true,
+        "set": {
+          "latency_ms": null,
+          "jitter_ms": null,
+          "loss_pct": null,
+          "dns_status": null,
+          "dns_latency_ms": null,
+          "sample_count": 0,
+          "freshness": {
+            "state": "unknown",
+            "observed_at": null,
+            "source": null
+          }
+        }
+      },
+      {
+        "name": "ok with loss but no latency",
+        "valid": true,
+        "set": {
+          "latency_ms": null,
+          "jitter_ms": null,
+          "loss_pct": 100.0
+        }
+      },
+      {
+        "name": "not-connected carries nothing",
+        "valid": true,
+        "set": {
+          "state": "not-connected",
+          "latency_ms": null,
+          "jitter_ms": null,
+          "loss_pct": null,
+          "dns_status": null,
+          "dns_latency_ms": null,
+          "sample_count": 0,
+          "freshness": {
+            "state": "unknown",
+            "observed_at": null,
+            "source": null
+          },
+          "window_seconds": 900
+        }
+      },
+      {
+        "name": "unknown carries nothing",
+        "valid": true,
+        "set": {
+          "state": "unknown",
+          "latency_ms": null,
+          "jitter_ms": null,
+          "loss_pct": null,
+          "dns_status": null,
+          "dns_latency_ms": null,
+          "sample_count": 0,
+          "freshness": {
+            "state": "unknown",
+            "observed_at": null,
+            "source": null
+          },
+          "window_seconds": 900
+        }
+      },
+      {
+        "name": "unknown carrying a latency",
+        "valid": false,
+        "set": {
+          "state": "unknown",
+          "jitter_ms": null,
+          "loss_pct": null,
+          "dns_status": null,
+          "dns_latency_ms": null,
+          "sample_count": 0
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "not-connected with samples counted",
+        "valid": false,
+        "set": {
+          "state": "not-connected",
+          "latency_ms": null,
+          "jitter_ms": null,
+          "loss_pct": null,
+          "dns_status": null,
+          "dns_latency_ms": null
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "loss above 100",
+        "valid": false,
+        "set": {
+          "loss_pct": 100.1
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "negative latency",
+        "valid": false,
+        "set": {
+          "latency_ms": -0.1
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "unrecognised dns status",
+        "valid": false,
+        "set": {
+          "dns_status": "maybe"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "negative window",
+        "valid": false,
+        "set": {
+          "window_seconds": -1
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "negative sample count",
+        "valid": false,
+        "set": {
+          "sample_count": -1
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "missing field",
+        "valid": false,
+        "delete": [
+          "jitter_ms"
+        ],
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "unexpected field",
+        "valid": false,
+        "set": {
+          "extra": true
+        },
+        "jsonschema_rejects": true
+      }
+    ]
+  },
+  "internet_availability": {
+    "base": {
+      "state": "ok",
+      "period_start": "2026-10-01T00:00:00Z",
+      "period_end": "2026-10-11T10:00:00Z",
+      "uptime_pct": 99.95,
+      "coverage_pct": 98.0,
+      "current_outage_started_at": null,
+      "current_outage_seconds": null,
+      "freshness": {
+        "state": "fresh",
+        "observed_at": "2026-10-11T10:00:00Z",
+        "source": "blackbox-probes"
+      }
+    },
+    "cases": [
+      {
+        "name": "ok month to date",
+        "valid": true
+      },
+      {
+        "name": "ok with an outage in progress",
+        "valid": true,
+        "set": {
+          "current_outage_started_at": "2026-10-11T09:55:00Z",
+          "current_outage_seconds": 300
+        }
+      },
+      {
+        "name": "ok with no known time",
+        "valid": true,
+        "set": {
+          "uptime_pct": null,
+          "coverage_pct": 0.0
+        }
+      },
+      {
+        "name": "not-connected carries nothing",
+        "valid": true,
+        "set": {
+          "state": "not-connected",
+          "period_start": null,
+          "period_end": null,
+          "uptime_pct": null,
+          "coverage_pct": null,
+          "current_outage_started_at": null,
+          "current_outage_seconds": null,
+          "freshness": {
+            "state": "unknown",
+            "observed_at": null,
+            "source": null
+          }
+        }
+      },
+      {
+        "name": "unknown carries nothing",
+        "valid": true,
+        "set": {
+          "state": "unknown",
+          "period_start": null,
+          "period_end": null,
+          "uptime_pct": null,
+          "coverage_pct": null,
+          "current_outage_started_at": null,
+          "current_outage_seconds": null,
+          "freshness": {
+            "state": "unknown",
+            "observed_at": null,
+            "source": null
+          }
+        }
+      },
+      {
+        "name": "unknown carrying an uptime",
+        "valid": false,
+        "set": {
+          "state": "unknown",
+          "period_start": null,
+          "period_end": null,
+          "coverage_pct": null
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "not-connected carrying an outage",
+        "valid": false,
+        "set": {
+          "state": "not-connected",
+          "period_start": null,
+          "period_end": null,
+          "uptime_pct": null,
+          "coverage_pct": null,
+          "current_outage_started_at": "2026-10-11T09:55:00Z",
+          "current_outage_seconds": 300
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "outage start without a duration (cross-field)",
+        "valid": false,
+        "set": {
+          "current_outage_started_at": "2026-10-11T09:55:00Z"
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "outage duration without a start (cross-field)",
+        "valid": false,
+        "set": {
+          "current_outage_seconds": 30
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "uptime above 100",
+        "valid": false,
+        "set": {
+          "uptime_pct": 100.1
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "negative outage duration",
+        "valid": false,
+        "set": {
+          "current_outage_started_at": "2026-10-11T09:55:00Z",
+          "current_outage_seconds": -5
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "missing field",
+        "valid": false,
+        "delete": [
+          "coverage_pct"
+        ],
+        "jsonschema_rejects": true
+      }
+    ]
+  },
+  "internet_link": {
+    "base": {
+      "id": "fibre-1",
+      "name": "Primary fibre",
+      "role": "primary",
+      "configured": {
+        "isp": "Example ISP",
+        "gateway": "192.0.2.1",
+        "probe_location": "branch"
+      },
+      "status": "up",
+      "interface": {
+        "state": "ok",
+        "oper_status": "up",
+        "capacity_bps": 1000000000,
+        "rx_bps": 100000000,
+        "tx_bps": 20000000,
+        "utilisation_pct": 10.0,
+        "public_ip": "8.8.8.8",
+        "freshness": {
+          "state": "fresh",
+          "observed_at": "2026-10-11T10:00:00Z",
+          "source": "librenms"
+        }
+      },
+      "quality": {
+        "state": "ok",
+        "latency_ms": 12.5,
+        "jitter_ms": 1.5,
+        "loss_pct": 0.0,
+        "dns_status": "pass",
+        "dns_latency_ms": 20.1,
+        "sample_count": 30,
+        "window_seconds": 900,
+        "freshness": {
+          "state": "fresh",
+          "observed_at": "2026-10-11T10:00:00Z",
+          "source": "blackbox-probes"
+        }
+      },
+      "availability": {
+        "state": "ok",
+        "period_start": "2026-10-01T00:00:00Z",
+        "period_end": "2026-10-11T10:00:00Z",
+        "uptime_pct": 99.95,
+        "coverage_pct": 98.0,
+        "current_outage_started_at": null,
+        "current_outage_seconds": null,
+        "freshness": {
+          "state": "fresh",
+          "observed_at": "2026-10-11T10:00:00Z",
+          "source": "blackbox-probes"
+        }
+      }
+    },
+    "cases": [
+      {
+        "name": "primary link",
+        "valid": true
+      },
+      {
+        "name": "backup link",
+        "valid": true,
+        "set": {
+          "role": "backup"
+        }
+      },
+      {
+        "name": "nothing configured",
+        "valid": true,
+        "set": {
+          "configured": {
+            "isp": null,
+            "gateway": null,
+            "probe_location": null
+          }
+        }
+      },
+      {
+        "name": "status unknown",
+        "valid": true,
+        "set": {
+          "status": "unknown"
+        }
+      },
+      {
+        "name": "status down",
+        "valid": true,
+        "set": {
+          "status": "down"
+        }
+      },
+      {
+        "name": "interface not connected",
+        "valid": true,
+        "set": {
+          "interface": {
+            "state": "not-connected",
+            "oper_status": null,
+            "capacity_bps": null,
+            "rx_bps": null,
+            "tx_bps": null,
+            "utilisation_pct": null,
+            "public_ip": null,
+            "freshness": {
+              "state": "unknown",
+              "observed_at": null,
+              "source": null
+            }
+          }
+        }
+      },
+      {
+        "name": "uppercase id",
+        "valid": false,
+        "set": {
+          "id": "Fibre-1"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "id with a space",
+        "valid": false,
+        "set": {
+          "id": "fibre 1"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "unknown role",
+        "valid": false,
+        "set": {
+          "role": "secondary"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "empty name",
+        "valid": false,
+        "set": {
+          "name": ""
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "unknown status",
+        "valid": false,
+        "set": {
+          "status": "healthy"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "interface unknown but still carrying values (nested)",
+        "valid": false,
+        "set": {
+          "interface.state": "unknown"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "quality not-connected but still carrying values (nested)",
+        "valid": false,
+        "set": {
+          "quality.state": "not-connected"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "availability unknown but still carrying values (nested)",
+        "valid": false,
+        "set": {
+          "availability.state": "unknown"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "unknown probe location",
+        "valid": false,
+        "set": {
+          "configured.probe_location": "mars"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "configured with an extra field",
+        "valid": false,
+        "set": {
+          "configured.owner": "x"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "missing section",
+        "valid": false,
+        "delete": [
+          "quality"
+        ],
+        "jsonschema_rejects": true
+      }
+    ]
+  },
+  "internet_failover": {
+    "base": {
+      "state": "normal",
+      "basis": "inferred"
+    },
+    "cases": [
+      {
+        "name": "normal",
+        "valid": true
+      },
+      {
+        "name": "failed over",
+        "valid": true,
+        "set": {
+          "state": "failed-over"
+        }
+      },
+      {
+        "name": "all down",
+        "valid": true,
+        "set": {
+          "state": "all-down"
+        }
+      },
+      {
+        "name": "single link",
+        "valid": true,
+        "set": {
+          "state": "single-link"
+        }
+      },
+      {
+        "name": "unknown",
+        "valid": true,
+        "set": {
+          "state": "unknown",
+          "basis": "unknown"
+        }
+      },
+      {
+        "name": "unknown state claiming an inferred basis",
+        "valid": false,
+        "set": {
+          "state": "unknown"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "a known state with an unknown basis",
+        "valid": false,
+        "set": {
+          "basis": "unknown"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "unrecognised state",
+        "valid": false,
+        "set": {
+          "state": "split-brain"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "missing basis",
+        "valid": false,
+        "delete": [
+          "basis"
+        ],
+        "jsonschema_rejects": true
+      }
+    ]
+  },
+  "internet_response": {
+    "base": {
+      "state": "ok",
+      "generated_at": "2026-10-11T10:00:00Z",
+      "links": [
+        {
+          "id": "fibre-1",
+          "name": "Primary fibre",
+          "role": "primary",
+          "configured": {
+            "isp": "Example ISP",
+            "gateway": "192.0.2.1",
+            "probe_location": "branch"
+          },
+          "status": "up",
+          "interface": {
+            "state": "ok",
+            "oper_status": "up",
+            "capacity_bps": 1000000000,
+            "rx_bps": 100000000,
+            "tx_bps": 20000000,
+            "utilisation_pct": 10.0,
+            "public_ip": "8.8.8.8",
+            "freshness": {
+              "state": "fresh",
+              "observed_at": "2026-10-11T10:00:00Z",
+              "source": "librenms"
+            }
+          },
+          "quality": {
+            "state": "ok",
+            "latency_ms": 12.5,
+            "jitter_ms": 1.5,
+            "loss_pct": 0.0,
+            "dns_status": "pass",
+            "dns_latency_ms": 20.1,
+            "sample_count": 30,
+            "window_seconds": 900,
+            "freshness": {
+              "state": "fresh",
+              "observed_at": "2026-10-11T10:00:00Z",
+              "source": "blackbox-probes"
+            }
+          },
+          "availability": {
+            "state": "ok",
+            "period_start": "2026-10-01T00:00:00Z",
+            "period_end": "2026-10-11T10:00:00Z",
+            "uptime_pct": 99.95,
+            "coverage_pct": 98.0,
+            "current_outage_started_at": null,
+            "current_outage_seconds": null,
+            "freshness": {
+              "state": "fresh",
+              "observed_at": "2026-10-11T10:00:00Z",
+              "source": "blackbox-probes"
+            }
+          }
+        }
+      ],
+      "failover": {
+        "state": "normal",
+        "basis": "inferred"
+      },
+      "detail_redacted": false
+    },
+    "cases": [
+      {
+        "name": "one link",
+        "valid": true
+      },
+      {
+        "name": "two links",
+        "valid": true,
+        "set": {
+          "links": [
+            {
+              "id": "fibre-1",
+              "name": "Primary fibre",
+              "role": "primary",
+              "configured": {
+                "isp": "Example ISP",
+                "gateway": "192.0.2.1",
+                "probe_location": "branch"
+              },
+              "status": "up",
+              "interface": {
+                "state": "ok",
+                "oper_status": "up",
+                "capacity_bps": 1000000000,
+                "rx_bps": 100000000,
+                "tx_bps": 20000000,
+                "utilisation_pct": 10.0,
+                "public_ip": "8.8.8.8",
+                "freshness": {
+                  "state": "fresh",
+                  "observed_at": "2026-10-11T10:00:00Z",
+                  "source": "librenms"
+                }
+              },
+              "quality": {
+                "state": "ok",
+                "latency_ms": 12.5,
+                "jitter_ms": 1.5,
+                "loss_pct": 0.0,
+                "dns_status": "pass",
+                "dns_latency_ms": 20.1,
+                "sample_count": 30,
+                "window_seconds": 900,
+                "freshness": {
+                  "state": "fresh",
+                  "observed_at": "2026-10-11T10:00:00Z",
+                  "source": "blackbox-probes"
+                }
+              },
+              "availability": {
+                "state": "ok",
+                "period_start": "2026-10-01T00:00:00Z",
+                "period_end": "2026-10-11T10:00:00Z",
+                "uptime_pct": 99.95,
+                "coverage_pct": 98.0,
+                "current_outage_started_at": null,
+                "current_outage_seconds": null,
+                "freshness": {
+                  "state": "fresh",
+                  "observed_at": "2026-10-11T10:00:00Z",
+                  "source": "blackbox-probes"
+                }
+              }
+            },
+            {
+              "id": "lte-1",
+              "name": "Backup LTE",
+              "role": "backup",
+              "configured": {
+                "isp": "Example ISP",
+                "gateway": "192.0.2.1",
+                "probe_location": "branch"
+              },
+              "status": "up",
+              "interface": {
+                "state": "ok",
+                "oper_status": "up",
+                "capacity_bps": 1000000000,
+                "rx_bps": 100000000,
+                "tx_bps": 20000000,
+                "utilisation_pct": 10.0,
+                "public_ip": "8.8.8.8",
+                "freshness": {
+                  "state": "fresh",
+                  "observed_at": "2026-10-11T10:00:00Z",
+                  "source": "librenms"
+                }
+              },
+              "quality": {
+                "state": "ok",
+                "latency_ms": 12.5,
+                "jitter_ms": 1.5,
+                "loss_pct": 0.0,
+                "dns_status": "pass",
+                "dns_latency_ms": 20.1,
+                "sample_count": 30,
+                "window_seconds": 900,
+                "freshness": {
+                  "state": "fresh",
+                  "observed_at": "2026-10-11T10:00:00Z",
+                  "source": "blackbox-probes"
+                }
+              },
+              "availability": {
+                "state": "ok",
+                "period_start": "2026-10-01T00:00:00Z",
+                "period_end": "2026-10-11T10:00:00Z",
+                "uptime_pct": 99.95,
+                "coverage_pct": 98.0,
+                "current_outage_started_at": null,
+                "current_outage_seconds": null,
+                "freshness": {
+                  "state": "fresh",
+                  "observed_at": "2026-10-11T10:00:00Z",
+                  "source": "blackbox-probes"
+                }
+              }
+            }
+          ],
+          "failover": {
+            "state": "normal",
+            "basis": "inferred"
+          }
+        }
+      },
+      {
+        "name": "ok with no links",
+        "valid": true,
+        "set": {
+          "links": []
+        }
+      },
+      {
+        "name": "not-connected without links",
+        "valid": true,
+        "set": {
+          "state": "not-connected",
+          "links": [],
+          "failover": {
+            "state": "unknown",
+            "basis": "unknown"
+          }
+        }
+      },
+      {
+        "name": "unknown without links",
+        "valid": true,
+        "set": {
+          "state": "unknown",
+          "links": [],
+          "failover": {
+            "state": "unknown",
+            "basis": "unknown"
+          }
+        }
+      },
+      {
+        "name": "not-connected carrying a link",
+        "valid": false,
+        "set": {
+          "state": "not-connected",
+          "failover": {
+            "state": "unknown",
+            "basis": "unknown"
+          }
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "unknown asserting a failover state",
+        "valid": false,
+        "set": {
+          "state": "unknown",
+          "links": []
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "nine links",
+        "valid": false,
+        "set": {
+          "links": [
+            {
+              "id": "fibre-1",
+              "name": "Primary fibre",
+              "role": "primary",
+              "configured": {
+                "isp": "Example ISP",
+                "gateway": "192.0.2.1",
+                "probe_location": "branch"
+              },
+              "status": "up",
+              "interface": {
+                "state": "ok",
+                "oper_status": "up",
+                "capacity_bps": 1000000000,
+                "rx_bps": 100000000,
+                "tx_bps": 20000000,
+                "utilisation_pct": 10.0,
+                "public_ip": "8.8.8.8",
+                "freshness": {
+                  "state": "fresh",
+                  "observed_at": "2026-10-11T10:00:00Z",
+                  "source": "librenms"
+                }
+              },
+              "quality": {
+                "state": "ok",
+                "latency_ms": 12.5,
+                "jitter_ms": 1.5,
+                "loss_pct": 0.0,
+                "dns_status": "pass",
+                "dns_latency_ms": 20.1,
+                "sample_count": 30,
+                "window_seconds": 900,
+                "freshness": {
+                  "state": "fresh",
+                  "observed_at": "2026-10-11T10:00:00Z",
+                  "source": "blackbox-probes"
+                }
+              },
+              "availability": {
+                "state": "ok",
+                "period_start": "2026-10-01T00:00:00Z",
+                "period_end": "2026-10-11T10:00:00Z",
+                "uptime_pct": 99.95,
+                "coverage_pct": 98.0,
+                "current_outage_started_at": null,
+                "current_outage_seconds": null,
+                "freshness": {
+                  "state": "fresh",
+                  "observed_at": "2026-10-11T10:00:00Z",
+                  "source": "blackbox-probes"
+                }
+              }
+            },
+            {
+              "id": "fibre-1",
+              "name": "Primary fibre",
+              "role": "primary",
+              "configured": {
+                "isp": "Example ISP",
+                "gateway": "192.0.2.1",
+                "probe_location": "branch"
+              },
+              "status": "up",
+              "interface": {
+                "state": "ok",
+                "oper_status": "up",
+                "capacity_bps": 1000000000,
+                "rx_bps": 100000000,
+                "tx_bps": 20000000,
+                "utilisation_pct": 10.0,
+                "public_ip": "8.8.8.8",
+                "freshness": {
+                  "state": "fresh",
+                  "observed_at": "2026-10-11T10:00:00Z",
+                  "source": "librenms"
+                }
+              },
+              "quality": {
+                "state": "ok",
+                "latency_ms": 12.5,
+                "jitter_ms": 1.5,
+                "loss_pct": 0.0,
+                "dns_status": "pass",
+                "dns_latency_ms": 20.1,
+                "sample_count": 30,
+                "window_seconds": 900,
+                "freshness": {
+                  "state": "fresh",
+                  "observed_at": "2026-10-11T10:00:00Z",
+                  "source": "blackbox-probes"
+                }
+              },
+              "availability": {
+                "state": "ok",
+                "period_start": "2026-10-01T00:00:00Z",
+                "period_end": "2026-10-11T10:00:00Z",
+                "uptime_pct": 99.95,
+                "coverage_pct": 98.0,
+                "current_outage_started_at": null,
+                "current_outage_seconds": null,
+                "freshness": {
+                  "state": "fresh",
+                  "observed_at": "2026-10-11T10:00:00Z",
+                  "source": "blackbox-probes"
+                }
+              }
+            },
+            {
+              "id": "fibre-1",
+              "name": "Primary fibre",
+              "role": "primary",
+              "configured": {
+                "isp": "Example ISP",
+                "gateway": "192.0.2.1",
+                "probe_location": "branch"
+              },
+              "status": "up",
+              "interface": {
+                "state": "ok",
+                "oper_status": "up",
+                "capacity_bps": 1000000000,
+                "rx_bps": 100000000,
+                "tx_bps": 20000000,
+                "utilisation_pct": 10.0,
+                "public_ip": "8.8.8.8",
+                "freshness": {
+                  "state": "fresh",
+                  "observed_at": "2026-10-11T10:00:00Z",
+                  "source": "librenms"
+                }
+              },
+              "quality": {
+                "state": "ok",
+                "latency_ms": 12.5,
+                "jitter_ms": 1.5,
+                "loss_pct": 0.0,
+                "dns_status": "pass",
+                "dns_latency_ms": 20.1,
+                "sample_count": 30,
+                "window_seconds": 900,
+                "freshness": {
+                  "state": "fresh",
+                  "observed_at": "2026-10-11T10:00:00Z",
+                  "source": "blackbox-probes"
+                }
+              },
+              "availability": {
+                "state": "ok",
+                "period_start": "2026-10-01T00:00:00Z",
+                "period_end": "2026-10-11T10:00:00Z",
+                "uptime_pct": 99.95,
+                "coverage_pct": 98.0,
+                "current_outage_started_at": null,
+                "current_outage_seconds": null,
+                "freshness": {
+                  "state": "fresh",
+                  "observed_at": "2026-10-11T10:00:00Z",
+                  "source": "blackbox-probes"
+                }
+              }
+            },
+            {
+              "id": "fibre-1",
+              "name": "Primary fibre",
+              "role": "primary",
+              "configured": {
+                "isp": "Example ISP",
+                "gateway": "192.0.2.1",
+                "probe_location": "branch"
+              },
+              "status": "up",
+              "interface": {
+                "state": "ok",
+                "oper_status": "up",
+                "capacity_bps": 1000000000,
+                "rx_bps": 100000000,
+                "tx_bps": 20000000,
+                "utilisation_pct": 10.0,
+                "public_ip": "8.8.8.8",
+                "freshness": {
+                  "state": "fresh",
+                  "observed_at": "2026-10-11T10:00:00Z",
+                  "source": "librenms"
+                }
+              },
+              "quality": {
+                "state": "ok",
+                "latency_ms": 12.5,
+                "jitter_ms": 1.5,
+                "loss_pct": 0.0,
+                "dns_status": "pass",
+                "dns_latency_ms": 20.1,
+                "sample_count": 30,
+                "window_seconds": 900,
+                "freshness": {
+                  "state": "fresh",
+                  "observed_at": "2026-10-11T10:00:00Z",
+                  "source": "blackbox-probes"
+                }
+              },
+              "availability": {
+                "state": "ok",
+                "period_start": "2026-10-01T00:00:00Z",
+                "period_end": "2026-10-11T10:00:00Z",
+                "uptime_pct": 99.95,
+                "coverage_pct": 98.0,
+                "current_outage_started_at": null,
+                "current_outage_seconds": null,
+                "freshness": {
+                  "state": "fresh",
+                  "observed_at": "2026-10-11T10:00:00Z",
+                  "source": "blackbox-probes"
+                }
+              }
+            },
+            {
+              "id": "fibre-1",
+              "name": "Primary fibre",
+              "role": "primary",
+              "configured": {
+                "isp": "Example ISP",
+                "gateway": "192.0.2.1",
+                "probe_location": "branch"
+              },
+              "status": "up",
+              "interface": {
+                "state": "ok",
+                "oper_status": "up",
+                "capacity_bps": 1000000000,
+                "rx_bps": 100000000,
+                "tx_bps": 20000000,
+                "utilisation_pct": 10.0,
+                "public_ip": "8.8.8.8",
+                "freshness": {
+                  "state": "fresh",
+                  "observed_at": "2026-10-11T10:00:00Z",
+                  "source": "librenms"
+                }
+              },
+              "quality": {
+                "state": "ok",
+                "latency_ms": 12.5,
+                "jitter_ms": 1.5,
+                "loss_pct": 0.0,
+                "dns_status": "pass",
+                "dns_latency_ms": 20.1,
+                "sample_count": 30,
+                "window_seconds": 900,
+                "freshness": {
+                  "state": "fresh",
+                  "observed_at": "2026-10-11T10:00:00Z",
+                  "source": "blackbox-probes"
+                }
+              },
+              "availability": {
+                "state": "ok",
+                "period_start": "2026-10-01T00:00:00Z",
+                "period_end": "2026-10-11T10:00:00Z",
+                "uptime_pct": 99.95,
+                "coverage_pct": 98.0,
+                "current_outage_started_at": null,
+                "current_outage_seconds": null,
+                "freshness": {
+                  "state": "fresh",
+                  "observed_at": "2026-10-11T10:00:00Z",
+                  "source": "blackbox-probes"
+                }
+              }
+            },
+            {
+              "id": "fibre-1",
+              "name": "Primary fibre",
+              "role": "primary",
+              "configured": {
+                "isp": "Example ISP",
+                "gateway": "192.0.2.1",
+                "probe_location": "branch"
+              },
+              "status": "up",
+              "interface": {
+                "state": "ok",
+                "oper_status": "up",
+                "capacity_bps": 1000000000,
+                "rx_bps": 100000000,
+                "tx_bps": 20000000,
+                "utilisation_pct": 10.0,
+                "public_ip": "8.8.8.8",
+                "freshness": {
+                  "state": "fresh",
+                  "observed_at": "2026-10-11T10:00:00Z",
+                  "source": "librenms"
+                }
+              },
+              "quality": {
+                "state": "ok",
+                "latency_ms": 12.5,
+                "jitter_ms": 1.5,
+                "loss_pct": 0.0,
+                "dns_status": "pass",
+                "dns_latency_ms": 20.1,
+                "sample_count": 30,
+                "window_seconds": 900,
+                "freshness": {
+                  "state": "fresh",
+                  "observed_at": "2026-10-11T10:00:00Z",
+                  "source": "blackbox-probes"
+                }
+              },
+              "availability": {
+                "state": "ok",
+                "period_start": "2026-10-01T00:00:00Z",
+                "period_end": "2026-10-11T10:00:00Z",
+                "uptime_pct": 99.95,
+                "coverage_pct": 98.0,
+                "current_outage_started_at": null,
+                "current_outage_seconds": null,
+                "freshness": {
+                  "state": "fresh",
+                  "observed_at": "2026-10-11T10:00:00Z",
+                  "source": "blackbox-probes"
+                }
+              }
+            },
+            {
+              "id": "fibre-1",
+              "name": "Primary fibre",
+              "role": "primary",
+              "configured": {
+                "isp": "Example ISP",
+                "gateway": "192.0.2.1",
+                "probe_location": "branch"
+              },
+              "status": "up",
+              "interface": {
+                "state": "ok",
+                "oper_status": "up",
+                "capacity_bps": 1000000000,
+                "rx_bps": 100000000,
+                "tx_bps": 20000000,
+                "utilisation_pct": 10.0,
+                "public_ip": "8.8.8.8",
+                "freshness": {
+                  "state": "fresh",
+                  "observed_at": "2026-10-11T10:00:00Z",
+                  "source": "librenms"
+                }
+              },
+              "quality": {
+                "state": "ok",
+                "latency_ms": 12.5,
+                "jitter_ms": 1.5,
+                "loss_pct": 0.0,
+                "dns_status": "pass",
+                "dns_latency_ms": 20.1,
+                "sample_count": 30,
+                "window_seconds": 900,
+                "freshness": {
+                  "state": "fresh",
+                  "observed_at": "2026-10-11T10:00:00Z",
+                  "source": "blackbox-probes"
+                }
+              },
+              "availability": {
+                "state": "ok",
+                "period_start": "2026-10-01T00:00:00Z",
+                "period_end": "2026-10-11T10:00:00Z",
+                "uptime_pct": 99.95,
+                "coverage_pct": 98.0,
+                "current_outage_started_at": null,
+                "current_outage_seconds": null,
+                "freshness": {
+                  "state": "fresh",
+                  "observed_at": "2026-10-11T10:00:00Z",
+                  "source": "blackbox-probes"
+                }
+              }
+            },
+            {
+              "id": "fibre-1",
+              "name": "Primary fibre",
+              "role": "primary",
+              "configured": {
+                "isp": "Example ISP",
+                "gateway": "192.0.2.1",
+                "probe_location": "branch"
+              },
+              "status": "up",
+              "interface": {
+                "state": "ok",
+                "oper_status": "up",
+                "capacity_bps": 1000000000,
+                "rx_bps": 100000000,
+                "tx_bps": 20000000,
+                "utilisation_pct": 10.0,
+                "public_ip": "8.8.8.8",
+                "freshness": {
+                  "state": "fresh",
+                  "observed_at": "2026-10-11T10:00:00Z",
+                  "source": "librenms"
+                }
+              },
+              "quality": {
+                "state": "ok",
+                "latency_ms": 12.5,
+                "jitter_ms": 1.5,
+                "loss_pct": 0.0,
+                "dns_status": "pass",
+                "dns_latency_ms": 20.1,
+                "sample_count": 30,
+                "window_seconds": 900,
+                "freshness": {
+                  "state": "fresh",
+                  "observed_at": "2026-10-11T10:00:00Z",
+                  "source": "blackbox-probes"
+                }
+              },
+              "availability": {
+                "state": "ok",
+                "period_start": "2026-10-01T00:00:00Z",
+                "period_end": "2026-10-11T10:00:00Z",
+                "uptime_pct": 99.95,
+                "coverage_pct": 98.0,
+                "current_outage_started_at": null,
+                "current_outage_seconds": null,
+                "freshness": {
+                  "state": "fresh",
+                  "observed_at": "2026-10-11T10:00:00Z",
+                  "source": "blackbox-probes"
+                }
+              }
+            },
+            {
+              "id": "fibre-1",
+              "name": "Primary fibre",
+              "role": "primary",
+              "configured": {
+                "isp": "Example ISP",
+                "gateway": "192.0.2.1",
+                "probe_location": "branch"
+              },
+              "status": "up",
+              "interface": {
+                "state": "ok",
+                "oper_status": "up",
+                "capacity_bps": 1000000000,
+                "rx_bps": 100000000,
+                "tx_bps": 20000000,
+                "utilisation_pct": 10.0,
+                "public_ip": "8.8.8.8",
+                "freshness": {
+                  "state": "fresh",
+                  "observed_at": "2026-10-11T10:00:00Z",
+                  "source": "librenms"
+                }
+              },
+              "quality": {
+                "state": "ok",
+                "latency_ms": 12.5,
+                "jitter_ms": 1.5,
+                "loss_pct": 0.0,
+                "dns_status": "pass",
+                "dns_latency_ms": 20.1,
+                "sample_count": 30,
+                "window_seconds": 900,
+                "freshness": {
+                  "state": "fresh",
+                  "observed_at": "2026-10-11T10:00:00Z",
+                  "source": "blackbox-probes"
+                }
+              },
+              "availability": {
+                "state": "ok",
+                "period_start": "2026-10-01T00:00:00Z",
+                "period_end": "2026-10-11T10:00:00Z",
+                "uptime_pct": 99.95,
+                "coverage_pct": 98.0,
+                "current_outage_started_at": null,
+                "current_outage_seconds": null,
+                "freshness": {
+                  "state": "fresh",
+                  "observed_at": "2026-10-11T10:00:00Z",
+                  "source": "blackbox-probes"
+                }
+              }
+            }
+          ]
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "missing generated_at",
+        "valid": false,
+        "delete": [
+          "generated_at"
+        ],
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "missing failover",
+        "valid": false,
+        "delete": [
+          "failover"
+        ],
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "unexpected field",
+        "valid": false,
+        "set": {
+          "extra": 1
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "redacted response withholds the detail",
+        "valid": true,
+        "set": {
+          "detail_redacted": true,
+          "links": [
+            {
+              "id": "fibre-1",
+              "name": "Primary fibre",
+              "role": "primary",
+              "configured": {
+                "isp": null,
+                "gateway": null,
+                "probe_location": "branch"
+              },
+              "status": "up",
+              "interface": {
+                "state": "ok",
+                "oper_status": "up",
+                "capacity_bps": 1000000000,
+                "rx_bps": null,
+                "tx_bps": null,
+                "utilisation_pct": null,
+                "public_ip": null,
+                "freshness": {
+                  "state": "fresh",
+                  "observed_at": "2026-10-11T10:00:00Z",
+                  "source": "librenms"
+                }
+              },
+              "quality": {
+                "state": "ok",
+                "latency_ms": 12.5,
+                "jitter_ms": 1.5,
+                "loss_pct": 0.0,
+                "dns_status": "pass",
+                "dns_latency_ms": 20.1,
+                "sample_count": 30,
+                "window_seconds": 900,
+                "freshness": {
+                  "state": "fresh",
+                  "observed_at": "2026-10-11T10:00:00Z",
+                  "source": "blackbox-probes"
+                }
+              },
+              "availability": {
+                "state": "ok",
+                "period_start": "2026-10-01T00:00:00Z",
+                "period_end": "2026-10-11T10:00:00Z",
+                "uptime_pct": 99.95,
+                "coverage_pct": 98.0,
+                "current_outage_started_at": null,
+                "current_outage_seconds": null,
+                "freshness": {
+                  "state": "fresh",
+                  "observed_at": "2026-10-11T10:00:00Z",
+                  "source": "blackbox-probes"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "redacted response still carrying the public IP (cross-field)",
+        "valid": false,
+        "set": {
+          "detail_redacted": true,
+          "links": [
+            {
+              "id": "fibre-1",
+              "name": "Primary fibre",
+              "role": "primary",
+              "configured": {
+                "isp": null,
+                "gateway": null,
+                "probe_location": "branch"
+              },
+              "status": "up",
+              "interface": {
+                "state": "ok",
+                "oper_status": "up",
+                "capacity_bps": 1000000000,
+                "rx_bps": null,
+                "tx_bps": null,
+                "utilisation_pct": null,
+                "public_ip": "8.8.8.8",
+                "freshness": {
+                  "state": "fresh",
+                  "observed_at": "2026-10-11T10:00:00Z",
+                  "source": "librenms"
+                }
+              },
+              "quality": {
+                "state": "ok",
+                "latency_ms": 12.5,
+                "jitter_ms": 1.5,
+                "loss_pct": 0.0,
+                "dns_status": "pass",
+                "dns_latency_ms": 20.1,
+                "sample_count": 30,
+                "window_seconds": 900,
+                "freshness": {
+                  "state": "fresh",
+                  "observed_at": "2026-10-11T10:00:00Z",
+                  "source": "blackbox-probes"
+                }
+              },
+              "availability": {
+                "state": "ok",
+                "period_start": "2026-10-01T00:00:00Z",
+                "period_end": "2026-10-11T10:00:00Z",
+                "uptime_pct": 99.95,
+                "coverage_pct": 98.0,
+                "current_outage_started_at": null,
+                "current_outage_seconds": null,
+                "freshness": {
+                  "state": "fresh",
+                  "observed_at": "2026-10-11T10:00:00Z",
+                  "source": "blackbox-probes"
+                }
+              }
+            }
+          ]
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "redacted response still carrying the ISP (cross-field)",
+        "valid": false,
+        "set": {
+          "detail_redacted": true,
+          "links": [
+            {
+              "id": "fibre-1",
+              "name": "Primary fibre",
+              "role": "primary",
+              "configured": {
+                "isp": "Example ISP",
+                "gateway": null,
+                "probe_location": "branch"
+              },
+              "status": "up",
+              "interface": {
+                "state": "ok",
+                "oper_status": "up",
+                "capacity_bps": 1000000000,
+                "rx_bps": null,
+                "tx_bps": null,
+                "utilisation_pct": null,
+                "public_ip": null,
+                "freshness": {
+                  "state": "fresh",
+                  "observed_at": "2026-10-11T10:00:00Z",
+                  "source": "librenms"
+                }
+              },
+              "quality": {
+                "state": "ok",
+                "latency_ms": 12.5,
+                "jitter_ms": 1.5,
+                "loss_pct": 0.0,
+                "dns_status": "pass",
+                "dns_latency_ms": 20.1,
+                "sample_count": 30,
+                "window_seconds": 900,
+                "freshness": {
+                  "state": "fresh",
+                  "observed_at": "2026-10-11T10:00:00Z",
+                  "source": "blackbox-probes"
+                }
+              },
+              "availability": {
+                "state": "ok",
+                "period_start": "2026-10-01T00:00:00Z",
+                "period_end": "2026-10-11T10:00:00Z",
+                "uptime_pct": 99.95,
+                "coverage_pct": 98.0,
+                "current_outage_started_at": null,
+                "current_outage_seconds": null,
+                "freshness": {
+                  "state": "fresh",
+                  "observed_at": "2026-10-11T10:00:00Z",
+                  "source": "blackbox-probes"
+                }
+              }
+            }
+          ]
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "redacted response still carrying throughput (cross-field)",
+        "valid": false,
+        "set": {
+          "detail_redacted": true,
+          "links": [
+            {
+              "id": "fibre-1",
+              "name": "Primary fibre",
+              "role": "primary",
+              "configured": {
+                "isp": null,
+                "gateway": null,
+                "probe_location": "branch"
+              },
+              "status": "up",
+              "interface": {
+                "state": "ok",
+                "oper_status": "up",
+                "capacity_bps": 1000000000,
+                "rx_bps": 5,
+                "tx_bps": null,
+                "utilisation_pct": null,
+                "public_ip": null,
+                "freshness": {
+                  "state": "fresh",
+                  "observed_at": "2026-10-11T10:00:00Z",
+                  "source": "librenms"
+                }
+              },
+              "quality": {
+                "state": "ok",
+                "latency_ms": 12.5,
+                "jitter_ms": 1.5,
+                "loss_pct": 0.0,
+                "dns_status": "pass",
+                "dns_latency_ms": 20.1,
+                "sample_count": 30,
+                "window_seconds": 900,
+                "freshness": {
+                  "state": "fresh",
+                  "observed_at": "2026-10-11T10:00:00Z",
+                  "source": "blackbox-probes"
+                }
+              },
+              "availability": {
+                "state": "ok",
+                "period_start": "2026-10-01T00:00:00Z",
+                "period_end": "2026-10-11T10:00:00Z",
+                "uptime_pct": 99.95,
+                "coverage_pct": 98.0,
+                "current_outage_started_at": null,
+                "current_outage_seconds": null,
+                "freshness": {
+                  "state": "fresh",
+                  "observed_at": "2026-10-11T10:00:00Z",
+                  "source": "blackbox-probes"
+                }
+              }
+            }
+          ]
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "missing redaction flag",
+        "valid": false,
+        "delete": [
+          "detail_redacted"
+        ],
+        "jsonschema_rejects": true
+      }
+    ]
+  },
+  "internet_sla_link": {
+    "base": {
+      "link_id": "fibre-1",
+      "name": "Primary fibre",
+      "state": "ok",
+      "uptime_target_pct": 99.5,
+      "total_seconds": 864000,
+      "up_seconds": 800000,
+      "degraded_seconds": 1000,
+      "down_seconds": 600,
+      "unknown_seconds": 62400,
+      "uptime_pct": 99.925,
+      "coverage_pct": 92.778,
+      "outage_count": 2,
+      "longest_outage_seconds": 400,
+      "cycle_count": 13360,
+      "violations": [],
+      "windows_truncated": false
+    },
+    "cases": [
+      {
+        "name": "ok month",
+        "valid": true
+      },
+      {
+        "name": "with a violation",
+        "valid": true,
+        "set": {
+          "violations": [
+            {
+              "kind": "uptime-below-target",
+              "target_pct": 99.9,
+              "actual_pct": 99.5
+            }
+          ]
+        }
+      },
+      {
+        "name": "no target configured",
+        "valid": true,
+        "set": {
+          "uptime_target_pct": null
+        }
+      },
+      {
+        "name": "nothing known all month",
+        "valid": true,
+        "set": {
+          "up_seconds": 0,
+          "degraded_seconds": 0,
+          "down_seconds": 0,
+          "unknown_seconds": 864000,
+          "uptime_pct": null,
+          "coverage_pct": 0.0,
+          "outage_count": 0,
+          "longest_outage_seconds": 0,
+          "cycle_count": 0
+        }
+      },
+      {
+        "name": "not-connected carries no figures",
+        "valid": true,
+        "set": {
+          "state": "not-connected",
+          "total_seconds": null,
+          "up_seconds": null,
+          "degraded_seconds": null,
+          "down_seconds": null,
+          "unknown_seconds": null,
+          "uptime_pct": null,
+          "coverage_pct": null,
+          "outage_count": null,
+          "longest_outage_seconds": null,
+          "cycle_count": null,
+          "windows_truncated": null
+        }
+      },
+      {
+        "name": "unknown carries no figures",
+        "valid": true,
+        "set": {
+          "state": "unknown",
+          "total_seconds": null,
+          "up_seconds": null,
+          "degraded_seconds": null,
+          "down_seconds": null,
+          "unknown_seconds": null,
+          "uptime_pct": null,
+          "coverage_pct": null,
+          "outage_count": null,
+          "longest_outage_seconds": null,
+          "cycle_count": null,
+          "windows_truncated": null
+        }
+      },
+      {
+        "name": "not-connected carrying figures",
+        "valid": false,
+        "set": {
+          "state": "not-connected"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "unknown carrying a violation",
+        "valid": false,
+        "set": {
+          "state": "unknown",
+          "total_seconds": null,
+          "up_seconds": null,
+          "degraded_seconds": null,
+          "down_seconds": null,
+          "unknown_seconds": null,
+          "uptime_pct": null,
+          "coverage_pct": null,
+          "outage_count": null,
+          "longest_outage_seconds": null,
+          "cycle_count": null,
+          "violations": [
+            {
+              "kind": "uptime-below-target",
+              "target_pct": 99.9,
+              "actual_pct": 99.5
+            }
+          ]
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "ok with a missing figure",
+        "valid": false,
+        "set": {
+          "up_seconds": null
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "ok without coverage",
+        "valid": false,
+        "set": {
+          "coverage_pct": null
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "seconds that do not add up (cross-field)",
+        "valid": false,
+        "set": {
+          "unknown_seconds": 62401
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "negative seconds",
+        "valid": false,
+        "set": {
+          "down_seconds": -1
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "zero target",
+        "valid": false,
+        "set": {
+          "uptime_target_pct": 0
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "target above 100",
+        "valid": false,
+        "set": {
+          "uptime_target_pct": 100.1
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "unknown violation kind",
+        "valid": false,
+        "set": {
+          "violations": [
+            {
+              "kind": "latency-over",
+              "target_pct": 99.9,
+              "actual_pct": 99.5
+            }
+          ]
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "uppercase link id",
+        "valid": false,
+        "set": {
+          "link_id": "Fibre-1"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "missing violations",
+        "valid": false,
+        "delete": [
+          "violations"
+        ],
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "truncated window list",
+        "valid": true,
+        "set": {
+          "windows_truncated": true
+        }
+      },
+      {
+        "name": "empty period (the instant a month starts)",
+        "valid": true,
+        "set": {
+          "total_seconds": 0,
+          "up_seconds": 0,
+          "degraded_seconds": 0,
+          "down_seconds": 0,
+          "unknown_seconds": 0,
+          "uptime_pct": null,
+          "coverage_pct": 0.0,
+          "outage_count": 0,
+          "longest_outage_seconds": 0,
+          "cycle_count": 0,
+          "uptime_target_pct": null
+        }
+      },
+      {
+        "name": "not-connected claiming truncation",
+        "valid": false,
+        "set": {
+          "state": "not-connected",
+          "total_seconds": null,
+          "up_seconds": null,
+          "degraded_seconds": null,
+          "down_seconds": null,
+          "unknown_seconds": null,
+          "uptime_pct": null,
+          "coverage_pct": null,
+          "outage_count": null,
+          "longest_outage_seconds": null,
+          "cycle_count": null,
+          "windows_truncated": true
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "ok with a null truncation flag",
+        "valid": false,
+        "set": {
+          "windows_truncated": null
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "missing truncation flag",
+        "valid": false,
+        "delete": [
+          "windows_truncated"
+        ],
+        "jsonschema_rejects": true
+      }
+    ]
+  },
+  "internet_sla_response": {
+    "base": {
+      "state": "ok",
+      "month": "2026-10",
+      "period_start": "2026-10-01T00:00:00Z",
+      "period_end": "2026-10-11T10:00:00Z",
+      "generated_at": "2026-10-11T10:00:00Z",
+      "links": [
+        {
+          "link_id": "fibre-1",
+          "name": "Primary fibre",
+          "state": "ok",
+          "uptime_target_pct": 99.5,
+          "total_seconds": 864000,
+          "up_seconds": 800000,
+          "degraded_seconds": 1000,
+          "down_seconds": 600,
+          "unknown_seconds": 62400,
+          "uptime_pct": 99.925,
+          "coverage_pct": 92.778,
+          "outage_count": 2,
+          "longest_outage_seconds": 400,
+          "cycle_count": 13360,
+          "violations": [],
+          "windows_truncated": false
+        }
+      ]
+    },
+    "cases": [
+      {
+        "name": "one link",
+        "valid": true
+      },
+      {
+        "name": "no links",
+        "valid": true,
+        "set": {
+          "links": []
+        }
+      },
+      {
+        "name": "not-connected",
+        "valid": true,
+        "set": {
+          "state": "not-connected",
+          "period_start": null,
+          "period_end": null,
+          "links": []
+        }
+      },
+      {
+        "name": "unknown",
+        "valid": true,
+        "set": {
+          "state": "unknown",
+          "period_start": null,
+          "period_end": null,
+          "links": []
+        }
+      },
+      {
+        "name": "past month",
+        "valid": true,
+        "set": {
+          "month": "2026-09",
+          "period_start": "2026-09-01T00:00:00Z",
+          "period_end": "2026-10-01T00:00:00Z"
+        }
+      },
+      {
+        "name": "not-connected carrying a link",
+        "valid": false,
+        "set": {
+          "state": "not-connected",
+          "period_start": null,
+          "period_end": null
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "not-connected carrying a period",
+        "valid": false,
+        "set": {
+          "state": "not-connected",
+          "links": []
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "ok without a period",
+        "valid": false,
+        "set": {
+          "period_start": null,
+          "period_end": null
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "month 13",
+        "valid": false,
+        "set": {
+          "month": "2026-13"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "month without padding",
+        "valid": false,
+        "set": {
+          "month": "2026-1"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "month with a day",
+        "valid": false,
+        "set": {
+          "month": "2026-10-01"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "nine links",
+        "valid": false,
+        "set": {
+          "links": [
+            {
+              "link_id": "fibre-1",
+              "name": "Primary fibre",
+              "state": "ok",
+              "uptime_target_pct": 99.5,
+              "total_seconds": 864000,
+              "up_seconds": 800000,
+              "degraded_seconds": 1000,
+              "down_seconds": 600,
+              "unknown_seconds": 62400,
+              "uptime_pct": 99.925,
+              "coverage_pct": 92.778,
+              "outage_count": 2,
+              "longest_outage_seconds": 400,
+              "cycle_count": 13360,
+              "violations": [],
+              "windows_truncated": false
+            },
+            {
+              "link_id": "fibre-1",
+              "name": "Primary fibre",
+              "state": "ok",
+              "uptime_target_pct": 99.5,
+              "total_seconds": 864000,
+              "up_seconds": 800000,
+              "degraded_seconds": 1000,
+              "down_seconds": 600,
+              "unknown_seconds": 62400,
+              "uptime_pct": 99.925,
+              "coverage_pct": 92.778,
+              "outage_count": 2,
+              "longest_outage_seconds": 400,
+              "cycle_count": 13360,
+              "violations": [],
+              "windows_truncated": false
+            },
+            {
+              "link_id": "fibre-1",
+              "name": "Primary fibre",
+              "state": "ok",
+              "uptime_target_pct": 99.5,
+              "total_seconds": 864000,
+              "up_seconds": 800000,
+              "degraded_seconds": 1000,
+              "down_seconds": 600,
+              "unknown_seconds": 62400,
+              "uptime_pct": 99.925,
+              "coverage_pct": 92.778,
+              "outage_count": 2,
+              "longest_outage_seconds": 400,
+              "cycle_count": 13360,
+              "violations": [],
+              "windows_truncated": false
+            },
+            {
+              "link_id": "fibre-1",
+              "name": "Primary fibre",
+              "state": "ok",
+              "uptime_target_pct": 99.5,
+              "total_seconds": 864000,
+              "up_seconds": 800000,
+              "degraded_seconds": 1000,
+              "down_seconds": 600,
+              "unknown_seconds": 62400,
+              "uptime_pct": 99.925,
+              "coverage_pct": 92.778,
+              "outage_count": 2,
+              "longest_outage_seconds": 400,
+              "cycle_count": 13360,
+              "violations": [],
+              "windows_truncated": false
+            },
+            {
+              "link_id": "fibre-1",
+              "name": "Primary fibre",
+              "state": "ok",
+              "uptime_target_pct": 99.5,
+              "total_seconds": 864000,
+              "up_seconds": 800000,
+              "degraded_seconds": 1000,
+              "down_seconds": 600,
+              "unknown_seconds": 62400,
+              "uptime_pct": 99.925,
+              "coverage_pct": 92.778,
+              "outage_count": 2,
+              "longest_outage_seconds": 400,
+              "cycle_count": 13360,
+              "violations": [],
+              "windows_truncated": false
+            },
+            {
+              "link_id": "fibre-1",
+              "name": "Primary fibre",
+              "state": "ok",
+              "uptime_target_pct": 99.5,
+              "total_seconds": 864000,
+              "up_seconds": 800000,
+              "degraded_seconds": 1000,
+              "down_seconds": 600,
+              "unknown_seconds": 62400,
+              "uptime_pct": 99.925,
+              "coverage_pct": 92.778,
+              "outage_count": 2,
+              "longest_outage_seconds": 400,
+              "cycle_count": 13360,
+              "violations": [],
+              "windows_truncated": false
+            },
+            {
+              "link_id": "fibre-1",
+              "name": "Primary fibre",
+              "state": "ok",
+              "uptime_target_pct": 99.5,
+              "total_seconds": 864000,
+              "up_seconds": 800000,
+              "degraded_seconds": 1000,
+              "down_seconds": 600,
+              "unknown_seconds": 62400,
+              "uptime_pct": 99.925,
+              "coverage_pct": 92.778,
+              "outage_count": 2,
+              "longest_outage_seconds": 400,
+              "cycle_count": 13360,
+              "violations": [],
+              "windows_truncated": false
+            },
+            {
+              "link_id": "fibre-1",
+              "name": "Primary fibre",
+              "state": "ok",
+              "uptime_target_pct": 99.5,
+              "total_seconds": 864000,
+              "up_seconds": 800000,
+              "degraded_seconds": 1000,
+              "down_seconds": 600,
+              "unknown_seconds": 62400,
+              "uptime_pct": 99.925,
+              "coverage_pct": 92.778,
+              "outage_count": 2,
+              "longest_outage_seconds": 400,
+              "cycle_count": 13360,
+              "violations": [],
+              "windows_truncated": false
+            },
+            {
+              "link_id": "fibre-1",
+              "name": "Primary fibre",
+              "state": "ok",
+              "uptime_target_pct": 99.5,
+              "total_seconds": 864000,
+              "up_seconds": 800000,
+              "degraded_seconds": 1000,
+              "down_seconds": 600,
+              "unknown_seconds": 62400,
+              "uptime_pct": 99.925,
+              "coverage_pct": 92.778,
+              "outage_count": 2,
+              "longest_outage_seconds": 400,
+              "cycle_count": 13360,
+              "violations": [],
+              "windows_truncated": false
+            }
+          ]
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "missing generated_at",
+        "valid": false,
+        "delete": [
+          "generated_at"
+        ],
+        "jsonschema_rejects": true
+      }
+    ]
+  },
+  "internet_sla_export_window": {
+    "base": {
+      "kind": "down",
+      "started_at": "2026-10-05T02:00:00Z",
+      "ended_at": "2026-10-05T02:07:30Z",
+      "duration_seconds": 450,
+      "sample_count": 5
+    },
+    "cases": [
+      {
+        "name": "an outage",
+        "valid": true
+      },
+      {
+        "name": "a degraded period",
+        "valid": true,
+        "set": {
+          "kind": "degraded"
+        }
+      },
+      {
+        "name": "a gap in sampling has no probe rounds",
+        "valid": true,
+        "set": {
+          "kind": "unknown",
+          "sample_count": 0
+        }
+      },
+      {
+        "name": "up is not a window",
+        "valid": false,
+        "set": {
+          "kind": "up"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "ends before it starts (cross-field)",
+        "valid": false,
+        "set": {
+          "ended_at": "2026-10-05T01:00:00Z"
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "ends when it starts (cross-field)",
+        "valid": false,
+        "set": {
+          "ended_at": "2026-10-05T02:00:00Z"
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "negative sample count",
+        "valid": false,
+        "set": {
+          "sample_count": -1
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "negative duration",
+        "valid": false,
+        "set": {
+          "duration_seconds": -1
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "missing field",
+        "valid": false,
+        "delete": [
+          "sample_count"
+        ],
+        "jsonschema_rejects": true
+      }
+    ]
+  },
+  "internet_sla_export_source": {
+    "base": {
+      "probe": "icmp",
+      "target": "probe-a.example",
+      "location": "branch"
+    },
+    "cases": [
+      {
+        "name": "icmp from a location",
+        "valid": true
+      },
+      {
+        "name": "dns from the host's own prober",
+        "valid": true,
+        "set": {
+          "probe": "dns",
+          "location": null
+        }
+      },
+      {
+        "name": "tcp",
+        "valid": true,
+        "set": {
+          "probe": "tcp"
+        }
+      },
+      {
+        "name": "http is not a recorded probe",
+        "valid": false,
+        "set": {
+          "probe": "http"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "unknown location",
+        "valid": false,
+        "set": {
+          "location": "mars"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "empty target",
+        "valid": false,
+        "set": {
+          "target": ""
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "missing location",
+        "valid": false,
+        "delete": [
+          "location"
+        ],
+        "jsonschema_rejects": true
+      }
+    ]
+  },
+  "internet_sla_export_link": {
+    "base": {
+      "link": {
+        "link_id": "fibre-1",
+        "name": "Primary fibre",
+        "state": "ok",
+        "uptime_target_pct": 99.5,
+        "total_seconds": 864000,
+        "up_seconds": 800000,
+        "degraded_seconds": 1000,
+        "down_seconds": 600,
+        "unknown_seconds": 62400,
+        "uptime_pct": 99.925,
+        "coverage_pct": 92.778,
+        "outage_count": 2,
+        "longest_outage_seconds": 400,
+        "cycle_count": 13360,
+        "violations": [],
+        "windows_truncated": false
+      },
+      "isp": "Example ISP",
+      "sources": [
+        {
+          "probe": "icmp",
+          "target": "probe-a.example",
+          "location": "branch"
+        }
+      ],
+      "windows": [
+        {
+          "kind": "down",
+          "started_at": "2026-10-05T02:00:00Z",
+          "ended_at": "2026-10-05T02:07:30Z",
+          "duration_seconds": 450,
+          "sample_count": 5
+        }
+      ],
+      "windows_truncated": false
+    },
+    "cases": [
+      {
+        "name": "with evidence",
+        "valid": true
+      },
+      {
+        "name": "truncated list",
+        "valid": true,
+        "set": {
+          "windows_truncated": true
+        }
+      },
+      {
+        "name": "no isp configured",
+        "valid": true,
+        "set": {
+          "isp": null
+        }
+      },
+      {
+        "name": "a perfect month has no windows",
+        "valid": true,
+        "set": {
+          "windows": []
+        }
+      },
+      {
+        "name": "not-connected link",
+        "valid": true,
+        "set": {
+          "link": {
+            "link_id": "fibre-1",
+            "name": "Primary fibre",
+            "state": "not-connected",
+            "uptime_target_pct": 99.5,
+            "total_seconds": null,
+            "up_seconds": null,
+            "degraded_seconds": null,
+            "down_seconds": null,
+            "unknown_seconds": null,
+            "uptime_pct": null,
+            "coverage_pct": null,
+            "outage_count": null,
+            "longest_outage_seconds": null,
+            "cycle_count": null,
+            "violations": [],
+            "windows_truncated": null
+          },
+          "sources": [],
+          "windows": []
+        }
+      },
+      {
+        "name": "not-connected link carrying windows (nested)",
+        "valid": false,
+        "set": {
+          "link": {
+            "link_id": "fibre-1",
+            "name": "Primary fibre",
+            "state": "not-connected",
+            "uptime_target_pct": 99.5,
+            "total_seconds": null,
+            "up_seconds": null,
+            "degraded_seconds": null,
+            "down_seconds": null,
+            "unknown_seconds": null,
+            "uptime_pct": null,
+            "coverage_pct": null,
+            "outage_count": null,
+            "longest_outage_seconds": null,
+            "cycle_count": null,
+            "violations": [],
+            "windows_truncated": null
+          },
+          "sources": []
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "not-connected link claiming truncation",
+        "valid": false,
+        "set": {
+          "link": {
+            "link_id": "fibre-1",
+            "name": "Primary fibre",
+            "state": "unknown",
+            "uptime_target_pct": 99.5,
+            "total_seconds": null,
+            "up_seconds": null,
+            "degraded_seconds": null,
+            "down_seconds": null,
+            "unknown_seconds": null,
+            "uptime_pct": null,
+            "coverage_pct": null,
+            "outage_count": null,
+            "longest_outage_seconds": null,
+            "cycle_count": null,
+            "violations": [],
+            "windows_truncated": null
+          },
+          "sources": [],
+          "windows": [],
+          "windows_truncated": true
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "missing windows",
+        "valid": false,
+        "delete": [
+          "windows"
+        ],
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "unexpected field",
+        "valid": false,
+        "set": {
+          "extra": 1
+        },
+        "jsonschema_rejects": true
+      }
+    ]
+  },
+  "internet_sla_export": {
+    "base": {
+      "state": "ok",
+      "month": "2026-10",
+      "period_start": "2026-10-01T00:00:00Z",
+      "period_end": "2026-10-11T10:00:00Z",
+      "generated_at": "2026-10-11T10:00:00Z",
+      "basis": "Computed only from stored probe samples. Time with no probe round is shown as unknown, never as up or down.",
+      "links": [
+        {
+          "link": {
+            "link_id": "fibre-1",
+            "name": "Primary fibre",
+            "state": "ok",
+            "uptime_target_pct": 99.5,
+            "total_seconds": 864000,
+            "up_seconds": 800000,
+            "degraded_seconds": 1000,
+            "down_seconds": 600,
+            "unknown_seconds": 62400,
+            "uptime_pct": 99.925,
+            "coverage_pct": 92.778,
+            "outage_count": 2,
+            "longest_outage_seconds": 400,
+            "cycle_count": 13360,
+            "violations": [],
+            "windows_truncated": false
+          },
+          "isp": "Example ISP",
+          "sources": [
+            {
+              "probe": "icmp",
+              "target": "probe-a.example",
+              "location": "branch"
+            }
+          ],
+          "windows": [
+            {
+              "kind": "down",
+              "started_at": "2026-10-05T02:00:00Z",
+              "ended_at": "2026-10-05T02:07:30Z",
+              "duration_seconds": 450,
+              "sample_count": 5
+            }
+          ],
+          "windows_truncated": false
+        }
+      ],
+      "detail_redacted": false
+    },
+    "cases": [
+      {
+        "name": "one link",
+        "valid": true
+      },
+      {
+        "name": "not-connected",
+        "valid": true,
+        "set": {
+          "state": "not-connected",
+          "period_start": null,
+          "period_end": null,
+          "links": []
+        }
+      },
+      {
+        "name": "not-connected carrying a link",
+        "valid": false,
+        "set": {
+          "state": "not-connected",
+          "period_start": null,
+          "period_end": null
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "ok without a period",
+        "valid": false,
+        "set": {
+          "period_start": null
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "empty basis",
+        "valid": false,
+        "set": {
+          "basis": ""
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "missing basis",
+        "valid": false,
+        "delete": [
+          "basis"
+        ],
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "bad month",
+        "valid": false,
+        "set": {
+          "month": "202610"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "redacted export withholds the ISP",
+        "valid": true,
+        "set": {
+          "detail_redacted": true,
+          "links.0.isp": null
+        }
+      },
+      {
+        "name": "redacted export carrying the ISP (cross-field)",
+        "valid": false,
+        "set": {
+          "detail_redacted": true
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "missing redaction flag",
+        "valid": false,
+        "delete": [
+          "detail_redacted"
+        ],
+        "jsonschema_rejects": true
+      }
+    ]
+  }
+}

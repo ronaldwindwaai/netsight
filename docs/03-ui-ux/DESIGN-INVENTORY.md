@@ -59,7 +59,9 @@ Recommended rename (do not rename without design-owner approval):
 ## Screens with no approved design (design gap — do not improvise visuals)
 
 Incidents list/board, Reports, Settings/Administration, Users & Identity, Device
-detail (tab structure exists in SCREEN-SPECS.md), Configuration/Change history.
+detail (tab structure exists in SCREEN-SPECS.md), Configuration/Change history,
+Internet / WAN (`/internet`, Step 5: only the overview "Internet" KPI card is
+designed; the page follows SCREEN-SPECS.md "Internet card and `/internet`").
 For these screens: derive layout only from SCREEN-SPECS.md + the global shell
 above, and request approved designs before polishing. Do not create alternative
 visual concepts.

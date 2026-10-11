@@ -1,0 +1,567 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "InternetResponse",
+  "description": "GET /api/v1/internet. A non-ok state carries no links; per-link blocks carry their own state so a missing source never reads as a healthy link.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "state",
+    "generated_at",
+    "links",
+    "failover",
+    "detail_redacted"
+  ],
+  "properties": {
+    "state": {
+      "enum": [
+        "not-connected",
+        "unknown",
+        "ok"
+      ]
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "links": {
+      "type": "array",
+      "maxItems": 8,
+      "items": {
+        "$ref": "#/$defs/link"
+      }
+    },
+    "failover": {
+      "$ref": "#/$defs/failover"
+    },
+    "detail_redacted": {
+      "type": "boolean",
+      "description": "True when the caller lacks internet:read_detail: the ISP name, gateway, public IP and per-link throughput are withheld (null). A null there then means restricted, not 'not reported' (cross-field: a redacted response carries none of them)."
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "enum": [
+              "not-connected",
+              "unknown"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "links": {
+            "maxItems": 0
+          },
+          "failover": {
+            "properties": {
+              "state": {
+                "const": "unknown"
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "configured": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "isp",
+        "gateway",
+        "probe_location"
+      ],
+      "properties": {
+        "isp": {
+          "minLength": 1,
+          "maxLength": 128,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "gateway": {
+          "minLength": 1,
+          "maxLength": 45,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "probe_location": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "enum": [
+                "cloud-external",
+                "user-lan",
+                "server-vlan",
+                "branch",
+                "wifi",
+                "remote-site"
+              ]
+            }
+          ]
+        }
+      },
+      "description": "Operator declarations (not telemetry); the UI labels them as configured."
+    },
+    "interface": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "oper_status",
+        "capacity_bps",
+        "rx_bps",
+        "tx_bps",
+        "utilisation_pct",
+        "public_ip",
+        "freshness"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "not-connected",
+            "unknown",
+            "ok"
+          ]
+        },
+        "oper_status": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "enum": [
+                "up",
+                "down",
+                "testing",
+                "dormant",
+                "notPresent",
+                "lowerLayerDown",
+                "unknown"
+              ]
+            }
+          ]
+        },
+        "capacity_bps": {
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "rx_bps": {
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "tx_bps": {
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "utilisation_pct": {
+          "minimum": 0,
+          "maximum": 1000,
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "public_ip": {
+          "minLength": 1,
+          "maxLength": 45,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "freshness": {
+          "$ref": "common.schema.json#/$defs/freshness"
+        }
+      },
+      "description": "LibreNMS interface metrics for the declared WAN port. Every value is reported or null; utilisation_pct is derived (larger of rx/tx over capacity) and only when all are known.",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "not-connected",
+                  "unknown"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "oper_status": {
+                "type": "null"
+              },
+              "capacity_bps": {
+                "type": "null"
+              },
+              "rx_bps": {
+                "type": "null"
+              },
+              "tx_bps": {
+                "type": "null"
+              },
+              "utilisation_pct": {
+                "type": "null"
+              },
+              "public_ip": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "quality": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "latency_ms",
+        "jitter_ms",
+        "loss_pct",
+        "dns_status",
+        "dns_latency_ms",
+        "sample_count",
+        "window_seconds",
+        "freshness"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "not-connected",
+            "unknown",
+            "ok"
+          ]
+        },
+        "latency_ms": {
+          "minimum": 0,
+          "maximum": 3600000,
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "jitter_ms": {
+          "minimum": 0,
+          "maximum": 3600000,
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "loss_pct": {
+          "minimum": 0,
+          "maximum": 100,
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "dns_status": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "enum": [
+                "pass",
+                "fail",
+                "unknown"
+              ]
+            }
+          ]
+        },
+        "dns_latency_ms": {
+          "minimum": 0,
+          "maximum": 3600000,
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "sample_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100000
+        },
+        "window_seconds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000000
+        },
+        "freshness": {
+          "$ref": "common.schema.json#/$defs/freshness"
+        }
+      },
+      "description": "Latency, jitter, loss and DNS computed from the stored probe samples of the window.",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "not-connected",
+                  "unknown"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "latency_ms": {
+                "type": "null"
+              },
+              "jitter_ms": {
+                "type": "null"
+              },
+              "loss_pct": {
+                "type": "null"
+              },
+              "dns_status": {
+                "type": "null"
+              },
+              "dns_latency_ms": {
+                "type": "null"
+              },
+              "sample_count": {
+                "const": 0
+              }
+            }
+          }
+        }
+      ]
+    },
+    "availability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "period_start",
+        "period_end",
+        "uptime_pct",
+        "coverage_pct",
+        "current_outage_started_at",
+        "current_outage_seconds",
+        "freshness"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "not-connected",
+            "unknown",
+            "ok"
+          ]
+        },
+        "period_start": {
+          "format": "date-time",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "period_end": {
+          "format": "date-time",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "uptime_pct": {
+          "minimum": 0,
+          "maximum": 100,
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "coverage_pct": {
+          "minimum": 0,
+          "maximum": 100,
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "current_outage_started_at": {
+          "format": "date-time",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "current_outage_seconds": {
+          "minimum": 0,
+          "maximum": 10000000,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "freshness": {
+          "$ref": "common.schema.json#/$defs/freshness"
+        }
+      },
+      "description": "Month-to-date availability and the outage in progress, from stored probe cycles. current_outage_started_at and current_outage_seconds are both set or both null (cross-field, not expressible here).",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "not-connected",
+                  "unknown"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "period_start": {
+                "type": "null"
+              },
+              "period_end": {
+                "type": "null"
+              },
+              "uptime_pct": {
+                "type": "null"
+              },
+              "coverage_pct": {
+                "type": "null"
+              },
+              "current_outage_started_at": {
+                "type": "null"
+              },
+              "current_outage_seconds": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "link": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "role",
+        "configured",
+        "status",
+        "interface",
+        "quality",
+        "availability"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]{0,47}$",
+          "minLength": 1,
+          "maxLength": 48
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "role": {
+          "enum": [
+            "primary",
+            "backup"
+          ]
+        },
+        "configured": {
+          "$ref": "#/$defs/configured"
+        },
+        "status": {
+          "enum": [
+            "up",
+            "degraded",
+            "down",
+            "unknown"
+          ]
+        },
+        "interface": {
+          "$ref": "#/$defs/interface"
+        },
+        "quality": {
+          "$ref": "#/$defs/quality"
+        },
+        "availability": {
+          "$ref": "#/$defs/availability"
+        }
+      },
+      "description": "status is inferred from the interface state and the latest probe round; unknown when a source is silent."
+    },
+    "failover": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "basis"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "single-link",
+            "normal",
+            "failed-over",
+            "all-down",
+            "unknown"
+          ]
+        },
+        "basis": {
+          "enum": [
+            "inferred",
+            "unknown"
+          ]
+        }
+      },
+      "description": "Derived from link status only (routing is not read); basis says so.",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "unknown"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "basis": {
+                "const": "unknown"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "basis": {
+                "const": "inferred"
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

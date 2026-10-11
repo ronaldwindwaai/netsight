@@ -61,6 +61,18 @@ SCHEMA_FILES = {
     "diagnostic_path": "diagnostic-session.schema.json#/$defs/path",
     "diagnostic_session_response": "diagnostic-api.schema.json#/$defs/sessionResponse",
     "diagnostic_session_list_response": "diagnostic-api.schema.json#/$defs/sessionListResponse",
+    "internet_response": "internet.schema.json",
+    "internet_interface": "internet.schema.json#/$defs/interface",
+    "internet_quality": "internet.schema.json#/$defs/quality",
+    "internet_availability": "internet.schema.json#/$defs/availability",
+    "internet_link": "internet.schema.json#/$defs/link",
+    "internet_failover": "internet.schema.json#/$defs/failover",
+    "internet_sla_response": "internet-sla.schema.json",
+    "internet_sla_link": "internet-sla.schema.json#/$defs/slaLink",
+    "internet_sla_export_window": "internet-sla.schema.json#/$defs/exportWindow",
+    "internet_sla_export_source": "internet-sla.schema.json#/$defs/exportSource",
+    "internet_sla_export_link": "internet-sla.schema.json#/$defs/exportLink",
+    "internet_sla_export": "internet-sla.schema.json#/$defs/export",
 }
 
 

@@ -126,7 +126,9 @@ def e2e_account(tmp_path_factory: pytest.TempPathFactory) -> E2EAccount:
 
 
 @pytest.fixture(scope="session")
-def e2e_api(e2e_account: E2EAccount, tmp_path_factory: pytest.TempPathFactory) -> Iterator[dict[str, str]]:
+def e2e_api(
+    e2e_account: E2EAccount, tmp_path_factory: pytest.TempPathFactory
+) -> Iterator[dict[str, str]]:
     """Run the real API against the stub LibreNMS; yield the endpoint map."""
 
     api_port = _free_port()
@@ -150,6 +152,22 @@ def e2e_api(e2e_account: E2EAccount, tmp_path_factory: pytest.TempPathFactory) -
         # check passes without a privileged port and without traffic leaving the machine.
         "BLACKBOX_ALLOWED_TARGETS": "localhost",
         "BLACKBOX_VANTAGE": "internal",
+        # One declared WAN link on the stub's port 1 (the Internet scenario). No DATABASE_URL, so
+        # there is no sample store: quality, availability and the SLA are honestly not-connected.
+        "NETSIGHT_WAN_LINKS": json.dumps(
+            [
+                {
+                    "id": "e2e-wan",
+                    "name": "E2E uplink",
+                    "role": "primary",
+                    "isp": "Example ISP",
+                    "librenms_device": "1",
+                    "librenms_port": "1",
+                    "probe_targets": ["localhost"],
+                    "dns_target": "localhost",
+                }
+            ]
+        ),
     }
 
     stub = subprocess.Popen(

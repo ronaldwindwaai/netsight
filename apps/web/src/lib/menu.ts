@@ -1,6 +1,7 @@
 import type { MenuNode } from '@adminlte/react';
 
 const DIAGNOSTICS_PERMISSION = 'diagnostics:read';
+const INTERNET_PERMISSION = 'internet:read';
 
 interface MenuEntry {
   node: MenuNode;
@@ -14,6 +15,10 @@ const MENU_ENTRIES: readonly MenuEntry[] = [
   { node: { type: 'item', text: 'Network Map', href: '/network/map', icon: 'bi-diagram-3' } },
   { node: { type: 'item', text: 'Devices', href: '/devices', icon: 'bi-hdd-network' } },
   { node: { type: 'item', text: 'Traffic', href: '/traffic', icon: 'bi-bar-chart-line' } },
+  {
+    node: { type: 'item', text: 'Internet', href: '/internet', icon: 'bi-globe2' },
+    requires: INTERNET_PERMISSION,
+  },
   { node: { type: 'item', text: 'Security', href: '/security', icon: 'bi-shield-exclamation' } },
   {
     node: { type: 'item', text: 'Diagnostics', href: '/diagnostics', icon: 'bi-clipboard2-pulse' },

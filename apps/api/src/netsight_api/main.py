@@ -60,6 +60,7 @@ from netsight_api.errors import ApiError
 from netsight_api.evaluation.wiring import build_evaluation_service, start_evaluation
 from netsight_api.incident_list_routes import router as incident_list_router
 from netsight_api.incident_routes import router as incident_router
+from netsight_api.internet_routes import router as internet_router
 from netsight_api.localauth.routes import router as localauth_router
 from netsight_api.maintenance_routes import router as maintenance_router
 from netsight_api.rbac import Identity, Permission, is_allowed
@@ -97,6 +98,7 @@ from netsight_api.schemas import (
 )
 from netsight_api.security_routes import router as security_router
 from netsight_api.timewindow import resolve_window
+from netsight_api.wan.wiring import build_wan_collector, start_wan_sampling
 
 API_PREFIX = "/api/v1"
 CORRELATION_ID_HEADER = "X-Correlation-ID"
@@ -112,11 +114,17 @@ async def lifespan(app_: FastAPI) -> AsyncIterator[None]:
     session_policy()
     configure_audit_logging()
     service = build_evaluation_service(librenms_client=get_optional_librenms_client)
+    # Both services are built before either starts: a bad setting fails start-up, not later.
+    wan_service = build_wan_collector()
     evaluation = start_evaluation(service)
     app_.state.evaluation_task = evaluation.task
+    wan_sampling = start_wan_sampling(wan_service)
+    app_.state.wan_sampling_task = wan_sampling.task
     try:
         yield
     finally:
+        await wan_sampling.shutdown()
+        app_.state.wan_sampling_task = None
         await evaluation.shutdown()
         app_.state.evaluation_task = None
         await oidc_aclose()
@@ -1265,6 +1273,7 @@ app.include_router(alert_rule_router, prefix=API_PREFIX)
 app.include_router(maintenance_router, prefix=API_PREFIX)
 app.include_router(diagnostic_router, prefix=API_PREFIX)
 app.include_router(diagnostic_session_router, prefix=API_PREFIX)
+app.include_router(internet_router, prefix=API_PREFIX)
 # Authentication lives under the same versioned prefix as every other platform
 # route (contracts/openapi/netsight-api.yaml declares `servers: /api/v1` with
 # `/auth/providers` relative to it). Serving it unversioned broke the server

@@ -14,7 +14,7 @@ Status: living plan. Sources consumed in order: `AGENTS.md`, `docs/00-product/PR
 - S1 slice implemented: OIDC login + local credentials with MFA (ADR 0010), sessions, RBAC, AdminLTE shell, overview aggregate, LibreNMS devices/interfaces/alerts, device table/detail, interface table, source-health states, E2E harness + security matrix tests.
 - NetBox (NS-030): read-only adapter + `/api/v1/sources/netbox/health`, `/api/v1/netbox/devices`, `/api/v1/netbox/devices/{id}`, `/api/v1/reconcile/findings`. Contract + parser contract surfaces updated for overview source state.
 - Topology (S3 steps 1–4): canonical `topology.schema.json`, `/api/v1/topology` endpoint, NetBox active cables as the only edge source (states `not-connected` / `unknown` / `ok`; only terminations that resolve to devices on both ends become edges), `/network/map` UI with explicit states + interactive layered canvas (pan/zoom/fit), contract + parser tests (no-source/empty/valid graph). Reconciliation findings consumed in edge context: nodes carry `reconciled` + `finding` (`missing-discovered` / `status-mismatch` only, finding requires `reconciled=true` in schema/pydantic/parser); `unknown-discovered` stays in `/reconcile/findings`. Reviewed: independent review (1 MAJOR contract-agreement finding fixed: `TopologyNode.name` now required-nullable across pydantic/OpenAPI/JSON-schema/TS parser) + security review (negative authz tests, SSRF pagination-origin test, hostile-name test, token-echo test added; threat-model delta recorded).
-- Web overview placeholders: topology, incidents, traffic, applications, users, internet, security are explicitly "not connected" surfaces; no fabricated metrics.
+- Web overview placeholders: topology, incidents, traffic, applications, users, security are explicitly "not connected" surfaces; no fabricated metrics. The Internet KPI is real since Step 5 (E08): it shows source-reported WAN status/throughput/utilisation only and otherwise stays "Not connected"/"Restricted"/"Unknown".
 - Traffic (S4-1 + S4-2): canonical `traffic.schema.json` (top responses) + `traffic-flows.schema.json`, pydantic models, OpenAPI paths and TS parsers in three-way agreement; `/api/v1/traffic/top-talkers`, `/api/v1/traffic/top-destinations`, `/api/v1/traffic/flows` gated by `traffic:read` with server-bounded windows (`preset` `1h`/`6h`/`24h`/`7d` or explicit `from`/`to`, ≤31 days, `limit` ≤100/≤500 → 422 on violations) and explicit `not-connected`/`unknown`/`ok` states. S4-2 wires the read-only ClickHouse/Akvorado `TrafficSource` (unset `CLICKHOUSE_DSN` → `not-connected`; configured-but-invalid or failed read → `unknown`; real reads → `ok` with source-reported freshness) — never fabricated sample rows.
 
 ## Build plan (next slices, DoD-gated)
@@ -194,6 +194,86 @@ Stories: PRD §35-40 (root-cause "Why?" engine), §54. Contracts: `diagnostic*.s
      - *Verification* (2026-10-11): ruff `check` clean (src, tests); mypy (`src`, 108 files) clean; default pytest **4410 passed / 452 skipped** (before the pass 4323 / 440); live PostgreSQL 16 (ephemeral `pgserver`, owner and least-privilege app role) **4860 passed / 2 skipped** (was 4761 / 2), server stopped and no stray `postgres` process; web typecheck and lint clean, **875 unit + 151 component tests** (were 866 + 143), `next build` succeeds. New-module coverage: `diagnostic_growth` 100%, `diagnostic_titles` 98%, `diagnostic_changes` 98%, `blackbox_exporter` 98%, `diagnostics` 99%; `postgres_diagnostics.py` is covered by the live suites only. UI is verified by jsdom component tests, typecheck, lint and build only (no browser run).
      - *Rollback.* Revert the commit(s); no deployed schema exists for 0004 (never committed), so amending it in place needs no down migration. Config: unset `NETSIGHT_DIAGNOSTIC_SESSIONS_DAILY_CAP` to use the default.
      - *Follow-ups.* Retention period and audited prune; scoping and the meaning of "Basic"/"Security scope"; read auditing for session reads; exporter authentication; a Playwright run of the session page.
+
+### E08 — Internet / WAN (PRD 6, 20, 21; "§41-42" in the brief maps to PRD 21 plus the overview Internet card)
+Design doc: `docs/12-implementation/INTERNET-WAN.md`. No approved design exists for `/internet` (only the overview card is designed): the page follows SCREEN-SPECS.
+
+1. ✅ **Step 5 - WAN status, SLA and evidence export** (2026-10-11, **uncommitted on `main`**; strict TDD, every slice RED first except the pure SLA module whose
+   tests and code were written in one pass; independent code, database and security reviews done and fixed, see "Review fix pass"). Delivered, contract-first:
+   - **(a) `GET /api/v1/internet`.** Per declared link: status, ISP and gateway (operator-declared, labelled "configured"), interface block (LibreNMS: status,
+     capacity, rx/tx rates, utilisation, public IP, the source's own freshness), quality block (latency, jitter, loss, DNS from stored probe samples), availability
+     block (rolling 24 h uptime, coverage, outage in progress) and a failover state. Multi-WAN (primary/backup). **Every field is source-reported or null**; absent
+     source = `not-connected`, failing = `unknown`, stale/undated counters labelled; link status and failover are `inferred` from current evidence only (rules in
+     INTERNET-WAN.md); nothing is fabricated (`non-ok => no values` in JSON Schema, pydantic, OpenAPI and the TS parser). Links are declared by the operator
+     (`NETSIGHT_WAN_LINKS`; never inferred). New LibreNMS adapter method `wan_port` (rates x8, `poll_time`, sole global IPv4).
+   - **RBAC (decision recorded in RBAC-MATRIX).** `internet:read` for every role (the WAN card is an Overview widget and Overview is granted to all roles);
+     `internet:export` for Admin, Network Engineer and Auditor only; `internet:read_detail` (ISP, gateway, public IP, throughput) for Admin, Network Engineer
+     and Security Analyst only (review fix pass). Authorise first, then per-identity limits (300/30/10 per minute).
+   - **(b) SLA and evidence export.** `GET /internet/sla?month=YYYY-MM` (server-bounded: current month and 24 back, else 422) and `/internet/sla/export`
+     (JSON or CSV; windows `down`/`degraded`/`unknown` with probe-round counts and sources; at most 2 000 windows per link; formula-injection-safe CSV; audited).
+     Computed by the pure `wan/sla.py` from stored cycles: gaps in sampling are `unknown` (never up or down), uptime over known time, `null` when nothing was
+     known. **Storage:** migration `0005_wan_probe_samples` (append-only `wan_probe_samples` + `wan_link_cycles` rollup, monthly range
+     partitions; the CHECK pins a cycle's state to its counts; API role `SELECT` only and a separate collector role `INSERT` only; ENABLE ALWAYS triggers on the
+     parents and every partition stop even the owner; guarded down), Protocol with in-memory and PostgreSQL stores in one conformance suite (memory, owner,
+     split runtime roles). **Sampling decision (documented):** a small bounded collector, off by default
+     (`NETSIGHT_WAN_SAMPLING_ENABLED`), env-gated, single leader via its own advisory-lock key and the evaluation `run_scheduler` loop - not the evaluation
+     scheduler (different failure domain and budgets; WAN evidence must not depend on alerting being enabled). It adds no probe capability: it uses the existing
+     allow-listed Blackbox clients; a probe that fails, hangs or raises is an `unknown` sample; a link nobody serves records nothing.
+   - **(c) UI.** `/internet` (sidebar entry gated by `internet:read`): failover card, one card per link with Interface/Quality/Availability blocks naming source
+     and freshness, "Not reported" instead of zero, outage-in-progress alert, partial and stale banners, the full state matrix (loading, empty, not-connected,
+     unknown, partial, stale, permission, unauthenticated, rate limited, error); SLA panel with a UTC month picker limited to the supported months (plain GET form),
+     per-link table and read-only CSV/JSON downloads (`/internet/export` route: validated query, cross-site refused, known content type and fixed attachment name only).
+     The overview Internet card shows real status, throughput and utilisation only; otherwise it stays "Not connected"/"Restricted"/"Unknown". Operator and
+     telemetry text is rendered as data (hostile-markup component tests); status is word plus icon, never colour alone.
+   - **Contracts.** `internet.schema.json`, `internet-sla.schema.json`, OpenAPI paths and 14 components, pydantic `schemas_internet.py`, TS `api-contracts-internet.ts`,
+     shared vectors `internet.vectors.json` (12 entities, 148 cases) driving all four verdicts plus an OpenAPI-vs-JSON-schema structural diff.
+   - **Verification** (2026-10-11): ruff clean (src, tests); mypy (`src`, 120 files) clean; `scripts/security-verify.sh` passes; default pytest **5218 passed / 521 skipped**
+     (baseline 4410 / 452); live PostgreSQL 16 (ephemeral `pgserver`, owner and least-privilege app role) **5737 passed / 2 skipped** (baseline 4860 / 2), server stopped afterwards (only the pre-existing
+     Laragon `postgres` processes remain); the 12-test real-process E2E (API against the stub LibreNMS) passes, including the new Internet scenario; new-module coverage 94-100%
+     (`wan/*`, `storage/wan.py`, `schemas_internet.py`; `postgres_wan.py` is covered by the live suites); web typecheck and lint clean, **1052 unit + 203 component tests**
+     (baseline 875 + 151), `next build` succeeds (`/internet`, `/internet/export` compile). UI is verified by jsdom component tests, typecheck, lint and build only (no browser run).
+   - **Rollback.** Unset `NETSIGHT_WAN_SAMPLING_ENABLED` (collector off; stored rows stay) and/or `NETSIGHT_WAN_LINKS` (`/internet` answers `not-connected`). Code: unregister
+     `internet_router` and the `build_wan_collector`/`start_wan_sampling` calls in `main.py`; drop the Internet menu entry and the overview KPI wiring. Schema:
+     `apply_down(conn, allow_destructive=True)` reverses 0005 only (refuses while rows exist unless `NETSIGHT_ALLOW_DESTRUCTIVE_DOWN=1`); disable sampling first.
+   - **Review fix pass** (2026-10-11, strict test-first; every item RED before GREEN; live suites on an ephemeral `pgserver` 16.2, stopped afterwards, only the pre-existing
+     Laragon `postgres` processes remain). Closes the three independent reviews of this step (code APPROVE, database approve with warnings, security PASS WITH FOLLOW-UPS):
+     - *Database.* H1: `wan_probe_samples` and `wan_link_cycles` are `PARTITION BY RANGE (sampled_at)`, one partition per UTC month, created idempotently by the migrator only
+       (`netsight_ensure_wan_partition`, EXECUTE revoked; `migrate up` makes this and next month, `migrate partitions` is the documented monthly step); the append-only triggers
+       are `ENABLE ALWAYS` on the parents and every partition (asserted from `pg_trigger`); a write into a month with no partition is rejected and the collector logs it and records
+       nothing (fail closed). Retention stays a pending human decision and is documented as a migrator drop of samples then detach-and-drop of cycles per month (the foreign key
+       forces that order; proven live). M1: the cycle read cap is derived from the sampling interval (2 x 31 days of rounds + look-back) and closed months (over an hour past month end,
+       immutable) are computed once and cached in a bounded in-memory memo with deterministic recomputation (no new table); `sla.summarise` resolves two writers (same instant:
+       agree -> one, contradict -> `unknown`; interleaved cycles tile deterministically). M2: covering index `(link_id, sampled_at) INCLUDE (probe, target, location)` + partition
+       pruning + the cache for the export's source query. M3: deferred constraint triggers (SECURITY DEFINER, pinned search_path) tie a cycle's counts to its samples at COMMIT, for new
+       cycles and late samples. LOW: only a unique violation is "cycle exists" (deadlock/serialization = failed write); samples via one `executemany`; CHECK fail/unknown => no latency
+       (a pass may have none, matching the collector); redundant `ON DELETE RESTRICT` dropped.
+     - *Security.* M1: separate collector role (`NETSIGHT_WAN_COLLECTOR_DATABASE_URL`, `grants/wan_collector_role.sql`, INSERT only) and a SELECT-only API role; the collector refuses to
+       start without its URL, with the API's role, or with a superuser/row-security-bypass/table-owner role, or one it cannot check; export `basis` states that evidence is only as
+       trustworthy as the recording host. M2: `internet:read_detail` (Admin, Network Engineer, Security Analyst) withholds ISP, gateway, public IP and throughput (null +
+       `detail_redacted`) in the API, the export's ISP name, the parsers and the UI ("Restricted"); Technician, Management, Auditor get status and the SLA summary (RBAC-MATRIX
+       decision record). M3: an unknown export is audited `failure`; the audit records link and row counts and format; the `assert` is an explicit check.
+     - *Code review.* The CSV ends with a `truncated` sentinel row and an `EXPORT INCOMPLETE` note when windows were cut; the SLA panel shows `windows_truncated` (new `SlaLink`
+       field); a null outage count renders "Not reported"; the exact month-start instant is an empty but honest period (it was `unknown`); the seconds always add up to the total
+       (the rounding remainder of a window with fractional-second edges, such as the rolling 24-hour window, is `unknown`; before, the parts could fall a second short of the total).
+     - *Contracts.* New fields `InternetResponse.detail_redacted`, `InternetSlaExport.detail_redacted`, `InternetSlaLink.windows_truncated` in JSON Schema, OpenAPI, pydantic, the TS
+       parser and the shared vectors (new cases, including the cross-field redaction rules).
+     - *Verification* (2026-10-11): ruff `check` clean (src, tests); mypy (`src`, 120 files) clean; `scripts/security-verify.sh` passes; default pytest **5361 passed / 544 skipped**
+       (was 5218 / 521); live PostgreSQL 16 (ephemeral `pgserver`; owner and the split collector/API roles) **5903 passed / 2 skipped** (was 5737 / 2); the 12-test real-process E2E passes;
+       coverage of the touched modules: `storage/wan.py`, `wan/collector.py`, `wan/reading.py` 100%, `wan/sla.py` 98%, `wan/sla_report.py` 99%, `postgres_wan.py` 96%,
+       `internet_routes.py` 99%, `wiring.py` 96%; web typecheck and lint clean, **1066 unit + 212 component tests** (were 1052 + 203), `next build` succeeds.
+     - *Rollback.* As above; additionally `apply_down` removes the partitions and both helper functions. Removing `NETSIGHT_WAN_COLLECTOR_DATABASE_URL` stops all writes.
+   - **Human decisions needed.** (1) **Retention period for probe samples and cycles, and who runs the migrator drop: pending, not invented** (DATA-RETENTION-MATRIX; nothing is scheduled).
+     (2) Confirm the RBAC reading: every role reads, export for Admin, Network Engineer, Auditor, and the new `internet:read_detail` split (detail for Admin, Network Engineer, Security
+     Analyst; whether Technician and Auditor should also hold it, whether Management should hold the export, whether probe targets in the export should be withheld too).
+     (3) The SLA definitions: degraded counts as reachable, the 1.5x coverage grace, reachability-only cycle state, the closed-month settling hour, and the per-link `uptime_target_pct`
+     (take them from the ISP contract). (4) Which probe targets and exporter locations represent each link, and whether backup links get their own exporter (DNS is only probed by the
+     local prober, so it does not reflect a backup link's path). (5) Who owns the scheduled monthly `migrate partitions` job (cron, systemd timer or Task Scheduler as the migrator) and
+     whether a missing-partition alert beyond the collector's error log is wanted. (6) Whether SLA evidence needs signing or independent attestation (today it is only as trustworthy as the
+     recording host). (7) An approved design for `/internet`.
+   - **Follow-ups.** Gateway reachability and route reads (failover is inferred from link status only); contracted capacity as a configured field; a persisted rollup if a cold month read proves
+     heavy; read auditing for status/SLA; live LibreNMS check that the ports list carries `ifInOctets_rate`, `ifOutOctets_rate` and `poll_time`; latency/loss SLA terms (only uptime violations
+     exist); a persisted/scheduled SLA report; a Playwright run of `/internet` against a real stack; a shared (non-per-worker) rate limiter; a cap that tolerates a sampling interval raised
+     after a dense month was stored (today such a month reads as an error, never a wrong figure).
 
 ### E09 — AI copilot
 Stories: per PRD E9.

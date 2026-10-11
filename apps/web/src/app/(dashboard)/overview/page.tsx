@@ -2,8 +2,10 @@ import Link from 'next/link';
 import { AppContent, Card, InfoBox } from '@adminlte/react';
 
 import { DataFailure, FreshnessNotice } from '@/components/data-state';
+import { OverviewInternetKpi } from '@/components/overview-internet-kpi';
 import { apiGet } from '@/lib/api';
 import { parseOverviewResponse } from '@/lib/api-contracts';
+import { parseInternetResponse } from '@/lib/api-contracts-internet';
 import { deviceHealthSummary, sourceProvenance } from '@/lib/overview-summary';
 
 function UnavailableSurface({
@@ -29,7 +31,10 @@ function UnavailableSurface({
 }
 
 export default async function OverviewPage() {
-  const state = await apiGet('/api/v1/overview', parseOverviewResponse);
+  const [state, internet] = await Promise.all([
+    apiGet('/api/v1/overview', parseOverviewResponse),
+    apiGet('/api/v1/internet', parseInternetResponse),
+  ]);
   const overview = state.kind === 'ok' ? state.data : null;
   const health = overview
     ? deviceHealthSummary(overview.devices)
@@ -76,16 +81,7 @@ export default async function OverviewPage() {
             progressText={health.detail}
           />
         </Link>
-        <div className="overview-kpi--unknown">
-          <InfoBox
-            icon="bi-globe2"
-            text="Internet"
-            title="Not connected"
-            theme="secondary"
-            progress={0}
-            progressText="WAN telemetry unavailable"
-          />
-        </div>
+        <OverviewInternetKpi state={internet} />
         <div className="overview-kpi--unknown">
           <InfoBox
             icon="bi-shield-exclamation"

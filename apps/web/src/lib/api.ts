@@ -62,6 +62,34 @@ export async function apiGet<T>(path: string, parse: ResponseParser<T>): Promise
   }
 }
 
+export type RawGetResult =
+  | { ok: true; response: Response; correlationId: string }
+  | { ok: false; status: number | null; correlationId: string };
+
+/**
+ * Cookie-authenticated GET that hands back the raw response (a file download). Only the status is
+ * ever relayed on failure: nothing the upstream said is surfaced. Same path rules as `apiGet`.
+ */
+export async function apiGetRaw(path: string, accept: string): Promise<RawGetResult> {
+  const correlationId = crypto.randomUUID();
+  try {
+    const session = (await cookies()).get(SESSION_COOKIE)?.value;
+    const response = await fetch(apiUrl(path), {
+      cache: 'no-store',
+      headers: {
+        Accept: accept,
+        'X-Correlation-ID': correlationId,
+        ...(session ? { Cookie: `${SESSION_COOKIE}=${encodeURIComponent(session)}` } : {}),
+      },
+      redirect: 'error',
+      signal: AbortSignal.timeout(API_TIMEOUT_MS),
+    });
+    return { ok: true, response, correlationId };
+  } catch {
+    return { ok: false, status: null, correlationId };
+  }
+}
+
 export interface ApiPostOptions {
   /** Overall budget for the CSRF token fetch and the write itself, in milliseconds. */
   timeoutMs?: number;

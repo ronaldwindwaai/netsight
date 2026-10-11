@@ -30,6 +30,15 @@ const DIAGNOSTIC_SESSION_VECTOR_URL = new URL(
   import.meta.url,
 );
 
+const INTERNET_VECTOR_URL = new URL(
+  '../../../../contracts/test-vectors/internet.vectors.json',
+  import.meta.url,
+);
+
+export function loadInternetVectors(): Record<string, VectorBlock> {
+  return JSON.parse(readFileSync(INTERNET_VECTOR_URL, 'utf-8')) as Record<string, VectorBlock>;
+}
+
 export function loadDiagnosticSessionVectors(): Record<string, VectorBlock> {
   return JSON.parse(readFileSync(DIAGNOSTIC_SESSION_VECTOR_URL, 'utf-8')) as Record<
     string,

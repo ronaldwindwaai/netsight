@@ -18,11 +18,14 @@ _READ_WINDOW_SECONDS = 60.0
 _read_limiter = RateLimiter()
 
 
-def enforce_read_limit(identity: Identity, family: str) -> None:
-    """Raise 429 when ``identity`` exceeds the read budget for ``family``."""
-    if not _read_limiter.allow(
-        f"{family}:{identity.id}", READ_LIMIT_PER_MINUTE, _READ_WINDOW_SECONDS
-    ):
+def enforce_read_limit(identity: Identity, family: str, limit: int | None = None) -> None:
+    """Raise 429 when ``identity`` exceeds the read budget for ``family``.
+
+    ``limit`` (per minute) overrides the shared budget for a heavier family (read at call time,
+    so the shared constant stays patchable in tests).
+    """
+    allowed = READ_LIMIT_PER_MINUTE if limit is None else limit
+    if not _read_limiter.allow(f"{family}:{identity.id}", allowed, _READ_WINDOW_SECONDS):
         raise ApiError(
             429,
             "RATE_LIMITED",

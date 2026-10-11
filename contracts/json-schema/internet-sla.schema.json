@@ -1,0 +1,604 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "InternetSlaResponse",
+  "description": "GET /api/v1/internet/sla?month=YYYY-MM. Server-bounded months; a non-ok state carries no links.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "state",
+    "month",
+    "period_start",
+    "period_end",
+    "generated_at",
+    "links"
+  ],
+  "properties": {
+    "state": {
+      "enum": [
+        "not-connected",
+        "unknown",
+        "ok"
+      ]
+    },
+    "month": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])$",
+      "minLength": 7,
+      "maxLength": 7
+    },
+    "period_start": {
+      "format": "date-time",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "period_end": {
+      "format": "date-time",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "links": {
+      "type": "array",
+      "maxItems": 8,
+      "items": {
+        "$ref": "#/$defs/slaLink"
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "enum": [
+              "not-connected",
+              "unknown"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "links": {
+            "maxItems": 0
+          },
+          "period_start": {
+            "type": "null"
+          },
+          "period_end": {
+            "type": "null"
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "period_start": {
+            "type": "string"
+          },
+          "period_end": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "violation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "target_pct",
+        "actual_pct"
+      ],
+      "properties": {
+        "kind": {
+          "const": "uptime-below-target"
+        },
+        "target_pct": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "actual_pct": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        }
+      }
+    },
+    "slaLink": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "link_id",
+        "name",
+        "state",
+        "uptime_target_pct",
+        "total_seconds",
+        "up_seconds",
+        "degraded_seconds",
+        "down_seconds",
+        "unknown_seconds",
+        "uptime_pct",
+        "coverage_pct",
+        "outage_count",
+        "longest_outage_seconds",
+        "cycle_count",
+        "windows_truncated",
+        "violations"
+      ],
+      "properties": {
+        "link_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]{0,47}$",
+          "minLength": 1,
+          "maxLength": 48
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "state": {
+          "enum": [
+            "not-connected",
+            "unknown",
+            "ok"
+          ]
+        },
+        "uptime_target_pct": {
+          "exclusiveMinimum": 0,
+          "maximum": 100,
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "total_seconds": {
+          "minimum": 0,
+          "maximum": 10000000,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "up_seconds": {
+          "minimum": 0,
+          "maximum": 10000000,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "degraded_seconds": {
+          "minimum": 0,
+          "maximum": 10000000,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "down_seconds": {
+          "minimum": 0,
+          "maximum": 10000000,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "unknown_seconds": {
+          "minimum": 0,
+          "maximum": 10000000,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "uptime_pct": {
+          "minimum": 0,
+          "maximum": 100,
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "coverage_pct": {
+          "minimum": 0,
+          "maximum": 100,
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "outage_count": {
+          "minimum": 0,
+          "maximum": 1000000,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "longest_outage_seconds": {
+          "minimum": 0,
+          "maximum": 10000000,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "cycle_count": {
+          "minimum": 0,
+          "maximum": 1000000,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "violations": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "$ref": "#/$defs/violation"
+          }
+        },
+        "windows_truncated": {
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "description": "True when the evidence export lists fewer windows than the month holds; the figures are never truncated. Null when the link is not ok."
+        }
+      },
+      "description": "Deterministic month figures from stored probe cycles. up + degraded + down + unknown seconds equal total_seconds (cross-field). uptime_pct is (up + degraded) over known time and null when nothing was known. Time with no probe round is unknown, never up or down.",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "not-connected",
+                  "unknown"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "total_seconds": {
+                "type": "null"
+              },
+              "up_seconds": {
+                "type": "null"
+              },
+              "degraded_seconds": {
+                "type": "null"
+              },
+              "down_seconds": {
+                "type": "null"
+              },
+              "unknown_seconds": {
+                "type": "null"
+              },
+              "uptime_pct": {
+                "type": "null"
+              },
+              "coverage_pct": {
+                "type": "null"
+              },
+              "outage_count": {
+                "type": "null"
+              },
+              "longest_outage_seconds": {
+                "type": "null"
+              },
+              "cycle_count": {
+                "type": "null"
+              },
+              "violations": {
+                "maxItems": 0
+              },
+              "windows_truncated": {
+                "type": "null"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "total_seconds": {
+                "type": "integer"
+              },
+              "up_seconds": {
+                "type": "integer"
+              },
+              "degraded_seconds": {
+                "type": "integer"
+              },
+              "down_seconds": {
+                "type": "integer"
+              },
+              "unknown_seconds": {
+                "type": "integer"
+              },
+              "coverage_pct": {
+                "type": "number"
+              },
+              "outage_count": {
+                "type": "integer"
+              },
+              "longest_outage_seconds": {
+                "type": "integer"
+              },
+              "cycle_count": {
+                "type": "integer"
+              },
+              "windows_truncated": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "exportWindow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "started_at",
+        "ended_at",
+        "duration_seconds",
+        "sample_count"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "down",
+            "degraded",
+            "unknown"
+          ]
+        },
+        "started_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "ended_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "duration_seconds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000000
+        },
+        "sample_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        }
+      },
+      "description": "ended_at is after started_at (cross-field). sample_count 0 is a gap in sampling."
+    },
+    "exportSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "probe",
+        "target",
+        "location"
+      ],
+      "properties": {
+        "probe": {
+          "enum": [
+            "icmp",
+            "tcp",
+            "dns"
+          ]
+        },
+        "target": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 253
+        },
+        "location": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "enum": [
+                "cloud-external",
+                "user-lan",
+                "server-vlan",
+                "branch",
+                "wifi",
+                "remote-site"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "exportLink": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "link",
+        "isp",
+        "sources",
+        "windows",
+        "windows_truncated"
+      ],
+      "properties": {
+        "link": {
+          "$ref": "#/$defs/slaLink"
+        },
+        "isp": {
+          "minLength": 1,
+          "maxLength": 128,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sources": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "$ref": "#/$defs/exportSource"
+          }
+        },
+        "windows": {
+          "type": "array",
+          "maxItems": 2000,
+          "items": {
+            "$ref": "#/$defs/exportWindow"
+          }
+        },
+        "windows_truncated": {
+          "type": "boolean"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "link": {
+                "properties": {
+                  "state": {
+                    "enum": [
+                      "not-connected",
+                      "unknown"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "sources": {
+                "maxItems": 0
+              },
+              "windows": {
+                "maxItems": 0
+              },
+              "windows_truncated": {
+                "const": false
+              }
+            }
+          }
+        }
+      ]
+    },
+    "export": {
+      "title": "InternetSlaExport",
+      "description": "GET /api/v1/internet/sla/export?format=json. Outage, degraded and unknown windows with probe sources and round counts; nothing is inferred beyond the samples.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "month",
+        "period_start",
+        "period_end",
+        "generated_at",
+        "basis",
+        "detail_redacted",
+        "links"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "not-connected",
+            "unknown",
+            "ok"
+          ]
+        },
+        "month": {
+          "type": "string",
+          "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])$",
+          "minLength": 7,
+          "maxLength": 7
+        },
+        "period_start": {
+          "format": "date-time",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "period_end": {
+          "format": "date-time",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "generated_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "basis": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "links": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "$ref": "#/$defs/exportLink"
+          }
+        },
+        "detail_redacted": {
+          "type": "boolean",
+          "description": "True when the caller lacks internet:read_detail: the ISP name is withheld (null)."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "not-connected",
+                  "unknown"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "links": {
+                "maxItems": 0
+              },
+              "period_start": {
+                "type": "null"
+              },
+              "period_end": {
+                "type": "null"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "period_start": {
+                "type": "string"
+              },
+              "period_end": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

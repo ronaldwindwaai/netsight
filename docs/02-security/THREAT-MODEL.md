@@ -313,6 +313,77 @@ Closes the Step 4 independent reviews (code approve, database approve, security 
 - **Integrity of the inference (code review).** The inferred evidence line no longer cites checks that could not be answered. `infer()` and the run route were split into small helpers with no behaviour change (the existing inference suites pass unchanged).
 - **Still open.** As above, plus read auditing, per-owner/site scoping, the exact meaning of Technician "Basic" and Security Analyst "Security scope", exporter authentication/mTLS, and the retention period and prune step.
 
+### Step 5 - Internet/WAN status, SLA and evidence export (2026-10-11) - threat-model delta
+New surface: `GET /api/v1/internet`, `/internet/sla`, `/internet/sla/export`, the web `/internet` page and `/internet/export` download route, two append-only
+tables (migration 0005: `wan_probe_samples`, `wan_link_cycles`), a LibreNMS port reading (`wan_port`), and an optional, off-by-default sampling collector
+(`NETSIGHT_WAN_SAMPLING_ENABLED`). Status (the independent reviews were run; their findings are closed in "Review fix pass" below):
+
+- **No new egress or probe capability (SSRF unchanged).** The collector calls the existing allow-listed probe clients only (`BLACKBOX_ALLOWED_TARGETS`, fixed
+  exporter modules, no redirects, bounded responses); a declared probe target is validated to a plain host or address (`[A-Za-z0-9._:-]`) and an unlisted one
+  answers `unknown` without a connection. The LibreNMS device and port identifiers come from the operator's declaration, are validated to
+  `[A-Za-z0-9][A-Za-z0-9._-]{0,63}` (no slash, backslash or `..`) and are percent-encoded into fixed paths (`/devices/{id}/ports`, `/ports/{id}/ip`); the token
+  travels only as a bearer header (a test asserts it is never in a URL). Redirects are refused, errors are typed and carry no URL.
+- **Fabricated telemetry (the central risk) - controlled by construction and by test.** Every API field is source-reported or `null`; non-ok blocks cannot carry
+  values (JSON Schema `if/then`, pydantic validators, TS parser and OpenAPI agree through 148 shared vectors). A missing, malformed, negative, non-finite or
+  boolean counter is `null` (never 0); an unrecognised interface status is `unknown`; counters older than 15 minutes are labelled `stale` and a missing poll time
+  `unknown`, and neither counts as evidence about now; a lapsed probe round claims nothing about the present; "no samples yet" is empty, never 0% loss. Failover and
+  link status are labelled `inferred` and are `unknown` whenever a link is silent; an interface that is up while every probe fails is `down`. The SLA treats time with
+  no probe round as `unknown` (never up, never down), reports uptime over known time only and is `null` when nothing was known (never 100%).
+- **Integrity of the SLA evidence.** Append-only tables: the Protocol has no update or removal method, a repeated `(link, time)` is a conflict, the app role holds
+  `SELECT, INSERT` only, and `BEFORE UPDATE OR DELETE` / `BEFORE TRUNCATE` triggers (`ENABLE ALWAYS`, the 0003 function) stop every role including the owner (proven
+  live as owner and app role, including under `session_replication_role = replica`). A CHECK pins each cycle's state to its sample counts, sample columns are
+  validated (probe kind, location, target pattern, latency range) and a cycle is written with its samples in one transaction after the application verifies they
+  agree. The computation is a pure function (`wan/sla.py`) with 43 unit tests; the PostgreSQL SLA equals the in-memory SLA for the same data (tested live).
+  **Residual:** the table owner can disable the triggers or drop a partition; keep the migrator credential out of the service (as for 0002 to 0004). The
+  evidence is only as trustworthy as the host that recorded it: the samples are taken and stored by the Netsight host and nothing is signed or independently
+  attested, which the export's `basis` text now says. (The earlier shared-role weakness is closed: see "Review fix pass".)
+- **Information disclosure.** Every role holds `internet:read` (status, quality, availability, SLA summary). The public IP, configured gateway, ISP name and
+  per-link throughput need `internet:read_detail` (Admin, Network Engineer, Security Analyst) and are withheld by the API (`null`, `detail_redacted`) from
+  Technician, Management and Auditor; the export (probe targets, outage windows) only to `internet:export` (Admin, Network Engineer, Auditor), and its ISP name
+  needs the detail permission too (decision in RBAC-MATRIX). Responses and the export never contain a connection string, a LibreNMS URL, probe detail text or driver
+  message (tests plant secrets in source errors and assert absence). The download route only relays a known content type with a fixed, anchored attachment name,
+  drops every other upstream header, sets `Cache-Control: no-store` and `nosniff`, and answers upstream failures with fixed text.
+- **CSV injection.** Operator-declared names (link name, ISP) are the only free text in the CSV; a leading `=`, `+`, `-`, `@`, tab, CR or LF is neutralised with a
+  leading apostrophe, cells are quoted by the csv module, and the file name is derived from the validated month only (no header injection; tested).
+- **Untrusted text in the UI (controlled).** Link names, ISP, gateway and every source value render as React text nodes; component tests plant `<img onerror>` and
+  `<script>` in names, ISP, gateway and public IP and assert no element is created; the surfaces offer no button, input or form except the plain GET month picker
+  and the two download links (asserted). No operator or telemetry text is ever interpreted as an instruction (no AI path reads it).
+- **Denial of service.** Reads are bounded: months are server-bounded (current plus 24 back, otherwise 422), one cycle read is capped at twice a month of rounds at the configured interval (about 89 000 rows at 60 s, derived
+  from `NETSIGHT_WAN_SAMPLE_INTERVAL_SECONDS`) and one sample read at 5 000 (over the cap is an error, never a silent cut), closed months are served from a bounded
+  in-memory cache (immutable data) and the month tables are partitioned so a read touches the month's partition only, the status read touches the last 24 hours of cycles (at most 2 880 at the 30 s floor) and 15
+  minutes of samples per link, at most 8 links, windows are capped at 2 000 per link with a `windows_truncated` flag. Per-identity limits after authorisation:
+  status 300/min, SLA 30/min, export 10/min (in-memory, per worker, as for every other limiter). A cross-site request cannot start an export from a browser
+  (`Sec-Fetch-Site` check) so a third-party page cannot spend an identity's export budget or write audit records. The collector is off by default, single-leader
+  (its own advisory lock, so it cannot double-write or contend with the evaluator), bounded per probe (15 s) and per link (one interval), and a failing probe, store
+  or link never stops the others. The first read of a closed month is O(cycles in the month) (later reads are cached); a persisted rollup is the follow-up if 30 s sampling over many links proves heavy.
+- **Configuration risk.** `NETSIGHT_WAN_LINKS` is strict JSON (unknown keys, bad ids, two primaries, more than 8 links, control characters, bad addresses all
+  refuse the whole declaration as `unknown`; the log carries a count, never the content). Enabling sampling without `NETSIGHT_WAN_COLLECTOR_DATABASE_URL` or a usable declaration fails
+  start-up; an invalid flag or interval fails start-up instead of defaulting; a collector database role that is a superuser, bypasses row security, owns the
+  WAN tables, equals the API's role or cannot be checked also fails start-up.
+- **Repudiation.** An export is audited (`internet.export`: actor, month, format, answered state, link and row counts; never content): `success`, `failure` when
+  the evidence could not be read (state `unknown`) and `denied` for a refused attempt. Status and SLA reads are not audited (platform-wide read auditing
+  remains open).
+- **Review fix pass (2026-10-11; closes the Step 5 independent reviews).**
+  - *Role split (security M1).* The API role (`DATABASE_URL`) is `SELECT` only on `wan_link_cycles` and `wan_probe_samples`; the collector uses its own role
+    (`NETSIGHT_WAN_COLLECTOR_DATABASE_URL`, `INSERT` only, no `SELECT`, no DDL), granted by `grants/wan_collector_role.sql` and proven live (the API role cannot
+    insert, update, delete, truncate, alter, drop or read a partition directly; the collector cannot read, update, delete, truncate or create anything). A
+    compromised API process can therefore no longer forge samples. The collector refuses to start with a superuser, row-security-bypassing or owner role, with
+    the API's role, or with a role it cannot check.
+  - *Detail permission (security M2)* and *export audit (security M3)* as above; the `assert` that guarded the attachment name is an explicit check.
+  - *Partitioning (database H1).* Monthly range partitions, append-only triggers `ENABLE ALWAYS` on the parents and every partition (verified from
+    `pg_trigger`), the partition helper is migrator-only (EXECUTE revoked), and a write into a month without a partition is refused by the database and logged by
+    the collector (fail closed, a gap rather than a wrong figure). Retention is a whole-partition drop or detach by the migrator (period pending).
+  - *Integrity (database M3 / LOW).* Deferred constraint triggers tie a cycle's counts to its stored samples; failed or unknown samples carry no latency (CHECK);
+    only a unique violation is "cycle exists" (a deadlock or serialization failure is a failed write); samples go in with one `executemany`; the redundant
+    `ON DELETE RESTRICT` was dropped.
+  - *Evidence quality (code review).* The CSV carries a trailing `truncated` sentinel row and an `EXPORT INCOMPLETE` note when windows were cut, the SLA panel
+    warns about it, the exact month-start instant is an empty period, the seconds always add up to the total (the rounding remainder is `unknown`), two writers'
+    overlapping or contradicting cycles resolve deterministically (contradiction is `unknown`), and the export `basis` states the recorder-trust limit.
+- **Still open.** The retention period and its migrator step (pending human decision); a signed or independently attested sample path (the recorder-trust limit);
+  a persisted rollup if a cold month read proves heavy; a per-worker shared rate limiter; probing the gateway and reading routes (failover is inferred from link
+  status only); whether probe targets in the export should be withheld too; whether Technician and Auditor should hold the detail; a live LibreNMS check that the
+  ports list carries the rate and `poll_time` columns; a partition-readiness alert (the next month's partition missing) beyond the collector's error log.
+
 ## AI-specific threats
 - prompt injection in logs/hostnames/knowledge;
 - tool injection;

@@ -7,6 +7,8 @@ silently converted into empty successful results.
 
 from __future__ import annotations
 
+import ipaddress
+import math
 import re
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -94,6 +96,69 @@ class DeviceCollection:
 class InterfaceCollection:
     items: tuple[NetworkInterface, ...]
     observed_at: datetime
+
+
+@dataclass(frozen=True)
+class WanPortReading:
+    """What the source reports for one WAN port; every field is reported or ``None``.
+
+    ``polled_at`` is the source's own poll time (``poll_time``), the freshness of the counters;
+    ``None`` when the source does not say. ``public_ip`` is set only when the port has exactly one
+    globally routable IPv4 address (a private, shared or ambiguous answer is not a public IP).
+    """
+
+    oper_status: InterfaceOperStatus
+    speed_bps: int | None
+    rx_bps: int | None
+    tx_bps: int | None
+    polled_at: datetime | None
+    public_ip: str | None
+
+
+_WAN_NATIVE_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}", re.ASCII)
+
+
+def _wan_native_id(value: str) -> str:
+    if not isinstance(value, str) or _WAN_NATIVE_ID.fullmatch(value) is None or ".." in value:
+        raise AdapterError(AdapterStatus.INVALID_SOURCE_DATA, "invalid native identifier")
+    return value
+
+
+def _rate_bps(raw: object) -> int | None:
+    """LibreNMS reports octets per second; a missing, malformed or negative value is unknown."""
+    if isinstance(raw, bool) or not isinstance(raw, (int, float)):
+        return None
+    if not math.isfinite(raw) or raw < 0:
+        return None
+    return int(raw * 8)
+
+
+def _poll_time(raw: object) -> datetime | None:
+    if isinstance(raw, bool) or not isinstance(raw, (int, float)) or not math.isfinite(raw):
+        return None
+    if raw <= 0:
+        return None
+    try:
+        return datetime.fromtimestamp(raw, UTC)
+    except (OverflowError, OSError, ValueError):
+        return None
+
+
+def _sole_public_ipv4(addresses: object) -> str | None:
+    if not isinstance(addresses, list):
+        return None
+    found: set[str] = set()
+    for entry in addresses:
+        value = entry.get("ipv4_address") if isinstance(entry, dict) else None
+        if not isinstance(value, str):
+            continue
+        try:
+            parsed = ipaddress.IPv4Address(value.strip())
+        except ValueError:
+            continue
+        if parsed.is_global:
+            found.add(str(parsed))
+    return next(iter(found)) if len(found) == 1 else None
 
 
 def canonical_device_id(native_id: str) -> str:
@@ -556,6 +621,38 @@ class LibrenmsClient:
             items=tuple(_map_interface(row, native_device_id, observed_at) for row in rows),
             observed_at=observed_at,
         )
+
+    async def wan_port(self, native_device_id: str, native_port_id: str) -> WanPortReading | None:
+        """Throughput, speed, status and public address of one operator-declared WAN port.
+
+        ``None`` when the source does not list the port. A failure of the port list raises
+        ``AdapterError`` (the caller reports ``unknown``); a failure of the address lookup only
+        loses the address, never the rest of the reading.
+        """
+        device = quote(_wan_native_id(native_device_id), safe="")
+        port_id = _wan_native_id(native_port_id)
+        body = await self._get(f"/api/v0/devices/{device}/ports")
+        row = next(
+            (r for r in _interface_rows(body) if str(r.get("port_id", "")).strip() == port_id),
+            None,
+        )
+        if row is None:
+            return None
+        return WanPortReading(
+            oper_status=_interface_oper_status(row.get("ifOperStatus")),
+            speed_bps=_interface_speed_bps(row),
+            rx_bps=_rate_bps(row.get("ifInOctets_rate")),
+            tx_bps=_rate_bps(row.get("ifOutOctets_rate")),
+            polled_at=_poll_time(row.get("poll_time")),
+            public_ip=await self._port_public_ip(port_id),
+        )
+
+    async def _port_public_ip(self, port_id: str) -> str | None:
+        try:
+            body = await self._get(f"/api/v0/ports/{quote(port_id, safe='')}/ip")
+        except AdapterError:
+            return None
+        return _sole_public_ipv4(body.get("addresses"))
 
     async def alerts(self) -> list[dict[str, Any]]:
         body = await self._get("/api/v0/alerts")

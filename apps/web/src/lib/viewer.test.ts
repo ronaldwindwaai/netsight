@@ -2,7 +2,13 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import type { SessionInfo } from './api-contracts.ts';
-import { canChangeAnything, canUseDiagnostics, viewerFromSession } from './viewer.ts';
+import {
+  canChangeAnything,
+  canExportInternet,
+  canReadInternet,
+  canUseDiagnostics,
+  viewerFromSession,
+} from './viewer.ts';
 
 function session(permissions: string[]): SessionInfo {
   return {
@@ -60,4 +66,15 @@ test('diagnostics are available only to a viewer holding diagnostics:read', () =
   // Management and Auditor read other things but hold no diagnostics permission.
   assert.equal(canUseDiagnostics(viewerFromSession(session(['incidents:read-summary', 'audit:read']))), false);
   assert.equal(canUseDiagnostics(viewerFromSession(session(['diagnostics:read']))), true);
+});
+
+test('the Internet permissions are read from the session and fail closed', () => {
+  const reader = viewerFromSession(session(['internet:read']));
+  const exporter = viewerFromSession(session(['internet:read', 'internet:export']));
+  assert.equal(canReadInternet(reader), true);
+  assert.equal(canExportInternet(reader), false);
+  assert.equal(canExportInternet(exporter), true);
+  assert.equal(canReadInternet(viewerFromSession(session(['incidents:read']))), false);
+  assert.equal(canReadInternet(null), false);
+  assert.equal(canExportInternet(null), false);
 });

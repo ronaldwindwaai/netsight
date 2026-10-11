@@ -79,3 +79,10 @@ the surplus incident). `notification.send` is one record per destination attempt
 `target` is the notification id, with `channel`, `destination` (a keyed hash or a host, never an address or token), `code`
 (a static code such as `OK`, `QUEUE_FULL`, `SMTP_5XX`), `attempts`, `alert` and `incident`; a send that could not be attempted
 carries `reason` (`no-public-url`); a page dropped because the backlog was full carries `code = BACKLOG_FULL` with `rule_id` and `alert`. Rule names, entity names, addresses and payload text are never logged.
+
+## Internet export (Step 5)
+
+`internet.export` records `success` (actor, `target` = the month, `format`, the answered `state`, `link_count` and `row_count`; never the evidence),
+`failure` when the evidence could not be read (the answered `state` is `unknown`; a `not-connected` answer is still a `success`) and `denied` (reason
+`permission`) when a caller without `internet:export` asks for it. Status and SLA reads are not audited (read auditing remains an open
+platform follow-up). The WAN collector writes no audit records: it performs no operator action and stores only probe outcomes.

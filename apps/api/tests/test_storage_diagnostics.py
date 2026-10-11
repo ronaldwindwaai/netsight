@@ -405,12 +405,12 @@ def test_down_refuses_while_sessions_exist_and_succeeds_with_consent(owner_conn)
 
     PostgresDiagnosticSessionRepository(owner_conn).save_session(make_session(1), actor_id="u")
     with owner_conn.connect() as conn, pytest.raises(migrate.DestructiveMigrationError) as raised:
-        migrate.apply_down(conn, allow_destructive=True, env={})
+        migrate.apply_down(conn, steps=2, allow_destructive=True, env={})
     assert "diagnostic_sessions" in str(raised.value)
     with owner_conn.connect() as conn:
         assert migrate.apply_down(
-            conn, allow_destructive=True, env={migrate.DESTRUCTIVE_ENV: "1"}
-        ) == ["0004"]
+            conn, steps=2, allow_destructive=True, env={migrate.DESTRUCTIVE_ENV: "1"}
+        ) == ["0005", "0004"]
         assert conn.execute("SELECT to_regclass('diagnostic_sessions') AS t").fetchone() == {
             "t": None
         }
@@ -423,4 +423,4 @@ def test_down_refuses_while_sessions_exist_and_succeeds_with_consent(owner_conn)
 @requires_pg
 def test_down_on_an_empty_table_needs_no_environment_override(owner_conn) -> None:  # type: ignore[no-untyped-def]
     with owner_conn.connect() as conn:
-        assert migrate.apply_down(conn, allow_destructive=True, env={}) == ["0004"]
+        assert migrate.apply_down(conn, steps=2, allow_destructive=True, env={}) == ["0005", "0004"]

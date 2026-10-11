@@ -39,6 +39,13 @@ class Permission(StrEnum):
     TRAFFIC_READ = "traffic:read"
     SECURITY_READ = "security:read"
     DIAGNOSTICS_READ = "diagnostics:read"
+    # Internet/WAN status, quality, availability and the monthly SLA figures (read-only).
+    INTERNET_READ = "internet:read"
+    # The bounded evidence export for ISP disputes (CSV/JSON of outage windows). Implies read.
+    INTERNET_EXPORT = "internet:export"
+    # The sensitive part of the Internet surface: public IP, gateway, ISP name and per-link
+    # throughput. Without it those fields are withheld (null, detail_redacted=true).
+    INTERNET_READ_DETAIL = "internet:read_detail"
     ACTIONS_PROPOSE = "actions:propose"
     ACTIONS_APPROVE = "actions:approve"
     ADMIN_CONFIG = "admin:config"
@@ -107,7 +114,14 @@ _ALL_READ = {
     Permission.TRAFFIC_READ,
     Permission.SECURITY_READ,
     Permission.REPORTS_READ,
+    Permission.INTERNET_READ,
 }
+# The WAN card is an Overview widget and the matrix gives Overview to every role, so every role
+# reads the Internet surface (Technician included); the evidence export is narrower.
+_INTERNET_EXPORT = {Permission.INTERNET_EXPORT}
+# Detail (public IP, gateway, ISP, throughput) is for the roles that run or defend the network.
+# Technician, Management and Auditor read status and the SLA summary only (security review M2).
+_INTERNET_DETAIL = {Permission.INTERNET_READ_DETAIL}
 # RBAC-MATRIX "Diagnostics": Admin / Network Engineer Full, Security Analyst "Security scope",
 # Technician "Basic"; Management and Auditor have none. Site / security scoping does not exist
 # yet, so every holder gets the same read-only surface. Held on its own (not in _ALL_READ) so a
@@ -117,10 +131,21 @@ _DIAGNOSTICS = {Permission.DIAGNOSTICS_READ}
 ROLE_PERMISSIONS: Mapping[Role, frozenset[Permission]] = {
     Role.ADMINISTRATOR: frozenset(Permission),
     Role.NETWORK_ENGINEER: frozenset(
-        _ALL_READ | _DIAGNOSTICS | _INCIDENT_FULL | _ALERTING_AUTHOR | {Permission.ACTIONS_PROPOSE}
+        _ALL_READ
+        | _DIAGNOSTICS
+        | _INCIDENT_FULL
+        | _ALERTING_AUTHOR
+        | _INTERNET_EXPORT
+        | _INTERNET_DETAIL
+        | {Permission.ACTIONS_PROPOSE}
     ),
     Role.SECURITY_ANALYST: frozenset(
-        _ALL_READ | _DIAGNOSTICS | _INCIDENT_FULL | _ALERTING_AUTHOR | {Permission.ACTIONS_PROPOSE}
+        _ALL_READ
+        | _DIAGNOSTICS
+        | _INCIDENT_FULL
+        | _ALERTING_AUTHOR
+        | _INTERNET_DETAIL
+        | {Permission.ACTIONS_PROPOSE}
     ),
     Role.TECHNICIAN: frozenset(
         {
@@ -130,12 +155,15 @@ ROLE_PERMISSIONS: Mapping[Role, frozenset[Permission]] = {
             Permission.INCIDENTS_READ_SUMMARY,
             Permission.INCIDENTS_WRITE_ASSIGNED,
             Permission.DIAGNOSTICS_READ,
+            Permission.INTERNET_READ,
             Permission.ACTIONS_PROPOSE,
         }
     ),
     # Summary only: the full incident read is withheld (human decision 2026-10-10).
     Role.MANAGEMENT: frozenset((_ALL_READ - {Permission.INCIDENTS_READ}) | {Permission.AUDIT_READ}),
-    Role.AUDITOR: frozenset(_ALL_READ | _ALERTING_READ | {Permission.AUDIT_READ}),
+    Role.AUDITOR: frozenset(
+        _ALL_READ | _ALERTING_READ | _INTERNET_EXPORT | {Permission.AUDIT_READ}
+    ),
 }
 
 

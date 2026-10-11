@@ -19,3 +19,13 @@ export function canChangeAnything(viewer: Viewer | null): boolean {
 export function canUseDiagnostics(viewer: Viewer | null): boolean {
   return viewer !== null && viewer.permissions.includes('diagnostics:read');
 }
+
+/** True when the viewer holds internet:read (every defined role does today). Advisory only. */
+export function canReadInternet(viewer: Viewer | null): boolean {
+  return viewer !== null && viewer.permissions.includes('internet:read');
+}
+
+/** True when the viewer holds internet:export (Admin, Network Engineer, Auditor). Advisory only. */
+export function canExportInternet(viewer: Viewer | null): boolean {
+  return viewer !== null && viewer.permissions.includes('internet:export');
+}

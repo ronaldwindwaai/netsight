@@ -18,6 +18,8 @@
 --   alert_incident_links       SELECT, INSERT, UPDATE (incident_id, linked_at, recovered_at)
 --   notification_delivery_attempts  SELECT, INSERT only (append-only)
 --   diagnostic_sessions        SELECT, INSERT only (a finished session is immutable)
+--   wan_link_cycles            SELECT only (the API reads the SLA evidence; the collector, a
+--   wan_probe_samples          SELECT only  separate role, is the only writer: wan_collector_role.sql)
 --   netsight_schema_migrations nothing
 -- It gets no DELETE, TRUNCATE, REFERENCES, TRIGGER, CREATE or ownership anywhere.
 
@@ -45,7 +47,7 @@ BEGIN
           AND relname IN ('incidents', 'incident_timeline_events', 'alert_rules',
                           'maintenance_windows', 'netsight_schema_migrations',
                           'alert_incident_links', 'notification_delivery_attempts',
-                          'diagnostic_sessions')
+                          'diagnostic_sessions', 'wan_link_cycles', 'wan_probe_samples')
           AND pg_has_role(app_role, relowner, 'USAGE')
     ) THEN
         RAISE EXCEPTION 'application role % owns (or inherits ownership of) the tables; '
@@ -60,7 +62,8 @@ BEGIN
         'REVOKE ALL ON TABLE %1$I.incidents, %1$I.incident_timeline_events, '
         '%1$I.alert_rules, %1$I.maintenance_windows, %1$I.netsight_schema_migrations, '
         '%1$I.alert_incident_links, %1$I.notification_delivery_attempts, '
-        '%1$I.diagnostic_sessions FROM %2$I',
+        '%1$I.diagnostic_sessions, %1$I.wan_link_cycles, %1$I.wan_probe_samples '
+        'FROM %2$I',
         schema_name, app_role);
 
     EXECUTE format('GRANT SELECT, INSERT ON TABLE %I.incidents TO %I', schema_name, app_role);
@@ -96,5 +99,10 @@ BEGIN
 
     EXECUTE format(
         'GRANT SELECT, INSERT ON TABLE %I.diagnostic_sessions TO %I', schema_name, app_role);
+
+    -- Read-only on the (partitioned) WAN tables: the privilege on the parent covers reads through it;
+    -- the month partitions carry no grant of their own, so they are not reachable directly.
+    EXECUTE format('GRANT SELECT ON TABLE %I.wan_link_cycles TO %I', schema_name, app_role);
+    EXECUTE format('GRANT SELECT ON TABLE %I.wan_probe_samples TO %I', schema_name, app_role);
 END
 $grants$;
