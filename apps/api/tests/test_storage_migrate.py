@@ -29,6 +29,7 @@ UP_FILES = {
     "0003_evaluation_links_and_delivery.up.sql",
     "0004_diagnostic_sessions.up.sql",
     "0005_wan_probe_samples.up.sql",
+    "0006_unknown_device_findings.up.sql",
 }
 
 
@@ -80,12 +81,12 @@ def test_apply_down_refuses_to_drop_populated_tables_without_the_environment_ove
 ) -> None:
     new_incident(PostgresIncidentRepository(migrated_pg, clock=FakeClock()))
     with migrated_pg.connect() as conn, pytest.raises(migrate.DestructiveMigrationError) as raised:
-        migrate.apply_down(conn, steps=5, allow_destructive=True, env={})
+        migrate.apply_down(conn, steps=6, allow_destructive=True, env={})
     assert "incidents" in str(raised.value)
     for wrong in ("0", "true", "yes", ""):
         with migrated_pg.connect() as conn, pytest.raises(migrate.DestructiveMigrationError):
             migrate.apply_down(
-                conn, steps=5, allow_destructive=True, env={migrate.DESTRUCTIVE_ENV: wrong}
+                conn, steps=6, allow_destructive=True, env={migrate.DESTRUCTIVE_ENV: wrong}
             )
     assert _version_rows(migrated_pg) == [
         "0001",
@@ -93,6 +94,7 @@ def test_apply_down_refuses_to_drop_populated_tables_without_the_environment_ove
         "0003",
         "0004",
         "0005",
+        "0006",
     ]  # nothing was reversed
 
 
@@ -103,9 +105,9 @@ def test_apply_down_on_populated_tables_needs_both_flag_and_environment(
     new_incident(PostgresIncidentRepository(migrated_pg, clock=FakeClock()))
     with migrated_pg.connect() as conn:
         reversed_versions = migrate.apply_down(
-            conn, steps=5, allow_destructive=True, env={migrate.DESTRUCTIVE_ENV: "1"}
+            conn, steps=6, allow_destructive=True, env={migrate.DESTRUCTIVE_ENV: "1"}
         )
-    assert reversed_versions == ["0005", "0004", "0003", "0002", "0001"]
+    assert reversed_versions == ["0006", "0005", "0004", "0003", "0002", "0001"]
 
 
 @requires_pg
@@ -114,7 +116,8 @@ def test_apply_down_of_the_privilege_migration_never_touches_data(
 ) -> None:
     new_incident(PostgresIncidentRepository(migrated_pg, clock=FakeClock()))
     with migrated_pg.connect() as conn:
-        assert migrate.apply_down(conn, steps=4, allow_destructive=True, env={}) == [
+        assert migrate.apply_down(conn, steps=5, allow_destructive=True, env={}) == [
+            "0006",
             "0005",
             "0004",
             "0003",
@@ -258,13 +261,15 @@ def test_cli_up_and_status_round_trip_with_grants() -> None:
         before = run_cli("status", *schema_args, env=base)
         assert before.returncode == 0, before.stderr
         assert all(
-            f"pending: {v}" in before.stdout for v in ("0001", "0002", "0003", "0004", "0005")
+            f"pending: {v}" in before.stdout
+            for v in ("0001", "0002", "0003", "0004", "0005", "0006")
         )
 
         first = run_cli("up", "--app-role", role, *schema_args, env=base)
         assert first.returncode == 0, first.stderr
         assert all(
-            f"applied: {v}" in first.stdout for v in ("0001", "0002", "0003", "0004", "0005")
+            f"applied: {v}" in first.stdout
+            for v in ("0001", "0002", "0003", "0004", "0005", "0006")
         )
         assert "grants applied" in first.stdout
 
@@ -483,8 +488,8 @@ def test_installed_wheel_finds_its_up_migrations_and_cannot_roll_back(
     )
     assert result.returncode == 0, result.stderr
     report = json.loads(result.stdout)
-    assert report["versions"] == ["0001", "0002", "0003", "0004", "0005"]
-    assert report["applied"] == ["0001", "0002", "0003", "0004", "0005"]
+    assert report["versions"] == ["0001", "0002", "0003", "0004", "0005", "0006"]
+    assert report["applied"] == ["0001", "0002", "0003", "0004", "0005", "0006"]
     assert report["ran_ddl"] is True
     assert report["down_error"] == "MigrationError"
 

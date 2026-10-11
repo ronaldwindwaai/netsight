@@ -2046,6 +2046,762 @@ paths:
       responses:
         '200':
           description: Approval recorded
+  # >>> step8:p-inventory
+  /inventory:
+    get:
+      summary: 'Asset inventory: NetBox intended state merged with discovered telemetry, per-field provenance, bounded and filtered server-side'
+      operationId: listInventory
+      parameters:
+      - in: query
+        name: page
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 25
+      - in: query
+        name: asset_class
+        schema:
+          enum:
+          - network-device
+          - server
+          - access-point
+          - endpoint
+          - cctv
+          - printer
+          - iot
+          - unknown-asset
+          - unclassified
+      - in: query
+        name: site
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 255
+      - in: query
+        name: status
+        description: Observed (discovered) status
+        schema:
+          enum:
+          - healthy
+          - warning
+          - degraded
+          - critical
+          - offline
+          - unknown
+          - maintenance
+      - in: query
+        name: source
+        schema:
+          enum:
+          - netbox
+          - discovered
+          - both
+      - in: query
+        name: known
+        description: 'true: in NetBox; false: seen by telemetry only'
+        schema:
+          type: boolean
+      - in: query
+        name: q
+        description: Case-insensitive substring of name, IP address or MAC address
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 64
+      responses:
+        '200':
+          description: A page of assets, or an explicit not-connected/unknown state without rows
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InventoryListResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /inventory/summary:
+    get:
+      summary: Inventory counts only
+      operationId: getInventorySummary
+      responses:
+        '200':
+          description: Counts, or an explicit not-connected/unknown state
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InventorySummaryResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /inventory/{device_id}:
+    get:
+      summary: One asset with the provenance of every field
+      operationId: getInventoryItem
+      parameters:
+      - in: path
+        name: device_id
+        required: true
+        schema:
+          type: string
+          minLength: 43
+          maxLength: 43
+          pattern: ^device-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+      responses:
+        '200':
+          description: The asset, or an explicit not-connected/unknown state without it
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InventoryDetailResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '404':
+          $ref: '#/components/responses/AssetNotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  # <<< step8:p-inventory
+  # >>> step8:p-ipam
+  /ipam:
+    get:
+      summary: 'IPAM overview: sources, telemetry coverage and counts only'
+      operationId: getIpam
+      responses:
+        '200':
+          description: Counts, or an explicit not-connected/unknown state
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IpamSummaryResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /ipam/prefixes:
+    get:
+      summary: Prefixes as a tree with utilisation and its basis, reserved ranges and the VLAN they name
+      operationId: listIpamPrefixes
+      parameters:
+      - in: query
+        name: page
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 25
+      - in: query
+        name: site
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+      - in: query
+        name: status
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 64
+      - in: query
+        name: family
+        schema:
+          enum:
+          - '4'
+          - '6'
+      - in: query
+        name: q
+        description: Substring of the prefix, description or VLAN name
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 64
+      responses:
+        '200':
+          description: A page of prefixes in tree order, or an explicit state without rows
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IpamPrefixList'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /ipam/vlans:
+    get:
+      summary: VLANs from NetBox
+      operationId: listIpamVlans
+      parameters:
+      - in: query
+        name: page
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 25
+      - in: query
+        name: site
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+      - in: query
+        name: q
+        description: Substring of the VLAN name or its number
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 64
+      responses:
+        '200':
+          description: A page of VLANs by number, or an explicit state without rows
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IpamVlanList'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /ipam/addresses:
+    get:
+      summary: 'IP usage: NetBox addresses and addresses telemetry saw, active versus stale with the basis'
+      operationId: listIpamAddresses
+      parameters:
+      - in: query
+        name: page
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 25
+      - in: query
+        name: activity
+        schema:
+          enum:
+          - active
+          - stale
+          - unknown
+          - reserved
+      - in: query
+        name: source
+        schema:
+          enum:
+          - netbox
+          - discovered
+          - both
+      - in: query
+        name: prefix
+        description: Only addresses whose smallest enclosing prefix is this one
+        schema:
+          type: string
+          pattern: ^ipam-prefix-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+      - in: query
+        name: q
+        description: Substring of the address, DNS name or description
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 64
+      responses:
+        '200':
+          description: A page of addresses in numeric order, or an explicit state without rows
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IpamAddressList'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  # <<< step8:p-ipam
+  # >>> step8:p-unknown
+  /unknown-devices:
+    get:
+      summary: 'Unknown-device findings: telemetry NetBox does not know, with the evidence chain and the comparison'
+      operationId: listUnknownDevices
+      parameters:
+      - in: query
+        name: page
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 50
+          default: 25
+      - in: query
+        name: state
+        description: open means new, acknowledged and investigating
+        schema:
+          enum:
+          - new
+          - acknowledged
+          - investigating
+          - resolved
+          - false-positive
+          - open
+      - in: query
+        name: severity
+        schema:
+          enum:
+          - low
+          - medium
+          - high
+          - critical
+          - unknown
+      - in: query
+        name: assigned
+        schema:
+          type: boolean
+      responses:
+        '200':
+          description: A page of findings, newest sighting first, or an explicit state without rows
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnknownDeviceListResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /unknown-devices/summary:
+    get:
+      summary: Counts of findings by state and severity
+      operationId: getUnknownDevicesSummary
+      responses:
+        '200':
+          description: Counts only
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnknownDeviceSummaryResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /unknown-devices/scan:
+    post:
+      summary: Compare discovered telemetry with NetBox now and record unknown devices (never writes to NetBox)
+      operationId: scanUnknownDevices
+      parameters:
+      - in: header
+        name: X-CSRF-Token
+        required: true
+        description: Session CSRF token from GET /auth/csrf. Required for cookie-authenticated writes.
+        schema:
+          type: string
+      responses:
+        '200':
+          description: What the comparison did
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnknownDeviceScanResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/FindingStoreUnavailable'
+  /unknown-devices/{finding_id}:
+    get:
+      summary: One finding with its evidence chain, comparison and proposed action
+      operationId: getUnknownDevice
+      parameters:
+      - in: path
+        name: finding_id
+        required: true
+        schema:
+          type: string
+          minLength: 51
+          maxLength: 51
+          pattern: ^unknown-device-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+      responses:
+        '200':
+          description: The finding, or an explicit state without it
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnknownDeviceDetailResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '404':
+          $ref: '#/components/responses/IncidentNotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /unknown-devices/{finding_id}/timeline:
+    get:
+      summary: Append-only timeline of a finding
+      operationId: getUnknownDeviceTimeline
+      parameters:
+      - in: path
+        name: finding_id
+        required: true
+        schema:
+          type: string
+          minLength: 51
+          maxLength: 51
+          pattern: ^unknown-device-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+      - in: query
+        name: after_seq
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+      - in: query
+        name: limit
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 200
+          default: 200
+      responses:
+        '200':
+          description: Events after the given sequence number
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnknownDeviceTimelineResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '404':
+          $ref: '#/components/responses/IncidentNotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /unknown-devices/{finding_id}/acknowledge:
+    post:
+      summary: Acknowledge a new finding
+      operationId: acknowledgeUnknownDevice
+      parameters:
+      - in: path
+        name: finding_id
+        required: true
+        schema:
+          type: string
+          minLength: 51
+          maxLength: 51
+          pattern: ^unknown-device-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+      - in: header
+        name: X-CSRF-Token
+        required: true
+        description: Session CSRF token from GET /auth/csrf. Required for cookie-authenticated writes.
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnknownDeviceFinding'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '404':
+          $ref: '#/components/responses/FindingNotFound'
+        '409':
+          $ref: '#/components/responses/FindingConflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/FindingStoreUnavailable'
+  /unknown-devices/{finding_id}/investigate:
+    post:
+      summary: Mark an acknowledged finding as being investigated
+      operationId: investigateUnknownDevice
+      parameters:
+      - in: path
+        name: finding_id
+        required: true
+        schema:
+          type: string
+          minLength: 51
+          maxLength: 51
+          pattern: ^unknown-device-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+      - in: header
+        name: X-CSRF-Token
+        required: true
+        description: Session CSRF token from GET /auth/csrf. Required for cookie-authenticated writes.
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnknownDeviceFinding'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '404':
+          $ref: '#/components/responses/FindingNotFound'
+        '409':
+          $ref: '#/components/responses/FindingConflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/FindingStoreUnavailable'
+  /unknown-devices/{finding_id}/assign:
+    post:
+      summary: Assign a finding, or unassign with null
+      operationId: assignUnknownDevice
+      parameters:
+      - in: path
+        name: finding_id
+        required: true
+        schema:
+          type: string
+          minLength: 51
+          maxLength: 51
+          pattern: ^unknown-device-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+      - in: header
+        name: X-CSRF-Token
+        required: true
+        description: Session CSRF token from GET /auth/csrf. Required for cookie-authenticated writes.
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UnknownDeviceAssignRequest'
+      responses:
+        '200':
+          description: OK
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnknownDeviceFinding'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '404':
+          $ref: '#/components/responses/FindingNotFound'
+        '409':
+          $ref: '#/components/responses/FindingConflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/FindingStoreUnavailable'
+  /unknown-devices/{finding_id}/comment:
+    post:
+      summary: Comment on a finding
+      operationId: commentUnknownDevice
+      parameters:
+      - in: path
+        name: finding_id
+        required: true
+        schema:
+          type: string
+          minLength: 51
+          maxLength: 51
+          pattern: ^unknown-device-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+      - in: header
+        name: X-CSRF-Token
+        required: true
+        description: Session CSRF token from GET /auth/csrf. Required for cookie-authenticated writes.
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UnknownDeviceCommentRequest'
+      responses:
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '404':
+          $ref: '#/components/responses/FindingNotFound'
+        '409':
+          $ref: '#/components/responses/FindingConflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/FindingStoreUnavailable'
+        '201':
+          description: OK
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnknownDeviceEvent'
+  /unknown-devices/{finding_id}/resolve:
+    post:
+      summary: Resolve a finding, or dismiss it as a false positive (needs a recent second factor)
+      operationId: resolveUnknownDevice
+      parameters:
+      - in: path
+        name: finding_id
+        required: true
+        schema:
+          type: string
+          minLength: 51
+          maxLength: 51
+          pattern: ^unknown-device-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+      - in: header
+        name: X-CSRF-Token
+        required: true
+        description: Session CSRF token from GET /auth/csrf. Required for cookie-authenticated writes.
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UnknownDeviceResolveRequest'
+      responses:
+        '200':
+          description: OK
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnknownDeviceFinding'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDeniedOrStepUp'
+        '404':
+          $ref: '#/components/responses/FindingNotFound'
+        '409':
+          $ref: '#/components/responses/FindingConflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/FindingStoreUnavailable'
+  # <<< step8:p-unknown
 components:
   headers:
     CorrelationId:
@@ -8266,6 +9022,2161 @@ components:
               maxItems: 0
             total:
               const: 0
+    # >>> step8:c-inventory
+    DataSourceStatus:
+      $ref: ../json-schema/common.schema.json#/$defs/sourceStatus
+    InventoryListResponse:
+      title: InventoryListResponse
+      type: object
+      additionalProperties: false
+      required:
+      - state
+      - generated_at
+      - page
+      - page_size
+      - total
+      - sources
+      - summary
+      - items
+      properties:
+        state:
+          enum:
+          - not-connected
+          - unknown
+          - ok
+        generated_at:
+          type: string
+          format: date-time
+        page:
+          minimum: 1
+          maximum: 100000
+          type: integer
+        page_size:
+          minimum: 1
+          maximum: 100
+          type: integer
+        total:
+          minimum: 0
+          maximum: 1000000
+          type: integer
+        sources:
+          type: array
+          maxItems: 3
+          items:
+            $ref: '#/components/schemas/DataSourceStatus'
+        summary:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/InventorySummary'
+        items:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/InventoryItem'
+      description: 'GET /api/v1/inventory. NetBox is the authority for intended state: without it (not-connected, unknown) there are no rows and no counts, and the other sources are still listed.'
+      allOf:
+      - if:
+          properties:
+            state:
+              enum:
+              - not-connected
+              - unknown
+        then:
+          properties:
+            items:
+              maxItems: 0
+            total:
+              const: 0
+            summary:
+              type: 'null'
+    InventoryField:
+      type: object
+      additionalProperties: false
+      required:
+      - value
+      - provenance
+      - netbox
+      - discovered
+      properties:
+        value:
+          minLength: 1
+          maxLength: 255
+          type:
+          - string
+          - 'null'
+        provenance:
+          enum:
+          - netbox
+          - discovered
+          - both
+          - conflict
+          - unknown
+        netbox:
+          minLength: 1
+          maxLength: 255
+          type:
+          - string
+          - 'null'
+        discovered:
+          minLength: 1
+          maxLength: 255
+          type:
+          - string
+          - 'null'
+      description: 'One value and where it came from. netbox: only NetBox reported it. discovered: only telemetry did. both: they agree. conflict: they differ and value is NetBox''s (intended state). unknown: nobody reported it. The value/netbox/discovered cross-rules are checked by pydantic and the TS parser as well.'
+      allOf:
+      - if:
+          properties:
+            provenance:
+              const: netbox
+        then:
+          properties:
+            value:
+              type: string
+            netbox:
+              type: string
+            discovered:
+              type: 'null'
+      - if:
+          properties:
+            provenance:
+              const: discovered
+        then:
+          properties:
+            value:
+              type: string
+            netbox:
+              type: 'null'
+            discovered:
+              type: string
+      - if:
+          properties:
+            provenance:
+              const: both
+        then:
+          properties:
+            value:
+              type: string
+            netbox:
+              type: string
+            discovered:
+              type: string
+      - if:
+          properties:
+            provenance:
+              const: conflict
+        then:
+          properties:
+            value:
+              type: string
+            netbox:
+              type: string
+            discovered:
+              type: string
+      - if:
+          properties:
+            provenance:
+              const: unknown
+        then:
+          properties:
+            value:
+              type: 'null'
+            netbox:
+              type: 'null'
+            discovered:
+              type: 'null'
+    InventoryReconcile:
+      type: object
+      additionalProperties: false
+      required:
+      - status
+      - detail
+      properties:
+        status:
+          enum:
+          - reconciled
+          - missing-discovered
+          - unknown-discovered
+          - status-mismatch
+          - ambiguous
+          - not-checked
+        detail:
+          minLength: 1
+          maxLength: 255
+          type:
+          - string
+          - 'null'
+      description: 'From the existing NetBox-vs-discovered reconciliation (reconcile.py). not-checked: a source needed for the comparison was not readable.'
+    InventoryAlias:
+      type: object
+      additionalProperties: false
+      required:
+      - source
+      - native_id
+      properties:
+        source:
+          enum:
+          - netbox
+          - librenms
+          - wazuh
+        native_id:
+          minLength: 1
+          maxLength: 255
+          type: string
+      description: The asset's identifier in one source. Never used to join two assets by name alone.
+    InventoryItem:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - asset_class
+      - class_basis
+      - source
+      - known
+      - name
+      - site
+      - ip_address
+      - mac_address
+      - role
+      - device_type
+      - intended_status
+      - observed_status
+      - reconcile
+      - sources
+      properties:
+        id:
+          minLength: 43
+          maxLength: 43
+          pattern: ^device-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+          type: string
+        asset_class:
+          enum:
+          - network-device
+          - server
+          - access-point
+          - endpoint
+          - cctv
+          - printer
+          - iot
+          - unknown-asset
+          - unclassified
+        class_basis:
+          enum:
+          - role-map
+          - type-map
+          - unmapped
+          - not-in-netbox
+        source:
+          enum:
+          - netbox
+          - discovered
+          - both
+        known:
+          type: boolean
+        name:
+          $ref: '#/components/schemas/InventoryField'
+        site:
+          $ref: '#/components/schemas/InventoryField'
+        ip_address:
+          $ref: '#/components/schemas/InventoryField'
+        mac_address:
+          $ref: '#/components/schemas/InventoryField'
+        role:
+          minLength: 1
+          maxLength: 128
+          type:
+          - string
+          - 'null'
+        device_type:
+          minLength: 1
+          maxLength: 128
+          type:
+          - string
+          - 'null'
+        intended_status:
+          minLength: 1
+          maxLength: 64
+          type:
+          - string
+          - 'null'
+        observed_status:
+          oneOf:
+          - type: 'null'
+          - enum:
+            - healthy
+            - warning
+            - degraded
+            - critical
+            - offline
+            - unknown
+            - maintenance
+        reconcile:
+          $ref: '#/components/schemas/InventoryReconcile'
+        sources:
+          type: array
+          minItems: 1
+          maxItems: 3
+          items:
+            $ref: '#/components/schemas/InventoryAlias'
+      description: One asset. The class comes only from the operator's NetBox role/type map (unmapped is unclassified; an asset NetBox does not know is unknown-asset), never from telemetry.
+      allOf:
+      - if:
+          properties:
+            source:
+              const: discovered
+        then:
+          properties:
+            known:
+              const: false
+            asset_class:
+              const: unknown-asset
+            class_basis:
+              const: not-in-netbox
+            role:
+              type: 'null'
+            device_type:
+              type: 'null'
+            intended_status:
+              type: 'null'
+      - if:
+          properties:
+            source:
+              enum:
+              - netbox
+              - both
+        then:
+          properties:
+            known:
+              const: true
+            class_basis:
+              enum:
+              - role-map
+              - type-map
+              - unmapped
+      - if:
+          properties:
+            source:
+              const: netbox
+        then:
+          properties:
+            observed_status:
+              type: 'null'
+      - if:
+          properties:
+            class_basis:
+              const: unmapped
+        then:
+          properties:
+            asset_class:
+              const: unclassified
+      - if:
+          properties:
+            class_basis:
+              enum:
+              - role-map
+              - type-map
+        then:
+          properties:
+            asset_class:
+              enum:
+              - network-device
+              - server
+              - access-point
+              - endpoint
+              - cctv
+              - printer
+              - iot
+      - if:
+          properties:
+            class_basis:
+              const: not-in-netbox
+        then:
+          properties:
+            asset_class:
+              const: unknown-asset
+    InventoryClassCount:
+      type: object
+      additionalProperties: false
+      required:
+      - asset_class
+      - count
+      properties:
+        asset_class:
+          enum:
+          - network-device
+          - server
+          - access-point
+          - endpoint
+          - cctv
+          - printer
+          - iot
+          - unknown-asset
+          - unclassified
+        count:
+          minimum: 0
+          maximum: 1000000
+          type: integer
+    InventorySourceCount:
+      type: object
+      additionalProperties: false
+      required:
+      - source
+      - count
+      properties:
+        source:
+          enum:
+          - netbox
+          - discovered
+          - both
+        count:
+          minimum: 0
+          maximum: 1000000
+          type: integer
+    InventorySummary:
+      type: object
+      additionalProperties: false
+      required:
+      - total
+      - known
+      - unknown
+      - by_class
+      - by_source
+      properties:
+        total:
+          minimum: 0
+          maximum: 1000000
+          type: integer
+        known:
+          minimum: 0
+          maximum: 1000000
+          type: integer
+        unknown:
+          minimum: 0
+          maximum: 1000000
+          type: integer
+        by_class:
+          type: array
+          maxItems: 9
+          items:
+            $ref: '#/components/schemas/InventoryClassCount'
+        by_source:
+          type: array
+          maxItems: 3
+          items:
+            $ref: '#/components/schemas/InventorySourceCount'
+      description: Counts over the whole inventory (not the filtered page). total = known + unknown.
+    InventoryDetailResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - state
+      - generated_at
+      - sources
+      - item
+      properties:
+        state:
+          enum:
+          - not-connected
+          - unknown
+          - ok
+        generated_at:
+          type: string
+          format: date-time
+        sources:
+          type: array
+          maxItems: 3
+          items:
+            $ref: '#/components/schemas/DataSourceStatus'
+        item:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/InventoryItem'
+      description: GET /api/v1/inventory/{id}. ok carries the item; any other state carries none.
+      allOf:
+      - if:
+          properties:
+            state:
+              enum:
+              - not-connected
+              - unknown
+        then:
+          properties:
+            item:
+              type: 'null'
+    InventorySummaryResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - state
+      - generated_at
+      - sources
+      - summary
+      properties:
+        state:
+          enum:
+          - not-connected
+          - unknown
+          - ok
+        generated_at:
+          type: string
+          format: date-time
+        sources:
+          type: array
+          maxItems: 3
+          items:
+            $ref: '#/components/schemas/DataSourceStatus'
+        summary:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/InventorySummary'
+      description: 'GET /api/v1/inventory/summary: counts only (Management''s rung).'
+      allOf:
+      - if:
+          properties:
+            state:
+              enum:
+              - not-connected
+              - unknown
+        then:
+          properties:
+            summary:
+              type: 'null'
+    # <<< step8:c-inventory
+    # >>> step8:c-ipam
+    IpamSummaryResponse:
+      title: IpamSummaryResponse
+      type: object
+      additionalProperties: false
+      required:
+      - state
+      - generated_at
+      - sources
+      - telemetry
+      - counts
+      properties:
+        state:
+          enum:
+          - not-connected
+          - unknown
+          - ok
+        generated_at:
+          type: string
+          format: date-time
+        sources:
+          type: array
+          maxItems: 3
+          items:
+            $ref: '#/components/schemas/DataSourceStatus'
+        telemetry:
+          $ref: '#/components/schemas/IpamTelemetry'
+        counts:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/IpamCounts'
+      description: 'GET /api/v1/ipam: what is known, from where, and counts only (Management''s rung). state is NetBox IPAM''s: not-connected when NetBox is not configured, unknown when none of its IPAM reads worked.'
+      allOf:
+      - if:
+          properties:
+            state:
+              enum:
+              - not-connected
+              - unknown
+        then:
+          properties:
+            counts:
+              type: 'null'
+    IpamCounts:
+      type: object
+      additionalProperties: false
+      required:
+      - prefixes
+      - vlans
+      - addresses
+      - reserved_ranges
+      - active_addresses
+      - stale_addresses
+      - unknown_activity_addresses
+      - discovered_only_addresses
+      properties:
+        prefixes:
+          minimum: 0
+          maximum: 1000000
+          type:
+          - integer
+          - 'null'
+        vlans:
+          minimum: 0
+          maximum: 1000000
+          type:
+          - integer
+          - 'null'
+        addresses:
+          minimum: 0
+          maximum: 1000000
+          type:
+          - integer
+          - 'null'
+        reserved_ranges:
+          minimum: 0
+          maximum: 1000000
+          type:
+          - integer
+          - 'null'
+        active_addresses:
+          minimum: 0
+          maximum: 1000000
+          type:
+          - integer
+          - 'null'
+        stale_addresses:
+          minimum: 0
+          maximum: 1000000
+          type:
+          - integer
+          - 'null'
+        unknown_activity_addresses:
+          minimum: 0
+          maximum: 1000000
+          type:
+          - integer
+          - 'null'
+        discovered_only_addresses:
+          minimum: 0
+          maximum: 1000000
+          type:
+          - integer
+          - 'null'
+      description: Counts only. null is not reported (that NetBox read failed or telemetry is unavailable), never zero.
+    IpamTelemetry:
+      type: object
+      additionalProperties: false
+      required:
+      - state
+      - window_seconds
+      - sources
+      properties:
+        state:
+          enum:
+          - not-connected
+          - unknown
+          - ok
+        window_seconds:
+          minimum: 3600
+          maximum: 604800
+          type: integer
+        sources:
+          type: array
+          maxItems: 2
+          items:
+            enum:
+            - librenms
+            - wazuh
+      description: Which telemetry decides whether an address was seen within the window. state ok means at least one source was read; it then lists those that were. Stale and active are only judged when it is ok.
+      allOf:
+      - if:
+          properties:
+            state:
+              enum:
+              - not-connected
+              - unknown
+        then:
+          properties:
+            sources:
+              maxItems: 0
+      - if:
+          properties:
+            state:
+              const: ok
+        then:
+          properties:
+            sources:
+              minItems: 1
+    IpamUtilisation:
+      type: object
+      additionalProperties: false
+      required:
+      - state
+      - basis
+      - capacity
+      - netbox_addresses
+      - discovered_only
+      - used
+      - reserved
+      - free
+      - percent
+      properties:
+        state:
+          enum:
+          - ok
+          - unknown
+        basis:
+          enum:
+          - netbox-addresses
+          - netbox-and-discovered
+          - marked-utilized
+          - capacity-not-meaningful
+          - addresses-unavailable
+        capacity:
+          minimum: 0
+          maximum: 4294967296
+          type:
+          - integer
+          - 'null'
+        netbox_addresses:
+          minimum: 0
+          maximum: 1000000
+          type:
+          - integer
+          - 'null'
+        discovered_only:
+          minimum: 0
+          maximum: 1000000
+          type:
+          - integer
+          - 'null'
+        used:
+          minimum: 0
+          maximum: 2000000
+          type:
+          - integer
+          - 'null'
+        reserved:
+          minimum: 0
+          maximum: 4294967296
+          type:
+          - integer
+          - 'null'
+        free:
+          minimum: 0
+          maximum: 4294967296
+          type:
+          - integer
+          - 'null'
+        percent:
+          minimum: 0
+          maximum: 100
+          type:
+          - number
+          - 'null'
+      description: Utilisation with its basis. used = NetBox address records inside the prefix + addresses telemetry saw that NetBox lacks; reserved = addresses of reserved ranges not otherwise used; percent = used over capacity (100 at most). marked-utilized is NetBox's own flag for a prefix the operator declared full. unknown carries no figure.
+      allOf:
+      - if:
+          properties:
+            state:
+              const: unknown
+        then:
+          properties:
+            netbox_addresses:
+              type: 'null'
+            discovered_only:
+              type: 'null'
+            used:
+              type: 'null'
+            reserved:
+              type: 'null'
+            free:
+              type: 'null'
+            percent:
+              type: 'null'
+      - if:
+          properties:
+            basis:
+              enum:
+              - capacity-not-meaningful
+              - addresses-unavailable
+        then:
+          properties:
+            state:
+              const: unknown
+      - if:
+          properties:
+            basis:
+              enum:
+              - capacity-not-meaningful
+        then:
+          properties:
+            capacity:
+              type: 'null'
+      - if:
+          properties:
+            basis:
+              const: marked-utilized
+        then:
+          properties:
+            state:
+              const: ok
+            percent:
+              const: 100
+      - if:
+          properties:
+            basis:
+              const: netbox-addresses
+        then:
+          properties:
+            state:
+              const: ok
+            discovered_only:
+              const: 0
+    IpamReservedRange:
+      type: object
+      additionalProperties: false
+      required:
+      - start
+      - end
+      - size
+      properties:
+        start:
+          minLength: 2
+          maxLength: 45
+          type: string
+        end:
+          minLength: 2
+          maxLength: 45
+          type: string
+        size:
+          minimum: 1
+          maximum: 4294967296
+          type: integer
+      description: A reserved range NetBox declares, shown on the smallest prefix that contains all of it.
+    IpamPrefixVlan:
+      type: object
+      additionalProperties: false
+      required:
+      - vid
+      - name
+      properties:
+        vid:
+          minimum: 1
+          maximum: 4094
+          type: integer
+        name:
+          minLength: 1
+          maxLength: 128
+          type: string
+    IpamPrefix:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - prefix
+      - version
+      - vrf
+      - status
+      - site
+      - role
+      - vlan
+      - description
+      - parent_id
+      - depth
+      - children
+      - utilisation
+      - reserved_ranges
+      - reserved_ranges_total
+      properties:
+        id:
+          minLength: 48
+          maxLength: 48
+          pattern: ^ipam-prefix-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+          type: string
+        prefix:
+          minLength: 3
+          maxLength: 64
+          type: string
+        version:
+          enum:
+          - 4
+          - 6
+        vrf:
+          minLength: 1
+          maxLength: 128
+          type:
+          - string
+          - 'null'
+        status:
+          minLength: 1
+          maxLength: 64
+          type:
+          - string
+          - 'null'
+        site:
+          minLength: 1
+          maxLength: 128
+          type:
+          - string
+          - 'null'
+        role:
+          minLength: 1
+          maxLength: 128
+          type:
+          - string
+          - 'null'
+        vlan:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/IpamPrefixVlan'
+        description:
+          minLength: 1
+          maxLength: 128
+          type:
+          - string
+          - 'null'
+        parent_id:
+          oneOf:
+          - type: 'null'
+          - minLength: 48
+            maxLength: 48
+            pattern: ^ipam-prefix-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+            type: string
+        depth:
+          minimum: 0
+          maximum: 128
+          type: integer
+        children:
+          minimum: 0
+          maximum: 1000000
+          type: integer
+        utilisation:
+          $ref: '#/components/schemas/IpamUtilisation'
+        reserved_ranges:
+          type: array
+          maxItems: 16
+          items:
+            $ref: '#/components/schemas/IpamReservedRange'
+        reserved_ranges_total:
+          minimum: 0
+          maximum: 1000000
+          type: integer
+      description: One prefix from NetBox. parent_id is the smallest prefix of the same VRF that contains it (a tree, never inferred from names).
+    IpamPrefixList:
+      type: object
+      additionalProperties: false
+      required:
+      - state
+      - generated_at
+      - sources
+      - telemetry
+      - page
+      - page_size
+      - total
+      - items
+      properties:
+        state:
+          enum:
+          - not-connected
+          - unknown
+          - ok
+        generated_at:
+          type: string
+          format: date-time
+        sources:
+          type: array
+          maxItems: 3
+          items:
+            $ref: '#/components/schemas/DataSourceStatus'
+        telemetry:
+          $ref: '#/components/schemas/IpamTelemetry'
+        page:
+          minimum: 1
+          maximum: 100000
+          type: integer
+        page_size:
+          minimum: 1
+          maximum: 100
+          type: integer
+        total:
+          minimum: 0
+          maximum: 1000000
+          type: integer
+        items:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/IpamPrefix'
+      description: GET /api/v1/ipam/prefixes. A non-ok state carries no rows.
+      allOf:
+      - if:
+          properties:
+            state:
+              enum:
+              - not-connected
+              - unknown
+        then:
+          properties:
+            items:
+              maxItems: 0
+            total:
+              const: 0
+    IpamVlan:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - vid
+      - name
+      - status
+      - site
+      - group
+      - description
+      - prefix_count
+      properties:
+        id:
+          minLength: 46
+          maxLength: 46
+          pattern: ^ipam-vlan-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+          type: string
+        vid:
+          minimum: 1
+          maximum: 4094
+          type: integer
+        name:
+          minLength: 1
+          maxLength: 128
+          type: string
+        status:
+          minLength: 1
+          maxLength: 64
+          type:
+          - string
+          - 'null'
+        site:
+          minLength: 1
+          maxLength: 128
+          type:
+          - string
+          - 'null'
+        group:
+          minLength: 1
+          maxLength: 128
+          type:
+          - string
+          - 'null'
+        description:
+          minLength: 1
+          maxLength: 128
+          type:
+          - string
+          - 'null'
+        prefix_count:
+          minimum: 0
+          maximum: 1000000
+          type:
+          - integer
+          - 'null'
+      description: One VLAN from NetBox. prefix_count is the number of NetBox prefixes that name it, or null when prefixes could not be read.
+    IpamVlanList:
+      type: object
+      additionalProperties: false
+      required:
+      - state
+      - generated_at
+      - sources
+      - telemetry
+      - page
+      - page_size
+      - total
+      - items
+      properties:
+        state:
+          enum:
+          - not-connected
+          - unknown
+          - ok
+        generated_at:
+          type: string
+          format: date-time
+        sources:
+          type: array
+          maxItems: 3
+          items:
+            $ref: '#/components/schemas/DataSourceStatus'
+        telemetry:
+          $ref: '#/components/schemas/IpamTelemetry'
+        page:
+          minimum: 1
+          maximum: 100000
+          type: integer
+        page_size:
+          minimum: 1
+          maximum: 100
+          type: integer
+        total:
+          minimum: 0
+          maximum: 1000000
+          type: integer
+        items:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/IpamVlan'
+      description: GET /api/v1/ipam/vlans. A non-ok state carries no rows.
+      allOf:
+      - if:
+          properties:
+            state:
+              enum:
+              - not-connected
+              - unknown
+        then:
+          properties:
+            items:
+              maxItems: 0
+            total:
+              const: 0
+    IpamAddress:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - address
+      - version
+      - prefix_id
+      - vrf
+      - status
+      - dns_name
+      - description
+      - source
+      - activity
+      - seen_by
+      - last_seen
+      properties:
+        id:
+          minLength: 49
+          maxLength: 49
+          pattern: ^ipam-address-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+          type: string
+        address:
+          minLength: 2
+          maxLength: 45
+          type: string
+        version:
+          enum:
+          - 4
+          - 6
+        prefix_id:
+          oneOf:
+          - type: 'null'
+          - minLength: 48
+            maxLength: 48
+            pattern: ^ipam-prefix-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+            type: string
+        vrf:
+          minLength: 1
+          maxLength: 128
+          type:
+          - string
+          - 'null'
+        status:
+          minLength: 1
+          maxLength: 64
+          type:
+          - string
+          - 'null'
+        dns_name:
+          minLength: 1
+          maxLength: 255
+          type:
+          - string
+          - 'null'
+        description:
+          minLength: 1
+          maxLength: 128
+          type:
+          - string
+          - 'null'
+        source:
+          enum:
+          - netbox
+          - discovered
+          - both
+        activity:
+          enum:
+          - active
+          - stale
+          - unknown
+          - reserved
+        seen_by:
+          type: array
+          maxItems: 2
+          items:
+            enum:
+            - librenms
+            - wazuh
+        last_seen:
+          type:
+          - string
+          - 'null'
+          format: date-time
+      description: 'One address. active: telemetry saw it within the window. stale: NetBox has it, telemetry was readable and did not see it. unknown: telemetry could not be read, so nothing is claimed. reserved: NetBox reserves it and nothing saw it.'
+      allOf:
+      - if:
+          properties:
+            source:
+              const: discovered
+        then:
+          properties:
+            status:
+              type: 'null'
+            activity:
+              const: active
+            dns_name:
+              type: 'null'
+      - if:
+          properties:
+            activity:
+              const: active
+        then:
+          properties:
+            seen_by:
+              minItems: 1
+            last_seen:
+              type: string
+      - if:
+          properties:
+            activity:
+              enum:
+              - stale
+              - unknown
+              - reserved
+        then:
+          properties:
+            seen_by:
+              maxItems: 0
+            last_seen:
+              type: 'null'
+      - if:
+          properties:
+            activity:
+              const: stale
+        then:
+          properties:
+            source:
+              const: netbox
+    IpamActivityCounts:
+      type: object
+      additionalProperties: false
+      required:
+      - active
+      - stale
+      - unknown
+      - reserved
+      properties:
+        active:
+          minimum: 0
+          maximum: 1000000
+          type: integer
+        stale:
+          minimum: 0
+          maximum: 1000000
+          type: integer
+        unknown:
+          minimum: 0
+          maximum: 1000000
+          type: integer
+        reserved:
+          minimum: 0
+          maximum: 1000000
+          type: integer
+      description: Address counts by activity over everything, not the filtered page.
+    IpamAddressList:
+      type: object
+      additionalProperties: false
+      required:
+      - state
+      - generated_at
+      - sources
+      - telemetry
+      - page
+      - page_size
+      - total
+      - activity_counts
+      - items
+      properties:
+        state:
+          enum:
+          - not-connected
+          - unknown
+          - ok
+        generated_at:
+          type: string
+          format: date-time
+        sources:
+          type: array
+          maxItems: 3
+          items:
+            $ref: '#/components/schemas/DataSourceStatus'
+        telemetry:
+          $ref: '#/components/schemas/IpamTelemetry'
+        page:
+          minimum: 1
+          maximum: 100000
+          type: integer
+        page_size:
+          minimum: 1
+          maximum: 100
+          type: integer
+        total:
+          minimum: 0
+          maximum: 1000000
+          type: integer
+        activity_counts:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/IpamActivityCounts'
+        items:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/IpamAddress'
+      description: GET /api/v1/ipam/addresses. A non-ok state carries no rows and no counts.
+      allOf:
+      - if:
+          properties:
+            state:
+              enum:
+              - not-connected
+              - unknown
+        then:
+          properties:
+            items:
+              maxItems: 0
+            total:
+              const: 0
+            activity_counts:
+              type: 'null'
+    # <<< step8:c-ipam
+    # >>> step8:c-unknown
+    UnknownDeviceListResponse:
+      title: UnknownDeviceListResponse
+      type: object
+      additionalProperties: false
+      required:
+      - state
+      - generated_at
+      - page
+      - page_size
+      - total
+      - items
+      properties:
+        state:
+          enum:
+          - not-connected
+          - unknown
+          - ok
+        generated_at:
+          type: string
+          format: date-time
+        page:
+          minimum: 1
+          maximum: 100000
+          type: integer
+        page_size:
+          minimum: 1
+          maximum: 50
+          type: integer
+        total:
+          minimum: 0
+          maximum: 1000000
+          type: integer
+        items:
+          type: array
+          maxItems: 50
+          items:
+            $ref: '#/components/schemas/UnknownDeviceFinding'
+      description: 'GET /api/v1/unknown-devices. Findings are stored in PostgreSQL: without the store the state is not-connected, a failing store is unknown, and neither carries rows.'
+      allOf:
+      - if:
+          properties:
+            state:
+              enum:
+              - not-connected
+              - unknown
+        then:
+          properties:
+            items:
+              maxItems: 0
+            total:
+              const: 0
+    UnknownDeviceEvidenceRef:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - source
+      - kind
+      - observed_at
+      - confidence
+      properties:
+        id:
+          minLength: 1
+          maxLength: 128
+          type: string
+        source:
+          minLength: 1
+          maxLength: 32
+          pattern: ^[a-z0-9][a-z0-9_.-]{0,31}$
+          type: string
+        kind:
+          minLength: 1
+          maxLength: 40
+          pattern: ^[a-z0-9][a-z0-9-]{0,39}$
+          type: string
+        observed_at:
+          type: string
+          format: date-time
+        confidence:
+          minimum: 0
+          maximum: 1
+          type:
+          - number
+          - 'null'
+      description: 'A pointer to the observation behind a link: which source, what kind, when. confidence is the source''s own, or null when it reported none.'
+    UnknownDeviceLinkSlot:
+      type: object
+      additionalProperties: false
+      required:
+      - slot
+      - basis
+      - value
+      - label
+      - attachment_kind
+      - confidence
+      - reason
+      - evidence
+      properties:
+        slot:
+          enum:
+          - ip
+          - mac
+          - attachment
+          - port
+          - vlan
+        basis:
+          enum:
+          - observed
+          - inferred
+          - unknown
+        value:
+          minLength: 1
+          maxLength: 128
+          type:
+          - string
+          - 'null'
+        label:
+          minLength: 1
+          maxLength: 128
+          type:
+          - string
+          - 'null'
+        attachment_kind:
+          oneOf:
+          - type: 'null'
+          - enum:
+            - switch
+            - ap
+        confidence:
+          minimum: 0
+          maximum: 1
+          type:
+          - number
+          - 'null'
+        reason:
+          oneOf:
+          - type: 'null'
+          - enum:
+            - declared-assignment
+            - indirect-evidence
+            - low-confidence
+            - name-match
+            - no-evidence
+            - expired
+            - conflicting-evidence
+            - source-unavailable
+            - guest-network
+        evidence:
+          type: array
+          maxItems: 16
+          items:
+            $ref: '#/components/schemas/UnknownDeviceEvidenceRef'
+      description: One hop of the chain IP, MAC, switch or AP, port, VLAN. observed and inferred name a value and the evidence behind it; unknown names nothing and says why. label is untrusted display text.
+      allOf:
+      - if:
+          properties:
+            basis:
+              const: unknown
+        then:
+          properties:
+            value:
+              type: 'null'
+            label:
+              type: 'null'
+            attachment_kind:
+              type: 'null'
+            confidence:
+              type: 'null'
+            reason:
+              type: string
+            evidence:
+              maxItems: 0
+      - if:
+          properties:
+            basis:
+              const: observed
+        then:
+          properties:
+            value:
+              type: string
+            reason:
+              type: 'null'
+            evidence:
+              minItems: 1
+      - if:
+          properties:
+            basis:
+              const: inferred
+        then:
+          properties:
+            value:
+              type: string
+            reason:
+              type: string
+            evidence:
+              minItems: 1
+            confidence:
+              type: number
+              maximum: 0.7
+      - if:
+          properties:
+            slot:
+              enum:
+              - ip
+              - mac
+              - port
+              - vlan
+        then:
+          properties:
+            attachment_kind:
+              type: 'null'
+    UnknownDeviceEndpoint:
+      type: object
+      additionalProperties: false
+      required:
+      - ip
+      - mac
+      - hostname
+      properties:
+        ip:
+          minLength: 2
+          maxLength: 45
+          type:
+          - string
+          - 'null'
+        mac:
+          minLength: 17
+          maxLength: 17
+          pattern: ^(?:[0-9a-f]{2}:){5}[0-9a-f]{2}$
+          type:
+          - string
+          - 'null'
+        hostname:
+          minLength: 1
+          maxLength: 255
+          type:
+          - string
+          - 'null'
+      description: What was seen. At least one of the three is reported (checked by pydantic and the TS parser).
+    UnknownDeviceCheck:
+      type: object
+      additionalProperties: false
+      required:
+      - field
+      - result
+      - detail
+      properties:
+        field:
+          enum:
+          - ip
+          - mac
+          - hostname
+        result:
+          enum:
+          - match
+          - no-match
+          - not-checked
+        detail:
+          minLength: 1
+          maxLength: 255
+          type:
+          - string
+          - 'null'
+      description: 'One comparison with NetBox. match: NetBox has it. no-match: NetBox was asked and does not. not-checked: it could not be asked (nothing observed, lookup limit, source error).'
+    UnknownDeviceComparison:
+      type: object
+      additionalProperties: false
+      required:
+      - checks
+      - checked_at
+      properties:
+        checks:
+          type: array
+          minItems: 3
+          maxItems: 3
+          items:
+            $ref: '#/components/schemas/UnknownDeviceCheck'
+        checked_at:
+          type: string
+          format: date-time
+      description: The comparison against NetBox, one check per field in the order ip, mac, hostname. A finding exists only when no check matched.
+    UnknownDeviceProposedAction:
+      type: object
+      additionalProperties: false
+      required:
+      - action_type
+      - state
+      - risk
+      - executable
+      - awaiting
+      - rationale
+      properties:
+        action_type:
+          const: endpoint.isolate
+        state:
+          const: proposed
+        risk:
+          const: C
+        executable:
+          const: false
+        awaiting:
+          const: action-engine
+        rationale:
+          minLength: 1
+          maxLength: 255
+          type: string
+      description: 'A recommendation only. No execution path exists: isolating an endpoint is owned by the action engine (Step 14) and needs step-up, a reason and human approval.'
+    UnknownDeviceFinding:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - state
+      - severity
+      - severity_basis
+      - assignee_id
+      - first_seen_at
+      - last_seen_at
+      - seen_count
+      - recurrence_of
+      - endpoint
+      - chain
+      - comparison
+      - proposed_action
+      properties:
+        id:
+          minLength: 51
+          maxLength: 51
+          pattern: ^unknown-device-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+          type: string
+        state:
+          enum:
+          - new
+          - acknowledged
+          - investigating
+          - resolved
+          - false-positive
+        severity:
+          enum:
+          - low
+          - medium
+          - high
+          - critical
+          - unknown
+        severity_basis:
+          enum:
+          - policy-rule
+          - policy-default
+          - no-policy
+        assignee_id:
+          minLength: 1
+          maxLength: 255
+          type:
+          - string
+          - 'null'
+        first_seen_at:
+          type: string
+          format: date-time
+        last_seen_at:
+          type: string
+          format: date-time
+        seen_count:
+          minimum: 1
+          maximum: 1000000
+          type: integer
+        recurrence_of:
+          oneOf:
+          - type: 'null'
+          - minLength: 51
+            maxLength: 51
+            pattern: ^unknown-device-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+            type: string
+        endpoint:
+          $ref: '#/components/schemas/UnknownDeviceEndpoint'
+        chain:
+          type: array
+          minItems: 5
+          maxItems: 5
+          prefixItems:
+          - allOf:
+            - $ref: '#/components/schemas/UnknownDeviceLinkSlot'
+            - properties:
+                slot:
+                  const: ip
+          - allOf:
+            - $ref: '#/components/schemas/UnknownDeviceLinkSlot'
+            - properties:
+                slot:
+                  const: mac
+          - allOf:
+            - $ref: '#/components/schemas/UnknownDeviceLinkSlot'
+            - properties:
+                slot:
+                  const: attachment
+          - allOf:
+            - $ref: '#/components/schemas/UnknownDeviceLinkSlot'
+            - properties:
+                slot:
+                  const: port
+          - allOf:
+            - $ref: '#/components/schemas/UnknownDeviceLinkSlot'
+            - properties:
+                slot:
+                  const: vlan
+          items: false
+        comparison:
+          $ref: '#/components/schemas/UnknownDeviceComparison'
+        proposed_action:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/UnknownDeviceProposedAction'
+      description: 'An unknown-device finding: something telemetry saw that NetBox does not know. The chain holds only the links actually observed; the rest are unknown. Severity comes from the operator''s policy, never from a guess.'
+      allOf:
+      - if:
+          properties:
+            severity:
+              const: unknown
+        then:
+          properties:
+            severity_basis:
+              const: no-policy
+      - if:
+          properties:
+            severity:
+              enum:
+              - low
+              - medium
+              - high
+              - critical
+        then:
+          properties:
+            severity_basis:
+              enum:
+              - policy-rule
+              - policy-default
+    UnknownDeviceStateCount:
+      type: object
+      additionalProperties: false
+      required:
+      - state
+      - count
+      properties:
+        state:
+          enum:
+          - new
+          - acknowledged
+          - investigating
+          - resolved
+          - false-positive
+        count:
+          minimum: 0
+          maximum: 1000000
+          type: integer
+    UnknownDeviceSeverityCount:
+      type: object
+      additionalProperties: false
+      required:
+      - severity
+      - count
+      properties:
+        severity:
+          enum:
+          - low
+          - medium
+          - high
+          - critical
+          - unknown
+        count:
+          minimum: 0
+          maximum: 1000000
+          type: integer
+    UnknownDeviceCounts:
+      type: object
+      additionalProperties: false
+      required:
+      - open
+      - by_state
+      - by_severity
+      properties:
+        open:
+          minimum: 0
+          maximum: 1000000
+          type: integer
+        by_state:
+          type: array
+          maxItems: 5
+          items:
+            $ref: '#/components/schemas/UnknownDeviceStateCount'
+        by_severity:
+          type: array
+          maxItems: 5
+          items:
+            $ref: '#/components/schemas/UnknownDeviceSeverityCount'
+      description: Counts only. open = new, acknowledged and investigating.
+    UnknownDeviceEvent:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - finding_id
+      - seq
+      - occurred_at
+      - actor_id
+      - kind
+      - state_from
+      - state_to
+      - reason
+      - message
+      - subject_id
+      properties:
+        id:
+          minLength: 57
+          maxLength: 57
+          pattern: ^unknown-device-event-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+          type: string
+        finding_id:
+          minLength: 51
+          maxLength: 51
+          pattern: ^unknown-device-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+          type: string
+        seq:
+          minimum: 1
+          maximum: 1000000
+          type: integer
+        occurred_at:
+          type: string
+          format: date-time
+        actor_id:
+          minLength: 1
+          maxLength: 255
+          type: string
+        kind:
+          enum:
+          - detected
+          - evidence-updated
+          - action-proposed
+          - state-changed
+          - assignee-changed
+          - comment
+        state_from:
+          oneOf:
+          - type: 'null'
+          - enum:
+            - new
+            - acknowledged
+            - investigating
+            - resolved
+            - false-positive
+        state_to:
+          oneOf:
+          - type: 'null'
+          - enum:
+            - new
+            - acknowledged
+            - investigating
+            - resolved
+            - false-positive
+        reason:
+          minLength: 1
+          maxLength: 1000
+          type:
+          - string
+          - 'null'
+        message:
+          minLength: 1
+          maxLength: 4000
+          type:
+          - string
+          - 'null'
+        subject_id:
+          minLength: 1
+          maxLength: 128
+          type:
+          - string
+          - 'null'
+      description: One append-only timeline entry. State changes carry both states; a resolution or dismissal carries its reason; a comment carries its text. subject_id names the assignee of an assignment.
+      allOf:
+      - if:
+          properties:
+            kind:
+              const: state-changed
+        then:
+          properties:
+            state_from:
+              type: string
+            state_to:
+              type: string
+      - if:
+          properties:
+            kind:
+              enum:
+              - detected
+              - evidence-updated
+              - action-proposed
+              - assignee-changed
+              - comment
+        then:
+          properties:
+            state_from:
+              type: 'null'
+            state_to:
+              type: 'null'
+      - if:
+          properties:
+            kind:
+              const: comment
+        then:
+          properties:
+            message:
+              type: string
+    UnknownDeviceDetailResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - state
+      - generated_at
+      - item
+      properties:
+        state:
+          enum:
+          - not-connected
+          - unknown
+          - ok
+        generated_at:
+          type: string
+          format: date-time
+        item:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/UnknownDeviceFinding'
+      description: GET /api/v1/unknown-devices/{id}.
+      allOf:
+      - if:
+          properties:
+            state:
+              enum:
+              - not-connected
+              - unknown
+        then:
+          properties:
+            item:
+              type: 'null'
+    UnknownDeviceSummaryResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - state
+      - generated_at
+      - counts
+      properties:
+        state:
+          enum:
+          - not-connected
+          - unknown
+          - ok
+        generated_at:
+          type: string
+          format: date-time
+        counts:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/UnknownDeviceCounts'
+      description: 'GET /api/v1/unknown-devices/summary: counts only (Management and Technician).'
+      allOf:
+      - if:
+          properties:
+            state:
+              enum:
+              - not-connected
+              - unknown
+        then:
+          properties:
+            counts:
+              type: 'null'
+    UnknownDeviceTimelineResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - state
+      - generated_at
+      - finding_id
+      - events
+      - after_seq
+      - next_after_seq
+      properties:
+        state:
+          enum:
+          - not-connected
+          - unknown
+          - ok
+        generated_at:
+          type: string
+          format: date-time
+        finding_id:
+          minLength: 51
+          maxLength: 51
+          pattern: ^unknown-device-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+          type: string
+        events:
+          type: array
+          maxItems: 200
+          items:
+            $ref: '#/components/schemas/UnknownDeviceEvent'
+        after_seq:
+          minimum: 0
+          maximum: 1000000
+          type: integer
+        next_after_seq:
+          minimum: 1
+          maximum: 1000000
+          type:
+          - integer
+          - 'null'
+      description: 'GET /api/v1/unknown-devices/{id}/timeline: append-only events in order, bounded per page.'
+      allOf:
+      - if:
+          properties:
+            state:
+              enum:
+              - not-connected
+              - unknown
+        then:
+          properties:
+            events:
+              maxItems: 0
+            next_after_seq:
+              type: 'null'
+    UnknownDeviceAssignRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - assignee_id
+      properties:
+        assignee_id:
+          minLength: 1
+          maxLength: 255
+          type:
+          - string
+          - 'null'
+      description: POST /unknown-devices/{id}/assign. null unassigns.
+    UnknownDeviceCommentRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - message
+      properties:
+        message:
+          minLength: 1
+          maxLength: 4000
+          pattern: \S
+          type: string
+      description: POST /unknown-devices/{id}/comment.
+    UnknownDeviceResolveRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - outcome
+      - reason
+      properties:
+        outcome:
+          enum:
+          - resolved
+          - false-positive
+        reason:
+          minLength: 1
+          maxLength: 1000
+          pattern: \S
+          type: string
+      description: POST /unknown-devices/{id}/resolve. A false-positive suppresses later detections of the same endpoint, so the reason is mandatory.
+    UnknownDeviceScanResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - state
+      - generated_at
+      - sources
+      - created
+      - refreshed
+      - suppressed
+      - unverified
+      - truncated
+      properties:
+        state:
+          enum:
+          - not-connected
+          - unknown
+          - ok
+        generated_at:
+          type: string
+          format: date-time
+        sources:
+          type: array
+          maxItems: 3
+          items:
+            $ref: '#/components/schemas/DataSourceStatus'
+        created:
+          minimum: 0
+          maximum: 1000000
+          type: integer
+        refreshed:
+          minimum: 0
+          maximum: 1000000
+          type: integer
+        suppressed:
+          minimum: 0
+          maximum: 1000000
+          type: integer
+        unverified:
+          minimum: 0
+          maximum: 1000000
+          type: integer
+        truncated:
+          type: boolean
+      description: 'POST /api/v1/unknown-devices/scan: what one comparison of telemetry with NetBox did. unverified: endpoints skipped because NetBox could not be asked about them. A non-ok state changed nothing.'
+      allOf:
+      - if:
+          properties:
+            state:
+              enum:
+              - not-connected
+              - unknown
+        then:
+          properties:
+            created:
+              const: 0
+            refreshed:
+              const: 0
+            suppressed:
+              const: 0
+            unverified:
+              const: 0
+    # <<< step8:c-unknown
   responses:
     AuthenticationRequired:
       description: Authentication required
@@ -8397,6 +11308,55 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorEnvelope'
+    # >>> step8:r-inventory
+    AssetNotFound:
+      description: Asset not found
+      headers:
+        X-Correlation-ID:
+          $ref: '#/components/headers/CorrelationId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    # <<< step8:r-inventory
+    # >>> step8:r-unknown
+    FindingNotFound:
+      description: Unknown-device finding not found
+      headers:
+        X-Correlation-ID:
+          $ref: '#/components/headers/CorrelationId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    FindingConflict:
+      description: Illegal transition or concurrent change
+      headers:
+        X-Correlation-ID:
+          $ref: '#/components/headers/CorrelationId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    FindingStoreUnavailable:
+      description: Finding storage is not connected or temporarily unavailable
+      headers:
+        X-Correlation-ID:
+          $ref: '#/components/headers/CorrelationId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    PermissionDeniedOrStepUp:
+      description: 'Permission denied, or STEP_UP_REQUIRED: recent MFA is needed (sign in again)'
+      headers:
+        X-Correlation-ID:
+          $ref: '#/components/headers/CorrelationId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    # <<< step8:r-unknown
   securitySchemes:
     sessionCookie:
       type: apiKey

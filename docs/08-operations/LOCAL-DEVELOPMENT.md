@@ -17,6 +17,21 @@ Use mocked adapter fixtures until a lab LibreNMS/NetBox is available.
 
 Do not connect development directly to production monitoring systems.
 
+## Demo account and fixture data
+
+To look around the UI without a real monitoring system, run from the repo root:
+
+```
+python scripts/demo-local.py          # API on 127.0.0.1:8000 + fixture LibreNMS on :8081
+cd apps/web && npm run dev            # http://localhost:3000
+```
+
+The first run creates a local administrator (`demo.admin`) through the operator CLI and prints the
+password, TOTP secret and recovery codes once, in that terminal. Only a password hash and an
+encrypted TOTP secret are kept, under the git-ignored `.demo/`. `--reset` removes the account.
+Only the LibreNMS fixture (devices, ports, alerts) has data; traffic, security, NetBox and the rest
+show "Not connected" because nothing is wired to them. Everything binds to loopback.
+
 ## Database migrations and roles (API)
 
 Separate database credentials, never the same one:

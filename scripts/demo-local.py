@@ -1,0 +1,185 @@
+"""Local demo environment: a throwaway account plus fixture data, on loopback only.
+
+Starts the loopback LibreNMS stub (fixture devices and ports) and the real API
+pointed at it, and provisions one local administrator account through the same
+CLI an operator uses. Nothing here talks to a real monitoring system, and every
+listener binds to 127.0.0.1.
+
+    python scripts/demo-local.py            # run from the repo root
+    python scripts/demo-local.py --reset    # forget the demo account and start clean
+
+The first run prints the username, password and TOTP secret ONCE, in this
+terminal. Only a password hash and an encrypted TOTP secret are stored (under
+`.demo/`, which is git-ignored). Add the TOTP secret or the provisioning URI to
+an authenticator app, then sign in at the web app.
+
+Then, in a second terminal:
+
+    cd apps/web && npm run dev          # http://localhost:3000
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import secrets
+import shutil
+import subprocess
+import sys
+import time
+import urllib.error
+import urllib.request
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+API_DIR = REPO_ROOT / "apps" / "api"
+STUB = API_DIR / "tests" / "e2e" / "stub_librenms.py"
+DEMO_DIR = Path(os.environ.get("NETSIGHT_DEMO_DIR", REPO_ROOT / ".demo"))
+ACCOUNT_FILE = DEMO_DIR / "local-accounts.json"
+SECRET_FILE = DEMO_DIR / "session-secret"
+
+HOST = "127.0.0.1"
+API_PORT = 8000  # the web app's default NETSIGHT_API_URL
+STUB_PORT = 8081
+USERNAME = "demo.admin"
+
+
+def _session_secret() -> str:
+    """A stable per-checkout secret, so the stored TOTP envelope stays readable."""
+    DEMO_DIR.mkdir(parents=True, exist_ok=True)
+    if SECRET_FILE.exists():
+        return SECRET_FILE.read_text(encoding="utf-8").strip()
+    value = secrets.token_urlsafe(48)
+    SECRET_FILE.write_text(value, encoding="utf-8")
+    try:
+        SECRET_FILE.chmod(0o600)
+    except OSError:  # pragma: no cover - not supported on every filesystem
+        pass
+    return value
+
+
+def _provision(env: dict[str, str]) -> dict[str, str] | None:
+    """Create the account through the operator CLI; None if it already exists."""
+    if ACCOUNT_FILE.exists():
+        return None
+    password = secrets.token_urlsafe(18)
+    # The CLI reads the password from the terminal by design (never argv); patch
+    # that one seam, exactly as the E2E harness does.
+    script = (
+        "import sys\n"
+        "import netsight_api.localauth.cli as cli\n"
+        f"cli._read_passwords = lambda *_: {password!r}\n"
+        f"sys.exit(cli.main(['add', {USERNAME!r}, '--roles', 'administrator']))\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        capture_output=True,
+        text=True,
+        cwd=str(API_DIR),
+        env=env,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise SystemExit(f"account provisioning failed ({result.returncode}); see the API logs")
+    payload = json.loads(result.stdout)
+    return {
+        "username": payload["created"],
+        "password": password,
+        "totp_secret": payload["totp_secret"],
+        "uri": payload.get("provisioning_uri", ""),
+        "recovery_codes": ", ".join(payload.get("recovery_codes", [])),
+    }
+
+
+def _wait_for(url: str, timeout: float = 40.0) -> None:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            with urllib.request.urlopen(url, timeout=2) as response:
+                if response.status < 500:
+                    return
+        except (urllib.error.URLError, OSError, TimeoutError):
+            time.sleep(0.3)
+    raise SystemExit(f"{url} did not become ready")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    parser.add_argument("--reset", action="store_true", help="delete the demo account and secret")
+    args = parser.parse_args()
+
+    if args.reset:
+        shutil.rmtree(DEMO_DIR, ignore_errors=True)
+        print("Demo account removed. Run again to create a new one.")
+        return 0
+
+    env = {
+        **os.environ,
+        "NETSIGHT_ENV": "development",
+        "NETSIGHT_SESSION_SECRET": _session_secret(),
+        "NETSIGHT_LOCAL_ACCOUNT_FILE": str(ACCOUNT_FILE),
+        # Plain http on loopback, so the browser must be allowed to keep the cookie.
+        "NETSIGHT_SESSION_COOKIE_SECURE": "false",
+        "LIBRENMS_BASE_URL": f"http://{HOST}:{STUB_PORT}",
+        "LIBRENMS_TIMEZONE": "UTC",
+        # The adapter needs a non-empty token to count as configured; the stub never checks it.
+        "LIBRENMS_TOKEN": secrets.token_urlsafe(24),
+    }
+
+    created = _provision(env)
+
+    stub = subprocess.Popen(
+        [sys.executable, str(STUB), "--port", str(STUB_PORT)],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    api = subprocess.Popen(
+        [
+            sys.executable,
+            "-m",
+            "uvicorn",
+            "netsight_api.main:app",
+            "--host",
+            HOST,
+            "--port",
+            str(API_PORT),
+        ],
+        cwd=str(API_DIR),
+        env=env,
+    )
+    try:
+        _wait_for(f"http://{HOST}:{API_PORT}/api/v1/health")
+        print("\n=== Netsight demo ===")
+        print(f"API   http://{HOST}:{API_PORT}   (fixture LibreNMS on :{STUB_PORT})")
+        print("Web   cd apps/web && npm run dev   ->  http://localhost:3000")
+        if created:
+            print("\nSign-in (shown once; store them now):")
+            print(f"  username     {created['username']}")
+            print(f"  password     {created['password']}")
+            print(f"  TOTP secret  {created['totp_secret']}")
+            if created["uri"]:
+                print(f"  TOTP URI     {created['uri']}")
+            if created["recovery_codes"]:
+                print(f"  recovery     {created['recovery_codes']}")
+        else:
+            print(f"\nAccount '{USERNAME}' already exists (credentials were shown at creation).")
+            print("Run with --reset to create a fresh one.")
+        print("\nOnly the fixture devices and ports have data. Traffic, security, NetBox and")
+        print("the other sources show 'Not connected' because nothing is wired to them.")
+        print("Ctrl+C to stop.\n")
+        api.wait()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        for process in (api, stub):
+            process.terminate()
+            try:
+                process.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                process.kill()
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

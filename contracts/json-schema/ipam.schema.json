@@ -1,0 +1,1164 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "IpamSummaryResponse",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "state",
+    "generated_at",
+    "sources",
+    "telemetry",
+    "counts"
+  ],
+  "properties": {
+    "state": {
+      "enum": [
+        "not-connected",
+        "unknown",
+        "ok"
+      ]
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "sources": {
+      "type": "array",
+      "maxItems": 3,
+      "items": {
+        "$ref": "common.schema.json#/$defs/sourceStatus"
+      }
+    },
+    "telemetry": {
+      "$ref": "#/$defs/telemetry"
+    },
+    "counts": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/counts"
+        }
+      ]
+    }
+  },
+  "description": "GET /api/v1/ipam: what is known, from where, and counts only (Management's rung). state is NetBox IPAM's: not-connected when NetBox is not configured, unknown when none of its IPAM reads worked.",
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "enum": [
+              "not-connected",
+              "unknown"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "counts": {
+            "type": "null"
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "prefixes",
+        "vlans",
+        "addresses",
+        "reserved_ranges",
+        "active_addresses",
+        "stale_addresses",
+        "unknown_activity_addresses",
+        "discovered_only_addresses"
+      ],
+      "properties": {
+        "prefixes": {
+          "minimum": 0,
+          "maximum": 1000000,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "vlans": {
+          "minimum": 0,
+          "maximum": 1000000,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "addresses": {
+          "minimum": 0,
+          "maximum": 1000000,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "reserved_ranges": {
+          "minimum": 0,
+          "maximum": 1000000,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "active_addresses": {
+          "minimum": 0,
+          "maximum": 1000000,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "stale_addresses": {
+          "minimum": 0,
+          "maximum": 1000000,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "unknown_activity_addresses": {
+          "minimum": 0,
+          "maximum": 1000000,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "discovered_only_addresses": {
+          "minimum": 0,
+          "maximum": 1000000,
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "description": "Counts only. null is not reported (that NetBox read failed or telemetry is unavailable), never zero."
+    },
+    "telemetry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "window_seconds",
+        "sources"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "not-connected",
+            "unknown",
+            "ok"
+          ]
+        },
+        "window_seconds": {
+          "minimum": 3600,
+          "maximum": 604800,
+          "type": "integer"
+        },
+        "sources": {
+          "type": "array",
+          "maxItems": 2,
+          "items": {
+            "enum": [
+              "librenms",
+              "wazuh"
+            ]
+          }
+        }
+      },
+      "description": "Which telemetry decides whether an address was seen within the window. state ok means at least one source was read; it then lists those that were. Stale and active are only judged when it is ok.",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "not-connected",
+                  "unknown"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "sources": {
+                "maxItems": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "ok"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "sources": {
+                "minItems": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "utilisation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "basis",
+        "capacity",
+        "netbox_addresses",
+        "discovered_only",
+        "used",
+        "reserved",
+        "free",
+        "percent"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "ok",
+            "unknown"
+          ]
+        },
+        "basis": {
+          "enum": [
+            "netbox-addresses",
+            "netbox-and-discovered",
+            "marked-utilized",
+            "capacity-not-meaningful",
+            "addresses-unavailable"
+          ]
+        },
+        "capacity": {
+          "minimum": 0,
+          "maximum": 4294967296,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "netbox_addresses": {
+          "minimum": 0,
+          "maximum": 1000000,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "discovered_only": {
+          "minimum": 0,
+          "maximum": 1000000,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "used": {
+          "minimum": 0,
+          "maximum": 2000000,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "reserved": {
+          "minimum": 0,
+          "maximum": 4294967296,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "free": {
+          "minimum": 0,
+          "maximum": 4294967296,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "percent": {
+          "minimum": 0,
+          "maximum": 100,
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "description": "Utilisation with its basis. used = NetBox address records inside the prefix + addresses telemetry saw that NetBox lacks; reserved = addresses of reserved ranges not otherwise used; percent = used over capacity (100 at most). marked-utilized is NetBox's own flag for a prefix the operator declared full. unknown carries no figure.",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "unknown"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "netbox_addresses": {
+                "type": "null"
+              },
+              "discovered_only": {
+                "type": "null"
+              },
+              "used": {
+                "type": "null"
+              },
+              "reserved": {
+                "type": "null"
+              },
+              "free": {
+                "type": "null"
+              },
+              "percent": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "basis": {
+                "enum": [
+                  "capacity-not-meaningful",
+                  "addresses-unavailable"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "state": {
+                "const": "unknown"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "basis": {
+                "enum": [
+                  "capacity-not-meaningful"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "capacity": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "basis": {
+                "const": "marked-utilized"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "state": {
+                "const": "ok"
+              },
+              "percent": {
+                "const": 100
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "basis": {
+                "const": "netbox-addresses"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "state": {
+                "const": "ok"
+              },
+              "discovered_only": {
+                "const": 0
+              }
+            }
+          }
+        }
+      ]
+    },
+    "reservedRange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "start",
+        "end",
+        "size"
+      ],
+      "properties": {
+        "start": {
+          "minLength": 2,
+          "maxLength": 45,
+          "type": "string"
+        },
+        "end": {
+          "minLength": 2,
+          "maxLength": 45,
+          "type": "string"
+        },
+        "size": {
+          "minimum": 1,
+          "maximum": 4294967296,
+          "type": "integer"
+        }
+      },
+      "description": "A reserved range NetBox declares, shown on the smallest prefix that contains all of it."
+    },
+    "prefixVlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "vid",
+        "name"
+      ],
+      "properties": {
+        "vid": {
+          "minimum": 1,
+          "maximum": 4094,
+          "type": "integer"
+        },
+        "name": {
+          "minLength": 1,
+          "maxLength": 128,
+          "type": "string"
+        }
+      }
+    },
+    "prefix": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "prefix",
+        "version",
+        "vrf",
+        "status",
+        "site",
+        "role",
+        "vlan",
+        "description",
+        "parent_id",
+        "depth",
+        "children",
+        "utilisation",
+        "reserved_ranges",
+        "reserved_ranges_total"
+      ],
+      "properties": {
+        "id": {
+          "minLength": 48,
+          "maxLength": 48,
+          "pattern": "^ipam-prefix-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+          "type": "string"
+        },
+        "prefix": {
+          "minLength": 3,
+          "maxLength": 64,
+          "type": "string"
+        },
+        "version": {
+          "enum": [
+            4,
+            6
+          ]
+        },
+        "vrf": {
+          "minLength": 1,
+          "maxLength": 128,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "status": {
+          "minLength": 1,
+          "maxLength": 64,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "site": {
+          "minLength": 1,
+          "maxLength": 128,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "role": {
+          "minLength": 1,
+          "maxLength": 128,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "vlan": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/prefixVlan"
+            }
+          ]
+        },
+        "description": {
+          "minLength": 1,
+          "maxLength": 128,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "parent_id": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "minLength": 48,
+              "maxLength": 48,
+              "pattern": "^ipam-prefix-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          ]
+        },
+        "depth": {
+          "minimum": 0,
+          "maximum": 128,
+          "type": "integer"
+        },
+        "children": {
+          "minimum": 0,
+          "maximum": 1000000,
+          "type": "integer"
+        },
+        "utilisation": {
+          "$ref": "#/$defs/utilisation"
+        },
+        "reserved_ranges": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "$ref": "#/$defs/reservedRange"
+          }
+        },
+        "reserved_ranges_total": {
+          "minimum": 0,
+          "maximum": 1000000,
+          "type": "integer"
+        }
+      },
+      "description": "One prefix from NetBox. parent_id is the smallest prefix of the same VRF that contains it (a tree, never inferred from names)."
+    },
+    "prefixList": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "generated_at",
+        "sources",
+        "telemetry",
+        "page",
+        "page_size",
+        "total",
+        "items"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "not-connected",
+            "unknown",
+            "ok"
+          ]
+        },
+        "generated_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "sources": {
+          "type": "array",
+          "maxItems": 3,
+          "items": {
+            "$ref": "common.schema.json#/$defs/sourceStatus"
+          }
+        },
+        "telemetry": {
+          "$ref": "#/$defs/telemetry"
+        },
+        "page": {
+          "minimum": 1,
+          "maximum": 100000,
+          "type": "integer"
+        },
+        "page_size": {
+          "minimum": 1,
+          "maximum": 100,
+          "type": "integer"
+        },
+        "total": {
+          "minimum": 0,
+          "maximum": 1000000,
+          "type": "integer"
+        },
+        "items": {
+          "type": "array",
+          "maxItems": 100,
+          "items": {
+            "$ref": "#/$defs/prefix"
+          }
+        }
+      },
+      "description": "GET /api/v1/ipam/prefixes. A non-ok state carries no rows.",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "not-connected",
+                  "unknown"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "items": {
+                "maxItems": 0
+              },
+              "total": {
+                "const": 0
+              }
+            }
+          }
+        }
+      ]
+    },
+    "vlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "vid",
+        "name",
+        "status",
+        "site",
+        "group",
+        "description",
+        "prefix_count"
+      ],
+      "properties": {
+        "id": {
+          "minLength": 46,
+          "maxLength": 46,
+          "pattern": "^ipam-vlan-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+          "type": "string"
+        },
+        "vid": {
+          "minimum": 1,
+          "maximum": 4094,
+          "type": "integer"
+        },
+        "name": {
+          "minLength": 1,
+          "maxLength": 128,
+          "type": "string"
+        },
+        "status": {
+          "minLength": 1,
+          "maxLength": 64,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "site": {
+          "minLength": 1,
+          "maxLength": 128,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "group": {
+          "minLength": 1,
+          "maxLength": 128,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "description": {
+          "minLength": 1,
+          "maxLength": 128,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "prefix_count": {
+          "minimum": 0,
+          "maximum": 1000000,
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "description": "One VLAN from NetBox. prefix_count is the number of NetBox prefixes that name it, or null when prefixes could not be read."
+    },
+    "vlanList": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "generated_at",
+        "sources",
+        "telemetry",
+        "page",
+        "page_size",
+        "total",
+        "items"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "not-connected",
+            "unknown",
+            "ok"
+          ]
+        },
+        "generated_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "sources": {
+          "type": "array",
+          "maxItems": 3,
+          "items": {
+            "$ref": "common.schema.json#/$defs/sourceStatus"
+          }
+        },
+        "telemetry": {
+          "$ref": "#/$defs/telemetry"
+        },
+        "page": {
+          "minimum": 1,
+          "maximum": 100000,
+          "type": "integer"
+        },
+        "page_size": {
+          "minimum": 1,
+          "maximum": 100,
+          "type": "integer"
+        },
+        "total": {
+          "minimum": 0,
+          "maximum": 1000000,
+          "type": "integer"
+        },
+        "items": {
+          "type": "array",
+          "maxItems": 100,
+          "items": {
+            "$ref": "#/$defs/vlan"
+          }
+        }
+      },
+      "description": "GET /api/v1/ipam/vlans. A non-ok state carries no rows.",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "not-connected",
+                  "unknown"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "items": {
+                "maxItems": 0
+              },
+              "total": {
+                "const": 0
+              }
+            }
+          }
+        }
+      ]
+    },
+    "address": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "address",
+        "version",
+        "prefix_id",
+        "vrf",
+        "status",
+        "dns_name",
+        "description",
+        "source",
+        "activity",
+        "seen_by",
+        "last_seen"
+      ],
+      "properties": {
+        "id": {
+          "minLength": 49,
+          "maxLength": 49,
+          "pattern": "^ipam-address-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+          "type": "string"
+        },
+        "address": {
+          "minLength": 2,
+          "maxLength": 45,
+          "type": "string"
+        },
+        "version": {
+          "enum": [
+            4,
+            6
+          ]
+        },
+        "prefix_id": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "minLength": 48,
+              "maxLength": 48,
+              "pattern": "^ipam-prefix-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          ]
+        },
+        "vrf": {
+          "minLength": 1,
+          "maxLength": 128,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "status": {
+          "minLength": 1,
+          "maxLength": 64,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "dns_name": {
+          "minLength": 1,
+          "maxLength": 255,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "description": {
+          "minLength": 1,
+          "maxLength": 128,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "source": {
+          "enum": [
+            "netbox",
+            "discovered",
+            "both"
+          ]
+        },
+        "activity": {
+          "enum": [
+            "active",
+            "stale",
+            "unknown",
+            "reserved"
+          ]
+        },
+        "seen_by": {
+          "type": "array",
+          "maxItems": 2,
+          "items": {
+            "enum": [
+              "librenms",
+              "wazuh"
+            ]
+          }
+        },
+        "last_seen": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        }
+      },
+      "description": "One address. active: telemetry saw it within the window. stale: NetBox has it, telemetry was readable and did not see it. unknown: telemetry could not be read, so nothing is claimed. reserved: NetBox reserves it and nothing saw it.",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "source": {
+                "const": "discovered"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "status": {
+                "type": "null"
+              },
+              "activity": {
+                "const": "active"
+              },
+              "dns_name": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "activity": {
+                "const": "active"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "seen_by": {
+                "minItems": 1
+              },
+              "last_seen": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "activity": {
+                "enum": [
+                  "stale",
+                  "unknown",
+                  "reserved"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "seen_by": {
+                "maxItems": 0
+              },
+              "last_seen": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "activity": {
+                "const": "stale"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "source": {
+                "const": "netbox"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "activityCounts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "active",
+        "stale",
+        "unknown",
+        "reserved"
+      ],
+      "properties": {
+        "active": {
+          "minimum": 0,
+          "maximum": 1000000,
+          "type": "integer"
+        },
+        "stale": {
+          "minimum": 0,
+          "maximum": 1000000,
+          "type": "integer"
+        },
+        "unknown": {
+          "minimum": 0,
+          "maximum": 1000000,
+          "type": "integer"
+        },
+        "reserved": {
+          "minimum": 0,
+          "maximum": 1000000,
+          "type": "integer"
+        }
+      },
+      "description": "Address counts by activity over everything, not the filtered page."
+    },
+    "addressList": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "generated_at",
+        "sources",
+        "telemetry",
+        "page",
+        "page_size",
+        "total",
+        "activity_counts",
+        "items"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "not-connected",
+            "unknown",
+            "ok"
+          ]
+        },
+        "generated_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "sources": {
+          "type": "array",
+          "maxItems": 3,
+          "items": {
+            "$ref": "common.schema.json#/$defs/sourceStatus"
+          }
+        },
+        "telemetry": {
+          "$ref": "#/$defs/telemetry"
+        },
+        "page": {
+          "minimum": 1,
+          "maximum": 100000,
+          "type": "integer"
+        },
+        "page_size": {
+          "minimum": 1,
+          "maximum": 100,
+          "type": "integer"
+        },
+        "total": {
+          "minimum": 0,
+          "maximum": 1000000,
+          "type": "integer"
+        },
+        "activity_counts": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/activityCounts"
+            }
+          ]
+        },
+        "items": {
+          "type": "array",
+          "maxItems": 100,
+          "items": {
+            "$ref": "#/$defs/address"
+          }
+        }
+      },
+      "description": "GET /api/v1/ipam/addresses. A non-ok state carries no rows and no counts.",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "not-connected",
+                  "unknown"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "items": {
+                "maxItems": 0
+              },
+              "total": {
+                "const": 0
+              },
+              "activity_counts": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

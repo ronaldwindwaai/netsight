@@ -1,0 +1,2080 @@
+{
+  "ipam_counts": {
+    "base": {
+      "prefixes": 4,
+      "vlans": 3,
+      "addresses": 120,
+      "reserved_ranges": 2,
+      "active_addresses": 80,
+      "stale_addresses": 30,
+      "unknown_activity_addresses": 0,
+      "discovered_only_addresses": 6
+    },
+    "cases": [
+      {
+        "name": "counts",
+        "valid": true
+      },
+      {
+        "name": "unreported counts are null",
+        "valid": true,
+        "set": {
+          "addresses": null,
+          "active_addresses": null,
+          "stale_addresses": null
+        }
+      },
+      {
+        "name": "negative",
+        "valid": false,
+        "set": {
+          "vlans": -1
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "fraction",
+        "valid": false,
+        "set": {
+          "vlans": 1.5
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "stale and active exceed the addresses",
+        "valid": false,
+        "set": {
+          "stale_addresses": 100
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "missing key",
+        "valid": false,
+        "delete": [
+          "vlans"
+        ],
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "extra key",
+        "valid": false,
+        "set": {
+          "hosts": 1
+        },
+        "jsonschema_rejects": true
+      }
+    ]
+  },
+  "ipam_telemetry": {
+    "base": {
+      "state": "ok",
+      "window_seconds": 86400,
+      "sources": [
+        "librenms",
+        "wazuh"
+      ]
+    },
+    "cases": [
+      {
+        "name": "both sources",
+        "valid": true
+      },
+      {
+        "name": "one source",
+        "valid": true,
+        "set": {
+          "sources": [
+            "wazuh"
+          ]
+        }
+      },
+      {
+        "name": "not connected",
+        "valid": true,
+        "set": {
+          "state": "not-connected",
+          "sources": []
+        }
+      },
+      {
+        "name": "unknown",
+        "valid": true,
+        "set": {
+          "state": "unknown",
+          "sources": []
+        }
+      },
+      {
+        "name": "ok with no source",
+        "valid": false,
+        "set": {
+          "sources": []
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "not connected with a source",
+        "valid": false,
+        "set": {
+          "state": "not-connected"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "window under an hour",
+        "valid": false,
+        "set": {
+          "window_seconds": 3599
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "window over a week",
+        "valid": false,
+        "set": {
+          "window_seconds": 604801
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "unknown source",
+        "valid": false,
+        "set": {
+          "sources": [
+            "netbox"
+          ]
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "duplicate source",
+        "valid": false,
+        "set": {
+          "sources": [
+            "wazuh",
+            "wazuh"
+          ]
+        },
+        "jsonschema_rejects": false
+      }
+    ]
+  },
+  "ipam_utilisation": {
+    "base": {
+      "state": "ok",
+      "basis": "netbox-and-discovered",
+      "capacity": 254,
+      "netbox_addresses": 100,
+      "discovered_only": 6,
+      "used": 106,
+      "reserved": 20,
+      "free": 128,
+      "percent": 41.7
+    },
+    "cases": [
+      {
+        "name": "computed with telemetry",
+        "valid": true
+      },
+      {
+        "name": "netbox only",
+        "valid": true,
+        "set": {
+          "basis": "netbox-addresses",
+          "discovered_only": 0,
+          "used": 100,
+          "free": 134,
+          "percent": 39.4
+        }
+      },
+      {
+        "name": "marked utilized",
+        "valid": true,
+        "set": {
+          "basis": "marked-utilized",
+          "percent": 100
+        }
+      },
+      {
+        "name": "ipv6 capacity not meaningful",
+        "valid": true,
+        "set": {
+          "state": "unknown",
+          "basis": "capacity-not-meaningful",
+          "capacity": null,
+          "netbox_addresses": null,
+          "discovered_only": null,
+          "used": null,
+          "reserved": null,
+          "free": null,
+          "percent": null
+        }
+      },
+      {
+        "name": "addresses unavailable",
+        "valid": true,
+        "set": {
+          "state": "unknown",
+          "basis": "addresses-unavailable",
+          "netbox_addresses": null,
+          "discovered_only": null,
+          "used": null,
+          "reserved": null,
+          "free": null,
+          "percent": null
+        }
+      },
+      {
+        "name": "reserved ranges unreadable",
+        "valid": true,
+        "set": {
+          "reserved": null,
+          "free": null
+        }
+      },
+      {
+        "name": "reserved without free",
+        "valid": false,
+        "set": {
+          "free": null
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "free without reserved",
+        "valid": false,
+        "set": {
+          "reserved": null
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "used above capacity caps at 100",
+        "valid": true,
+        "set": {
+          "capacity": 10,
+          "percent": 100,
+          "free": 0
+        }
+      },
+      {
+        "name": "unknown with a figure",
+        "valid": false,
+        "set": {
+          "state": "unknown"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "percent over 100",
+        "valid": false,
+        "set": {
+          "percent": 100.1
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "negative used",
+        "valid": false,
+        "set": {
+          "used": -1
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "capacity not meaningful but ok",
+        "valid": false,
+        "set": {
+          "basis": "capacity-not-meaningful"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "netbox-addresses claiming discovered addresses",
+        "valid": false,
+        "set": {
+          "basis": "netbox-addresses"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "marked utilized below 100",
+        "valid": false,
+        "set": {
+          "basis": "marked-utilized",
+          "percent": 50
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "used is not the sum",
+        "valid": false,
+        "set": {
+          "used": 107
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "percent is not used over capacity",
+        "valid": false,
+        "set": {
+          "percent": 80.0
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "free is more than capacity allows",
+        "valid": false,
+        "set": {
+          "free": 200
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "unknown basis",
+        "valid": false,
+        "set": {
+          "basis": "guess"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "extra key",
+        "valid": false,
+        "set": {
+          "trend": "up"
+        },
+        "jsonschema_rejects": true
+      }
+    ]
+  },
+  "ipam_reserved_range": {
+    "base": {
+      "start": "10.0.0.100",
+      "end": "10.0.0.150",
+      "size": 51
+    },
+    "cases": [
+      {
+        "name": "range",
+        "valid": true
+      },
+      {
+        "name": "single address",
+        "valid": true,
+        "set": {
+          "end": "10.0.0.100",
+          "size": 1
+        }
+      },
+      {
+        "name": "zero size",
+        "valid": false,
+        "set": {
+          "size": 0
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "size is not the span",
+        "valid": false,
+        "set": {
+          "size": 50
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "reversed",
+        "valid": false,
+        "set": {
+          "start": "10.0.0.150",
+          "end": "10.0.0.100"
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "mixed families",
+        "valid": false,
+        "set": {
+          "end": "2001:db8::1"
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "extra key",
+        "valid": false,
+        "set": {
+          "x": 1
+        },
+        "jsonschema_rejects": true
+      }
+    ]
+  },
+  "ipam_prefix": {
+    "base": {
+      "id": "ipam-prefix-6f1c2a9e-0b1d-5c3e-8f4a-123456789abd",
+      "prefix": "10.0.0.0/24",
+      "version": 4,
+      "vrf": null,
+      "status": "active",
+      "site": "HQ",
+      "role": "Staff",
+      "vlan": {
+        "vid": 20,
+        "name": "staff"
+      },
+      "description": "Staff LAN",
+      "parent_id": "ipam-prefix-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+      "depth": 1,
+      "children": 0,
+      "utilisation": {
+        "state": "ok",
+        "basis": "netbox-and-discovered",
+        "capacity": 254,
+        "netbox_addresses": 100,
+        "discovered_only": 6,
+        "used": 106,
+        "reserved": 20,
+        "free": 128,
+        "percent": 41.7
+      },
+      "reserved_ranges": [
+        {
+          "start": "10.0.0.100",
+          "end": "10.0.0.119",
+          "size": 20
+        }
+      ],
+      "reserved_ranges_total": 1
+    },
+    "cases": [
+      {
+        "name": "child prefix",
+        "valid": true
+      },
+      {
+        "name": "root prefix",
+        "valid": true,
+        "set": {
+          "parent_id": null,
+          "depth": 0,
+          "id": "ipam-prefix-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc"
+        }
+      },
+      {
+        "name": "no vlan",
+        "valid": true,
+        "set": {
+          "vlan": null
+        }
+      },
+      {
+        "name": "hostile text is data",
+        "valid": true,
+        "set": {
+          "description": "<script>alert(1)</script>",
+          "site": "' OR 1=1 --"
+        }
+      },
+      {
+        "name": "root with a depth",
+        "valid": false,
+        "set": {
+          "parent_id": null
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "child at depth 0",
+        "valid": false,
+        "set": {
+          "depth": 0
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "its own parent",
+        "valid": false,
+        "set": {
+          "parent_id": "ipam-prefix-6f1c2a9e-0b1d-5c3e-8f4a-123456789abd"
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "more listed ranges than the total",
+        "valid": false,
+        "set": {
+          "reserved_ranges_total": 0
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "ipv6 flagged as 4",
+        "valid": false,
+        "set": {
+          "prefix": "2001:db8::/64"
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "ipv4 flagged as 6",
+        "valid": false,
+        "set": {
+          "version": 6
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "not a prefix",
+        "valid": false,
+        "set": {
+          "prefix": "10.0.0.5"
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "vlan 0",
+        "valid": false,
+        "set": {
+          "vlan": {
+            "vid": 0,
+            "name": "x"
+          }
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "bad id",
+        "valid": false,
+        "set": {
+          "id": "prefix-1"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "unknown version",
+        "valid": false,
+        "set": {
+          "version": 5
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "extra key",
+        "valid": false,
+        "set": {
+          "owner": "x"
+        },
+        "jsonschema_rejects": true
+      }
+    ]
+  },
+  "ipam_vlan": {
+    "base": {
+      "id": "ipam-vlan-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+      "vid": 20,
+      "name": "staff",
+      "status": "active",
+      "site": "HQ",
+      "group": "Campus",
+      "description": null,
+      "prefix_count": 1
+    },
+    "cases": [
+      {
+        "name": "vlan",
+        "valid": true
+      },
+      {
+        "name": "prefixes unreadable",
+        "valid": true,
+        "set": {
+          "prefix_count": null
+        }
+      },
+      {
+        "name": "vid 4094",
+        "valid": true,
+        "set": {
+          "vid": 4094
+        }
+      },
+      {
+        "name": "vid 4095",
+        "valid": false,
+        "set": {
+          "vid": 4095
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "vid 0",
+        "valid": false,
+        "set": {
+          "vid": 0
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "blank name",
+        "valid": false,
+        "set": {
+          "name": ""
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "bad id",
+        "valid": false,
+        "set": {
+          "id": "vlan-20"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "extra key",
+        "valid": false,
+        "set": {
+          "x": 1
+        },
+        "jsonschema_rejects": true
+      }
+    ]
+  },
+  "ipam_address": {
+    "base": {
+      "id": "ipam-address-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+      "address": "10.0.0.15",
+      "version": 4,
+      "prefix_id": "ipam-prefix-6f1c2a9e-0b1d-5c3e-8f4a-123456789abd",
+      "vrf": null,
+      "status": "active",
+      "dns_name": "pc-15.example",
+      "description": "Front desk",
+      "source": "both",
+      "activity": "active",
+      "seen_by": [
+        "librenms"
+      ],
+      "last_seen": "2026-10-11T12:00:00Z"
+    },
+    "cases": [
+      {
+        "name": "seen",
+        "valid": true
+      },
+      {
+        "name": "stale",
+        "valid": true,
+        "set": {
+          "source": "netbox",
+          "activity": "stale",
+          "seen_by": [],
+          "last_seen": null
+        }
+      },
+      {
+        "name": "unknown without telemetry",
+        "valid": true,
+        "set": {
+          "source": "netbox",
+          "activity": "unknown",
+          "seen_by": [],
+          "last_seen": null
+        }
+      },
+      {
+        "name": "reserved and unseen",
+        "valid": true,
+        "set": {
+          "source": "netbox",
+          "status": "reserved",
+          "activity": "reserved",
+          "seen_by": [],
+          "last_seen": null
+        }
+      },
+      {
+        "name": "seen by telemetry only",
+        "valid": true,
+        "set": {
+          "source": "discovered",
+          "status": null,
+          "dns_name": null,
+          "description": null,
+          "seen_by": [
+            "wazuh"
+          ]
+        }
+      },
+      {
+        "name": "outside every prefix",
+        "valid": true,
+        "set": {
+          "prefix_id": null
+        }
+      },
+      {
+        "name": "active without a witness",
+        "valid": false,
+        "set": {
+          "seen_by": []
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "active without a time",
+        "valid": false,
+        "set": {
+          "last_seen": null
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "stale but seen",
+        "valid": false,
+        "set": {
+          "source": "netbox",
+          "activity": "stale"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "stale telemetry-only address",
+        "valid": false,
+        "set": {
+          "source": "discovered",
+          "status": null,
+          "dns_name": null,
+          "activity": "stale",
+          "seen_by": [],
+          "last_seen": null
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "telemetry-only address with a netbox status",
+        "valid": false,
+        "set": {
+          "source": "discovered",
+          "seen_by": [
+            "wazuh"
+          ]
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "ipv6 flagged as 4",
+        "valid": false,
+        "set": {
+          "address": "2001:db8::5"
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "not an address",
+        "valid": false,
+        "set": {
+          "address": "10.0.0.15/24"
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "duplicate witness",
+        "valid": false,
+        "set": {
+          "seen_by": [
+            "wazuh",
+            "wazuh"
+          ]
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "unknown activity word",
+        "valid": false,
+        "set": {
+          "activity": "idle"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "bad id",
+        "valid": false,
+        "set": {
+          "id": "address-1"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "extra key",
+        "valid": false,
+        "set": {
+          "owner": "x"
+        },
+        "jsonschema_rejects": true
+      }
+    ]
+  },
+  "ipam_prefix_list": {
+    "base": {
+      "state": "ok",
+      "generated_at": "2026-10-11T12:00:00Z",
+      "sources": [
+        {
+          "source": "netbox",
+          "state": "ok",
+          "observed_at": "2026-10-11T12:00:00Z"
+        },
+        {
+          "source": "librenms",
+          "state": "ok",
+          "observed_at": "2026-10-11T12:00:00Z"
+        },
+        {
+          "source": "wazuh",
+          "state": "not-connected",
+          "observed_at": null
+        }
+      ],
+      "telemetry": {
+        "state": "ok",
+        "window_seconds": 86400,
+        "sources": [
+          "librenms"
+        ]
+      },
+      "page": 1,
+      "page_size": 25,
+      "total": 1,
+      "items": [
+        {
+          "id": "ipam-prefix-6f1c2a9e-0b1d-5c3e-8f4a-123456789abd",
+          "prefix": "10.0.0.0/24",
+          "version": 4,
+          "vrf": null,
+          "status": "active",
+          "site": "HQ",
+          "role": "Staff",
+          "vlan": {
+            "vid": 20,
+            "name": "staff"
+          },
+          "description": "Staff LAN",
+          "parent_id": "ipam-prefix-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+          "depth": 1,
+          "children": 0,
+          "utilisation": {
+            "state": "ok",
+            "basis": "netbox-and-discovered",
+            "capacity": 254,
+            "netbox_addresses": 100,
+            "discovered_only": 6,
+            "used": 106,
+            "reserved": 20,
+            "free": 128,
+            "percent": 41.7
+          },
+          "reserved_ranges": [
+            {
+              "start": "10.0.0.100",
+              "end": "10.0.0.119",
+              "size": 20
+            }
+          ],
+          "reserved_ranges_total": 1
+        }
+      ]
+    },
+    "cases": [
+      {
+        "name": "one page",
+        "valid": true
+      },
+      {
+        "name": "empty page",
+        "valid": true,
+        "set": {
+          "total": 0,
+          "items": []
+        }
+      },
+      {
+        "name": "netbox not connected",
+        "valid": true,
+        "set": {
+          "state": "not-connected",
+          "total": 0,
+          "items": [],
+          "telemetry": {
+            "state": "not-connected",
+            "window_seconds": 86400,
+            "sources": []
+          },
+          "sources": [
+            {
+              "source": "netbox",
+              "state": "not-connected",
+              "observed_at": null
+            }
+          ]
+        }
+      },
+      {
+        "name": "netbox unknown",
+        "valid": true,
+        "set": {
+          "state": "unknown",
+          "total": 0,
+          "items": [],
+          "telemetry": {
+            "state": "not-connected",
+            "window_seconds": 86400,
+            "sources": []
+          },
+          "sources": [
+            {
+              "source": "netbox",
+              "state": "not-connected",
+              "observed_at": null
+            }
+          ]
+        }
+      },
+      {
+        "name": "not-connected with rows",
+        "valid": false,
+        "set": {
+          "state": "not-connected",
+          "total": 0,
+          "items": [
+            {
+              "id": "ipam-prefix-6f1c2a9e-0b1d-5c3e-8f4a-123456789abd",
+              "prefix": "10.0.0.0/24",
+              "version": 4,
+              "vrf": null,
+              "status": "active",
+              "site": "HQ",
+              "role": "Staff",
+              "vlan": {
+                "vid": 20,
+                "name": "staff"
+              },
+              "description": "Staff LAN",
+              "parent_id": "ipam-prefix-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "depth": 1,
+              "children": 0,
+              "utilisation": {
+                "state": "ok",
+                "basis": "netbox-and-discovered",
+                "capacity": 254,
+                "netbox_addresses": 100,
+                "discovered_only": 6,
+                "used": 106,
+                "reserved": 20,
+                "free": 128,
+                "percent": 41.7
+              },
+              "reserved_ranges": [
+                {
+                  "start": "10.0.0.100",
+                  "end": "10.0.0.119",
+                  "size": 20
+                }
+              ],
+              "reserved_ranges_total": 1
+            }
+          ],
+          "telemetry": {
+            "state": "not-connected",
+            "window_seconds": 86400,
+            "sources": []
+          },
+          "sources": [
+            {
+              "source": "netbox",
+              "state": "not-connected",
+              "observed_at": null
+            }
+          ]
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "not-connected with a total",
+        "valid": false,
+        "set": {
+          "state": "not-connected",
+          "total": 1,
+          "items": [],
+          "telemetry": {
+            "state": "not-connected",
+            "window_seconds": 86400,
+            "sources": []
+          },
+          "sources": [
+            {
+              "source": "netbox",
+              "state": "not-connected",
+              "observed_at": null
+            }
+          ]
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "page size over 100",
+        "valid": false,
+        "set": {
+          "page_size": 101
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "page zero",
+        "valid": false,
+        "set": {
+          "page": 0
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "more rows than the page size",
+        "valid": false,
+        "set": {
+          "page_size": 1,
+          "total": 2,
+          "items": [
+            {
+              "id": "ipam-prefix-6f1c2a9e-0b1d-5c3e-8f4a-123456789abd",
+              "prefix": "10.0.0.0/24",
+              "version": 4,
+              "vrf": null,
+              "status": "active",
+              "site": "HQ",
+              "role": "Staff",
+              "vlan": {
+                "vid": 20,
+                "name": "staff"
+              },
+              "description": "Staff LAN",
+              "parent_id": "ipam-prefix-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "depth": 1,
+              "children": 0,
+              "utilisation": {
+                "state": "ok",
+                "basis": "netbox-and-discovered",
+                "capacity": 254,
+                "netbox_addresses": 100,
+                "discovered_only": 6,
+                "used": 106,
+                "reserved": 20,
+                "free": 128,
+                "percent": 41.7
+              },
+              "reserved_ranges": [
+                {
+                  "start": "10.0.0.100",
+                  "end": "10.0.0.119",
+                  "size": 20
+                }
+              ],
+              "reserved_ranges_total": 1
+            },
+            {
+              "id": "ipam-prefix-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "prefix": "10.0.0.0/24",
+              "version": 4,
+              "vrf": null,
+              "status": "active",
+              "site": "HQ",
+              "role": "Staff",
+              "vlan": {
+                "vid": 20,
+                "name": "staff"
+              },
+              "description": "Staff LAN",
+              "parent_id": "ipam-prefix-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "depth": 1,
+              "children": 0,
+              "utilisation": {
+                "state": "ok",
+                "basis": "netbox-and-discovered",
+                "capacity": 254,
+                "netbox_addresses": 100,
+                "discovered_only": 6,
+                "used": 106,
+                "reserved": 20,
+                "free": 128,
+                "percent": 41.7
+              },
+              "reserved_ranges": [
+                {
+                  "start": "10.0.0.100",
+                  "end": "10.0.0.119",
+                  "size": 20
+                }
+              ],
+              "reserved_ranges_total": 1
+            }
+          ]
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "total smaller than the rows",
+        "valid": false,
+        "set": {
+          "total": 0
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "duplicate sources",
+        "valid": false,
+        "set": {
+          "sources": [
+            {
+              "source": "netbox",
+              "state": "ok",
+              "observed_at": "2026-10-11T12:00:00Z"
+            },
+            {
+              "source": "netbox",
+              "state": "ok",
+              "observed_at": "2026-10-11T12:00:00Z"
+            }
+          ]
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "netbox missing from the sources",
+        "valid": false,
+        "set": {
+          "sources": [
+            {
+              "source": "librenms",
+              "state": "ok",
+              "observed_at": "2026-10-11T12:00:00Z"
+            },
+            {
+              "source": "wazuh",
+              "state": "not-connected",
+              "observed_at": null
+            }
+          ]
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "duplicate rows",
+        "valid": false,
+        "set": {
+          "total": 2,
+          "items": [
+            {
+              "id": "ipam-prefix-6f1c2a9e-0b1d-5c3e-8f4a-123456789abd",
+              "prefix": "10.0.0.0/24",
+              "version": 4,
+              "vrf": null,
+              "status": "active",
+              "site": "HQ",
+              "role": "Staff",
+              "vlan": {
+                "vid": 20,
+                "name": "staff"
+              },
+              "description": "Staff LAN",
+              "parent_id": "ipam-prefix-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "depth": 1,
+              "children": 0,
+              "utilisation": {
+                "state": "ok",
+                "basis": "netbox-and-discovered",
+                "capacity": 254,
+                "netbox_addresses": 100,
+                "discovered_only": 6,
+                "used": 106,
+                "reserved": 20,
+                "free": 128,
+                "percent": 41.7
+              },
+              "reserved_ranges": [
+                {
+                  "start": "10.0.0.100",
+                  "end": "10.0.0.119",
+                  "size": 20
+                }
+              ],
+              "reserved_ranges_total": 1
+            },
+            {
+              "id": "ipam-prefix-6f1c2a9e-0b1d-5c3e-8f4a-123456789abd",
+              "prefix": "10.0.0.0/24",
+              "version": 4,
+              "vrf": null,
+              "status": "active",
+              "site": "HQ",
+              "role": "Staff",
+              "vlan": {
+                "vid": 20,
+                "name": "staff"
+              },
+              "description": "Staff LAN",
+              "parent_id": "ipam-prefix-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "depth": 1,
+              "children": 0,
+              "utilisation": {
+                "state": "ok",
+                "basis": "netbox-and-discovered",
+                "capacity": 254,
+                "netbox_addresses": 100,
+                "discovered_only": 6,
+                "used": 106,
+                "reserved": 20,
+                "free": 128,
+                "percent": 41.7
+              },
+              "reserved_ranges": [
+                {
+                  "start": "10.0.0.100",
+                  "end": "10.0.0.119",
+                  "size": 20
+                }
+              ],
+              "reserved_ranges_total": 1
+            }
+          ]
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "extra key",
+        "valid": false,
+        "set": {
+          "next": "x"
+        },
+        "jsonschema_rejects": true
+      }
+    ]
+  },
+  "ipam_vlan_list": {
+    "base": {
+      "state": "ok",
+      "generated_at": "2026-10-11T12:00:00Z",
+      "sources": [
+        {
+          "source": "netbox",
+          "state": "ok",
+          "observed_at": "2026-10-11T12:00:00Z"
+        },
+        {
+          "source": "librenms",
+          "state": "ok",
+          "observed_at": "2026-10-11T12:00:00Z"
+        },
+        {
+          "source": "wazuh",
+          "state": "not-connected",
+          "observed_at": null
+        }
+      ],
+      "telemetry": {
+        "state": "ok",
+        "window_seconds": 86400,
+        "sources": [
+          "librenms"
+        ]
+      },
+      "page": 1,
+      "page_size": 25,
+      "total": 1,
+      "items": [
+        {
+          "id": "ipam-vlan-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+          "vid": 20,
+          "name": "staff",
+          "status": "active",
+          "site": "HQ",
+          "group": "Campus",
+          "description": null,
+          "prefix_count": 1
+        }
+      ]
+    },
+    "cases": [
+      {
+        "name": "one page",
+        "valid": true
+      },
+      {
+        "name": "empty page",
+        "valid": true,
+        "set": {
+          "total": 0,
+          "items": []
+        }
+      },
+      {
+        "name": "netbox not connected",
+        "valid": true,
+        "set": {
+          "state": "not-connected",
+          "total": 0,
+          "items": [],
+          "telemetry": {
+            "state": "not-connected",
+            "window_seconds": 86400,
+            "sources": []
+          },
+          "sources": [
+            {
+              "source": "netbox",
+              "state": "not-connected",
+              "observed_at": null
+            }
+          ]
+        }
+      },
+      {
+        "name": "netbox unknown",
+        "valid": true,
+        "set": {
+          "state": "unknown",
+          "total": 0,
+          "items": [],
+          "telemetry": {
+            "state": "not-connected",
+            "window_seconds": 86400,
+            "sources": []
+          },
+          "sources": [
+            {
+              "source": "netbox",
+              "state": "not-connected",
+              "observed_at": null
+            }
+          ]
+        }
+      },
+      {
+        "name": "not-connected with rows",
+        "valid": false,
+        "set": {
+          "state": "not-connected",
+          "total": 0,
+          "items": [
+            {
+              "id": "ipam-vlan-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "vid": 20,
+              "name": "staff",
+              "status": "active",
+              "site": "HQ",
+              "group": "Campus",
+              "description": null,
+              "prefix_count": 1
+            }
+          ],
+          "telemetry": {
+            "state": "not-connected",
+            "window_seconds": 86400,
+            "sources": []
+          },
+          "sources": [
+            {
+              "source": "netbox",
+              "state": "not-connected",
+              "observed_at": null
+            }
+          ]
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "not-connected with a total",
+        "valid": false,
+        "set": {
+          "state": "not-connected",
+          "total": 1,
+          "items": [],
+          "telemetry": {
+            "state": "not-connected",
+            "window_seconds": 86400,
+            "sources": []
+          },
+          "sources": [
+            {
+              "source": "netbox",
+              "state": "not-connected",
+              "observed_at": null
+            }
+          ]
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "page size over 100",
+        "valid": false,
+        "set": {
+          "page_size": 101
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "page zero",
+        "valid": false,
+        "set": {
+          "page": 0
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "more rows than the page size",
+        "valid": false,
+        "set": {
+          "page_size": 1,
+          "total": 2,
+          "items": [
+            {
+              "id": "ipam-vlan-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "vid": 20,
+              "name": "staff",
+              "status": "active",
+              "site": "HQ",
+              "group": "Campus",
+              "description": null,
+              "prefix_count": 1
+            },
+            {
+              "id": "ipam-vlan-6f1c2a9e-0b1d-5c3e-8f4a-123456789abd",
+              "vid": 20,
+              "name": "staff",
+              "status": "active",
+              "site": "HQ",
+              "group": "Campus",
+              "description": null,
+              "prefix_count": 1
+            }
+          ]
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "total smaller than the rows",
+        "valid": false,
+        "set": {
+          "total": 0
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "duplicate sources",
+        "valid": false,
+        "set": {
+          "sources": [
+            {
+              "source": "netbox",
+              "state": "ok",
+              "observed_at": "2026-10-11T12:00:00Z"
+            },
+            {
+              "source": "netbox",
+              "state": "ok",
+              "observed_at": "2026-10-11T12:00:00Z"
+            }
+          ]
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "netbox missing from the sources",
+        "valid": false,
+        "set": {
+          "sources": [
+            {
+              "source": "librenms",
+              "state": "ok",
+              "observed_at": "2026-10-11T12:00:00Z"
+            },
+            {
+              "source": "wazuh",
+              "state": "not-connected",
+              "observed_at": null
+            }
+          ]
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "duplicate rows",
+        "valid": false,
+        "set": {
+          "total": 2,
+          "items": [
+            {
+              "id": "ipam-vlan-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "vid": 20,
+              "name": "staff",
+              "status": "active",
+              "site": "HQ",
+              "group": "Campus",
+              "description": null,
+              "prefix_count": 1
+            },
+            {
+              "id": "ipam-vlan-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "vid": 20,
+              "name": "staff",
+              "status": "active",
+              "site": "HQ",
+              "group": "Campus",
+              "description": null,
+              "prefix_count": 1
+            }
+          ]
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "extra key",
+        "valid": false,
+        "set": {
+          "next": "x"
+        },
+        "jsonschema_rejects": true
+      }
+    ]
+  },
+  "ipam_address_list": {
+    "base": {
+      "state": "ok",
+      "generated_at": "2026-10-11T12:00:00Z",
+      "sources": [
+        {
+          "source": "netbox",
+          "state": "ok",
+          "observed_at": "2026-10-11T12:00:00Z"
+        },
+        {
+          "source": "librenms",
+          "state": "ok",
+          "observed_at": "2026-10-11T12:00:00Z"
+        },
+        {
+          "source": "wazuh",
+          "state": "not-connected",
+          "observed_at": null
+        }
+      ],
+      "telemetry": {
+        "state": "ok",
+        "window_seconds": 86400,
+        "sources": [
+          "librenms"
+        ]
+      },
+      "page": 1,
+      "page_size": 25,
+      "total": 1,
+      "items": [
+        {
+          "id": "ipam-address-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+          "address": "10.0.0.15",
+          "version": 4,
+          "prefix_id": "ipam-prefix-6f1c2a9e-0b1d-5c3e-8f4a-123456789abd",
+          "vrf": null,
+          "status": "active",
+          "dns_name": "pc-15.example",
+          "description": "Front desk",
+          "source": "both",
+          "activity": "active",
+          "seen_by": [
+            "librenms"
+          ],
+          "last_seen": "2026-10-11T12:00:00Z"
+        }
+      ],
+      "activity_counts": {
+        "active": 1,
+        "stale": 0,
+        "unknown": 0,
+        "reserved": 0
+      }
+    },
+    "cases": [
+      {
+        "name": "one page",
+        "valid": true
+      },
+      {
+        "name": "empty page",
+        "valid": true,
+        "set": {
+          "total": 0,
+          "items": []
+        }
+      },
+      {
+        "name": "netbox not connected",
+        "valid": true,
+        "set": {
+          "state": "not-connected",
+          "total": 0,
+          "items": [],
+          "telemetry": {
+            "state": "not-connected",
+            "window_seconds": 86400,
+            "sources": []
+          },
+          "sources": [
+            {
+              "source": "netbox",
+              "state": "not-connected",
+              "observed_at": null
+            }
+          ],
+          "activity_counts": null
+        }
+      },
+      {
+        "name": "netbox unknown",
+        "valid": true,
+        "set": {
+          "state": "unknown",
+          "total": 0,
+          "items": [],
+          "telemetry": {
+            "state": "not-connected",
+            "window_seconds": 86400,
+            "sources": []
+          },
+          "sources": [
+            {
+              "source": "netbox",
+              "state": "not-connected",
+              "observed_at": null
+            }
+          ],
+          "activity_counts": null
+        }
+      },
+      {
+        "name": "not-connected with rows",
+        "valid": false,
+        "set": {
+          "state": "not-connected",
+          "total": 0,
+          "items": [
+            {
+              "id": "ipam-address-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "address": "10.0.0.15",
+              "version": 4,
+              "prefix_id": "ipam-prefix-6f1c2a9e-0b1d-5c3e-8f4a-123456789abd",
+              "vrf": null,
+              "status": "active",
+              "dns_name": "pc-15.example",
+              "description": "Front desk",
+              "source": "both",
+              "activity": "active",
+              "seen_by": [
+                "librenms"
+              ],
+              "last_seen": "2026-10-11T12:00:00Z"
+            }
+          ],
+          "telemetry": {
+            "state": "not-connected",
+            "window_seconds": 86400,
+            "sources": []
+          },
+          "sources": [
+            {
+              "source": "netbox",
+              "state": "not-connected",
+              "observed_at": null
+            }
+          ]
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "not-connected with a total",
+        "valid": false,
+        "set": {
+          "state": "not-connected",
+          "total": 1,
+          "items": [],
+          "telemetry": {
+            "state": "not-connected",
+            "window_seconds": 86400,
+            "sources": []
+          },
+          "sources": [
+            {
+              "source": "netbox",
+              "state": "not-connected",
+              "observed_at": null
+            }
+          ]
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "page size over 100",
+        "valid": false,
+        "set": {
+          "page_size": 101
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "page zero",
+        "valid": false,
+        "set": {
+          "page": 0
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "more rows than the page size",
+        "valid": false,
+        "set": {
+          "page_size": 1,
+          "total": 2,
+          "items": [
+            {
+              "id": "ipam-address-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "address": "10.0.0.15",
+              "version": 4,
+              "prefix_id": "ipam-prefix-6f1c2a9e-0b1d-5c3e-8f4a-123456789abd",
+              "vrf": null,
+              "status": "active",
+              "dns_name": "pc-15.example",
+              "description": "Front desk",
+              "source": "both",
+              "activity": "active",
+              "seen_by": [
+                "librenms"
+              ],
+              "last_seen": "2026-10-11T12:00:00Z"
+            },
+            {
+              "id": "ipam-address-6f1c2a9e-0b1d-5c3e-8f4a-123456789abd",
+              "address": "10.0.0.15",
+              "version": 4,
+              "prefix_id": "ipam-prefix-6f1c2a9e-0b1d-5c3e-8f4a-123456789abd",
+              "vrf": null,
+              "status": "active",
+              "dns_name": "pc-15.example",
+              "description": "Front desk",
+              "source": "both",
+              "activity": "active",
+              "seen_by": [
+                "librenms"
+              ],
+              "last_seen": "2026-10-11T12:00:00Z"
+            }
+          ]
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "total smaller than the rows",
+        "valid": false,
+        "set": {
+          "total": 0
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "duplicate sources",
+        "valid": false,
+        "set": {
+          "sources": [
+            {
+              "source": "netbox",
+              "state": "ok",
+              "observed_at": "2026-10-11T12:00:00Z"
+            },
+            {
+              "source": "netbox",
+              "state": "ok",
+              "observed_at": "2026-10-11T12:00:00Z"
+            }
+          ]
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "netbox missing from the sources",
+        "valid": false,
+        "set": {
+          "sources": [
+            {
+              "source": "librenms",
+              "state": "ok",
+              "observed_at": "2026-10-11T12:00:00Z"
+            },
+            {
+              "source": "wazuh",
+              "state": "not-connected",
+              "observed_at": null
+            }
+          ]
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "duplicate rows",
+        "valid": false,
+        "set": {
+          "total": 2,
+          "items": [
+            {
+              "id": "ipam-address-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "address": "10.0.0.15",
+              "version": 4,
+              "prefix_id": "ipam-prefix-6f1c2a9e-0b1d-5c3e-8f4a-123456789abd",
+              "vrf": null,
+              "status": "active",
+              "dns_name": "pc-15.example",
+              "description": "Front desk",
+              "source": "both",
+              "activity": "active",
+              "seen_by": [
+                "librenms"
+              ],
+              "last_seen": "2026-10-11T12:00:00Z"
+            },
+            {
+              "id": "ipam-address-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "address": "10.0.0.15",
+              "version": 4,
+              "prefix_id": "ipam-prefix-6f1c2a9e-0b1d-5c3e-8f4a-123456789abd",
+              "vrf": null,
+              "status": "active",
+              "dns_name": "pc-15.example",
+              "description": "Front desk",
+              "source": "both",
+              "activity": "active",
+              "seen_by": [
+                "librenms"
+              ],
+              "last_seen": "2026-10-11T12:00:00Z"
+            }
+          ]
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "extra key",
+        "valid": false,
+        "set": {
+          "next": "x"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "not-connected with counts",
+        "valid": false,
+        "set": {
+          "state": "not-connected",
+          "total": 0,
+          "items": [],
+          "telemetry": {
+            "state": "not-connected",
+            "window_seconds": 86400,
+            "sources": []
+          },
+          "sources": [
+            {
+              "source": "netbox",
+              "state": "not-connected",
+              "observed_at": null
+            }
+          ],
+          "activity_counts": {
+            "active": 1,
+            "stale": 0,
+            "unknown": 0,
+            "reserved": 0
+          }
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "ok without counts",
+        "valid": false,
+        "set": {
+          "activity_counts": null
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "counts smaller than the rows",
+        "valid": false,
+        "set": {
+          "activity_counts": {
+            "active": 0,
+            "stale": 0,
+            "unknown": 0,
+            "reserved": 0
+          }
+        },
+        "jsonschema_rejects": false
+      }
+    ]
+  },
+  "ipam_summary_response": {
+    "base": {
+      "state": "ok",
+      "generated_at": "2026-10-11T12:00:00Z",
+      "sources": [
+        {
+          "source": "netbox",
+          "state": "ok",
+          "observed_at": "2026-10-11T12:00:00Z"
+        },
+        {
+          "source": "librenms",
+          "state": "ok",
+          "observed_at": "2026-10-11T12:00:00Z"
+        },
+        {
+          "source": "wazuh",
+          "state": "not-connected",
+          "observed_at": null
+        }
+      ],
+      "telemetry": {
+        "state": "ok",
+        "window_seconds": 86400,
+        "sources": [
+          "librenms"
+        ]
+      },
+      "counts": {
+        "prefixes": 4,
+        "vlans": 3,
+        "addresses": 120,
+        "reserved_ranges": 2,
+        "active_addresses": 80,
+        "stale_addresses": 30,
+        "unknown_activity_addresses": 0,
+        "discovered_only_addresses": 6
+      }
+    },
+    "cases": [
+      {
+        "name": "counts",
+        "valid": true
+      },
+      {
+        "name": "netbox not connected",
+        "valid": true,
+        "set": {
+          "state": "not-connected",
+          "counts": null,
+          "sources": [
+            {
+              "source": "netbox",
+              "state": "not-connected",
+              "observed_at": null
+            }
+          ],
+          "telemetry": {
+            "state": "not-connected",
+            "window_seconds": 86400,
+            "sources": []
+          }
+        }
+      },
+      {
+        "name": "netbox unknown",
+        "valid": true,
+        "set": {
+          "state": "unknown",
+          "counts": null
+        }
+      },
+      {
+        "name": "not-connected with counts",
+        "valid": false,
+        "set": {
+          "state": "not-connected"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "ok without counts",
+        "valid": false,
+        "set": {
+          "counts": null
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "netbox missing from the sources",
+        "valid": false,
+        "set": {
+          "sources": [
+            {
+              "source": "librenms",
+              "state": "ok",
+              "observed_at": "2026-10-11T12:00:00Z"
+            },
+            {
+              "source": "wazuh",
+              "state": "not-connected",
+              "observed_at": null
+            }
+          ]
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "duplicate sources",
+        "valid": false,
+        "set": {
+          "sources": [
+            {
+              "source": "netbox",
+              "state": "ok",
+              "observed_at": "2026-10-11T12:00:00Z"
+            },
+            {
+              "source": "netbox",
+              "state": "ok",
+              "observed_at": "2026-10-11T12:00:00Z"
+            }
+          ]
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "telemetry sources that were not read",
+        "valid": false,
+        "set": {
+          "telemetry": {
+            "state": "ok",
+            "window_seconds": 86400,
+            "sources": [
+              "wazuh"
+            ]
+          }
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "extra key",
+        "valid": false,
+        "set": {
+          "items": []
+        },
+        "jsonschema_rejects": true
+      }
+    ]
+  }
+}

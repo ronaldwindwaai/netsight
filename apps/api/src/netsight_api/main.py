@@ -62,6 +62,8 @@ from netsight_api.identity_routes import router as identity_router
 from netsight_api.incident_list_routes import router as incident_list_router
 from netsight_api.incident_routes import router as incident_router
 from netsight_api.internet_routes import router as internet_router
+from netsight_api.inventory_routes import router as inventory_router
+from netsight_api.ipam_routes import router as ipam_router
 from netsight_api.localauth.routes import router as localauth_router
 from netsight_api.maintenance_routes import router as maintenance_router
 from netsight_api.rbac import Identity, Permission, is_allowed
@@ -99,6 +101,8 @@ from netsight_api.security_routes import router as security_router
 from netsight_api.timewindow import resolve_window
 from netsight_api.traffic.responses import freshness_for
 from netsight_api.traffic_routes import router as traffic_router
+from netsight_api.unknown_device_routes import router as unknown_device_router
+from netsight_api.unknown_devices.wiring import build_scan_service, start_scan
 from netsight_api.wan.wiring import build_wan_collector, start_wan_sampling
 
 API_PREFIX = "/api/v1"
@@ -115,15 +119,20 @@ async def lifespan(app_: FastAPI) -> AsyncIterator[None]:
     session_policy()
     configure_audit_logging()
     service = build_evaluation_service(librenms_client=get_optional_librenms_client)
-    # Both services are built before either starts: a bad setting fails start-up, not later.
+    # All three services are built before any starts: a bad setting fails start-up, not later.
     wan_service = build_wan_collector()
+    scan_service = build_scan_service()
     evaluation = start_evaluation(service)
     app_.state.evaluation_task = evaluation.task
     wan_sampling = start_wan_sampling(wan_service)
     app_.state.wan_sampling_task = wan_sampling.task
+    unknown_scan = start_scan(scan_service)
+    app_.state.unknown_scan_task = unknown_scan.task
     try:
         yield
     finally:
+        await unknown_scan.shutdown()
+        app_.state.unknown_scan_task = None
         await wan_sampling.shutdown()
         app_.state.wan_sampling_task = None
         await evaluation.shutdown()
@@ -370,7 +379,6 @@ class TrafficSource(Protocol):
         reports no data currency.
         """
         ...
-
 
 
 def get_optional_traffic_source() -> TrafficSource | None:
@@ -1200,6 +1208,9 @@ app.include_router(diagnostic_router, prefix=API_PREFIX)
 app.include_router(diagnostic_session_router, prefix=API_PREFIX)
 app.include_router(internet_router, prefix=API_PREFIX)
 app.include_router(identity_router, prefix=API_PREFIX)
+app.include_router(inventory_router, prefix=API_PREFIX)
+app.include_router(ipam_router, prefix=API_PREFIX)
+app.include_router(unknown_device_router, prefix=API_PREFIX)
 app.include_router(traffic_router, prefix=API_PREFIX)
 # Authentication lives under the same versioned prefix as every other platform
 # route (contracts/openapi/netsight-api.yaml declares `servers: /api/v1` with

@@ -20,11 +20,15 @@ class Finding:
     detail: str
 
 
-def _match_key(device: Device) -> str:
+def match_key(device: Device) -> str:
+    """The join key reconciliation uses (case-insensitive hostname, else name). Not an identity."""
     hostname = (device.hostname or "").strip().lower()
     if hostname:
         return hostname
     return device.name.strip().lower()
+
+
+_match_key = match_key
 
 
 def _netbox_status(device: Device) -> str:

@@ -24,6 +24,21 @@ from uuid import NAMESPACE_URL, uuid5
 import httpx
 from pydantic import ValidationError
 
+from netsight_api.adapters.netbox_ipam import (
+    CANONICAL_MAC,
+    MacMatch,
+    NetboxAddress,
+    NetboxPrefix,
+    NetboxRange,
+    NetboxVlan,
+    RowError,
+    asset_extras,
+    parse_address,
+    parse_mac_match,
+    parse_prefix,
+    parse_range,
+    parse_vlan,
+)
 from netsight_api.schemas import (
     Device,
     DeviceSourceAlias,
@@ -152,6 +167,36 @@ class DeviceAgentKeyCollection:
     items: tuple[DeviceAgentKey, ...]
     observed_at: datetime
     skipped: int = 0
+
+
+@dataclass(frozen=True)
+class NetboxAsset:
+    """A NetBox device with the role and type the operator's class map keys on (declared intent)."""
+
+    device: Device
+    role_slug: str | None
+    role_name: str | None
+    type_slug: str | None
+    type_model: str | None
+    status: str | None
+
+
+@dataclass(frozen=True)
+class RowCollection[T]:
+    """Rows of a bounded paged read; ``skipped`` counts malformed rows that were dropped."""
+
+    items: tuple[T, ...]
+    observed_at: datetime
+    skipped: int = 0
+
+
+@dataclass(frozen=True)
+class MacLookup:
+    """The NetBox interfaces that carry one MAC address (empty: NetBox does not know it)."""
+
+    mac: str
+    matches: tuple[MacMatch, ...]
+    observed_at: datetime
 
 
 def canonical_device_id(native_id: str) -> str:
@@ -354,7 +399,7 @@ def _tolerant[T](
     for row in rows:
         try:
             item = parse(row)
-        except AdapterError:
+        except (AdapterError, RowError):
             skipped += 1
             continue
         if item is not None:
@@ -629,6 +674,71 @@ class NetboxClient:
         )
         items, skipped = _tolerant(rows, lambda row: _device_agent_key(row, field_name))
         return DeviceAgentKeyCollection(tuple(items), datetime.now(UTC), skipped)
+
+    async def _tolerant_read[T](
+        self, path: str, parse: Callable[[dict[str, Any]], T | None]
+    ) -> RowCollection[T]:
+        rows = await self._paged_rows(path)
+        items, skipped = _tolerant(rows, parse)
+        return RowCollection(tuple(items), datetime.now(UTC), skipped)
+
+    async def inventory_assets(self) -> RowCollection[NetboxAsset]:
+        """Every device with its role and type (read-only; bounded; malformed rows counted)."""
+        observed_at = datetime.now(UTC)
+
+        def parse(row: dict[str, Any]) -> NetboxAsset:
+            extras = asset_extras(row)
+            return NetboxAsset(
+                _map_device(row, observed_at),
+                extras.role_slug,
+                extras.role_name,
+                extras.type_slug,
+                extras.type_model,
+                extras.status,
+            )
+
+        return await self._tolerant_read(f"/api/dcim/devices/?limit={_ASSIGNMENT_PAGE_SIZE}", parse)
+
+    async def prefixes(self) -> RowCollection[NetboxPrefix]:
+        return await self._tolerant_read(
+            f"/api/ipam/prefixes/?limit={_ASSIGNMENT_PAGE_SIZE}", parse_prefix
+        )
+
+    async def vlans(self) -> RowCollection[NetboxVlan]:
+        return await self._tolerant_read(
+            f"/api/ipam/vlans/?limit={_ASSIGNMENT_PAGE_SIZE}", parse_vlan
+        )
+
+    async def ip_addresses(self) -> RowCollection[NetboxAddress]:
+        """Every address record, whatever its status (read-only; bounded)."""
+        return await self._tolerant_read(
+            f"/api/ipam/ip-addresses/?limit={_ASSIGNMENT_PAGE_SIZE}", parse_address
+        )
+
+    async def reserved_ranges(self) -> RowCollection[NetboxRange]:
+        """Reserved IP ranges only (the filter is asked for and repeated client side)."""
+        return await self._tolerant_read(
+            f"/api/ipam/ip-ranges/?limit={_ASSIGNMENT_PAGE_SIZE}&status=reserved", parse_range
+        )
+
+    async def interfaces_by_mac(self, mac: str) -> MacLookup:
+        """The device interfaces NetBox records with ``mac`` (canonical lower-case colon form only).
+
+        One bounded GET. The address is validated before it is placed in the URL, and matches are
+        re-checked client side, so a NetBox that ignores the filter cannot widen what is trusted.
+        """
+        if CANONICAL_MAC.fullmatch(mac) is None:
+            raise ValueError("a MAC address must be lower-case colon-separated")
+        body = await self._get(f"/api/dcim/interfaces/?mac_address={mac}&limit=50")
+        raw = body.get("results")
+        if not isinstance(raw, list) or any(not isinstance(row, dict) for row in raw):
+            raise AdapterError(AdapterStatus.INVALID_SOURCE_DATA, "invalid interface list")
+        matches = tuple(
+            match
+            for row in cast(list[dict[str, Any]], raw)
+            if (match := parse_mac_match(row, mac)) is not None
+        )
+        return MacLookup(mac, matches, datetime.now(UTC))
 
     async def get_device(self, native_id: str) -> Device:
         encoded_native_id = quote(native_id, safe="")

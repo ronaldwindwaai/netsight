@@ -66,3 +66,34 @@ test('the menu offers Traffic only to a session holding traffic:read, and fails 
   assert.ok(!labels(menuItemsFor([])).includes('Traffic'));
   assert.ok(!labels(menuItemsFor(null)).includes('Traffic'));
 });
+
+test('the menu offers Inventory, IPAM and Unknown devices only to a session holding their permission', () => {
+  const held = labels(menuItemsFor(['inventory:read-summary', 'ipam:read-summary', 'unknown-devices:read-summary']));
+  assert.ok(held.includes('Inventory') && held.includes('IPAM') && held.includes('Unknown devices'));
+  for (const text of ['Inventory', 'IPAM', 'Unknown devices']) {
+    assert.ok(!labels(menuItemsFor(['incidents:read', 'devices:read'])).includes(text));
+    assert.ok(!labels(menuItemsFor([])).includes(text));
+    assert.ok(!labels(menuItemsFor(null)).includes(text));
+  }
+});
+
+test('each of the three entries is gated by its own permission', () => {
+  const mine = (permission: string) =>
+    labels(menuItemsFor([permission])).filter((t) => ['Inventory', 'IPAM', 'Unknown devices'].includes(t));
+  assert.deepEqual(mine('inventory:read-summary'), ['Inventory']);
+  assert.deepEqual(mine('ipam:read-summary'), ['IPAM']);
+  assert.deepEqual(mine('unknown-devices:read-summary'), ['Unknown devices']);
+});
+
+test('the new entries point at their pages, after Devices', () => {
+  const items = menuItemsFor(['inventory:read-summary', 'ipam:read-summary', 'unknown-devices:read-summary']);
+  const href = (text: string) => {
+    const entry = items.find((item) => item.type === 'item' && item.text === text);
+    return entry && entry.type === 'item' ? entry.href : null;
+  };
+  assert.equal(href('Inventory'), '/inventory');
+  assert.equal(href('IPAM'), '/ipam');
+  assert.equal(href('Unknown devices'), '/unknown-devices');
+  const order = labels(items);
+  assert.ok(order.indexOf('Inventory') > order.indexOf('Devices'));
+});

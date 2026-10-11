@@ -1,0 +1,1252 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "UnknownDeviceListResponse",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "state",
+    "generated_at",
+    "page",
+    "page_size",
+    "total",
+    "items"
+  ],
+  "properties": {
+    "state": {
+      "enum": [
+        "not-connected",
+        "unknown",
+        "ok"
+      ]
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "page": {
+      "minimum": 1,
+      "maximum": 100000,
+      "type": "integer"
+    },
+    "page_size": {
+      "minimum": 1,
+      "maximum": 50,
+      "type": "integer"
+    },
+    "total": {
+      "minimum": 0,
+      "maximum": 1000000,
+      "type": "integer"
+    },
+    "items": {
+      "type": "array",
+      "maxItems": 50,
+      "items": {
+        "$ref": "#/$defs/finding"
+      }
+    }
+  },
+  "description": "GET /api/v1/unknown-devices. Findings are stored in PostgreSQL: without the store the state is not-connected, a failing store is unknown, and neither carries rows.",
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "enum": [
+              "not-connected",
+              "unknown"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "items": {
+            "maxItems": 0
+          },
+          "total": {
+            "const": 0
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "evidenceRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "source",
+        "kind",
+        "observed_at",
+        "confidence"
+      ],
+      "properties": {
+        "id": {
+          "minLength": 1,
+          "maxLength": 128,
+          "type": "string"
+        },
+        "source": {
+          "minLength": 1,
+          "maxLength": 32,
+          "pattern": "^[a-z0-9][a-z0-9_.-]{0,31}$",
+          "type": "string"
+        },
+        "kind": {
+          "minLength": 1,
+          "maxLength": 40,
+          "pattern": "^[a-z0-9][a-z0-9-]{0,39}$",
+          "type": "string"
+        },
+        "observed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "confidence": {
+          "minimum": 0,
+          "maximum": 1,
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "description": "A pointer to the observation behind a link: which source, what kind, when. confidence is the source's own, or null when it reported none."
+    },
+    "slot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "slot",
+        "basis",
+        "value",
+        "label",
+        "attachment_kind",
+        "confidence",
+        "reason",
+        "evidence"
+      ],
+      "properties": {
+        "slot": {
+          "enum": [
+            "ip",
+            "mac",
+            "attachment",
+            "port",
+            "vlan"
+          ]
+        },
+        "basis": {
+          "enum": [
+            "observed",
+            "inferred",
+            "unknown"
+          ]
+        },
+        "value": {
+          "minLength": 1,
+          "maxLength": 128,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "label": {
+          "minLength": 1,
+          "maxLength": 128,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "attachment_kind": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "enum": [
+                "switch",
+                "ap"
+              ]
+            }
+          ]
+        },
+        "confidence": {
+          "minimum": 0,
+          "maximum": 1,
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "reason": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "enum": [
+                "declared-assignment",
+                "indirect-evidence",
+                "low-confidence",
+                "name-match",
+                "no-evidence",
+                "expired",
+                "conflicting-evidence",
+                "source-unavailable",
+                "guest-network"
+              ]
+            }
+          ]
+        },
+        "evidence": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "$ref": "#/$defs/evidenceRef"
+          }
+        }
+      },
+      "description": "One hop of the chain IP, MAC, switch or AP, port, VLAN. observed and inferred name a value and the evidence behind it; unknown names nothing and says why. label is untrusted display text.",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "basis": {
+                "const": "unknown"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "null"
+              },
+              "label": {
+                "type": "null"
+              },
+              "attachment_kind": {
+                "type": "null"
+              },
+              "confidence": {
+                "type": "null"
+              },
+              "reason": {
+                "type": "string"
+              },
+              "evidence": {
+                "maxItems": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "basis": {
+                "const": "observed"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "string"
+              },
+              "reason": {
+                "type": "null"
+              },
+              "evidence": {
+                "minItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "basis": {
+                "const": "inferred"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "string"
+              },
+              "reason": {
+                "type": "string"
+              },
+              "evidence": {
+                "minItems": 1
+              },
+              "confidence": {
+                "type": "number",
+                "maximum": 0.7
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "slot": {
+                "enum": [
+                  "ip",
+                  "mac",
+                  "port",
+                  "vlan"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "attachment_kind": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "endpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ip",
+        "mac",
+        "hostname"
+      ],
+      "properties": {
+        "ip": {
+          "minLength": 2,
+          "maxLength": 45,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "mac": {
+          "minLength": 17,
+          "maxLength": 17,
+          "pattern": "^(?:[0-9a-f]{2}:){5}[0-9a-f]{2}$",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "hostname": {
+          "minLength": 1,
+          "maxLength": 255,
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "description": "What was seen. At least one of the three is reported (checked by pydantic and the TS parser)."
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "field",
+        "result",
+        "detail"
+      ],
+      "properties": {
+        "field": {
+          "enum": [
+            "ip",
+            "mac",
+            "hostname"
+          ]
+        },
+        "result": {
+          "enum": [
+            "match",
+            "no-match",
+            "not-checked"
+          ]
+        },
+        "detail": {
+          "minLength": 1,
+          "maxLength": 255,
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "description": "One comparison with NetBox. match: NetBox has it. no-match: NetBox was asked and does not. not-checked: it could not be asked (nothing observed, lookup limit, source error)."
+    },
+    "comparison": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "checks",
+        "checked_at"
+      ],
+      "properties": {
+        "checks": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "$ref": "#/$defs/check"
+          }
+        },
+        "checked_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "description": "The comparison against NetBox, one check per field in the order ip, mac, hostname. A finding exists only when no check matched."
+    },
+    "proposedAction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action_type",
+        "state",
+        "risk",
+        "executable",
+        "awaiting",
+        "rationale"
+      ],
+      "properties": {
+        "action_type": {
+          "const": "endpoint.isolate"
+        },
+        "state": {
+          "const": "proposed"
+        },
+        "risk": {
+          "const": "C"
+        },
+        "executable": {
+          "const": false
+        },
+        "awaiting": {
+          "const": "action-engine"
+        },
+        "rationale": {
+          "minLength": 1,
+          "maxLength": 255,
+          "type": "string"
+        }
+      },
+      "description": "A recommendation only. No execution path exists: isolating an endpoint is owned by the action engine (Step 14) and needs step-up, a reason and human approval."
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "state",
+        "severity",
+        "severity_basis",
+        "assignee_id",
+        "first_seen_at",
+        "last_seen_at",
+        "seen_count",
+        "recurrence_of",
+        "endpoint",
+        "chain",
+        "comparison",
+        "proposed_action"
+      ],
+      "properties": {
+        "id": {
+          "minLength": 51,
+          "maxLength": 51,
+          "pattern": "^unknown-device-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+          "type": "string"
+        },
+        "state": {
+          "enum": [
+            "new",
+            "acknowledged",
+            "investigating",
+            "resolved",
+            "false-positive"
+          ]
+        },
+        "severity": {
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            "critical",
+            "unknown"
+          ]
+        },
+        "severity_basis": {
+          "enum": [
+            "policy-rule",
+            "policy-default",
+            "no-policy"
+          ]
+        },
+        "assignee_id": {
+          "minLength": 1,
+          "maxLength": 255,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "first_seen_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "last_seen_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "seen_count": {
+          "minimum": 1,
+          "maximum": 1000000,
+          "type": "integer"
+        },
+        "recurrence_of": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "minLength": 51,
+              "maxLength": 51,
+              "pattern": "^unknown-device-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          ]
+        },
+        "endpoint": {
+          "$ref": "#/$defs/endpoint"
+        },
+        "chain": {
+          "type": "array",
+          "minItems": 5,
+          "maxItems": 5,
+          "prefixItems": [
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/slot"
+                },
+                {
+                  "properties": {
+                    "slot": {
+                      "const": "ip"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/slot"
+                },
+                {
+                  "properties": {
+                    "slot": {
+                      "const": "mac"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/slot"
+                },
+                {
+                  "properties": {
+                    "slot": {
+                      "const": "attachment"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/slot"
+                },
+                {
+                  "properties": {
+                    "slot": {
+                      "const": "port"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/slot"
+                },
+                {
+                  "properties": {
+                    "slot": {
+                      "const": "vlan"
+                    }
+                  }
+                }
+              ]
+            }
+          ],
+          "items": false
+        },
+        "comparison": {
+          "$ref": "#/$defs/comparison"
+        },
+        "proposed_action": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/proposedAction"
+            }
+          ]
+        }
+      },
+      "description": "An unknown-device finding: something telemetry saw that NetBox does not know. The chain holds only the links actually observed; the rest are unknown. Severity comes from the operator's policy, never from a guess.",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "severity": {
+                "const": "unknown"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "severity_basis": {
+                "const": "no-policy"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "severity": {
+                "enum": [
+                  "low",
+                  "medium",
+                  "high",
+                  "critical"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "severity_basis": {
+                "enum": [
+                  "policy-rule",
+                  "policy-default"
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    "stateCount": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "count"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "new",
+            "acknowledged",
+            "investigating",
+            "resolved",
+            "false-positive"
+          ]
+        },
+        "count": {
+          "minimum": 0,
+          "maximum": 1000000,
+          "type": "integer"
+        }
+      }
+    },
+    "severityCount": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "severity",
+        "count"
+      ],
+      "properties": {
+        "severity": {
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            "critical",
+            "unknown"
+          ]
+        },
+        "count": {
+          "minimum": 0,
+          "maximum": 1000000,
+          "type": "integer"
+        }
+      }
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "open",
+        "by_state",
+        "by_severity"
+      ],
+      "properties": {
+        "open": {
+          "minimum": 0,
+          "maximum": 1000000,
+          "type": "integer"
+        },
+        "by_state": {
+          "type": "array",
+          "maxItems": 5,
+          "items": {
+            "$ref": "#/$defs/stateCount"
+          }
+        },
+        "by_severity": {
+          "type": "array",
+          "maxItems": 5,
+          "items": {
+            "$ref": "#/$defs/severityCount"
+          }
+        }
+      },
+      "description": "Counts only. open = new, acknowledged and investigating."
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "finding_id",
+        "seq",
+        "occurred_at",
+        "actor_id",
+        "kind",
+        "state_from",
+        "state_to",
+        "reason",
+        "message",
+        "subject_id"
+      ],
+      "properties": {
+        "id": {
+          "minLength": 57,
+          "maxLength": 57,
+          "pattern": "^unknown-device-event-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+          "type": "string"
+        },
+        "finding_id": {
+          "minLength": 51,
+          "maxLength": 51,
+          "pattern": "^unknown-device-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 1,
+          "maximum": 1000000,
+          "type": "integer"
+        },
+        "occurred_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "actor_id": {
+          "minLength": 1,
+          "maxLength": 255,
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "detected",
+            "evidence-updated",
+            "action-proposed",
+            "state-changed",
+            "assignee-changed",
+            "comment"
+          ]
+        },
+        "state_from": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "enum": [
+                "new",
+                "acknowledged",
+                "investigating",
+                "resolved",
+                "false-positive"
+              ]
+            }
+          ]
+        },
+        "state_to": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "enum": [
+                "new",
+                "acknowledged",
+                "investigating",
+                "resolved",
+                "false-positive"
+              ]
+            }
+          ]
+        },
+        "reason": {
+          "minLength": 1,
+          "maxLength": 1000,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "message": {
+          "minLength": 1,
+          "maxLength": 4000,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "subject_id": {
+          "minLength": 1,
+          "maxLength": 128,
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "description": "One append-only timeline entry. State changes carry both states; a resolution or dismissal carries its reason; a comment carries its text. subject_id names the assignee of an assignment.",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "state-changed"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "state_from": {
+                "type": "string"
+              },
+              "state_to": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "detected",
+                  "evidence-updated",
+                  "action-proposed",
+                  "assignee-changed",
+                  "comment"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "state_from": {
+                "type": "null"
+              },
+              "state_to": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "comment"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "detailResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "generated_at",
+        "item"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "not-connected",
+            "unknown",
+            "ok"
+          ]
+        },
+        "generated_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "item": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/finding"
+            }
+          ]
+        }
+      },
+      "description": "GET /api/v1/unknown-devices/{id}.",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "not-connected",
+                  "unknown"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "item": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "summaryResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "generated_at",
+        "counts"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "not-connected",
+            "unknown",
+            "ok"
+          ]
+        },
+        "generated_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "counts": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/counts"
+            }
+          ]
+        }
+      },
+      "description": "GET /api/v1/unknown-devices/summary: counts only (Management and Technician).",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "not-connected",
+                  "unknown"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "counts": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "timelineResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "generated_at",
+        "finding_id",
+        "events",
+        "after_seq",
+        "next_after_seq"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "not-connected",
+            "unknown",
+            "ok"
+          ]
+        },
+        "generated_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "finding_id": {
+          "minLength": 51,
+          "maxLength": 51,
+          "pattern": "^unknown-device-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+          "type": "string"
+        },
+        "events": {
+          "type": "array",
+          "maxItems": 200,
+          "items": {
+            "$ref": "#/$defs/event"
+          }
+        },
+        "after_seq": {
+          "minimum": 0,
+          "maximum": 1000000,
+          "type": "integer"
+        },
+        "next_after_seq": {
+          "minimum": 1,
+          "maximum": 1000000,
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "description": "GET /api/v1/unknown-devices/{id}/timeline: append-only events in order, bounded per page.",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "not-connected",
+                  "unknown"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "events": {
+                "maxItems": 0
+              },
+              "next_after_seq": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "assignRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "assignee_id"
+      ],
+      "properties": {
+        "assignee_id": {
+          "minLength": 1,
+          "maxLength": 255,
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "description": "POST /unknown-devices/{id}/assign. null unassigns."
+    },
+    "commentRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "message"
+      ],
+      "properties": {
+        "message": {
+          "minLength": 1,
+          "maxLength": 4000,
+          "pattern": "\\S",
+          "type": "string"
+        }
+      },
+      "description": "POST /unknown-devices/{id}/comment."
+    },
+    "resolveRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "outcome",
+        "reason"
+      ],
+      "properties": {
+        "outcome": {
+          "enum": [
+            "resolved",
+            "false-positive"
+          ]
+        },
+        "reason": {
+          "minLength": 1,
+          "maxLength": 1000,
+          "pattern": "\\S",
+          "type": "string"
+        }
+      },
+      "description": "POST /unknown-devices/{id}/resolve. A false-positive suppresses later detections of the same endpoint, so the reason is mandatory."
+    },
+    "scanResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "generated_at",
+        "sources",
+        "created",
+        "refreshed",
+        "suppressed",
+        "unverified",
+        "truncated"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "not-connected",
+            "unknown",
+            "ok"
+          ]
+        },
+        "generated_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "sources": {
+          "type": "array",
+          "maxItems": 3,
+          "items": {
+            "$ref": "common.schema.json#/$defs/sourceStatus"
+          }
+        },
+        "created": {
+          "minimum": 0,
+          "maximum": 1000000,
+          "type": "integer"
+        },
+        "refreshed": {
+          "minimum": 0,
+          "maximum": 1000000,
+          "type": "integer"
+        },
+        "suppressed": {
+          "minimum": 0,
+          "maximum": 1000000,
+          "type": "integer"
+        },
+        "unverified": {
+          "minimum": 0,
+          "maximum": 1000000,
+          "type": "integer"
+        },
+        "truncated": {
+          "type": "boolean"
+        }
+      },
+      "description": "POST /api/v1/unknown-devices/scan: what one comparison of telemetry with NetBox did. unverified: endpoints skipped because NetBox could not be asked about them. A non-ok state changed nothing.",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "not-connected",
+                  "unknown"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "created": {
+                "const": 0
+              },
+              "refreshed": {
+                "const": 0
+              },
+              "suppressed": {
+                "const": 0
+              },
+              "unverified": {
+                "const": 0
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

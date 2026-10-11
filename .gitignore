@@ -25,3 +25,6 @@ secrets/
 *.zip
 .env.local
 *.egg-info/
+
+# Local demo environment (scripts/demo-local.py)
+.demo/

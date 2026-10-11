@@ -118,6 +118,62 @@ Steps:
      reputation/risk from a source field; saved views, CSV export and drill-through to a device; site scoping; a shared (non per-worker) limiter and cache; a Playwright run of the pages; tamper-evident audit;
      independent code and security review of this step.
 
+7. ✅ **Step 8 - Inventory, IPAM and the unknown-device workflow (E03)** (2026-10-11, **uncommitted on `main`**). Design, configuration and limits: `docs/12-implementation/INVENTORY-IPAM.md`.
+   **PRD note:** the brief cites PRD 44-46, which do not exist (the PRD ends around section 40); the requirements come from PRD 8, 9, 14, 22 and 35. Contract-first, four-way agreement
+   (JSON Schema, OpenAPI, pydantic, TS parser, shared vectors) with cross-field rules JSON Schema cannot express marked `jsonschema_rejects: false`. Strict TDD at slice level; see Verification for
+   what was RED-first and what was guarded by mutation spot-checks afterwards. Builds only what was missing: the NetBox adapter, reconcile `match_key` and findings, the LibreNMS and Wazuh readers, the
+   Step 6 identity engine (`CorrelationIndex`, `EvidenceRecord`, `Relation`, `Basis`), the incident-route write pattern, the rate limiter and the append-only trigger function from 0003 were reused.
+   - **(a) Inventory.** `GET /inventory`, `/inventory/summary`, `/inventory/{id}`: classes from the operator NetBox role/type map (`NETSIGHT_INVENTORY_CLASS_MAP[_FILE]`; unmapped is `unclassified`, a
+     telemetry-only asset is `unknown-asset`); NetBox joined to LibreNMS by `match_key` (two candidates are `ambiguous`, never merged) and to Wazuh only through a NetBox custom field the operator names; per-field
+     provenance `netbox`/`discovered`/`both`/`conflict` on name, site, IP and MAC; reconcile status from the existing findings; strict allow-listed filters (class, site, status, source, known, q); paging bounded to 100.
+   - **(b) IPAM.** `GET /ipam`, `/ipam/prefixes`, `/vlans`, `/addresses`: prefix tree by containment per VRF and family; utilisation with its basis (`netbox-addresses`, `netbox-and-discovered`,
+     `marked-utilized`, `capacity-not-meaningful`, `addresses-unavailable`), integer half-up percent; reserved ranges; active/stale/unknown/reserved per address (`NETSIGHT_IPAM_STALE_WINDOW_HOURS`, default
+     24 pending a decision; **unknown, never stale, when telemetry cannot be read**); datasets paged and failing independently.
+   - **(c) Unknown devices.** Detection compares telemetry endpoints with NetBox (IP, interface MAC, device name) and raises a finding only when every check was made and none matched (a failed lookup
+     is `unverified`, never a finding). Evidence chain IP -> MAC -> switch/AP -> port -> VLAN with only observed links as values, the rest Unknown with a reason. Severity only from the operator policy
+     (`NETSIGHT_UNKNOWN_DEVICE_POLICY[_FILE]`; none or invalid means `unknown` severity and no recommendation). Lifecycle new/acknowledged/investigating/resolved/false-positive in PostgreSQL
+     (migration 0006: `unknown_device_findings`, append-only `unknown_device_events`, partial unique index for one open finding per endpoint, advisory and row locks, DB triggers and CHECKs repeating the
+     lifecycle, `ENABLE ALWAYS` append-only triggers, app-role grants in `grants/app_role.sql`, guarded destructive `down`), plus a memory store. Writes (acknowledge, investigate, assign, comment, resolve,
+     scan) are human-only with CSRF, origin, step-up on resolve, a per-identity limit and audit of counts and names only. **Quarantine is a PROPOSED record** (`executable: false` in every schema,
+     `awaiting: action-engine`); no execution path exists and Step 14 owns it. Optional scheduled scan (off by default) under an advisory lock.
+   - **(d) RBAC** (RBAC-MATRIX "Inventory, IPAM and unknown-device permissions (Step 8)"): `inventory:read[-summary]`, `ipam:read[-summary]`, `unknown-devices:read[-summary]` and five human-only writes.
+     Management counts only; Technician reads inventory and IPAM rows and finding counts; Auditor reads rows, no writes. Limits and audit actions are listed there. The sign-in return allow-list gained
+     `inventory`, `ipam` and `unknown-devices` (API and web, tested) so a step-up returns to the finding.
+   - **(e) UI.** `/inventory`, `/inventory/[deviceId]`, `/ipam`, `/unknown-devices`, `/unknown-devices/[findingId]`; sidebar entries gated by the summary permissions; filter chips and forms in the URL;
+     provenance, state and severity as word plus icon; full state matrix; the finding page shows the endpoint, the five-hop chain with basis badges and evidence, the NetBox comparison, the proposed
+     action as a recommendation, the workflow actions (server actions reusing `ActionDialog`, `useServerWrite`, `WriteFeedback`) and the timeline; untrusted text rendered as text (tests). Component-test
+     timeout raised from 60 s to 180 s in `scripts/run-component-tests.mjs`: the existing `alerting-write-controls` file takes ~30 s alone and exceeded 60 s only when bundled in parallel with the new files.
+   - **Contracts.** `inventory.schema.json`, `ipam.schema.json`, `unknown-devices.schema.json`, `$defs/sourceStatus` in `common.schema.json`; OpenAPI paths, components and responses (`AssetNotFound`,
+     `FindingNotFound`, `FindingConflict`, `FindingStoreUnavailable`, `PermissionDeniedOrStepUp`); pydantic `schemas_inventory.py`, `schemas_ipam.py`, `schemas_unknown_devices.py`, `schemas_sources.py`;
+     TS parsers `api-contracts-{inventory,ipam,unknown-devices,sources}.ts`; vectors `{inventory,ipam,unknown-devices}.vectors.json`.
+   - **Verification** (2026-10-11):
+     ruff clean (src, tests); mypy (`src`, 184 files) clean; `scripts/security-verify.sh` passes. Default pytest **10,527 passed / 710 skipped / 8 failed** (baseline before the step 8,601 / 545). The 8 failures are all in
+     `tests/test_diagnostic_sessions_api.py` (Step 4) and are **clock-dependent, not caused by this step**: the test pins `NOW = 2026-10-10T08:00Z` and a 24 h look-back, they passed in the earlier full run of the same
+     session (10,533 passed) and began to fail when the wall clock moved past 2026-10-11T08:00Z; I did not change them (likely cause, not proven by a clock-frozen re-run). **Live PostgreSQL** (ephemeral
+     pgserver 16.2, `NETSIGHT_TEST_PG_DSN`): the whole suite **11,240 passed / 3 skipped**, including the finding-store conformance suite (memory, owner role, app role), `test_unknown_devices_postgres.py`
+     (migration text, lifecycle triggers, append-only, partial unique index, guarded down) and the existing storage suites patched for migration 0006; the live run found four existing tests that assumed 0005 was the
+     latest migration (`test_storage_migrate`, `test_storage_wan` down/up), which are fixed. The server was stopped afterwards and only the six Laragon `postgres.exe` processes remain.
+     Coverage of the new modules (non-PG run, 1,934 tests): `inventory/*` 97-100% (`wiring` 83%), `ipam/*` 99-100% (`wiring` 84%), `unknown_devices/*` 96-98%, `unknown_device_routes.py` 95%, `inventory_routes.py` 93%,
+     `ipam_routes.py` 95%, `netbox_ipam.py` 96%, `schemas_*` 98-100%, `storage/unknown_devices.py` 99%; `postgres_unknown_devices.py` is 32% without a database (it is exercised by the live run above; its coverage was not measured).
+     Web: typecheck and lint clean; **2,265 unit + 514 component tests** (baseline 1,797 + 426); `next build` succeeds (five new routes). **Mutation spot-checks** (a seeded fault each in: stale when telemetry is unreadable,
+     a failed MAC lookup becoming a finding, an all-skipped comparison becoming a finding, unknown severity recommending quarantine, last-match-wins in the policy, type-before-role in the class map, Management
+     reading inventory rows, a backward lifecycle transition, rounding in the utilisation percent): seven were caught at once; **two survived** (the all-skipped comparison, and the lifecycle table, which the store
+     tests derived from the code under test) and were closed with new tests, then caught. **Honest limits:** the policy, class-map and detection tests were written in the same pass as their code, so RED was observed
+     only for the RBAC, contract, adapter, storage and route slices; the mutation checks above are the evidence for the others. No live NetBox, LibreNMS or Wazuh (mock transport only); no real-process E2E for the
+     new routes; no browser run of the pages; no web mutation checks.
+   - **Rollback.** Unregister the `inventory`, `ipam` and `unknown_device` routers and the lifespan scan hook in `main.py`; hide the three menu entries and delete the three page folders; unset the
+     Step 8 environment variables (every feature then reports Unknown or not-connected). Contracts are additive: removing the three schema files, the OpenAPI blocks and `$defs/sourceStatus` restores the
+     previous contract. Data: `0006_unknown_device_findings.down.sql` is destructive and the migrator needs `NETSIGHT_ALLOW_DESTRUCTIVE_DOWN=1` while rows exist; take a backup first. Revert the sign-in
+     allow-list additions only together with the pages.
+   - **Human decisions needed.** (1) **Retention** of findings and timeline (pending; nothing invented, no prune built) and a privacy/legal review (PRD 92) of keeping MAC/IP/port history.
+     (2) **Step-up on resolve and dismiss**. (3) The **RBAC interpretations** (Technician finding counts only, Auditor rows without comment, Management counts only). (4) The **stale window**
+     (24 h default). (5) The **severity policy** and the `quarantine_recommended_at` threshold (nothing is classified without it). (6) The NetBox role/type **class map**. (7) The NetBox **custom field**
+     that joins Wazuh agents. (8) Whether to **enable the scheduled scan** and its interval. (9) The accepted design for the five pages (the repository has none for them).
+   - **Follow-ups.** DHCP, switch FDB/ARP and Wi-Fi controller adapters (without them attachment, port and VLAN are `source-unavailable` in production); a live run against real NetBox, LibreNMS and Wazuh
+     (shapes are pinned by mock transport only); LibreNMS history for the stale window (today it contributes "up now"); automatic resolution and reopen rules, and an undo path for a false positive
+     (manual today); per-source evidence states in the scan response; a prune once retention is decided; site scoping; a shared (non per-worker) cache and limiter; a real-process E2E and a Playwright run of
+     the pages; Step 14 execution of a proposed quarantine; independent code and security review of this step.
+
 Out of slice pass (P1 follow-ups): ~~NS-043 identity correlation framework~~ (done, Step 6: see E05/NS-043 below), ~~NS-044 after-hours baselines~~ (done as context-only, deterministic baselines in Step 7; per-device/user baselines and incident-period exclusion remain).
 
 ### E05 — Security operations

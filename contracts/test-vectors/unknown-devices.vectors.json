@@ -1,0 +1,5691 @@
+{
+  "unknown_device_evidence_ref": {
+    "base": {
+      "id": "librenms:9",
+      "source": "librenms",
+      "kind": "device-poll",
+      "observed_at": "2026-10-11T12:00:00Z",
+      "confidence": null
+    },
+    "cases": [
+      {
+        "name": "poll",
+        "valid": true
+      },
+      {
+        "name": "with confidence",
+        "valid": true,
+        "set": {
+          "confidence": 0.85,
+          "kind": "switch-mac-table"
+        }
+      },
+      {
+        "name": "confidence over 1",
+        "valid": false,
+        "set": {
+          "confidence": 1.1
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "upper-case source",
+        "valid": false,
+        "set": {
+          "source": "LibreNMS"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "kind with spaces",
+        "valid": false,
+        "set": {
+          "kind": "device poll"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "blank id",
+        "valid": false,
+        "set": {
+          "id": ""
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "missing time",
+        "valid": false,
+        "delete": [
+          "observed_at"
+        ],
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "extra key",
+        "valid": false,
+        "set": {
+          "x": 1
+        },
+        "jsonschema_rejects": true
+      }
+    ]
+  },
+  "unknown_device_link_slot": {
+    "base": {
+      "slot": "ip",
+      "basis": "observed",
+      "value": "10.0.5.9",
+      "label": null,
+      "attachment_kind": null,
+      "confidence": null,
+      "reason": null,
+      "evidence": [
+        {
+          "id": "librenms:9",
+          "source": "librenms",
+          "kind": "device-poll",
+          "observed_at": "2026-10-11T12:00:00Z",
+          "confidence": null
+        }
+      ]
+    },
+    "cases": [
+      {
+        "name": "observed",
+        "valid": true
+      },
+      {
+        "name": "unknown",
+        "valid": true,
+        "set": {
+          "slot": "ip",
+          "basis": "unknown",
+          "value": null,
+          "label": null,
+          "attachment_kind": null,
+          "confidence": null,
+          "reason": "no-evidence",
+          "evidence": []
+        }
+      },
+      {
+        "name": "inferred with a reason",
+        "valid": true,
+        "set": {
+          "basis": "inferred",
+          "confidence": 0.5,
+          "reason": "indirect-evidence"
+        }
+      },
+      {
+        "name": "attachment",
+        "valid": true,
+        "set": {
+          "slot": "attachment",
+          "basis": "observed",
+          "value": "device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+          "label": "access-sw-3",
+          "attachment_kind": "switch",
+          "confidence": 0.9,
+          "reason": null,
+          "evidence": [
+            {
+              "id": "snmp:fdb-1",
+              "source": "snmp",
+              "kind": "switch-mac-table",
+              "observed_at": "2026-10-11T12:00:00Z",
+              "confidence": 0.9
+            }
+          ]
+        }
+      },
+      {
+        "name": "hostile label is data",
+        "valid": true,
+        "set": {
+          "slot": "attachment",
+          "basis": "observed",
+          "value": "device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+          "label": "<script>alert(1)</script>",
+          "attachment_kind": "switch",
+          "confidence": 0.9,
+          "reason": null,
+          "evidence": [
+            {
+              "id": "snmp:fdb-1",
+              "source": "snmp",
+              "kind": "switch-mac-table",
+              "observed_at": "2026-10-11T12:00:00Z",
+              "confidence": 0.9
+            }
+          ]
+        }
+      },
+      {
+        "name": "unknown that names a value",
+        "valid": false,
+        "set": {
+          "slot": "ip",
+          "basis": "unknown",
+          "value": "10.0.5.9",
+          "label": null,
+          "attachment_kind": null,
+          "confidence": null,
+          "reason": "no-evidence",
+          "evidence": []
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "unknown without a reason",
+        "valid": false,
+        "set": {
+          "slot": "ip",
+          "basis": "unknown",
+          "value": null,
+          "label": null,
+          "attachment_kind": null,
+          "confidence": null,
+          "reason": null,
+          "evidence": []
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "unknown with evidence",
+        "valid": false,
+        "set": {
+          "slot": "ip",
+          "basis": "unknown",
+          "value": null,
+          "label": null,
+          "attachment_kind": null,
+          "confidence": null,
+          "reason": "no-evidence",
+          "evidence": [
+            {
+              "id": "librenms:9",
+              "source": "librenms",
+              "kind": "device-poll",
+              "observed_at": "2026-10-11T12:00:00Z",
+              "confidence": null
+            }
+          ]
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "observed without evidence",
+        "valid": false,
+        "set": {
+          "evidence": []
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "observed without a value",
+        "valid": false,
+        "set": {
+          "value": null
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "observed with a reason",
+        "valid": false,
+        "set": {
+          "reason": "no-evidence"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "inferred above the ceiling",
+        "valid": false,
+        "set": {
+          "basis": "inferred",
+          "confidence": 0.8,
+          "reason": "indirect-evidence"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "inferred without a reason",
+        "valid": false,
+        "set": {
+          "basis": "inferred",
+          "confidence": 0.5
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "inferred without a confidence",
+        "valid": false,
+        "set": {
+          "basis": "inferred",
+          "reason": "indirect-evidence"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "attachment kind on an ip slot",
+        "valid": false,
+        "set": {
+          "attachment_kind": "switch"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "attachment without a kind",
+        "valid": false,
+        "set": {
+          "slot": "attachment",
+          "basis": "observed",
+          "value": "device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+          "label": "access-sw-3",
+          "attachment_kind": null,
+          "confidence": 0.9,
+          "reason": null,
+          "evidence": [
+            {
+              "id": "snmp:fdb-1",
+              "source": "snmp",
+              "kind": "switch-mac-table",
+              "observed_at": "2026-10-11T12:00:00Z",
+              "confidence": 0.9
+            }
+          ]
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "unknown slot name",
+        "valid": false,
+        "set": {
+          "slot": "router"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "unknown reason word",
+        "valid": false,
+        "set": {
+          "slot": "ip",
+          "basis": "unknown",
+          "value": null,
+          "label": null,
+          "attachment_kind": null,
+          "confidence": null,
+          "reason": "because",
+          "evidence": []
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "17 evidence refs",
+        "valid": false,
+        "set": {
+          "evidence": [
+            {
+              "id": "librenms:9",
+              "source": "librenms",
+              "kind": "device-poll",
+              "observed_at": "2026-10-11T12:00:00Z",
+              "confidence": null
+            },
+            {
+              "id": "librenms:9",
+              "source": "librenms",
+              "kind": "device-poll",
+              "observed_at": "2026-10-11T12:00:00Z",
+              "confidence": null
+            },
+            {
+              "id": "librenms:9",
+              "source": "librenms",
+              "kind": "device-poll",
+              "observed_at": "2026-10-11T12:00:00Z",
+              "confidence": null
+            },
+            {
+              "id": "librenms:9",
+              "source": "librenms",
+              "kind": "device-poll",
+              "observed_at": "2026-10-11T12:00:00Z",
+              "confidence": null
+            },
+            {
+              "id": "librenms:9",
+              "source": "librenms",
+              "kind": "device-poll",
+              "observed_at": "2026-10-11T12:00:00Z",
+              "confidence": null
+            },
+            {
+              "id": "librenms:9",
+              "source": "librenms",
+              "kind": "device-poll",
+              "observed_at": "2026-10-11T12:00:00Z",
+              "confidence": null
+            },
+            {
+              "id": "librenms:9",
+              "source": "librenms",
+              "kind": "device-poll",
+              "observed_at": "2026-10-11T12:00:00Z",
+              "confidence": null
+            },
+            {
+              "id": "librenms:9",
+              "source": "librenms",
+              "kind": "device-poll",
+              "observed_at": "2026-10-11T12:00:00Z",
+              "confidence": null
+            },
+            {
+              "id": "librenms:9",
+              "source": "librenms",
+              "kind": "device-poll",
+              "observed_at": "2026-10-11T12:00:00Z",
+              "confidence": null
+            },
+            {
+              "id": "librenms:9",
+              "source": "librenms",
+              "kind": "device-poll",
+              "observed_at": "2026-10-11T12:00:00Z",
+              "confidence": null
+            },
+            {
+              "id": "librenms:9",
+              "source": "librenms",
+              "kind": "device-poll",
+              "observed_at": "2026-10-11T12:00:00Z",
+              "confidence": null
+            },
+            {
+              "id": "librenms:9",
+              "source": "librenms",
+              "kind": "device-poll",
+              "observed_at": "2026-10-11T12:00:00Z",
+              "confidence": null
+            },
+            {
+              "id": "librenms:9",
+              "source": "librenms",
+              "kind": "device-poll",
+              "observed_at": "2026-10-11T12:00:00Z",
+              "confidence": null
+            },
+            {
+              "id": "librenms:9",
+              "source": "librenms",
+              "kind": "device-poll",
+              "observed_at": "2026-10-11T12:00:00Z",
+              "confidence": null
+            },
+            {
+              "id": "librenms:9",
+              "source": "librenms",
+              "kind": "device-poll",
+              "observed_at": "2026-10-11T12:00:00Z",
+              "confidence": null
+            },
+            {
+              "id": "librenms:9",
+              "source": "librenms",
+              "kind": "device-poll",
+              "observed_at": "2026-10-11T12:00:00Z",
+              "confidence": null
+            },
+            {
+              "id": "librenms:9",
+              "source": "librenms",
+              "kind": "device-poll",
+              "observed_at": "2026-10-11T12:00:00Z",
+              "confidence": null
+            }
+          ]
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "extra key",
+        "valid": false,
+        "set": {
+          "x": 1
+        },
+        "jsonschema_rejects": true
+      }
+    ]
+  },
+  "unknown_device_endpoint": {
+    "base": {
+      "ip": "10.0.5.9",
+      "mac": "aa:bb:cc:00:11:22",
+      "hostname": "printer-x"
+    },
+    "cases": [
+      {
+        "name": "all three",
+        "valid": true
+      },
+      {
+        "name": "ip only",
+        "valid": true,
+        "set": {
+          "mac": null,
+          "hostname": null
+        }
+      },
+      {
+        "name": "hostname only",
+        "valid": true,
+        "set": {
+          "ip": null,
+          "mac": null
+        }
+      },
+      {
+        "name": "nothing",
+        "valid": false,
+        "set": {
+          "ip": null,
+          "mac": null,
+          "hostname": null
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "upper-case mac",
+        "valid": false,
+        "set": {
+          "mac": "AA:BB:CC:00:11:22"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "dashed mac",
+        "valid": false,
+        "set": {
+          "mac": "aa-bb-cc-00-11-22"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "not an ip",
+        "valid": false,
+        "set": {
+          "ip": "10.0.5.9/24"
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "blank hostname",
+        "valid": false,
+        "set": {
+          "hostname": ""
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "hostile hostname is data",
+        "valid": true,
+        "set": {
+          "hostname": "<img src=x onerror=alert(1)>"
+        }
+      },
+      {
+        "name": "extra key",
+        "valid": false,
+        "set": {
+          "vendor": "x"
+        },
+        "jsonschema_rejects": true
+      }
+    ]
+  },
+  "unknown_device_check": {
+    "base": {
+      "field": "ip",
+      "result": "no-match",
+      "detail": null
+    },
+    "cases": [
+      {
+        "name": "no match",
+        "valid": true
+      },
+      {
+        "name": "not checked with a reason",
+        "valid": true,
+        "set": {
+          "field": "mac",
+          "result": "not-checked",
+          "detail": "no MAC was observed"
+        }
+      },
+      {
+        "name": "match",
+        "valid": true,
+        "set": {
+          "result": "match"
+        }
+      },
+      {
+        "name": "unknown field",
+        "valid": false,
+        "set": {
+          "field": "serial"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "unknown result",
+        "valid": false,
+        "set": {
+          "result": "maybe"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "blank detail",
+        "valid": false,
+        "set": {
+          "detail": ""
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "extra key",
+        "valid": false,
+        "set": {
+          "x": 1
+        },
+        "jsonschema_rejects": true
+      }
+    ]
+  },
+  "unknown_device_comparison": {
+    "base": {
+      "checks": [
+        {
+          "field": "ip",
+          "result": "no-match",
+          "detail": null
+        },
+        {
+          "field": "mac",
+          "result": "no-match",
+          "detail": null
+        },
+        {
+          "field": "hostname",
+          "result": "no-match",
+          "detail": null
+        }
+      ],
+      "checked_at": "2026-10-11T12:00:00Z"
+    },
+    "cases": [
+      {
+        "name": "nothing matched",
+        "valid": true
+      },
+      {
+        "name": "some not checked",
+        "valid": true,
+        "set": {
+          "checks": [
+            {
+              "field": "ip",
+              "result": "no-match",
+              "detail": null
+            },
+            {
+              "field": "mac",
+              "result": "not-checked",
+              "detail": "no MAC was observed"
+            },
+            {
+              "field": "hostname",
+              "result": "no-match",
+              "detail": null
+            }
+          ]
+        }
+      },
+      {
+        "name": "two checks",
+        "valid": false,
+        "set": {
+          "checks": [
+            {
+              "field": "ip",
+              "result": "no-match",
+              "detail": null
+            },
+            {
+              "field": "mac",
+              "result": "no-match",
+              "detail": null
+            }
+          ]
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "four checks",
+        "valid": false,
+        "set": {
+          "checks": [
+            {
+              "field": "ip",
+              "result": "no-match",
+              "detail": null
+            },
+            {
+              "field": "mac",
+              "result": "no-match",
+              "detail": null
+            },
+            {
+              "field": "hostname",
+              "result": "no-match",
+              "detail": null
+            },
+            {
+              "field": "ip",
+              "result": "no-match",
+              "detail": null
+            }
+          ]
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "a match means no finding",
+        "valid": false,
+        "set": {
+          "checks": [
+            {
+              "field": "ip",
+              "result": "match",
+              "detail": null
+            },
+            {
+              "field": "mac",
+              "result": "no-match",
+              "detail": null
+            },
+            {
+              "field": "hostname",
+              "result": "no-match",
+              "detail": null
+            }
+          ]
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "checks out of order",
+        "valid": false,
+        "set": {
+          "checks": [
+            {
+              "field": "mac",
+              "result": "no-match",
+              "detail": null
+            },
+            {
+              "field": "ip",
+              "result": "no-match",
+              "detail": null
+            },
+            {
+              "field": "hostname",
+              "result": "no-match",
+              "detail": null
+            }
+          ]
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "all not checked proves nothing",
+        "valid": false,
+        "set": {
+          "checks": [
+            {
+              "field": "ip",
+              "result": "not-checked",
+              "detail": "x"
+            },
+            {
+              "field": "mac",
+              "result": "not-checked",
+              "detail": "x"
+            },
+            {
+              "field": "hostname",
+              "result": "not-checked",
+              "detail": "x"
+            }
+          ]
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "missing time",
+        "valid": false,
+        "delete": [
+          "checked_at"
+        ],
+        "jsonschema_rejects": true
+      }
+    ]
+  },
+  "unknown_device_proposed_action": {
+    "base": {
+      "action_type": "endpoint.isolate",
+      "state": "proposed",
+      "risk": "C",
+      "executable": false,
+      "awaiting": "action-engine",
+      "rationale": "Severity high by operator policy"
+    },
+    "cases": [
+      {
+        "name": "proposed",
+        "valid": true
+      },
+      {
+        "name": "executable",
+        "valid": false,
+        "set": {
+          "executable": true
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "authorised",
+        "valid": false,
+        "set": {
+          "state": "authorised"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "another action",
+        "valid": false,
+        "set": {
+          "action_type": "switch.port.disable"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "risk A",
+        "valid": false,
+        "set": {
+          "risk": "A"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "blank rationale",
+        "valid": false,
+        "set": {
+          "rationale": ""
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "extra key",
+        "valid": false,
+        "set": {
+          "approval_id": "x"
+        },
+        "jsonschema_rejects": true
+      }
+    ]
+  },
+  "unknown_device_finding": {
+    "base": {
+      "id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+      "state": "new",
+      "severity": "medium",
+      "severity_basis": "policy-default",
+      "assignee_id": null,
+      "first_seen_at": "2026-10-11T12:00:00Z",
+      "last_seen_at": "2026-10-11T12:00:00Z",
+      "seen_count": 1,
+      "recurrence_of": null,
+      "endpoint": {
+        "ip": "10.0.5.9",
+        "mac": "aa:bb:cc:00:11:22",
+        "hostname": "printer-x"
+      },
+      "chain": [
+        {
+          "slot": "ip",
+          "basis": "observed",
+          "value": "10.0.5.9",
+          "label": null,
+          "attachment_kind": null,
+          "confidence": null,
+          "reason": null,
+          "evidence": [
+            {
+              "id": "librenms:9",
+              "source": "librenms",
+              "kind": "device-poll",
+              "observed_at": "2026-10-11T12:00:00Z",
+              "confidence": null
+            }
+          ]
+        },
+        {
+          "slot": "mac",
+          "basis": "observed",
+          "value": "aa:bb:cc:00:11:22",
+          "label": null,
+          "attachment_kind": null,
+          "confidence": null,
+          "reason": null,
+          "evidence": [
+            {
+              "id": "librenms:9",
+              "source": "librenms",
+              "kind": "device-poll",
+              "observed_at": "2026-10-11T12:00:00Z",
+              "confidence": null
+            }
+          ]
+        },
+        {
+          "slot": "attachment",
+          "basis": "unknown",
+          "value": null,
+          "label": null,
+          "attachment_kind": null,
+          "confidence": null,
+          "reason": "source-unavailable",
+          "evidence": []
+        },
+        {
+          "slot": "port",
+          "basis": "unknown",
+          "value": null,
+          "label": null,
+          "attachment_kind": null,
+          "confidence": null,
+          "reason": "source-unavailable",
+          "evidence": []
+        },
+        {
+          "slot": "vlan",
+          "basis": "unknown",
+          "value": null,
+          "label": null,
+          "attachment_kind": null,
+          "confidence": null,
+          "reason": "source-unavailable",
+          "evidence": []
+        }
+      ],
+      "comparison": {
+        "checks": [
+          {
+            "field": "ip",
+            "result": "no-match",
+            "detail": null
+          },
+          {
+            "field": "mac",
+            "result": "no-match",
+            "detail": null
+          },
+          {
+            "field": "hostname",
+            "result": "no-match",
+            "detail": null
+          }
+        ],
+        "checked_at": "2026-10-11T12:00:00Z"
+      },
+      "proposed_action": null
+    },
+    "cases": [
+      {
+        "name": "new finding",
+        "valid": true
+      },
+      {
+        "name": "with a proposed action",
+        "valid": true,
+        "set": {
+          "severity": "high",
+          "severity_basis": "policy-rule",
+          "proposed_action": {
+            "action_type": "endpoint.isolate",
+            "state": "proposed",
+            "risk": "C",
+            "executable": false,
+            "awaiting": "action-engine",
+            "rationale": "Severity high by operator policy"
+          }
+        }
+      },
+      {
+        "name": "no policy means unknown severity",
+        "valid": true,
+        "set": {
+          "severity": "unknown",
+          "severity_basis": "no-policy"
+        }
+      },
+      {
+        "name": "assigned and investigating",
+        "valid": true,
+        "set": {
+          "state": "investigating",
+          "assignee_id": "oidc:analyst-1"
+        }
+      },
+      {
+        "name": "a recurrence",
+        "valid": true,
+        "set": {
+          "recurrence_of": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abd"
+        }
+      },
+      {
+        "name": "seen again later",
+        "valid": true,
+        "set": {
+          "last_seen_at": "2026-10-11T13:00:00Z",
+          "seen_count": 4
+        }
+      },
+      {
+        "name": "false positive",
+        "valid": true,
+        "set": {
+          "state": "false-positive"
+        }
+      },
+      {
+        "name": "severity unknown under a policy",
+        "valid": false,
+        "set": {
+          "severity": "unknown"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "a severity without a policy basis",
+        "valid": false,
+        "set": {
+          "severity_basis": "no-policy"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "chain too short",
+        "valid": false,
+        "set": {
+          "chain": [
+            {
+              "slot": "ip",
+              "basis": "observed",
+              "value": "10.0.5.9",
+              "label": null,
+              "attachment_kind": null,
+              "confidence": null,
+              "reason": null,
+              "evidence": [
+                {
+                  "id": "librenms:9",
+                  "source": "librenms",
+                  "kind": "device-poll",
+                  "observed_at": "2026-10-11T12:00:00Z",
+                  "confidence": null
+                }
+              ]
+            },
+            {
+              "slot": "mac",
+              "basis": "observed",
+              "value": "aa:bb:cc:00:11:22",
+              "label": null,
+              "attachment_kind": null,
+              "confidence": null,
+              "reason": null,
+              "evidence": [
+                {
+                  "id": "librenms:9",
+                  "source": "librenms",
+                  "kind": "device-poll",
+                  "observed_at": "2026-10-11T12:00:00Z",
+                  "confidence": null
+                }
+              ]
+            },
+            {
+              "slot": "attachment",
+              "basis": "unknown",
+              "value": null,
+              "label": null,
+              "attachment_kind": null,
+              "confidence": null,
+              "reason": "source-unavailable",
+              "evidence": []
+            },
+            {
+              "slot": "port",
+              "basis": "unknown",
+              "value": null,
+              "label": null,
+              "attachment_kind": null,
+              "confidence": null,
+              "reason": "source-unavailable",
+              "evidence": []
+            }
+          ]
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "chain too long",
+        "valid": false,
+        "set": {
+          "chain": [
+            {
+              "slot": "ip",
+              "basis": "observed",
+              "value": "10.0.5.9",
+              "label": null,
+              "attachment_kind": null,
+              "confidence": null,
+              "reason": null,
+              "evidence": [
+                {
+                  "id": "librenms:9",
+                  "source": "librenms",
+                  "kind": "device-poll",
+                  "observed_at": "2026-10-11T12:00:00Z",
+                  "confidence": null
+                }
+              ]
+            },
+            {
+              "slot": "mac",
+              "basis": "observed",
+              "value": "aa:bb:cc:00:11:22",
+              "label": null,
+              "attachment_kind": null,
+              "confidence": null,
+              "reason": null,
+              "evidence": [
+                {
+                  "id": "librenms:9",
+                  "source": "librenms",
+                  "kind": "device-poll",
+                  "observed_at": "2026-10-11T12:00:00Z",
+                  "confidence": null
+                }
+              ]
+            },
+            {
+              "slot": "attachment",
+              "basis": "unknown",
+              "value": null,
+              "label": null,
+              "attachment_kind": null,
+              "confidence": null,
+              "reason": "source-unavailable",
+              "evidence": []
+            },
+            {
+              "slot": "port",
+              "basis": "unknown",
+              "value": null,
+              "label": null,
+              "attachment_kind": null,
+              "confidence": null,
+              "reason": "source-unavailable",
+              "evidence": []
+            },
+            {
+              "slot": "vlan",
+              "basis": "unknown",
+              "value": null,
+              "label": null,
+              "attachment_kind": null,
+              "confidence": null,
+              "reason": "source-unavailable",
+              "evidence": []
+            },
+            {
+              "slot": "ip",
+              "basis": "observed",
+              "value": "10.0.5.9",
+              "label": null,
+              "attachment_kind": null,
+              "confidence": null,
+              "reason": null,
+              "evidence": [
+                {
+                  "id": "librenms:9",
+                  "source": "librenms",
+                  "kind": "device-poll",
+                  "observed_at": "2026-10-11T12:00:00Z",
+                  "confidence": null
+                }
+              ]
+            }
+          ]
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "chain in the wrong order",
+        "valid": false,
+        "set": {
+          "chain": [
+            {
+              "slot": "mac",
+              "basis": "observed",
+              "value": "aa:bb:cc:00:11:22",
+              "label": null,
+              "attachment_kind": null,
+              "confidence": null,
+              "reason": null,
+              "evidence": [
+                {
+                  "id": "librenms:9",
+                  "source": "librenms",
+                  "kind": "device-poll",
+                  "observed_at": "2026-10-11T12:00:00Z",
+                  "confidence": null
+                }
+              ]
+            },
+            {
+              "slot": "ip",
+              "basis": "observed",
+              "value": "10.0.5.9",
+              "label": null,
+              "attachment_kind": null,
+              "confidence": null,
+              "reason": null,
+              "evidence": [
+                {
+                  "id": "librenms:9",
+                  "source": "librenms",
+                  "kind": "device-poll",
+                  "observed_at": "2026-10-11T12:00:00Z",
+                  "confidence": null
+                }
+              ]
+            },
+            {
+              "slot": "attachment",
+              "basis": "unknown",
+              "value": null,
+              "label": null,
+              "attachment_kind": null,
+              "confidence": null,
+              "reason": "source-unavailable",
+              "evidence": []
+            },
+            {
+              "slot": "port",
+              "basis": "unknown",
+              "value": null,
+              "label": null,
+              "attachment_kind": null,
+              "confidence": null,
+              "reason": "source-unavailable",
+              "evidence": []
+            },
+            {
+              "slot": "vlan",
+              "basis": "unknown",
+              "value": null,
+              "label": null,
+              "attachment_kind": null,
+              "confidence": null,
+              "reason": "source-unavailable",
+              "evidence": []
+            }
+          ]
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "last seen before first seen",
+        "valid": false,
+        "set": {
+          "last_seen_at": "2026-10-11T11:00:00Z"
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "its own recurrence",
+        "valid": false,
+        "set": {
+          "recurrence_of": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc"
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "ip slot differs from the endpoint",
+        "valid": false,
+        "set": {
+          "endpoint": {
+            "ip": "10.0.5.10",
+            "mac": "aa:bb:cc:00:11:22",
+            "hostname": "printer-x"
+          }
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "mac slot differs from the endpoint",
+        "valid": false,
+        "set": {
+          "endpoint": {
+            "ip": "10.0.5.9",
+            "mac": "aa:bb:cc:00:11:23",
+            "hostname": "printer-x"
+          }
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "endpoint ip with an unknown ip slot",
+        "valid": false,
+        "set": {
+          "chain": [
+            {
+              "slot": "ip",
+              "basis": "unknown",
+              "value": null,
+              "label": null,
+              "attachment_kind": null,
+              "confidence": null,
+              "reason": "no-evidence",
+              "evidence": []
+            },
+            {
+              "slot": "mac",
+              "basis": "observed",
+              "value": "aa:bb:cc:00:11:22",
+              "label": null,
+              "attachment_kind": null,
+              "confidence": null,
+              "reason": null,
+              "evidence": [
+                {
+                  "id": "librenms:9",
+                  "source": "librenms",
+                  "kind": "device-poll",
+                  "observed_at": "2026-10-11T12:00:00Z",
+                  "confidence": null
+                }
+              ]
+            },
+            {
+              "slot": "attachment",
+              "basis": "unknown",
+              "value": null,
+              "label": null,
+              "attachment_kind": null,
+              "confidence": null,
+              "reason": "source-unavailable",
+              "evidence": []
+            },
+            {
+              "slot": "port",
+              "basis": "unknown",
+              "value": null,
+              "label": null,
+              "attachment_kind": null,
+              "confidence": null,
+              "reason": "source-unavailable",
+              "evidence": []
+            },
+            {
+              "slot": "vlan",
+              "basis": "unknown",
+              "value": null,
+              "label": null,
+              "attachment_kind": null,
+              "confidence": null,
+              "reason": "source-unavailable",
+              "evidence": []
+            }
+          ]
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "seen count zero",
+        "valid": false,
+        "set": {
+          "seen_count": 0
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "bad id",
+        "valid": false,
+        "set": {
+          "id": "unknown-device-1"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "unknown state",
+        "valid": false,
+        "set": {
+          "state": "closed"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "extra key",
+        "valid": false,
+        "set": {
+          "owner": "x"
+        },
+        "jsonschema_rejects": true
+      }
+    ]
+  },
+  "unknown_device_state_count": {
+    "base": {
+      "state": "new",
+      "count": 2
+    },
+    "cases": [
+      {
+        "name": "count",
+        "valid": true
+      },
+      {
+        "name": "negative",
+        "valid": false,
+        "set": {
+          "count": -1
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "unknown state",
+        "valid": false,
+        "set": {
+          "state": "done"
+        },
+        "jsonschema_rejects": true
+      }
+    ]
+  },
+  "unknown_device_severity_count": {
+    "base": {
+      "severity": "high",
+      "count": 2
+    },
+    "cases": [
+      {
+        "name": "count",
+        "valid": true
+      },
+      {
+        "name": "negative",
+        "valid": false,
+        "set": {
+          "count": -1
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "unknown severity",
+        "valid": false,
+        "set": {
+          "severity": "severe"
+        },
+        "jsonschema_rejects": true
+      }
+    ]
+  },
+  "unknown_device_counts": {
+    "base": {
+      "open": 3,
+      "by_state": [
+        {
+          "state": "new",
+          "count": 2
+        },
+        {
+          "state": "resolved",
+          "count": 1
+        },
+        {
+          "state": "acknowledged",
+          "count": 1
+        }
+      ],
+      "by_severity": [
+        {
+          "severity": "high",
+          "count": 2
+        },
+        {
+          "severity": "unknown",
+          "count": 2
+        }
+      ]
+    },
+    "cases": [
+      {
+        "name": "counts",
+        "valid": true
+      },
+      {
+        "name": "empty",
+        "valid": true,
+        "set": {
+          "open": 0,
+          "by_state": [],
+          "by_severity": []
+        }
+      },
+      {
+        "name": "open does not match the states",
+        "valid": false,
+        "set": {
+          "open": 4
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "state counts and severity counts disagree",
+        "valid": false,
+        "set": {
+          "by_severity": [
+            {
+              "severity": "high",
+              "count": 1
+            }
+          ]
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "duplicate state rows",
+        "valid": false,
+        "set": {
+          "by_state": [
+            {
+              "state": "new",
+              "count": 1
+            },
+            {
+              "state": "new",
+              "count": 1
+            },
+            {
+              "state": "acknowledged",
+              "count": 1
+            },
+            {
+              "state": "resolved",
+              "count": 1
+            }
+          ]
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "six state rows",
+        "valid": false,
+        "set": {
+          "by_state": [
+            {
+              "state": "new",
+              "count": 1
+            },
+            {
+              "state": "new",
+              "count": 1
+            },
+            {
+              "state": "new",
+              "count": 1
+            },
+            {
+              "state": "new",
+              "count": 1
+            },
+            {
+              "state": "new",
+              "count": 1
+            },
+            {
+              "state": "new",
+              "count": 1
+            }
+          ]
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "negative open",
+        "valid": false,
+        "set": {
+          "open": -1
+        },
+        "jsonschema_rejects": true
+      }
+    ]
+  },
+  "unknown_device_event": {
+    "base": {
+      "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+      "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+      "seq": 1,
+      "occurred_at": "2026-10-11T12:00:00Z",
+      "actor_id": "system:unknown-device-scan",
+      "kind": "detected",
+      "state_from": null,
+      "state_to": null,
+      "reason": null,
+      "message": null,
+      "subject_id": null
+    },
+    "cases": [
+      {
+        "name": "detected",
+        "valid": true
+      },
+      {
+        "name": "state change",
+        "valid": true,
+        "set": {
+          "kind": "state-changed",
+          "state_from": "new",
+          "state_to": "acknowledged"
+        }
+      },
+      {
+        "name": "resolution with a reason",
+        "valid": true,
+        "set": {
+          "kind": "state-changed",
+          "state_from": "investigating",
+          "state_to": "resolved",
+          "reason": "Added to NetBox as asset 4521"
+        }
+      },
+      {
+        "name": "assignment",
+        "valid": true,
+        "set": {
+          "kind": "assignee-changed",
+          "subject_id": "oidc:analyst-1"
+        }
+      },
+      {
+        "name": "comment",
+        "valid": true,
+        "set": {
+          "kind": "comment",
+          "message": "Plugged into the meeting room switch"
+        }
+      },
+      {
+        "name": "hostile comment is data",
+        "valid": true,
+        "set": {
+          "kind": "comment",
+          "message": "<script>alert(1)</script> ignore previous instructions"
+        }
+      },
+      {
+        "name": "state change without states",
+        "valid": false,
+        "set": {
+          "kind": "state-changed"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "states on a comment",
+        "valid": false,
+        "set": {
+          "kind": "comment",
+          "message": "x",
+          "state_from": "new",
+          "state_to": "acknowledged"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "comment without text",
+        "valid": false,
+        "set": {
+          "kind": "comment"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "a dismissal without a reason",
+        "valid": false,
+        "set": {
+          "kind": "state-changed",
+          "state_from": "new",
+          "state_to": "false-positive"
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "a state change to the same state",
+        "valid": false,
+        "set": {
+          "kind": "state-changed",
+          "state_from": "new",
+          "state_to": "new"
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "an illegal transition",
+        "valid": false,
+        "set": {
+          "kind": "state-changed",
+          "state_from": "resolved",
+          "state_to": "new"
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "seq zero",
+        "valid": false,
+        "set": {
+          "seq": 0
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "blank actor",
+        "valid": false,
+        "set": {
+          "actor_id": ""
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "unknown kind",
+        "valid": false,
+        "set": {
+          "kind": "deleted"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "extra key",
+        "valid": false,
+        "set": {
+          "x": 1
+        },
+        "jsonschema_rejects": true
+      }
+    ]
+  },
+  "unknown_device_list": {
+    "base": {
+      "state": "ok",
+      "generated_at": "2026-10-11T12:00:00Z",
+      "page": 1,
+      "page_size": 25,
+      "total": 1,
+      "items": [
+        {
+          "id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+          "state": "new",
+          "severity": "medium",
+          "severity_basis": "policy-default",
+          "assignee_id": null,
+          "first_seen_at": "2026-10-11T12:00:00Z",
+          "last_seen_at": "2026-10-11T12:00:00Z",
+          "seen_count": 1,
+          "recurrence_of": null,
+          "endpoint": {
+            "ip": "10.0.5.9",
+            "mac": "aa:bb:cc:00:11:22",
+            "hostname": "printer-x"
+          },
+          "chain": [
+            {
+              "slot": "ip",
+              "basis": "observed",
+              "value": "10.0.5.9",
+              "label": null,
+              "attachment_kind": null,
+              "confidence": null,
+              "reason": null,
+              "evidence": [
+                {
+                  "id": "librenms:9",
+                  "source": "librenms",
+                  "kind": "device-poll",
+                  "observed_at": "2026-10-11T12:00:00Z",
+                  "confidence": null
+                }
+              ]
+            },
+            {
+              "slot": "mac",
+              "basis": "observed",
+              "value": "aa:bb:cc:00:11:22",
+              "label": null,
+              "attachment_kind": null,
+              "confidence": null,
+              "reason": null,
+              "evidence": [
+                {
+                  "id": "librenms:9",
+                  "source": "librenms",
+                  "kind": "device-poll",
+                  "observed_at": "2026-10-11T12:00:00Z",
+                  "confidence": null
+                }
+              ]
+            },
+            {
+              "slot": "attachment",
+              "basis": "unknown",
+              "value": null,
+              "label": null,
+              "attachment_kind": null,
+              "confidence": null,
+              "reason": "source-unavailable",
+              "evidence": []
+            },
+            {
+              "slot": "port",
+              "basis": "unknown",
+              "value": null,
+              "label": null,
+              "attachment_kind": null,
+              "confidence": null,
+              "reason": "source-unavailable",
+              "evidence": []
+            },
+            {
+              "slot": "vlan",
+              "basis": "unknown",
+              "value": null,
+              "label": null,
+              "attachment_kind": null,
+              "confidence": null,
+              "reason": "source-unavailable",
+              "evidence": []
+            }
+          ],
+          "comparison": {
+            "checks": [
+              {
+                "field": "ip",
+                "result": "no-match",
+                "detail": null
+              },
+              {
+                "field": "mac",
+                "result": "no-match",
+                "detail": null
+              },
+              {
+                "field": "hostname",
+                "result": "no-match",
+                "detail": null
+              }
+            ],
+            "checked_at": "2026-10-11T12:00:00Z"
+          },
+          "proposed_action": null
+        }
+      ]
+    },
+    "cases": [
+      {
+        "name": "one page",
+        "valid": true
+      },
+      {
+        "name": "empty",
+        "valid": true,
+        "set": {
+          "total": 0,
+          "items": []
+        }
+      },
+      {
+        "name": "no store",
+        "valid": true,
+        "set": {
+          "state": "not-connected",
+          "total": 0,
+          "items": []
+        }
+      },
+      {
+        "name": "store failing",
+        "valid": true,
+        "set": {
+          "state": "unknown",
+          "total": 0,
+          "items": []
+        }
+      },
+      {
+        "name": "not-connected with rows",
+        "valid": false,
+        "set": {
+          "state": "not-connected"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "not-connected with a total",
+        "valid": false,
+        "set": {
+          "state": "not-connected",
+          "items": [],
+          "total": 1
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "page size over 50",
+        "valid": false,
+        "set": {
+          "page_size": 51
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "page zero",
+        "valid": false,
+        "set": {
+          "page": 0
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "more rows than the page size",
+        "valid": false,
+        "set": {
+          "page_size": 1,
+          "total": 2,
+          "items": [
+            {
+              "id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "state": "new",
+              "severity": "medium",
+              "severity_basis": "policy-default",
+              "assignee_id": null,
+              "first_seen_at": "2026-10-11T12:00:00Z",
+              "last_seen_at": "2026-10-11T12:00:00Z",
+              "seen_count": 1,
+              "recurrence_of": null,
+              "endpoint": {
+                "ip": "10.0.5.9",
+                "mac": "aa:bb:cc:00:11:22",
+                "hostname": "printer-x"
+              },
+              "chain": [
+                {
+                  "slot": "ip",
+                  "basis": "observed",
+                  "value": "10.0.5.9",
+                  "label": null,
+                  "attachment_kind": null,
+                  "confidence": null,
+                  "reason": null,
+                  "evidence": [
+                    {
+                      "id": "librenms:9",
+                      "source": "librenms",
+                      "kind": "device-poll",
+                      "observed_at": "2026-10-11T12:00:00Z",
+                      "confidence": null
+                    }
+                  ]
+                },
+                {
+                  "slot": "mac",
+                  "basis": "observed",
+                  "value": "aa:bb:cc:00:11:22",
+                  "label": null,
+                  "attachment_kind": null,
+                  "confidence": null,
+                  "reason": null,
+                  "evidence": [
+                    {
+                      "id": "librenms:9",
+                      "source": "librenms",
+                      "kind": "device-poll",
+                      "observed_at": "2026-10-11T12:00:00Z",
+                      "confidence": null
+                    }
+                  ]
+                },
+                {
+                  "slot": "attachment",
+                  "basis": "unknown",
+                  "value": null,
+                  "label": null,
+                  "attachment_kind": null,
+                  "confidence": null,
+                  "reason": "source-unavailable",
+                  "evidence": []
+                },
+                {
+                  "slot": "port",
+                  "basis": "unknown",
+                  "value": null,
+                  "label": null,
+                  "attachment_kind": null,
+                  "confidence": null,
+                  "reason": "source-unavailable",
+                  "evidence": []
+                },
+                {
+                  "slot": "vlan",
+                  "basis": "unknown",
+                  "value": null,
+                  "label": null,
+                  "attachment_kind": null,
+                  "confidence": null,
+                  "reason": "source-unavailable",
+                  "evidence": []
+                }
+              ],
+              "comparison": {
+                "checks": [
+                  {
+                    "field": "ip",
+                    "result": "no-match",
+                    "detail": null
+                  },
+                  {
+                    "field": "mac",
+                    "result": "no-match",
+                    "detail": null
+                  },
+                  {
+                    "field": "hostname",
+                    "result": "no-match",
+                    "detail": null
+                  }
+                ],
+                "checked_at": "2026-10-11T12:00:00Z"
+              },
+              "proposed_action": null
+            },
+            {
+              "id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abd",
+              "state": "new",
+              "severity": "medium",
+              "severity_basis": "policy-default",
+              "assignee_id": null,
+              "first_seen_at": "2026-10-11T12:00:00Z",
+              "last_seen_at": "2026-10-11T12:00:00Z",
+              "seen_count": 1,
+              "recurrence_of": null,
+              "endpoint": {
+                "ip": "10.0.5.9",
+                "mac": "aa:bb:cc:00:11:22",
+                "hostname": "printer-x"
+              },
+              "chain": [
+                {
+                  "slot": "ip",
+                  "basis": "observed",
+                  "value": "10.0.5.9",
+                  "label": null,
+                  "attachment_kind": null,
+                  "confidence": null,
+                  "reason": null,
+                  "evidence": [
+                    {
+                      "id": "librenms:9",
+                      "source": "librenms",
+                      "kind": "device-poll",
+                      "observed_at": "2026-10-11T12:00:00Z",
+                      "confidence": null
+                    }
+                  ]
+                },
+                {
+                  "slot": "mac",
+                  "basis": "observed",
+                  "value": "aa:bb:cc:00:11:22",
+                  "label": null,
+                  "attachment_kind": null,
+                  "confidence": null,
+                  "reason": null,
+                  "evidence": [
+                    {
+                      "id": "librenms:9",
+                      "source": "librenms",
+                      "kind": "device-poll",
+                      "observed_at": "2026-10-11T12:00:00Z",
+                      "confidence": null
+                    }
+                  ]
+                },
+                {
+                  "slot": "attachment",
+                  "basis": "unknown",
+                  "value": null,
+                  "label": null,
+                  "attachment_kind": null,
+                  "confidence": null,
+                  "reason": "source-unavailable",
+                  "evidence": []
+                },
+                {
+                  "slot": "port",
+                  "basis": "unknown",
+                  "value": null,
+                  "label": null,
+                  "attachment_kind": null,
+                  "confidence": null,
+                  "reason": "source-unavailable",
+                  "evidence": []
+                },
+                {
+                  "slot": "vlan",
+                  "basis": "unknown",
+                  "value": null,
+                  "label": null,
+                  "attachment_kind": null,
+                  "confidence": null,
+                  "reason": "source-unavailable",
+                  "evidence": []
+                }
+              ],
+              "comparison": {
+                "checks": [
+                  {
+                    "field": "ip",
+                    "result": "no-match",
+                    "detail": null
+                  },
+                  {
+                    "field": "mac",
+                    "result": "no-match",
+                    "detail": null
+                  },
+                  {
+                    "field": "hostname",
+                    "result": "no-match",
+                    "detail": null
+                  }
+                ],
+                "checked_at": "2026-10-11T12:00:00Z"
+              },
+              "proposed_action": null
+            }
+          ]
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "total below the rows",
+        "valid": false,
+        "set": {
+          "total": 0
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "duplicate rows",
+        "valid": false,
+        "set": {
+          "total": 2,
+          "items": [
+            {
+              "id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "state": "new",
+              "severity": "medium",
+              "severity_basis": "policy-default",
+              "assignee_id": null,
+              "first_seen_at": "2026-10-11T12:00:00Z",
+              "last_seen_at": "2026-10-11T12:00:00Z",
+              "seen_count": 1,
+              "recurrence_of": null,
+              "endpoint": {
+                "ip": "10.0.5.9",
+                "mac": "aa:bb:cc:00:11:22",
+                "hostname": "printer-x"
+              },
+              "chain": [
+                {
+                  "slot": "ip",
+                  "basis": "observed",
+                  "value": "10.0.5.9",
+                  "label": null,
+                  "attachment_kind": null,
+                  "confidence": null,
+                  "reason": null,
+                  "evidence": [
+                    {
+                      "id": "librenms:9",
+                      "source": "librenms",
+                      "kind": "device-poll",
+                      "observed_at": "2026-10-11T12:00:00Z",
+                      "confidence": null
+                    }
+                  ]
+                },
+                {
+                  "slot": "mac",
+                  "basis": "observed",
+                  "value": "aa:bb:cc:00:11:22",
+                  "label": null,
+                  "attachment_kind": null,
+                  "confidence": null,
+                  "reason": null,
+                  "evidence": [
+                    {
+                      "id": "librenms:9",
+                      "source": "librenms",
+                      "kind": "device-poll",
+                      "observed_at": "2026-10-11T12:00:00Z",
+                      "confidence": null
+                    }
+                  ]
+                },
+                {
+                  "slot": "attachment",
+                  "basis": "unknown",
+                  "value": null,
+                  "label": null,
+                  "attachment_kind": null,
+                  "confidence": null,
+                  "reason": "source-unavailable",
+                  "evidence": []
+                },
+                {
+                  "slot": "port",
+                  "basis": "unknown",
+                  "value": null,
+                  "label": null,
+                  "attachment_kind": null,
+                  "confidence": null,
+                  "reason": "source-unavailable",
+                  "evidence": []
+                },
+                {
+                  "slot": "vlan",
+                  "basis": "unknown",
+                  "value": null,
+                  "label": null,
+                  "attachment_kind": null,
+                  "confidence": null,
+                  "reason": "source-unavailable",
+                  "evidence": []
+                }
+              ],
+              "comparison": {
+                "checks": [
+                  {
+                    "field": "ip",
+                    "result": "no-match",
+                    "detail": null
+                  },
+                  {
+                    "field": "mac",
+                    "result": "no-match",
+                    "detail": null
+                  },
+                  {
+                    "field": "hostname",
+                    "result": "no-match",
+                    "detail": null
+                  }
+                ],
+                "checked_at": "2026-10-11T12:00:00Z"
+              },
+              "proposed_action": null
+            },
+            {
+              "id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "state": "new",
+              "severity": "medium",
+              "severity_basis": "policy-default",
+              "assignee_id": null,
+              "first_seen_at": "2026-10-11T12:00:00Z",
+              "last_seen_at": "2026-10-11T12:00:00Z",
+              "seen_count": 1,
+              "recurrence_of": null,
+              "endpoint": {
+                "ip": "10.0.5.9",
+                "mac": "aa:bb:cc:00:11:22",
+                "hostname": "printer-x"
+              },
+              "chain": [
+                {
+                  "slot": "ip",
+                  "basis": "observed",
+                  "value": "10.0.5.9",
+                  "label": null,
+                  "attachment_kind": null,
+                  "confidence": null,
+                  "reason": null,
+                  "evidence": [
+                    {
+                      "id": "librenms:9",
+                      "source": "librenms",
+                      "kind": "device-poll",
+                      "observed_at": "2026-10-11T12:00:00Z",
+                      "confidence": null
+                    }
+                  ]
+                },
+                {
+                  "slot": "mac",
+                  "basis": "observed",
+                  "value": "aa:bb:cc:00:11:22",
+                  "label": null,
+                  "attachment_kind": null,
+                  "confidence": null,
+                  "reason": null,
+                  "evidence": [
+                    {
+                      "id": "librenms:9",
+                      "source": "librenms",
+                      "kind": "device-poll",
+                      "observed_at": "2026-10-11T12:00:00Z",
+                      "confidence": null
+                    }
+                  ]
+                },
+                {
+                  "slot": "attachment",
+                  "basis": "unknown",
+                  "value": null,
+                  "label": null,
+                  "attachment_kind": null,
+                  "confidence": null,
+                  "reason": "source-unavailable",
+                  "evidence": []
+                },
+                {
+                  "slot": "port",
+                  "basis": "unknown",
+                  "value": null,
+                  "label": null,
+                  "attachment_kind": null,
+                  "confidence": null,
+                  "reason": "source-unavailable",
+                  "evidence": []
+                },
+                {
+                  "slot": "vlan",
+                  "basis": "unknown",
+                  "value": null,
+                  "label": null,
+                  "attachment_kind": null,
+                  "confidence": null,
+                  "reason": "source-unavailable",
+                  "evidence": []
+                }
+              ],
+              "comparison": {
+                "checks": [
+                  {
+                    "field": "ip",
+                    "result": "no-match",
+                    "detail": null
+                  },
+                  {
+                    "field": "mac",
+                    "result": "no-match",
+                    "detail": null
+                  },
+                  {
+                    "field": "hostname",
+                    "result": "no-match",
+                    "detail": null
+                  }
+                ],
+                "checked_at": "2026-10-11T12:00:00Z"
+              },
+              "proposed_action": null
+            }
+          ]
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "extra key",
+        "valid": false,
+        "set": {
+          "next": "x"
+        },
+        "jsonschema_rejects": true
+      }
+    ]
+  },
+  "unknown_device_detail": {
+    "base": {
+      "state": "ok",
+      "generated_at": "2026-10-11T12:00:00Z",
+      "item": {
+        "id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+        "state": "new",
+        "severity": "medium",
+        "severity_basis": "policy-default",
+        "assignee_id": null,
+        "first_seen_at": "2026-10-11T12:00:00Z",
+        "last_seen_at": "2026-10-11T12:00:00Z",
+        "seen_count": 1,
+        "recurrence_of": null,
+        "endpoint": {
+          "ip": "10.0.5.9",
+          "mac": "aa:bb:cc:00:11:22",
+          "hostname": "printer-x"
+        },
+        "chain": [
+          {
+            "slot": "ip",
+            "basis": "observed",
+            "value": "10.0.5.9",
+            "label": null,
+            "attachment_kind": null,
+            "confidence": null,
+            "reason": null,
+            "evidence": [
+              {
+                "id": "librenms:9",
+                "source": "librenms",
+                "kind": "device-poll",
+                "observed_at": "2026-10-11T12:00:00Z",
+                "confidence": null
+              }
+            ]
+          },
+          {
+            "slot": "mac",
+            "basis": "observed",
+            "value": "aa:bb:cc:00:11:22",
+            "label": null,
+            "attachment_kind": null,
+            "confidence": null,
+            "reason": null,
+            "evidence": [
+              {
+                "id": "librenms:9",
+                "source": "librenms",
+                "kind": "device-poll",
+                "observed_at": "2026-10-11T12:00:00Z",
+                "confidence": null
+              }
+            ]
+          },
+          {
+            "slot": "attachment",
+            "basis": "unknown",
+            "value": null,
+            "label": null,
+            "attachment_kind": null,
+            "confidence": null,
+            "reason": "source-unavailable",
+            "evidence": []
+          },
+          {
+            "slot": "port",
+            "basis": "unknown",
+            "value": null,
+            "label": null,
+            "attachment_kind": null,
+            "confidence": null,
+            "reason": "source-unavailable",
+            "evidence": []
+          },
+          {
+            "slot": "vlan",
+            "basis": "unknown",
+            "value": null,
+            "label": null,
+            "attachment_kind": null,
+            "confidence": null,
+            "reason": "source-unavailable",
+            "evidence": []
+          }
+        ],
+        "comparison": {
+          "checks": [
+            {
+              "field": "ip",
+              "result": "no-match",
+              "detail": null
+            },
+            {
+              "field": "mac",
+              "result": "no-match",
+              "detail": null
+            },
+            {
+              "field": "hostname",
+              "result": "no-match",
+              "detail": null
+            }
+          ],
+          "checked_at": "2026-10-11T12:00:00Z"
+        },
+        "proposed_action": null
+      }
+    },
+    "cases": [
+      {
+        "name": "the finding",
+        "valid": true
+      },
+      {
+        "name": "no store",
+        "valid": true,
+        "set": {
+          "state": "not-connected",
+          "item": null
+        }
+      },
+      {
+        "name": "failing",
+        "valid": true,
+        "set": {
+          "state": "unknown",
+          "item": null
+        }
+      },
+      {
+        "name": "not-connected with an item",
+        "valid": false,
+        "set": {
+          "state": "not-connected"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "ok without an item",
+        "valid": false,
+        "set": {
+          "item": null
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "extra key",
+        "valid": false,
+        "set": {
+          "x": 1
+        },
+        "jsonschema_rejects": true
+      }
+    ]
+  },
+  "unknown_device_summary": {
+    "base": {
+      "state": "ok",
+      "generated_at": "2026-10-11T12:00:00Z",
+      "counts": {
+        "open": 3,
+        "by_state": [
+          {
+            "state": "new",
+            "count": 2
+          },
+          {
+            "state": "resolved",
+            "count": 1
+          },
+          {
+            "state": "acknowledged",
+            "count": 1
+          }
+        ],
+        "by_severity": [
+          {
+            "severity": "high",
+            "count": 2
+          },
+          {
+            "severity": "unknown",
+            "count": 2
+          }
+        ]
+      }
+    },
+    "cases": [
+      {
+        "name": "counts",
+        "valid": true
+      },
+      {
+        "name": "no store",
+        "valid": true,
+        "set": {
+          "state": "not-connected",
+          "counts": null
+        }
+      },
+      {
+        "name": "unknown with counts",
+        "valid": false,
+        "set": {
+          "state": "unknown"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "ok without counts",
+        "valid": false,
+        "set": {
+          "counts": null
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "extra key",
+        "valid": false,
+        "set": {
+          "items": []
+        },
+        "jsonschema_rejects": true
+      }
+    ]
+  },
+  "unknown_device_timeline": {
+    "base": {
+      "state": "ok",
+      "generated_at": "2026-10-11T12:00:00Z",
+      "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+      "events": [
+        {
+          "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+          "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+          "seq": 1,
+          "occurred_at": "2026-10-11T12:00:00Z",
+          "actor_id": "system:unknown-device-scan",
+          "kind": "detected",
+          "state_from": null,
+          "state_to": null,
+          "reason": null,
+          "message": null,
+          "subject_id": null
+        }
+      ],
+      "after_seq": 0,
+      "next_after_seq": null
+    },
+    "cases": [
+      {
+        "name": "one event",
+        "valid": true
+      },
+      {
+        "name": "more to read",
+        "valid": true,
+        "set": {
+          "next_after_seq": 1
+        }
+      },
+      {
+        "name": "empty",
+        "valid": true,
+        "set": {
+          "events": []
+        }
+      },
+      {
+        "name": "no store",
+        "valid": true,
+        "set": {
+          "state": "not-connected",
+          "events": [],
+          "next_after_seq": null
+        }
+      },
+      {
+        "name": "not-connected with events",
+        "valid": false,
+        "set": {
+          "state": "not-connected"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "event of another finding",
+        "valid": false,
+        "set": {
+          "events": [
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abd",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            }
+          ]
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "events out of order",
+        "valid": false,
+        "set": {
+          "events": [
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 2,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            }
+          ]
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "events before the cursor",
+        "valid": false,
+        "set": {
+          "after_seq": 5
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "next cursor with no events",
+        "valid": false,
+        "set": {
+          "events": [],
+          "next_after_seq": 3
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "201 events",
+        "valid": false,
+        "set": {
+          "events": [
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            },
+            {
+              "id": "unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "finding_id": "unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "seq": 1,
+              "occurred_at": "2026-10-11T12:00:00Z",
+              "actor_id": "system:unknown-device-scan",
+              "kind": "detected",
+              "state_from": null,
+              "state_to": null,
+              "reason": null,
+              "message": null,
+              "subject_id": null
+            }
+          ]
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "extra key",
+        "valid": false,
+        "set": {
+          "x": 1
+        },
+        "jsonschema_rejects": true
+      }
+    ]
+  },
+  "unknown_device_assign_request": {
+    "base": {
+      "assignee_id": "oidc:analyst-1"
+    },
+    "cases": [
+      {
+        "name": "assign",
+        "valid": true
+      },
+      {
+        "name": "unassign",
+        "valid": true,
+        "set": {
+          "assignee_id": null
+        }
+      },
+      {
+        "name": "blank",
+        "valid": false,
+        "set": {
+          "assignee_id": ""
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "256 characters",
+        "valid": false,
+        "set": {
+          "assignee_id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "missing",
+        "valid": false,
+        "delete": [
+          "assignee_id"
+        ],
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "extra key",
+        "valid": false,
+        "set": {
+          "x": 1
+        },
+        "jsonschema_rejects": true
+      }
+    ]
+  },
+  "unknown_device_comment_request": {
+    "base": {
+      "message": "Plugged into the meeting room switch"
+    },
+    "cases": [
+      {
+        "name": "comment",
+        "valid": true
+      },
+      {
+        "name": "hostile text is data",
+        "valid": true,
+        "set": {
+          "message": "<script>alert(1)</script>"
+        }
+      },
+      {
+        "name": "blank",
+        "valid": false,
+        "set": {
+          "message": "   "
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "empty",
+        "valid": false,
+        "set": {
+          "message": ""
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "4001 characters",
+        "valid": false,
+        "set": {
+          "message": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "extra key",
+        "valid": false,
+        "set": {
+          "x": 1
+        },
+        "jsonschema_rejects": true
+      }
+    ]
+  },
+  "unknown_device_resolve_request": {
+    "base": {
+      "outcome": "resolved",
+      "reason": "Added to NetBox as asset 4521"
+    },
+    "cases": [
+      {
+        "name": "resolve",
+        "valid": true
+      },
+      {
+        "name": "false positive",
+        "valid": true,
+        "set": {
+          "outcome": "false-positive",
+          "reason": "Test lab device, owned by IT"
+        }
+      },
+      {
+        "name": "no reason",
+        "valid": false,
+        "delete": [
+          "reason"
+        ],
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "blank reason",
+        "valid": false,
+        "set": {
+          "reason": "  "
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "1001 characters",
+        "valid": false,
+        "set": {
+          "reason": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "outcome acknowledged",
+        "valid": false,
+        "set": {
+          "outcome": "acknowledged"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "extra key",
+        "valid": false,
+        "set": {
+          "x": 1
+        },
+        "jsonschema_rejects": true
+      }
+    ]
+  },
+  "unknown_device_scan": {
+    "base": {
+      "state": "ok",
+      "generated_at": "2026-10-11T12:00:00Z",
+      "sources": [
+        {
+          "source": "netbox",
+          "state": "ok",
+          "observed_at": "2026-10-11T12:00:00Z"
+        },
+        {
+          "source": "librenms",
+          "state": "ok",
+          "observed_at": "2026-10-11T12:00:00Z"
+        },
+        {
+          "source": "wazuh",
+          "state": "not-connected",
+          "observed_at": null
+        }
+      ],
+      "created": 2,
+      "refreshed": 1,
+      "suppressed": 0,
+      "unverified": 3,
+      "truncated": false
+    },
+    "cases": [
+      {
+        "name": "a scan",
+        "valid": true
+      },
+      {
+        "name": "netbox missing",
+        "valid": true,
+        "set": {
+          "state": "not-connected",
+          "sources": [
+            {
+              "source": "netbox",
+              "state": "not-connected",
+              "observed_at": null
+            }
+          ],
+          "created": 0,
+          "refreshed": 0,
+          "suppressed": 0,
+          "unverified": 0
+        }
+      },
+      {
+        "name": "unknown that changed something",
+        "valid": false,
+        "set": {
+          "state": "unknown",
+          "sources": [
+            {
+              "source": "netbox",
+              "state": "unknown",
+              "observed_at": null
+            }
+          ]
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "negative",
+        "valid": false,
+        "set": {
+          "created": -1
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "truncated is a boolean",
+        "valid": false,
+        "set": {
+          "truncated": "no"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "netbox missing from the sources",
+        "valid": false,
+        "set": {
+          "sources": [
+            {
+              "source": "librenms",
+              "state": "ok",
+              "observed_at": "2026-10-11T12:00:00Z"
+            },
+            {
+              "source": "wazuh",
+              "state": "not-connected",
+              "observed_at": null
+            }
+          ]
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "duplicate sources",
+        "valid": false,
+        "set": {
+          "sources": [
+            {
+              "source": "netbox",
+              "state": "ok",
+              "observed_at": "2026-10-11T12:00:00Z"
+            },
+            {
+              "source": "netbox",
+              "state": "ok",
+              "observed_at": "2026-10-11T12:00:00Z"
+            }
+          ]
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "ok with netbox not read",
+        "valid": false,
+        "set": {
+          "sources": [
+            {
+              "source": "netbox",
+              "state": "unknown",
+              "observed_at": null
+            },
+            {
+              "source": "librenms",
+              "state": "ok",
+              "observed_at": "2026-10-11T12:00:00Z"
+            },
+            {
+              "source": "wazuh",
+              "state": "not-connected",
+              "observed_at": null
+            }
+          ]
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "extra key",
+        "valid": false,
+        "set": {
+          "x": 1
+        },
+        "jsonschema_rejects": true
+      }
+    ]
+  }
+}

@@ -57,6 +57,21 @@ class Permission(StrEnum):
     USERS_READ = "users:read"
     USERS_READ_LIMITED = "users:read-limited"
     USERS_READ_SUMMARY = "users:read-summary"
+    # Asset inventory (NetBox intended state + discovered telemetry), IPAM and unknown-device
+    # findings (Step 8). Each is a strict-subset ladder: read (rows, per-asset detail) implies
+    # read-summary (counts only, Management's rung).
+    INVENTORY_READ = "inventory:read"
+    INVENTORY_READ_SUMMARY = "inventory:read-summary"
+    IPAM_READ = "ipam:read"
+    IPAM_READ_SUMMARY = "ipam:read-summary"
+    UNKNOWN_DEVICES_READ = "unknown-devices:read"
+    UNKNOWN_DEVICES_READ_SUMMARY = "unknown-devices:read-summary"
+    # Triage of an unknown-device finding; every one is a human judgement (HUMAN_ONLY_PERMISSIONS).
+    UNKNOWN_DEVICES_ACKNOWLEDGE = "unknown-devices:acknowledge"  # acknowledge, mark investigating
+    UNKNOWN_DEVICES_ASSIGN = "unknown-devices:assign"
+    UNKNOWN_DEVICES_COMMENT = "unknown-devices:comment"
+    UNKNOWN_DEVICES_RESOLVE = "unknown-devices:resolve"  # resolved or false-positive
+    UNKNOWN_DEVICES_SCAN = "unknown-devices:scan"  # compare discovered telemetry with NetBox now
     ACTIONS_PROPOSE = "actions:propose"
     ACTIONS_APPROVE = "actions:approve"
     ADMIN_CONFIG = "admin:config"
@@ -88,6 +103,13 @@ HUMAN_ONLY_PERMISSIONS: frozenset[Permission] = frozenset(
         # a person decides to look, and the read is audited under their name.
         Permission.USERS_READ,
         Permission.USERS_READ_LIMITED,
+        # A finding's lifecycle is a person's decision about a device on the network; an AI or
+        # service principal may detect and propose, never acknowledge, resolve or dismiss.
+        Permission.UNKNOWN_DEVICES_ACKNOWLEDGE,
+        Permission.UNKNOWN_DEVICES_ASSIGN,
+        Permission.UNKNOWN_DEVICES_COMMENT,
+        Permission.UNKNOWN_DEVICES_RESOLVE,
+        Permission.UNKNOWN_DEVICES_SCAN,
     }
 )
 
@@ -152,6 +174,22 @@ _USERS_SUMMARY = {Permission.USERS_READ_SUMMARY}
 _USERS_LIMITED = _USERS_SUMMARY | {Permission.USERS_READ_LIMITED}
 _USERS_FULL = _USERS_LIMITED | {Permission.USERS_READ}
 
+# Inventory / IPAM / unknown devices (Step 8). The RBAC-MATRIX "Devices" row (Full / Full / Read /
+# Operational / Summary / Read) gives inventory and IPAM rows to everyone but Management, which gets
+# counts. "Security" (Full / Read / Full / Limited / Summary / Read) gives findings to everyone but
+# Technician ("Limited" is undefined, so counts only, as for traffic) and Management (counts).
+_INVENTORY_SUMMARY = {Permission.INVENTORY_READ_SUMMARY, Permission.IPAM_READ_SUMMARY}
+_INVENTORY_ROWS = _INVENTORY_SUMMARY | {Permission.INVENTORY_READ, Permission.IPAM_READ}
+_FINDINGS_SUMMARY = {Permission.UNKNOWN_DEVICES_READ_SUMMARY}
+_FINDINGS_READ = _FINDINGS_SUMMARY | {Permission.UNKNOWN_DEVICES_READ}
+_FINDINGS_TRIAGE = {
+    Permission.UNKNOWN_DEVICES_ACKNOWLEDGE,
+    Permission.UNKNOWN_DEVICES_ASSIGN,
+    Permission.UNKNOWN_DEVICES_COMMENT,
+    Permission.UNKNOWN_DEVICES_RESOLVE,
+    Permission.UNKNOWN_DEVICES_SCAN,
+}
+
 ROLE_PERMISSIONS: Mapping[Role, frozenset[Permission]] = {
     Role.ADMINISTRATOR: frozenset(Permission),
     Role.NETWORK_ENGINEER: frozenset(
@@ -163,6 +201,9 @@ ROLE_PERMISSIONS: Mapping[Role, frozenset[Permission]] = {
         | _INTERNET_EXPORT
         | _INTERNET_DETAIL
         | _USERS_FULL
+        | _INVENTORY_ROWS
+        | _FINDINGS_READ
+        | _FINDINGS_TRIAGE
         | {Permission.ACTIONS_PROPOSE}
     ),
     Role.SECURITY_ANALYST: frozenset(
@@ -173,6 +214,9 @@ ROLE_PERMISSIONS: Mapping[Role, frozenset[Permission]] = {
         | _ALERTING_AUTHOR
         | _INTERNET_DETAIL
         | _USERS_FULL
+        | _INVENTORY_ROWS
+        | _FINDINGS_READ
+        | _FINDINGS_TRIAGE
         | {Permission.ACTIONS_PROPOSE}
     ),
     Role.TECHNICIAN: frozenset(
@@ -186,17 +230,25 @@ ROLE_PERMISSIONS: Mapping[Role, frozenset[Permission]] = {
             Permission.INTERNET_READ,
             Permission.ACTIONS_PROPOSE,
             *_USERS_LIMITED,
+            *_INVENTORY_ROWS,
+            *_FINDINGS_SUMMARY,
         }
     ),
     # Summary only: the full incident read is withheld (human decision 2026-10-10).
     Role.MANAGEMENT: frozenset(
-        (_ALL_READ - {Permission.INCIDENTS_READ}) | _USERS_SUMMARY | {Permission.AUDIT_READ}
+        (_ALL_READ - {Permission.INCIDENTS_READ})
+        | _USERS_SUMMARY
+        | _INVENTORY_SUMMARY
+        | _FINDINGS_SUMMARY
+        | {Permission.AUDIT_READ}
     ),
     Role.AUDITOR: frozenset(
         _ALL_READ
         | _TRAFFIC_DETAIL
         | _ALERTING_READ
         | _INTERNET_EXPORT
+        | _INVENTORY_ROWS
+        | _FINDINGS_READ
         | {Permission.AUDIT_READ}
     ),
 }

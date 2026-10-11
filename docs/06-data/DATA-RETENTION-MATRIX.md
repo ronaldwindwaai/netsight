@@ -41,3 +41,18 @@ incident reconstruction, per IDENTITY-CORRELATION.md "Preserve historical correl
 aggregate; (3) who may prune and how a prune is audited; (4) whether a privacy/legal review (PRD 92) must precede any persistence of per-person network history. Constraints any answer must
 respect: the table would be Netsight app state in PostgreSQL (DATABASE-OWNERSHIP), append-only with audited, migrator-owned deletion, least-privilege roles, a guarded `down`, and
 evidence references rather than copies of source records. Until decided, **no migration 0006 exists and nothing is stored**.
+
+## Decision needed: unknown-device findings and timeline (open, human; Step 8)
+
+| Data class | Retention |
+|---|---|
+| Unknown-device findings (`unknown_device_findings`) | **PENDING HUMAN DECISION** (no period is set) |
+| Unknown-device events (`unknown_device_events`, append-only timeline) | **PENDING HUMAN DECISION** (no period is set) |
+| Inventory and IPAM (Step 8) | not persisted: computed on read from NetBox and telemetry, cached in API memory for 30 s |
+
+Not decided and **not invented here**: (1) how long a finished (resolved or false-positive) finding and its timeline are kept; (2) whether the MAC address, IP address, hostname and any
+port or VLAN in an endpoint record, and the operator-typed comments and reasons, may be kept for the whole period or must be minimised or expired sooner; (3) who may run a prune and how it is audited;
+(4) whether a privacy and legal review (PRD 92) must precede keeping per-endpoint network history. Constraints any answer must respect: the events table is append-only and its triggers (`ENABLE ALWAYS`)
+stop every role including the owner, so removal is an audited migrator step that disables the trigger deliberately (as for notification attempts), or a partitioning change; a false-positive finding
+is what suppresses later sightings of that endpoint, so removing it makes the endpoint reappear as new; the `down` migration is destructive and needs `NETSIGHT_ALLOW_DESTRUCTIVE_DOWN=1`. **No prune is built**: until a
+period is approved the tables only grow, bounded by the number of distinct unknown endpoints (one open finding per endpoint) and the size of the timeline.

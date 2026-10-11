@@ -1,0 +1,785 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "InventoryListResponse",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "state",
+    "generated_at",
+    "page",
+    "page_size",
+    "total",
+    "sources",
+    "summary",
+    "items"
+  ],
+  "properties": {
+    "state": {
+      "enum": [
+        "not-connected",
+        "unknown",
+        "ok"
+      ]
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "page": {
+      "minimum": 1,
+      "maximum": 100000,
+      "type": "integer"
+    },
+    "page_size": {
+      "minimum": 1,
+      "maximum": 100,
+      "type": "integer"
+    },
+    "total": {
+      "minimum": 0,
+      "maximum": 1000000,
+      "type": "integer"
+    },
+    "sources": {
+      "type": "array",
+      "maxItems": 3,
+      "items": {
+        "$ref": "common.schema.json#/$defs/sourceStatus"
+      }
+    },
+    "summary": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/summary"
+        }
+      ]
+    },
+    "items": {
+      "type": "array",
+      "maxItems": 100,
+      "items": {
+        "$ref": "#/$defs/item"
+      }
+    }
+  },
+  "description": "GET /api/v1/inventory. NetBox is the authority for intended state: without it (not-connected, unknown) there are no rows and no counts, and the other sources are still listed.",
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "enum": [
+              "not-connected",
+              "unknown"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "items": {
+            "maxItems": 0
+          },
+          "total": {
+            "const": 0
+          },
+          "summary": {
+            "type": "null"
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "field": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "value",
+        "provenance",
+        "netbox",
+        "discovered"
+      ],
+      "properties": {
+        "value": {
+          "minLength": 1,
+          "maxLength": 255,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "provenance": {
+          "enum": [
+            "netbox",
+            "discovered",
+            "both",
+            "conflict",
+            "unknown"
+          ]
+        },
+        "netbox": {
+          "minLength": 1,
+          "maxLength": 255,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "discovered": {
+          "minLength": 1,
+          "maxLength": 255,
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "description": "One value and where it came from. netbox: only NetBox reported it. discovered: only telemetry did. both: they agree. conflict: they differ and value is NetBox's (intended state). unknown: nobody reported it. The value/netbox/discovered cross-rules are checked by pydantic and the TS parser as well.",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "provenance": {
+                "const": "netbox"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "string"
+              },
+              "netbox": {
+                "type": "string"
+              },
+              "discovered": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "provenance": {
+                "const": "discovered"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "string"
+              },
+              "netbox": {
+                "type": "null"
+              },
+              "discovered": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "provenance": {
+                "const": "both"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "string"
+              },
+              "netbox": {
+                "type": "string"
+              },
+              "discovered": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "provenance": {
+                "const": "conflict"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "string"
+              },
+              "netbox": {
+                "type": "string"
+              },
+              "discovered": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "provenance": {
+                "const": "unknown"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "null"
+              },
+              "netbox": {
+                "type": "null"
+              },
+              "discovered": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "reconcile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "detail"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "reconciled",
+            "missing-discovered",
+            "unknown-discovered",
+            "status-mismatch",
+            "ambiguous",
+            "not-checked"
+          ]
+        },
+        "detail": {
+          "minLength": 1,
+          "maxLength": 255,
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "description": "From the existing NetBox-vs-discovered reconciliation (reconcile.py). not-checked: a source needed for the comparison was not readable."
+    },
+    "alias": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "native_id"
+      ],
+      "properties": {
+        "source": {
+          "enum": [
+            "netbox",
+            "librenms",
+            "wazuh"
+          ]
+        },
+        "native_id": {
+          "minLength": 1,
+          "maxLength": 255,
+          "type": "string"
+        }
+      },
+      "description": "The asset's identifier in one source. Never used to join two assets by name alone."
+    },
+    "item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "asset_class",
+        "class_basis",
+        "source",
+        "known",
+        "name",
+        "site",
+        "ip_address",
+        "mac_address",
+        "role",
+        "device_type",
+        "intended_status",
+        "observed_status",
+        "reconcile",
+        "sources"
+      ],
+      "properties": {
+        "id": {
+          "minLength": 43,
+          "maxLength": 43,
+          "pattern": "^device-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+          "type": "string"
+        },
+        "asset_class": {
+          "enum": [
+            "network-device",
+            "server",
+            "access-point",
+            "endpoint",
+            "cctv",
+            "printer",
+            "iot",
+            "unknown-asset",
+            "unclassified"
+          ]
+        },
+        "class_basis": {
+          "enum": [
+            "role-map",
+            "type-map",
+            "unmapped",
+            "not-in-netbox"
+          ]
+        },
+        "source": {
+          "enum": [
+            "netbox",
+            "discovered",
+            "both"
+          ]
+        },
+        "known": {
+          "type": "boolean"
+        },
+        "name": {
+          "$ref": "#/$defs/field"
+        },
+        "site": {
+          "$ref": "#/$defs/field"
+        },
+        "ip_address": {
+          "$ref": "#/$defs/field"
+        },
+        "mac_address": {
+          "$ref": "#/$defs/field"
+        },
+        "role": {
+          "minLength": 1,
+          "maxLength": 128,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "device_type": {
+          "minLength": 1,
+          "maxLength": 128,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "intended_status": {
+          "minLength": 1,
+          "maxLength": 64,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "observed_status": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "enum": [
+                "healthy",
+                "warning",
+                "degraded",
+                "critical",
+                "offline",
+                "unknown",
+                "maintenance"
+              ]
+            }
+          ]
+        },
+        "reconcile": {
+          "$ref": "#/$defs/reconcile"
+        },
+        "sources": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 3,
+          "items": {
+            "$ref": "#/$defs/alias"
+          }
+        }
+      },
+      "description": "One asset. The class comes only from the operator's NetBox role/type map (unmapped is unclassified; an asset NetBox does not know is unknown-asset), never from telemetry.",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "source": {
+                "const": "discovered"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "known": {
+                "const": false
+              },
+              "asset_class": {
+                "const": "unknown-asset"
+              },
+              "class_basis": {
+                "const": "not-in-netbox"
+              },
+              "role": {
+                "type": "null"
+              },
+              "device_type": {
+                "type": "null"
+              },
+              "intended_status": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "source": {
+                "enum": [
+                  "netbox",
+                  "both"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "known": {
+                "const": true
+              },
+              "class_basis": {
+                "enum": [
+                  "role-map",
+                  "type-map",
+                  "unmapped"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "source": {
+                "const": "netbox"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "observed_status": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "class_basis": {
+                "const": "unmapped"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "asset_class": {
+                "const": "unclassified"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "class_basis": {
+                "enum": [
+                  "role-map",
+                  "type-map"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "asset_class": {
+                "enum": [
+                  "network-device",
+                  "server",
+                  "access-point",
+                  "endpoint",
+                  "cctv",
+                  "printer",
+                  "iot"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "class_basis": {
+                "const": "not-in-netbox"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "asset_class": {
+                "const": "unknown-asset"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "classCount": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "asset_class",
+        "count"
+      ],
+      "properties": {
+        "asset_class": {
+          "enum": [
+            "network-device",
+            "server",
+            "access-point",
+            "endpoint",
+            "cctv",
+            "printer",
+            "iot",
+            "unknown-asset",
+            "unclassified"
+          ]
+        },
+        "count": {
+          "minimum": 0,
+          "maximum": 1000000,
+          "type": "integer"
+        }
+      }
+    },
+    "sourceCount": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "count"
+      ],
+      "properties": {
+        "source": {
+          "enum": [
+            "netbox",
+            "discovered",
+            "both"
+          ]
+        },
+        "count": {
+          "minimum": 0,
+          "maximum": 1000000,
+          "type": "integer"
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "total",
+        "known",
+        "unknown",
+        "by_class",
+        "by_source"
+      ],
+      "properties": {
+        "total": {
+          "minimum": 0,
+          "maximum": 1000000,
+          "type": "integer"
+        },
+        "known": {
+          "minimum": 0,
+          "maximum": 1000000,
+          "type": "integer"
+        },
+        "unknown": {
+          "minimum": 0,
+          "maximum": 1000000,
+          "type": "integer"
+        },
+        "by_class": {
+          "type": "array",
+          "maxItems": 9,
+          "items": {
+            "$ref": "#/$defs/classCount"
+          }
+        },
+        "by_source": {
+          "type": "array",
+          "maxItems": 3,
+          "items": {
+            "$ref": "#/$defs/sourceCount"
+          }
+        }
+      },
+      "description": "Counts over the whole inventory (not the filtered page). total = known + unknown."
+    },
+    "detailResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "generated_at",
+        "sources",
+        "item"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "not-connected",
+            "unknown",
+            "ok"
+          ]
+        },
+        "generated_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "sources": {
+          "type": "array",
+          "maxItems": 3,
+          "items": {
+            "$ref": "common.schema.json#/$defs/sourceStatus"
+          }
+        },
+        "item": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/item"
+            }
+          ]
+        }
+      },
+      "description": "GET /api/v1/inventory/{id}. ok carries the item; any other state carries none.",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "not-connected",
+                  "unknown"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "item": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "summaryResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "generated_at",
+        "sources",
+        "summary"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "not-connected",
+            "unknown",
+            "ok"
+          ]
+        },
+        "generated_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "sources": {
+          "type": "array",
+          "maxItems": 3,
+          "items": {
+            "$ref": "common.schema.json#/$defs/sourceStatus"
+          }
+        },
+        "summary": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/summary"
+            }
+          ]
+        }
+      },
+      "description": "GET /api/v1/inventory/summary: counts only (Management's rung).",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "not-connected",
+                  "unknown"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "summary": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

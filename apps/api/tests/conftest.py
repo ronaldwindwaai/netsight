@@ -48,3 +48,16 @@ def _fresh_clickhouse_limit_capability() -> Iterator[None]:
 
     clickhouse_limits.reset_for_tests()
     yield
+
+
+@pytest.fixture(autouse=True)
+def _fresh_step8_caches() -> Iterator[None]:
+    """The inventory, IPAM and finding wiring caches are module state: each test starts cold."""
+    from netsight_api.inventory import wiring as inventory_wiring
+    from netsight_api.ipam import wiring as ipam_wiring
+    from netsight_api.unknown_devices import wiring as unknown_wiring
+
+    inventory_wiring.reset_for_tests()
+    ipam_wiring.reset_for_tests()
+    unknown_wiring.reset_for_tests()
+    yield

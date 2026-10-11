@@ -32,6 +32,9 @@ from netsight_api.main import app
         "/diagnostics",
         "/security",
         "/traffic",
+        "/inventory?known=false",
+        "/ipam",
+        "/unknown-devices/unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
     ],
 )
 def test_ui_paths_are_kept(target: str) -> None:

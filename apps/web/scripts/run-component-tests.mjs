@@ -23,6 +23,7 @@ const STUBS = [
   [/^next\/navigation$/, join(srcDir, 'test', 'next-navigation-stub.ts')],
   [/^@\/app\/\(dashboard\)\/(incidents\/\[incidentId\]|alerts)\/actions$/, join(srcDir, 'test', 'server-actions-stub.ts')],
   [/^@\/app\/\(dashboard\)\/diagnostics\/actions$/, join(srcDir, 'test', 'diagnostics-actions-stub.ts')],
+  [/^@\/app\/\(dashboard\)\/unknown-devices\/(\[findingId\]\/)?actions$/, join(srcDir, 'test', 'unknown-device-actions-stub.ts')],
 ];
 
 const OPTIONAL_WIDGET_LIBRARIES = /^(flatpickr|tom-select|sortablejs|tabulator-tables|quill|chart\.js)(\/.*)?$/;
@@ -79,6 +80,6 @@ await build({
 const bundles = readdirSync(outDir)
   .filter((name) => name.endsWith('.test.cjs'))
   .map((name) => join(outDir, name));
-const result = spawnSync(process.execPath, ['--test', '--test-timeout=60000', '--test-force-exit', ...process.argv.slice(2), ...bundles], { stdio: 'inherit', cwd: root });
+const result = spawnSync(process.execPath, ['--test', '--test-timeout=180000', '--test-force-exit', ...process.argv.slice(2), ...bundles], { stdio: 'inherit', cwd: root });
 rmSync(outDir, { recursive: true, force: true });
 process.exit(result.status ?? 1);

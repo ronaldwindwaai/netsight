@@ -235,3 +235,39 @@ human-only decision (`users:read`, above), so the traffic surface has three inde
   (5 by default) and whether Management should see a destination inside the organisation at all. (2) Auditor sees endpoint rows (matrix: "Read")
   but not people. (3) What Technician "Limited" removes (today: all of traffic). (4) Whether any non-Admin role may see people in flow rows
   before the privacy/legal policy of PRD 92 exists. (5) Site/department scoping of traffic (does not exist).
+
+## Inventory, IPAM and unknown-device permissions (Step 8, 2026-10-11)
+
+The original matrix has no Inventory, IPAM or Unknown-devices row; the nearest are "Devices" (Full / Full / Read / Operational / Summary / Read) and "Security". The mapping
+below is an interpretation of those rows, **to be confirmed by the human owner**. Each surface has a strict-subset ladder (`*:read` implies `*:read-summary`; `test_rbac_inventory.py`).
+Fail closed: unknown roles, no identity and unknown permission names are denied.
+
+| Permission | Admin | Network Engineer | Security Analyst | Technician | Management | Auditor |
+|---|---|---|---|---|---|---|
+| `inventory:read` (asset rows and per-asset detail) | Yes | Yes | Yes | Yes | **No** | Yes |
+| `inventory:read-summary` (counts only) | Yes | Yes | Yes | Yes | Yes | Yes |
+| `ipam:read` (prefixes, VLANs, addresses) | Yes | Yes | Yes | Yes | **No** | Yes |
+| `ipam:read-summary` (counts only) | Yes | Yes | Yes | Yes | Yes | Yes |
+| `unknown-devices:read` (finding rows, detail, timeline) | Yes | Yes | Yes | **No** | **No** | Yes |
+| `unknown-devices:read-summary` (counts only) | Yes | Yes | Yes | Yes | Yes | Yes |
+| `unknown-devices:acknowledge` (acknowledge, mark investigating) | Yes | Yes | Yes | **No** | **No** | **No** |
+| `unknown-devices:assign`, `:comment` | Yes | Yes | Yes | **No** | **No** | **No** |
+| `unknown-devices:resolve` (resolve or dismiss as false positive; step-up) | Yes | Yes | Yes | **No** | **No** | **No** |
+| `unknown-devices:scan` (run a detection scan now) | Yes | Yes | Yes | **No** | **No** | **No** |
+
+* **Management ("Summary") sees counts only** on all three surfaces: no asset, address, prefix or finding row, and `403` on the row routes (`/inventory`, `/inventory/{id}`,
+  `/ipam/prefixes`, `/ipam/vlans`, `/ipam/addresses`, `/unknown-devices`, `/unknown-devices/{id}`, `/unknown-devices/{id}/timeline`). `GET /ipam` returns the counts block for every role with at least the summary rung.
+* **Technician ("Operational") reads inventory and IPAM rows** (the same reading as Devices) **but only the finding counts**: a finding names an endpoint and the way it attaches to the network,
+  and Technician has no security scope. This is a conservative reading; granting `unknown-devices:read` to Technician is one line in `rbac.py` if the owner wants it.
+* **Auditor ("Read") reads rows on all three surfaces and holds no write**, including no comment (it does not change the record it audits).
+* **All five finding writes are in `HUMAN_ONLY_PERMISSIONS`**: no service or AI principal may acknowledge, assign, comment, resolve or scan, whatever role it carries. The reads are not human-only.
+* **Step-up on resolve.** Resolving or dismissing is the only action that closes the record and, for a false positive, suppresses later sightings of the endpoint, so it requires a recent
+  multi-factor sign-in (same mechanism as incident resolution). **This is a recorded, open decision**: the alternative is no step-up for dismissal of a low-severity finding.
+* **Quarantine is not a permission.** There is no quarantine or isolate grant: a proposed quarantine is a record on the finding. Execution belongs to the action engine (Step 14), which
+  has its own approval permissions.
+* **Order of guards.** Reads: authenticate, authorise (a refusal is audited), per-identity rate limit, strict query, `no-store`. Writes: authenticate, authorise (audited), CSRF and origin, step-up (resolve only), per-identity rate limit.
+  Limits per identity per minute: inventory list/detail/summary 60/120/60; IPAM 60; findings list/detail/timeline/summary 120/120/120/60; finding writes 60; scan 6.
+* **Audit.** Actions `inventory.list.read`, `.item.read`, `.summary.read`, the IPAM and unknown-device read actions, and one action per finding write: actor, outcome, counts and the *names* of the filters used;
+  never an address, MAC, hostname, comment or reason text.
+* **Decisions for the owner.** (1) The role mapping above, in particular Technician (finding counts only) and Auditor (rows, no comment). (2) Step-up on resolve and dismiss. (3) Whether Management should see
+  inventory and IPAM counts at all. (4) Site scoping does not exist, so a "scoped" role sees every site.

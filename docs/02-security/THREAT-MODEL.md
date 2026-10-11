@@ -522,6 +522,45 @@ New read-only surface: `GET /traffic/flows` (filters, aggregations, attribution)
   incident periods from baselines; operator labels; per-site scoping; the people-in-rows decision; an index strategy for address filters
   on very large tables; reading `SamplingRate` (an explicit, labelled scaled view); a Playwright run of the four pages.
 
+## Inventory, IPAM and unknown-device delta (Step 8, E03)
+
+New surface: `GET /inventory`, `/inventory/summary`, `/inventory/{id}`; `GET /ipam`, `/ipam/prefixes`, `/ipam/vlans`, `/ipam/addresses`; `GET /unknown-devices` (+ `/summary`,
+`/{id}`, `/{id}/timeline`) and the human-only `POST /unknown-devices/{id}/acknowledge|investigate|assign|comment|resolve` and `/unknown-devices/scan`; read-only NetBox adapter
+additions (assets, prefixes, VLANs, addresses, ranges, interfaces by MAC); migration 0006 (two tables); an optional scheduled scan; five pages. RBAC is in RBAC-MATRIX
+("Inventory, IPAM and unknown-device permissions (Step 8)"); the design is in INVENTORY-IPAM.md. Nothing is written to NetBox or any network system.
+
+- **Write path to an external system: none.** The NetBox adapter issues `GET` only (the adapter tests assert `GET` on the requests seen by a mock transport). A quarantine is a `proposed_action`
+  record with `executable: false` as a constant in every schema (JSON Schema, OpenAPI, pydantic, TS parser, vectors). No route, button, permission or code path isolates an endpoint;
+  Step 14 (the action engine, with its own approvals) owns execution. The UI says "Quarantine proposed, not executed".
+- **Untrusted source text.** Device names, roles, sites, descriptions, hostnames, DNS names, VLAN names and NetBox custom-field values reach the API from third-party systems and may
+  hold markup or instructions. They are length- and shape-bounded by the parsers, returned as JSON strings, never interpolated into SQL (all queries are parameterised), never used as
+  a key without validation, never given to an AI, and rendered as React text nodes (component tests put `<img onerror>` and "ignore previous instructions" into the untrusted fields and
+  assert nothing but text is produced). The Wazuh join uses a NetBox custom field the operator names, never a name match.
+- **NetBox lookup injection.** The one caller-influenced NetBox query (`interfaces_by_mac`) takes a MAC that is validated as lowercase colon-hex before the request is built, asks for at most
+  50 rows, and re-checks every returned row against the requested MAC on the client (an over-broad NetBox filter cannot attach someone else's device).
+- **False "unknown device" findings from a failed lookup.** A finding is raised only when every NetBox check was actually made and none matched. When NetBox cannot answer (not configured, error,
+  truncated, over the lookup budget) the endpoint is counted `unverified` and **no finding is made**; the scan response and UI say so. A finding states which hops are observed; a hop no connected
+  source can see is Unknown with a reason, never inferred from a name or a neighbouring value.
+- **Alert fatigue and denial of service through scanning.** At most 500 candidate endpoints and 100 MAC lookups per scan, a 25 s whole-read budget, a 30 s cache, scan limited to 6/min per
+  identity, one scheduled scan across workers (PostgreSQL advisory lock), scheduled scans off by default. One open finding per endpoint (partial unique index) so a noisy endpoint raises one finding
+  and a `seen_count`, not a flood.
+- **Tampering with the lifecycle or its history.** Transitions are a fixed table enforced in the API, the store and again in PostgreSQL (trigger and CHECK constraints: a finished finding is final,
+  a resolution carries a reason). The timeline is append-only for every role including the owner (`ENABLE ALWAYS` triggers from migration 0003). An advisory lock per subject and row locks serialise
+  concurrent writers; a lost race is a 409 with the current state, not a silent overwrite. The app role has no `DELETE` on either table. The `down` migration is destructive and guarded.
+- **Writes are human-only and guarded.** Authenticate, authorise (audited), CSRF and origin, step-up (resolve only), per-identity limit (60/min). A service or AI principal cannot acknowledge,
+  assign, comment, resolve or scan whatever role it holds. A comment and a reason are stored as typed and shown as text; the audit record carries counts and names only, never the text.
+- **Privacy (PRD 92).** A finding records a MAC, an IP, a hostname and, when a source reports them, the switch, port and VLAN: per-endpoint network history. Controls: Management sees counts only,
+  Technician sees finding counts only, rows are `no-store`, every read is audited without values, and **no retention period is invented** (DATA-RETENTION-MATRIX, pending human decision, no prune
+  built). A privacy and legal review is recommended before the scan is enabled for a site with personal devices.
+- **Operator documents (class map, severity policy).** Read with one `open` and `fstat`, 64 KiB maximum, duplicate keys refused, unknown keys refused, entries bounded, values from closed sets. An
+  invalid document fails closed (nothing classified; severity `unknown`; no quarantine recommended) and the response says `invalid`. Error messages are static and never echo document content.
+- **Information disclosure through error paths.** A source failure is a state (`unknown`), not an error string; no exception text, URL or token reaches the response or the UI. Inventory and IPAM
+  datasets fail independently, so one failing source degrades one section and does not leak the cause of another.
+- **Sign-in return paths.** The login redirect allow-list (API `UI_AREAS` and the web `UI_AREAS`, kept in step) gained `inventory`, `ipam` and `unknown-devices` so a step-up on resolve returns to
+  the finding. Open-redirect rules (no scheme, no `//`, no backslash, no controls) are unchanged and still tested.
+- **Still open.** No live NetBox, LibreNMS or Wazuh run (shapes pinned by mock transport only); no DHCP, switch-FDB/ARP or Wi-Fi adapters, so attachment, port and VLAN stay Unknown; retention and
+  prune; site scoping; whether dismissal needs step-up; a shared (non per-worker) cache and limiter; a Playwright run of the pages; tamper-evident audit; independent code and security review of this step.
+
 ## AI-specific threats
 - prompt injection in logs/hostnames/knowledge;
 - tool injection;

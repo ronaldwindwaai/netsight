@@ -1,0 +1,1797 @@
+{
+  "data_source_status": {
+    "base": {
+      "source": "netbox",
+      "state": "ok",
+      "observed_at": "2026-10-11T12:00:00Z"
+    },
+    "cases": [
+      {
+        "name": "ok netbox",
+        "valid": true
+      },
+      {
+        "name": "librenms not-connected",
+        "valid": true,
+        "set": {
+          "source": "librenms",
+          "state": "not-connected",
+          "observed_at": null
+        }
+      },
+      {
+        "name": "wazuh unknown",
+        "valid": true,
+        "set": {
+          "source": "wazuh",
+          "state": "unknown",
+          "observed_at": null
+        }
+      },
+      {
+        "name": "ok without a time",
+        "valid": false,
+        "set": {
+          "observed_at": null
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "not-connected with a time",
+        "valid": false,
+        "set": {
+          "state": "not-connected"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "unknown source name",
+        "valid": false,
+        "set": {
+          "source": "dhcp"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "unknown state",
+        "valid": false,
+        "set": {
+          "state": "degraded"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "extra key",
+        "valid": false,
+        "set": {
+          "detail": "x"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "missing state",
+        "valid": false,
+        "delete": [
+          "state"
+        ],
+        "jsonschema_rejects": true
+      }
+    ]
+  },
+  "inventory_field": {
+    "base": {
+      "value": "core-sw-1",
+      "provenance": "both",
+      "netbox": "core-sw-1",
+      "discovered": "core-sw-1"
+    },
+    "cases": [
+      {
+        "name": "both agree",
+        "valid": true
+      },
+      {
+        "name": "netbox only",
+        "valid": true,
+        "set": {
+          "provenance": "netbox",
+          "discovered": null
+        }
+      },
+      {
+        "name": "discovered only",
+        "valid": true,
+        "set": {
+          "provenance": "discovered",
+          "netbox": null
+        }
+      },
+      {
+        "name": "conflict keeps netbox value",
+        "valid": true,
+        "set": {
+          "provenance": "conflict",
+          "discovered": "core-sw-01"
+        }
+      },
+      {
+        "name": "unknown",
+        "valid": true,
+        "set": {
+          "provenance": "unknown",
+          "value": null,
+          "netbox": null,
+          "discovered": null
+        }
+      },
+      {
+        "name": "hostile text is data",
+        "valid": true,
+        "set": {
+          "value": "<img src=x onerror=alert(1)>",
+          "netbox": "<img src=x onerror=alert(1)>",
+          "discovered": "<img src=x onerror=alert(1)>"
+        }
+      },
+      {
+        "name": "both with a missing side",
+        "valid": false,
+        "set": {
+          "discovered": null
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "netbox with a discovered value",
+        "valid": false,
+        "set": {
+          "provenance": "netbox"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "discovered with a netbox value",
+        "valid": false,
+        "set": {
+          "provenance": "discovered"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "unknown carrying a value",
+        "valid": false,
+        "set": {
+          "provenance": "unknown"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "unknown provenance word",
+        "valid": false,
+        "set": {
+          "provenance": "inferred"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "empty value",
+        "valid": false,
+        "set": {
+          "value": ""
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "overlong value",
+        "valid": false,
+        "set": {
+          "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "netbox": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "discovered": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "both values disagree",
+        "valid": false,
+        "set": {
+          "discovered": "other"
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "conflict whose value is not netbox's",
+        "valid": false,
+        "set": {
+          "provenance": "conflict",
+          "value": "core-sw-01",
+          "discovered": "core-sw-01"
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "conflict that agrees",
+        "valid": false,
+        "set": {
+          "provenance": "conflict"
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "both whose value is not the shared value",
+        "valid": false,
+        "set": {
+          "value": "x"
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "extra key",
+        "valid": false,
+        "set": {
+          "extra": 1
+        },
+        "jsonschema_rejects": true
+      }
+    ]
+  },
+  "inventory_reconcile": {
+    "base": {
+      "status": "reconciled",
+      "detail": null
+    },
+    "cases": [
+      {
+        "name": "reconciled",
+        "valid": true
+      },
+      {
+        "name": "mismatch with detail",
+        "valid": true,
+        "set": {
+          "status": "status-mismatch",
+          "detail": "NetBox status=offline; discovered status=healthy"
+        }
+      },
+      {
+        "name": "not checked",
+        "valid": true,
+        "set": {
+          "status": "not-checked",
+          "detail": "LibreNMS was not readable"
+        }
+      },
+      {
+        "name": "unknown status word",
+        "valid": false,
+        "set": {
+          "status": "fine"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "blank detail",
+        "valid": false,
+        "set": {
+          "detail": ""
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "missing detail",
+        "valid": false,
+        "delete": [
+          "detail"
+        ],
+        "jsonschema_rejects": true
+      }
+    ]
+  },
+  "inventory_alias": {
+    "base": {
+      "source": "netbox",
+      "native_id": "42"
+    },
+    "cases": [
+      {
+        "name": "netbox",
+        "valid": true
+      },
+      {
+        "name": "wazuh agent",
+        "valid": true,
+        "set": {
+          "source": "wazuh",
+          "native_id": "001"
+        }
+      },
+      {
+        "name": "unknown source",
+        "valid": false,
+        "set": {
+          "source": "snmp"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "empty native id",
+        "valid": false,
+        "set": {
+          "native_id": ""
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "extra key",
+        "valid": false,
+        "set": {
+          "url": "x"
+        },
+        "jsonschema_rejects": true
+      }
+    ]
+  },
+  "inventory_item": {
+    "base": {
+      "id": "device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+      "asset_class": "network-device",
+      "class_basis": "role-map",
+      "source": "both",
+      "known": true,
+      "name": {
+        "value": "core-sw-1",
+        "provenance": "both",
+        "netbox": "core-sw-1",
+        "discovered": "core-sw-1"
+      },
+      "site": {
+        "value": "HQ",
+        "provenance": "netbox",
+        "netbox": "HQ",
+        "discovered": null
+      },
+      "ip_address": {
+        "value": "10.0.0.2",
+        "provenance": "both",
+        "netbox": "10.0.0.2",
+        "discovered": "10.0.0.2"
+      },
+      "mac_address": {
+        "value": "aa:bb:cc:00:11:22",
+        "provenance": "discovered",
+        "netbox": null,
+        "discovered": "aa:bb:cc:00:11:22"
+      },
+      "role": "Core switch",
+      "device_type": "C9300-48P",
+      "intended_status": "active",
+      "observed_status": "healthy",
+      "reconcile": {
+        "status": "reconciled",
+        "detail": null
+      },
+      "sources": [
+        {
+          "source": "netbox",
+          "native_id": "42"
+        },
+        {
+          "source": "librenms",
+          "native_id": "7"
+        }
+      ]
+    },
+    "cases": [
+      {
+        "name": "netbox and librenms agree",
+        "valid": true
+      },
+      {
+        "name": "netbox only",
+        "valid": true,
+        "set": {
+          "source": "netbox",
+          "observed_status": null,
+          "mac_address": {
+            "value": null,
+            "provenance": "unknown",
+            "netbox": null,
+            "discovered": null
+          },
+          "name": {
+            "value": "core-sw-1",
+            "provenance": "netbox",
+            "netbox": "core-sw-1",
+            "discovered": null
+          },
+          "ip_address": {
+            "value": "10.0.0.2",
+            "provenance": "netbox",
+            "netbox": "10.0.0.2",
+            "discovered": null
+          },
+          "reconcile": {
+            "status": "missing-discovered",
+            "detail": "Intended device not seen by LibreNMS discovery"
+          },
+          "sources": [
+            {
+              "source": "netbox",
+              "native_id": "42"
+            }
+          ]
+        }
+      },
+      {
+        "name": "discovered only is an unknown asset",
+        "valid": true,
+        "set": {
+          "source": "discovered",
+          "known": false,
+          "asset_class": "unknown-asset",
+          "class_basis": "not-in-netbox",
+          "role": null,
+          "device_type": null,
+          "intended_status": null,
+          "name": {
+            "value": "printer-x",
+            "provenance": "discovered",
+            "netbox": null,
+            "discovered": "printer-x"
+          },
+          "site": {
+            "value": null,
+            "provenance": "unknown",
+            "netbox": null,
+            "discovered": null
+          },
+          "ip_address": {
+            "value": "10.0.5.9",
+            "provenance": "discovered",
+            "netbox": null,
+            "discovered": "10.0.5.9"
+          },
+          "reconcile": {
+            "status": "unknown-discovered",
+            "detail": "Discovered device has no matching NetBox record"
+          },
+          "sources": [
+            {
+              "source": "librenms",
+              "native_id": "9"
+            }
+          ]
+        }
+      },
+      {
+        "name": "unmapped role is unclassified",
+        "valid": true,
+        "set": {
+          "class_basis": "unmapped",
+          "asset_class": "unclassified"
+        }
+      },
+      {
+        "name": "type-map access point",
+        "valid": true,
+        "set": {
+          "class_basis": "type-map",
+          "asset_class": "access-point"
+        }
+      },
+      {
+        "name": "hostile names are data",
+        "valid": true,
+        "set": {
+          "role": "<script>alert(1)</script>",
+          "device_type": "' OR 1=1 --"
+        }
+      },
+      {
+        "name": "discovered only that claims to be known",
+        "valid": false,
+        "set": {
+          "source": "discovered",
+          "known": true,
+          "asset_class": "unknown-asset",
+          "class_basis": "not-in-netbox",
+          "role": null,
+          "device_type": null,
+          "intended_status": null,
+          "name": {
+            "value": "printer-x",
+            "provenance": "discovered",
+            "netbox": null,
+            "discovered": "printer-x"
+          },
+          "site": {
+            "value": null,
+            "provenance": "unknown",
+            "netbox": null,
+            "discovered": null
+          },
+          "ip_address": {
+            "value": "10.0.5.9",
+            "provenance": "discovered",
+            "netbox": null,
+            "discovered": "10.0.5.9"
+          },
+          "reconcile": {
+            "status": "unknown-discovered",
+            "detail": "Discovered device has no matching NetBox record"
+          },
+          "sources": [
+            {
+              "source": "librenms",
+              "native_id": "9"
+            }
+          ]
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "discovered only with a class",
+        "valid": false,
+        "set": {
+          "source": "discovered",
+          "known": false,
+          "asset_class": "server",
+          "class_basis": "not-in-netbox",
+          "role": null,
+          "device_type": null,
+          "intended_status": null,
+          "name": {
+            "value": "printer-x",
+            "provenance": "discovered",
+            "netbox": null,
+            "discovered": "printer-x"
+          },
+          "site": {
+            "value": null,
+            "provenance": "unknown",
+            "netbox": null,
+            "discovered": null
+          },
+          "ip_address": {
+            "value": "10.0.5.9",
+            "provenance": "discovered",
+            "netbox": null,
+            "discovered": "10.0.5.9"
+          },
+          "reconcile": {
+            "status": "unknown-discovered",
+            "detail": "Discovered device has no matching NetBox record"
+          },
+          "sources": [
+            {
+              "source": "librenms",
+              "native_id": "9"
+            }
+          ]
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "discovered only with a role",
+        "valid": false,
+        "set": {
+          "source": "discovered",
+          "known": false,
+          "asset_class": "unknown-asset",
+          "class_basis": "not-in-netbox",
+          "role": "Core switch",
+          "device_type": null,
+          "intended_status": null,
+          "name": {
+            "value": "printer-x",
+            "provenance": "discovered",
+            "netbox": null,
+            "discovered": "printer-x"
+          },
+          "site": {
+            "value": null,
+            "provenance": "unknown",
+            "netbox": null,
+            "discovered": null
+          },
+          "ip_address": {
+            "value": "10.0.5.9",
+            "provenance": "discovered",
+            "netbox": null,
+            "discovered": "10.0.5.9"
+          },
+          "reconcile": {
+            "status": "unknown-discovered",
+            "detail": "Discovered device has no matching NetBox record"
+          },
+          "sources": [
+            {
+              "source": "librenms",
+              "native_id": "9"
+            }
+          ]
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "netbox asset not known",
+        "valid": false,
+        "set": {
+          "known": false
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "netbox asset classed unknown-asset",
+        "valid": false,
+        "set": {
+          "asset_class": "unknown-asset"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "unmapped but classified",
+        "valid": false,
+        "set": {
+          "class_basis": "unmapped",
+          "asset_class": "server"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "mapped but unclassified",
+        "valid": false,
+        "set": {
+          "asset_class": "unclassified"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "netbox only with an observed status",
+        "valid": false,
+        "set": {
+          "source": "netbox",
+          "observed_status": "healthy",
+          "mac_address": {
+            "value": null,
+            "provenance": "unknown",
+            "netbox": null,
+            "discovered": null
+          },
+          "name": {
+            "value": "core-sw-1",
+            "provenance": "netbox",
+            "netbox": "core-sw-1",
+            "discovered": null
+          },
+          "ip_address": {
+            "value": "10.0.0.2",
+            "provenance": "netbox",
+            "netbox": "10.0.0.2",
+            "discovered": null
+          },
+          "reconcile": {
+            "status": "missing-discovered",
+            "detail": "Intended device not seen by LibreNMS discovery"
+          },
+          "sources": [
+            {
+              "source": "netbox",
+              "native_id": "42"
+            }
+          ]
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "netbox basis not-in-netbox",
+        "valid": false,
+        "set": {
+          "class_basis": "not-in-netbox"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "unknown class word",
+        "valid": false,
+        "set": {
+          "asset_class": "toaster"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "no sources",
+        "valid": false,
+        "set": {
+          "sources": []
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "too many sources",
+        "valid": false,
+        "set": {
+          "sources": [
+            {
+              "source": "netbox",
+              "native_id": "1"
+            },
+            {
+              "source": "librenms",
+              "native_id": "2"
+            },
+            {
+              "source": "wazuh",
+              "native_id": "3"
+            },
+            {
+              "source": "wazuh",
+              "native_id": "4"
+            }
+          ]
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "bad id",
+        "valid": false,
+        "set": {
+          "id": "device-1"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "name missing",
+        "valid": false,
+        "delete": [
+          "name"
+        ],
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "name provenance unknown",
+        "valid": false,
+        "set": {
+          "name": {
+            "value": null,
+            "provenance": "unknown",
+            "netbox": null,
+            "discovered": null
+          }
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "known asset without a netbox alias",
+        "valid": false,
+        "set": {
+          "sources": [
+            {
+              "source": "librenms",
+              "native_id": "7"
+            }
+          ]
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "both without a discovered alias",
+        "valid": false,
+        "set": {
+          "sources": [
+            {
+              "source": "netbox",
+              "native_id": "42"
+            }
+          ]
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "discovered asset with a netbox alias",
+        "valid": false,
+        "set": {
+          "source": "discovered",
+          "known": false,
+          "asset_class": "unknown-asset",
+          "class_basis": "not-in-netbox",
+          "role": null,
+          "device_type": null,
+          "intended_status": null,
+          "name": {
+            "value": "printer-x",
+            "provenance": "discovered",
+            "netbox": null,
+            "discovered": "printer-x"
+          },
+          "site": {
+            "value": null,
+            "provenance": "unknown",
+            "netbox": null,
+            "discovered": null
+          },
+          "ip_address": {
+            "value": "10.0.5.9",
+            "provenance": "discovered",
+            "netbox": null,
+            "discovered": "10.0.5.9"
+          },
+          "reconcile": {
+            "status": "unknown-discovered",
+            "detail": "Discovered device has no matching NetBox record"
+          },
+          "sources": [
+            {
+              "source": "netbox",
+              "native_id": "9"
+            }
+          ]
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "duplicate source aliases",
+        "valid": false,
+        "set": {
+          "sources": [
+            {
+              "source": "netbox",
+              "native_id": "42"
+            },
+            {
+              "source": "netbox",
+              "native_id": "43"
+            },
+            {
+              "source": "librenms",
+              "native_id": "7"
+            }
+          ]
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "netbox name reported only by discovery on a known asset",
+        "valid": false,
+        "set": {
+          "name": {
+            "value": "x",
+            "provenance": "discovered",
+            "netbox": null,
+            "discovered": "x"
+          }
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "extra key",
+        "valid": false,
+        "set": {
+          "owner": "x"
+        },
+        "jsonschema_rejects": true
+      }
+    ]
+  },
+  "inventory_summary": {
+    "base": {
+      "total": 3,
+      "known": 2,
+      "unknown": 1,
+      "by_class": [
+        {
+          "asset_class": "network-device",
+          "count": 2
+        },
+        {
+          "asset_class": "unknown-asset",
+          "count": 1
+        }
+      ],
+      "by_source": [
+        {
+          "source": "both",
+          "count": 2
+        },
+        {
+          "source": "discovered",
+          "count": 1
+        }
+      ]
+    },
+    "cases": [
+      {
+        "name": "counts",
+        "valid": true
+      },
+      {
+        "name": "empty",
+        "valid": true,
+        "set": {
+          "total": 0,
+          "known": 0,
+          "unknown": 0,
+          "by_class": [],
+          "by_source": []
+        }
+      },
+      {
+        "name": "negative",
+        "valid": false,
+        "set": {
+          "total": -1
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "total is not known plus unknown",
+        "valid": false,
+        "set": {
+          "total": 4
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "class counts do not add up to the total",
+        "valid": false,
+        "set": {
+          "by_class": [
+            {
+              "asset_class": "server",
+              "count": 1
+            }
+          ]
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "source counts do not add up to the total",
+        "valid": false,
+        "set": {
+          "by_source": [
+            {
+              "source": "both",
+              "count": 1
+            }
+          ]
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "duplicate class rows",
+        "valid": false,
+        "set": {
+          "by_class": [
+            {
+              "asset_class": "network-device",
+              "count": 2
+            },
+            {
+              "asset_class": "network-device",
+              "count": 1
+            }
+          ]
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "known counts disagree with sources",
+        "valid": false,
+        "set": {
+          "known": 3,
+          "unknown": 0
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "unknown class",
+        "valid": false,
+        "set": {
+          "by_class": [
+            {
+              "asset_class": "toaster",
+              "count": 3
+            }
+          ]
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "missing by_source",
+        "valid": false,
+        "delete": [
+          "by_source"
+        ],
+        "jsonschema_rejects": true
+      }
+    ]
+  },
+  "inventory_list": {
+    "base": {
+      "state": "ok",
+      "generated_at": "2026-10-11T12:00:00Z",
+      "page": 1,
+      "page_size": 25,
+      "total": 1,
+      "sources": [
+        {
+          "source": "netbox",
+          "state": "ok",
+          "observed_at": "2026-10-11T12:00:00Z"
+        },
+        {
+          "source": "librenms",
+          "state": "ok",
+          "observed_at": "2026-10-11T12:00:00Z"
+        },
+        {
+          "source": "wazuh",
+          "state": "not-connected",
+          "observed_at": null
+        }
+      ],
+      "summary": {
+        "total": 1,
+        "known": 1,
+        "unknown": 0,
+        "by_class": [
+          {
+            "asset_class": "network-device",
+            "count": 1
+          }
+        ],
+        "by_source": [
+          {
+            "source": "both",
+            "count": 1
+          }
+        ]
+      },
+      "items": [
+        {
+          "id": "device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+          "asset_class": "network-device",
+          "class_basis": "role-map",
+          "source": "both",
+          "known": true,
+          "name": {
+            "value": "core-sw-1",
+            "provenance": "both",
+            "netbox": "core-sw-1",
+            "discovered": "core-sw-1"
+          },
+          "site": {
+            "value": "HQ",
+            "provenance": "netbox",
+            "netbox": "HQ",
+            "discovered": null
+          },
+          "ip_address": {
+            "value": "10.0.0.2",
+            "provenance": "both",
+            "netbox": "10.0.0.2",
+            "discovered": "10.0.0.2"
+          },
+          "mac_address": {
+            "value": "aa:bb:cc:00:11:22",
+            "provenance": "discovered",
+            "netbox": null,
+            "discovered": "aa:bb:cc:00:11:22"
+          },
+          "role": "Core switch",
+          "device_type": "C9300-48P",
+          "intended_status": "active",
+          "observed_status": "healthy",
+          "reconcile": {
+            "status": "reconciled",
+            "detail": null
+          },
+          "sources": [
+            {
+              "source": "netbox",
+              "native_id": "42"
+            },
+            {
+              "source": "librenms",
+              "native_id": "7"
+            }
+          ]
+        }
+      ]
+    },
+    "cases": [
+      {
+        "name": "one page",
+        "valid": true
+      },
+      {
+        "name": "empty after filtering",
+        "valid": true,
+        "set": {
+          "total": 0,
+          "items": []
+        }
+      },
+      {
+        "name": "netbox not connected",
+        "valid": true,
+        "set": {
+          "state": "not-connected",
+          "total": 0,
+          "summary": null,
+          "items": [],
+          "sources": [
+            {
+              "source": "netbox",
+              "state": "not-connected",
+              "observed_at": null
+            }
+          ]
+        }
+      },
+      {
+        "name": "netbox unknown",
+        "valid": true,
+        "set": {
+          "state": "unknown",
+          "total": 0,
+          "summary": null,
+          "items": [],
+          "sources": [
+            {
+              "source": "netbox",
+              "state": "not-connected",
+              "observed_at": null
+            }
+          ]
+        }
+      },
+      {
+        "name": "page two of many",
+        "valid": true,
+        "set": {
+          "page": 2,
+          "total": 26
+        }
+      },
+      {
+        "name": "not-connected with rows",
+        "valid": false,
+        "set": {
+          "state": "not-connected",
+          "total": 0,
+          "summary": null,
+          "items": [
+            {
+              "id": "device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "asset_class": "network-device",
+              "class_basis": "role-map",
+              "source": "both",
+              "known": true,
+              "name": {
+                "value": "core-sw-1",
+                "provenance": "both",
+                "netbox": "core-sw-1",
+                "discovered": "core-sw-1"
+              },
+              "site": {
+                "value": "HQ",
+                "provenance": "netbox",
+                "netbox": "HQ",
+                "discovered": null
+              },
+              "ip_address": {
+                "value": "10.0.0.2",
+                "provenance": "both",
+                "netbox": "10.0.0.2",
+                "discovered": "10.0.0.2"
+              },
+              "mac_address": {
+                "value": "aa:bb:cc:00:11:22",
+                "provenance": "discovered",
+                "netbox": null,
+                "discovered": "aa:bb:cc:00:11:22"
+              },
+              "role": "Core switch",
+              "device_type": "C9300-48P",
+              "intended_status": "active",
+              "observed_status": "healthy",
+              "reconcile": {
+                "status": "reconciled",
+                "detail": null
+              },
+              "sources": [
+                {
+                  "source": "netbox",
+                  "native_id": "42"
+                },
+                {
+                  "source": "librenms",
+                  "native_id": "7"
+                }
+              ]
+            }
+          ],
+          "sources": [
+            {
+              "source": "netbox",
+              "state": "not-connected",
+              "observed_at": null
+            }
+          ]
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "not-connected with a total",
+        "valid": false,
+        "set": {
+          "state": "not-connected",
+          "total": 1,
+          "summary": null,
+          "items": [],
+          "sources": [
+            {
+              "source": "netbox",
+              "state": "not-connected",
+              "observed_at": null
+            }
+          ]
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "not-connected with counts",
+        "valid": false,
+        "set": {
+          "state": "not-connected",
+          "total": 0,
+          "summary": {
+            "total": 1,
+            "known": 1,
+            "unknown": 0,
+            "by_class": [
+              {
+                "asset_class": "network-device",
+                "count": 1
+              }
+            ],
+            "by_source": [
+              {
+                "source": "both",
+                "count": 1
+              }
+            ]
+          },
+          "items": [],
+          "sources": [
+            {
+              "source": "netbox",
+              "state": "not-connected",
+              "observed_at": null
+            }
+          ]
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "page size over 100",
+        "valid": false,
+        "set": {
+          "page_size": 101
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "page zero",
+        "valid": false,
+        "set": {
+          "page": 0
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "more rows than the page size",
+        "valid": false,
+        "set": {
+          "page_size": 1,
+          "total": 2,
+          "items": [
+            {
+              "id": "device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "asset_class": "network-device",
+              "class_basis": "role-map",
+              "source": "both",
+              "known": true,
+              "name": {
+                "value": "core-sw-1",
+                "provenance": "both",
+                "netbox": "core-sw-1",
+                "discovered": "core-sw-1"
+              },
+              "site": {
+                "value": "HQ",
+                "provenance": "netbox",
+                "netbox": "HQ",
+                "discovered": null
+              },
+              "ip_address": {
+                "value": "10.0.0.2",
+                "provenance": "both",
+                "netbox": "10.0.0.2",
+                "discovered": "10.0.0.2"
+              },
+              "mac_address": {
+                "value": "aa:bb:cc:00:11:22",
+                "provenance": "discovered",
+                "netbox": null,
+                "discovered": "aa:bb:cc:00:11:22"
+              },
+              "role": "Core switch",
+              "device_type": "C9300-48P",
+              "intended_status": "active",
+              "observed_status": "healthy",
+              "reconcile": {
+                "status": "reconciled",
+                "detail": null
+              },
+              "sources": [
+                {
+                  "source": "netbox",
+                  "native_id": "42"
+                },
+                {
+                  "source": "librenms",
+                  "native_id": "7"
+                }
+              ]
+            },
+            {
+              "id": "device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abd",
+              "asset_class": "network-device",
+              "class_basis": "role-map",
+              "source": "both",
+              "known": true,
+              "name": {
+                "value": "core-sw-1",
+                "provenance": "both",
+                "netbox": "core-sw-1",
+                "discovered": "core-sw-1"
+              },
+              "site": {
+                "value": "HQ",
+                "provenance": "netbox",
+                "netbox": "HQ",
+                "discovered": null
+              },
+              "ip_address": {
+                "value": "10.0.0.2",
+                "provenance": "both",
+                "netbox": "10.0.0.2",
+                "discovered": "10.0.0.2"
+              },
+              "mac_address": {
+                "value": "aa:bb:cc:00:11:22",
+                "provenance": "discovered",
+                "netbox": null,
+                "discovered": "aa:bb:cc:00:11:22"
+              },
+              "role": "Core switch",
+              "device_type": "C9300-48P",
+              "intended_status": "active",
+              "observed_status": "healthy",
+              "reconcile": {
+                "status": "reconciled",
+                "detail": null
+              },
+              "sources": [
+                {
+                  "source": "netbox",
+                  "native_id": "42"
+                },
+                {
+                  "source": "librenms",
+                  "native_id": "7"
+                }
+              ]
+            }
+          ]
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "total smaller than the rows",
+        "valid": false,
+        "set": {
+          "total": 0
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "ok without counts",
+        "valid": false,
+        "set": {
+          "summary": null
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "duplicate source rows",
+        "valid": false,
+        "set": {
+          "sources": [
+            {
+              "source": "netbox",
+              "state": "ok",
+              "observed_at": "2026-10-11T12:00:00Z"
+            },
+            {
+              "source": "netbox",
+              "state": "ok",
+              "observed_at": "2026-10-11T12:00:00Z"
+            }
+          ]
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "netbox missing from the source list",
+        "valid": false,
+        "set": {
+          "sources": [
+            {
+              "source": "librenms",
+              "state": "ok",
+              "observed_at": "2026-10-11T12:00:00Z"
+            },
+            {
+              "source": "wazuh",
+              "state": "not-connected",
+              "observed_at": null
+            }
+          ]
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "duplicate asset ids",
+        "valid": false,
+        "set": {
+          "total": 2,
+          "items": [
+            {
+              "id": "device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "asset_class": "network-device",
+              "class_basis": "role-map",
+              "source": "both",
+              "known": true,
+              "name": {
+                "value": "core-sw-1",
+                "provenance": "both",
+                "netbox": "core-sw-1",
+                "discovered": "core-sw-1"
+              },
+              "site": {
+                "value": "HQ",
+                "provenance": "netbox",
+                "netbox": "HQ",
+                "discovered": null
+              },
+              "ip_address": {
+                "value": "10.0.0.2",
+                "provenance": "both",
+                "netbox": "10.0.0.2",
+                "discovered": "10.0.0.2"
+              },
+              "mac_address": {
+                "value": "aa:bb:cc:00:11:22",
+                "provenance": "discovered",
+                "netbox": null,
+                "discovered": "aa:bb:cc:00:11:22"
+              },
+              "role": "Core switch",
+              "device_type": "C9300-48P",
+              "intended_status": "active",
+              "observed_status": "healthy",
+              "reconcile": {
+                "status": "reconciled",
+                "detail": null
+              },
+              "sources": [
+                {
+                  "source": "netbox",
+                  "native_id": "42"
+                },
+                {
+                  "source": "librenms",
+                  "native_id": "7"
+                }
+              ]
+            },
+            {
+              "id": "device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+              "asset_class": "network-device",
+              "class_basis": "role-map",
+              "source": "both",
+              "known": true,
+              "name": {
+                "value": "core-sw-1",
+                "provenance": "both",
+                "netbox": "core-sw-1",
+                "discovered": "core-sw-1"
+              },
+              "site": {
+                "value": "HQ",
+                "provenance": "netbox",
+                "netbox": "HQ",
+                "discovered": null
+              },
+              "ip_address": {
+                "value": "10.0.0.2",
+                "provenance": "both",
+                "netbox": "10.0.0.2",
+                "discovered": "10.0.0.2"
+              },
+              "mac_address": {
+                "value": "aa:bb:cc:00:11:22",
+                "provenance": "discovered",
+                "netbox": null,
+                "discovered": "aa:bb:cc:00:11:22"
+              },
+              "role": "Core switch",
+              "device_type": "C9300-48P",
+              "intended_status": "active",
+              "observed_status": "healthy",
+              "reconcile": {
+                "status": "reconciled",
+                "detail": null
+              },
+              "sources": [
+                {
+                  "source": "netbox",
+                  "native_id": "42"
+                },
+                {
+                  "source": "librenms",
+                  "native_id": "7"
+                }
+              ]
+            }
+          ]
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "unknown state",
+        "valid": false,
+        "set": {
+          "state": "partial"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "extra key",
+        "valid": false,
+        "set": {
+          "next": "x"
+        },
+        "jsonschema_rejects": true
+      }
+    ]
+  },
+  "inventory_detail": {
+    "base": {
+      "state": "ok",
+      "generated_at": "2026-10-11T12:00:00Z",
+      "sources": [
+        {
+          "source": "netbox",
+          "state": "ok",
+          "observed_at": "2026-10-11T12:00:00Z"
+        },
+        {
+          "source": "librenms",
+          "state": "ok",
+          "observed_at": "2026-10-11T12:00:00Z"
+        },
+        {
+          "source": "wazuh",
+          "state": "not-connected",
+          "observed_at": null
+        }
+      ],
+      "item": {
+        "id": "device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc",
+        "asset_class": "network-device",
+        "class_basis": "role-map",
+        "source": "both",
+        "known": true,
+        "name": {
+          "value": "core-sw-1",
+          "provenance": "both",
+          "netbox": "core-sw-1",
+          "discovered": "core-sw-1"
+        },
+        "site": {
+          "value": "HQ",
+          "provenance": "netbox",
+          "netbox": "HQ",
+          "discovered": null
+        },
+        "ip_address": {
+          "value": "10.0.0.2",
+          "provenance": "both",
+          "netbox": "10.0.0.2",
+          "discovered": "10.0.0.2"
+        },
+        "mac_address": {
+          "value": "aa:bb:cc:00:11:22",
+          "provenance": "discovered",
+          "netbox": null,
+          "discovered": "aa:bb:cc:00:11:22"
+        },
+        "role": "Core switch",
+        "device_type": "C9300-48P",
+        "intended_status": "active",
+        "observed_status": "healthy",
+        "reconcile": {
+          "status": "reconciled",
+          "detail": null
+        },
+        "sources": [
+          {
+            "source": "netbox",
+            "native_id": "42"
+          },
+          {
+            "source": "librenms",
+            "native_id": "7"
+          }
+        ]
+      }
+    },
+    "cases": [
+      {
+        "name": "the asset",
+        "valid": true
+      },
+      {
+        "name": "netbox unknown",
+        "valid": true,
+        "set": {
+          "state": "unknown",
+          "item": null
+        }
+      },
+      {
+        "name": "netbox not connected",
+        "valid": true,
+        "set": {
+          "state": "not-connected",
+          "item": null
+        }
+      },
+      {
+        "name": "not-connected with an item",
+        "valid": false,
+        "set": {
+          "state": "not-connected"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "ok without an item",
+        "valid": false,
+        "set": {
+          "item": null
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "duplicate sources",
+        "valid": false,
+        "set": {
+          "sources": [
+            {
+              "source": "netbox",
+              "state": "ok",
+              "observed_at": "2026-10-11T12:00:00Z"
+            },
+            {
+              "source": "netbox",
+              "state": "ok",
+              "observed_at": "2026-10-11T12:00:00Z"
+            }
+          ]
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "extra key",
+        "valid": false,
+        "set": {
+          "extra": 1
+        },
+        "jsonschema_rejects": true
+      }
+    ]
+  },
+  "inventory_summary_response": {
+    "base": {
+      "state": "ok",
+      "generated_at": "2026-10-11T12:00:00Z",
+      "sources": [
+        {
+          "source": "netbox",
+          "state": "ok",
+          "observed_at": "2026-10-11T12:00:00Z"
+        },
+        {
+          "source": "librenms",
+          "state": "ok",
+          "observed_at": "2026-10-11T12:00:00Z"
+        },
+        {
+          "source": "wazuh",
+          "state": "not-connected",
+          "observed_at": null
+        }
+      ],
+      "summary": {
+        "total": 1,
+        "known": 1,
+        "unknown": 0,
+        "by_class": [
+          {
+            "asset_class": "network-device",
+            "count": 1
+          }
+        ],
+        "by_source": [
+          {
+            "source": "both",
+            "count": 1
+          }
+        ]
+      }
+    },
+    "cases": [
+      {
+        "name": "counts",
+        "valid": true
+      },
+      {
+        "name": "unknown",
+        "valid": true,
+        "set": {
+          "state": "unknown",
+          "summary": null
+        }
+      },
+      {
+        "name": "unknown with counts",
+        "valid": false,
+        "set": {
+          "state": "unknown"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "ok without counts",
+        "valid": false,
+        "set": {
+          "summary": null
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "extra key",
+        "valid": false,
+        "set": {
+          "items": []
+        },
+        "jsonschema_rejects": true
+      }
+    ]
+  }
+}

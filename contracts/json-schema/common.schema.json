@@ -32,6 +32,76 @@
           ]
         }
       }
+    },
+    "sourceStatus": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "state",
+        "observed_at"
+      ],
+      "properties": {
+        "source": {
+          "enum": [
+            "netbox",
+            "librenms",
+            "wazuh"
+          ]
+        },
+        "state": {
+          "enum": [
+            "ok",
+            "not-connected",
+            "unknown"
+          ]
+        },
+        "observed_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        }
+      },
+      "description": "One read-only source behind a response: whether it was read, and when. Only an ok read carries a time (cross-field: ok has observed_at, the others do not).",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "ok"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "observed_at": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "not-connected",
+                  "unknown"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "observed_at": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
     }
   }
 }

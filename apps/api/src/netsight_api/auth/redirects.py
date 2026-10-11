@@ -16,7 +16,19 @@ MAX_REDIRECT_LENGTH: Final = 512
 
 # The first path segment of every dashboard area (keep in step with apps/web/src/app/(dashboard)).
 UI_AREAS: Final = frozenset(
-    {"overview", "network", "devices", "traffic", "security", "diagnostics", "incidents", "alerts"}
+    {
+        "overview",
+        "network",
+        "devices",
+        "traffic",
+        "security",
+        "diagnostics",
+        "incidents",
+        "alerts",
+        "inventory",
+        "ipam",
+        "unknown-devices",
+    }
 )
 
 # C0/C1 controls, then zero-width formatting characters, bidi overrides and bidi isolates.

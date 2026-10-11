@@ -5,7 +5,14 @@ import type { SessionInfo } from './api-contracts.ts';
 import {
   canChangeAnything,
   canExportInternet,
+  canReadFindings,
+  canReadFindingsSummary,
   canReadInternet,
+  canReadInventory,
+  canReadInventorySummary,
+  canReadIpam,
+  canReadIpamSummary,
+  canScanForUnknownDevices,
   canReadPeople,
   canReadTraffic,
   canReadTrafficDetail,
@@ -102,4 +109,60 @@ test('the traffic helpers follow the two rungs and fail closed without a viewer'
   assert.deepEqual([canReadTraffic(aggregate), canReadTrafficDetail(aggregate)], [true, false]);
   assert.deepEqual([canReadTraffic(neither), canReadTrafficDetail(neither)], [false, false]);
   assert.deepEqual([canReadTraffic(null), canReadTrafficDetail(null)], [false, false]);
+});
+
+test('inventory, IPAM and finding helpers follow the permissions the API reported', () => {
+  const none = viewerFromSession(session(['incidents:read']));
+  const summary = viewerFromSession(
+    session(['inventory:read-summary', 'ipam:read-summary', 'unknown-devices:read-summary']),
+  );
+  const rows = viewerFromSession(
+    session([
+      'inventory:read',
+      'inventory:read-summary',
+      'ipam:read',
+      'ipam:read-summary',
+      'unknown-devices:read',
+      'unknown-devices:read-summary',
+    ]),
+  );
+  for (const helper of [
+    canReadInventory,
+    canReadInventorySummary,
+    canReadIpam,
+    canReadIpamSummary,
+    canReadFindings,
+    canReadFindingsSummary,
+    canScanForUnknownDevices,
+  ]) {
+    assert.equal(helper(null), false);
+    assert.equal(helper(none), false);
+  }
+  assert.deepEqual(
+    [canReadInventorySummary, canReadIpamSummary, canReadFindingsSummary].map((h) => h(summary)),
+    [true, true, true],
+  );
+  assert.deepEqual(
+    [canReadInventory, canReadIpam, canReadFindings].map((h) => h(summary)),
+    [false, false, false],
+  );
+  assert.deepEqual(
+    [canReadInventory, canReadIpam, canReadFindings].map((h) => h(rows)),
+    [true, true, true],
+  );
+  assert.equal(canScanForUnknownDevices(rows), false);
+  assert.equal(canScanForUnknownDevices(viewerFromSession(session(['unknown-devices:scan']))), true);
+});
+
+test('finding writes count as a change anyone holding them can make', () => {
+  for (const permission of [
+    'unknown-devices:acknowledge',
+    'unknown-devices:assign',
+    'unknown-devices:comment',
+    'unknown-devices:resolve',
+    'unknown-devices:scan',
+  ]) {
+    assert.equal(canChangeAnything(viewerFromSession(session([permission]))), true, permission);
+  }
+  assert.equal(canChangeAnything(viewerFromSession(session(['unknown-devices:read']))), false);
 });

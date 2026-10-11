@@ -43,7 +43,10 @@ from netsight_api.storage import InMemoryIncidentRepository, StorageError
 from netsight_api.storage.diagnostics import InMemoryDiagnosticSessionRepository
 
 BASE = "/api/v1/diagnostics"
-NOW = datetime(2026, 10, 10, 8, 0, tzinfo=UTC)
+# The code under test builds its 24-hour "recent changes" window from the real clock, so a fixed
+# date here silently ages out of that window (these tests failed once the real date moved on).
+# Anchor to the real clock instead; every fixture time is an offset from NOW.
+NOW = datetime.now(UTC).replace(microsecond=0)
 
 
 def device_id(name: str) -> str:

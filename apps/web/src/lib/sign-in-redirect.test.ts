@@ -13,6 +13,15 @@ test('safeNextPath keeps same-origin absolute paths with a query', () => {
   assert.equal(safeNextPath('/alerts?rules_offset=50'), '/alerts?rules_offset=50');
 });
 
+test('safeNextPath returns to the inventory, IPAM and unknown-device areas after a sign-in', () => {
+  assert.equal(safeNextPath('/inventory?known=false'), '/inventory?known=false');
+  assert.equal(safeNextPath('/ipam'), '/ipam');
+  assert.equal(
+    safeNextPath('/unknown-devices/unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc'),
+    '/unknown-devices/unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc',
+  );
+});
+
 test('safeNextPath takes the first value of a repeated parameter', () => {
   assert.equal(safeNextPath(['/alerts', '/evil']), '/alerts');
 });

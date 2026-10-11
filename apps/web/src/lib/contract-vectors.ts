@@ -96,3 +96,9 @@ export function buildInstance(block: VectorBlock, vector: VectorCase): unknown {
   }
   return instance;
 }
+
+/** Any shared vector file by name (contracts/test-vectors/<name>), for the Step 8 contracts. */
+export function loadVectorFile(name: string): Record<string, VectorBlock> {
+  const url = new URL(`../../../../contracts/test-vectors/${name}`, import.meta.url);
+  return JSON.parse(readFileSync(url, 'utf-8')) as Record<string, VectorBlock>;
+}

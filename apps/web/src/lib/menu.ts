@@ -7,6 +7,10 @@ const USERS_PERMISSION = 'users:read-summary';
 // The aggregate rung of traffic: whoever can read any traffic surface sees the entry. Rows and
 // address, device and VLAN filters need traffic:read-detail on top (enforced by the API, hidden by the pages).
 const TRAFFIC_PERMISSION = 'traffic:read';
+// Whoever can see any inventory, IPAM or finding surface (even counts) sees the entry.
+const INVENTORY_PERMISSION = 'inventory:read-summary';
+const IPAM_PERMISSION = 'ipam:read-summary';
+const FINDINGS_PERMISSION = 'unknown-devices:read-summary';
 
 interface MenuEntry {
   node: MenuNode;
@@ -19,6 +23,18 @@ const MENU_ENTRIES: readonly MenuEntry[] = [
   { node: { type: 'item', text: 'Overview', href: '/overview', icon: 'bi-speedometer2' } },
   { node: { type: 'item', text: 'Network Map', href: '/network/map', icon: 'bi-diagram-3' } },
   { node: { type: 'item', text: 'Devices', href: '/devices', icon: 'bi-hdd-network' } },
+  {
+    node: { type: 'item', text: 'Inventory', href: '/inventory', icon: 'bi-boxes' },
+    requires: INVENTORY_PERMISSION,
+  },
+  {
+    node: { type: 'item', text: 'IPAM', href: '/ipam', icon: 'bi-diagram-2' },
+    requires: IPAM_PERMISSION,
+  },
+  {
+    node: { type: 'item', text: 'Unknown devices', href: '/unknown-devices', icon: 'bi-patch-question' },
+    requires: FINDINGS_PERMISSION,
+  },
   {
     node: { type: 'item', text: 'Users', href: '/users', icon: 'bi-people' },
     requires: USERS_PERMISSION,
