@@ -62,6 +62,11 @@ Incidents list/board, Reports, Settings/Administration, Users & Identity, Device
 detail (tab structure exists in SCREEN-SPECS.md), Configuration/Change history,
 Internet / WAN (`/internet`, Step 5: only the overview "Internet" KPI card is
 designed; the page follows SCREEN-SPECS.md "Internet card and `/internet`"),
+Traffic Flow Explorer / Applications / Destinations / Anomalies (`/traffic/flows`, `/traffic/applications`, `/traffic/destinations`,
+`/traffic/anomalies`, Step 7: design 5 covers only the `/traffic` overview ("Who is using bandwidth?"); the four pages follow SCREEN-SPECS.md
+"Traffic" and the global shell, and show no field the source does not provide: no department, no user avatar, no "At Risk" badge, no
+sparklines; the small-cohort status, the "Withheld (fewer than k)" count, the "Inside the organisation" badge and the daylight-saving note are
+words in existing text slots, no new component),
 Users & Identity (`/users`, `/users/[userId]`, Step 6: no design exists; built from SCREEN-SPECS.md "Users"
 and the key/value user card of the Incident Detail design, using only fields a source provides; the
 "At Risk" badge, department, manager and MFA fields of that card are not data and are not shown).

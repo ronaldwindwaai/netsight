@@ -17,8 +17,6 @@ from netsight_api.main import app, get_optional_traffic_source
 from netsight_api.rbac import Identity
 from netsight_api.schemas import (
     Freshness,
-    TrafficFlow,
-    TrafficFlowsResponse,
     TrafficItem,
     TrafficTimeRange,
     TrafficTopResponse,
@@ -76,25 +74,6 @@ def _item(**overrides: Any) -> dict[str, Any]:
     return item
 
 
-def _flow(**overrides: Any) -> dict[str, Any]:
-    flow: dict[str, Any] = {
-        "observed_at": "2026-10-06T07:59:00Z",
-        "source_ip": "10.1.2.3",
-        "source_device_id": DEVICE_A,
-        "destination_ip": "203.0.113.9",
-        "destination_host": "cdn.example.net",
-        "protocol": "tcp",
-        "destination_port": 443,
-        "bytes": 987_654_321,
-        "packets": 700_000,
-        "direction": "outbound",
-        "application": "https",
-        "user": "alice",
-    }
-    flow.update(overrides)
-    return flow
-
-
 def test_valid_top_contract() -> None:
     instance = {
         "state": "ok",
@@ -108,28 +87,6 @@ def test_valid_top_contract() -> None:
         "freshness": _freshness(),
     }
     validate("traffic_top", instance)
-
-
-def test_valid_flows_contract() -> None:
-    instance = {
-        "state": "ok",
-        "time_range": _time_range(),
-        "flows": [
-            _flow(),
-            _flow(
-                source_device_id=None,
-                destination_host=None,
-                protocol="udp",
-                destination_port=None,
-                packets=None,
-                direction="unknown",
-                application=None,
-                user=None,
-            ),
-        ],
-        "freshness": _freshness(),
-    }
-    validate("traffic_flows", instance)
 
 
 @pytest.mark.parametrize(
@@ -222,51 +179,6 @@ def test_invalid_top_contract(instance: dict[str, Any]) -> None:
         validate("traffic_top", instance)
 
 
-@pytest.mark.parametrize(
-    "instance",
-    [
-        # unknown must not carry flows
-        {
-            "state": "unknown",
-            "time_range": _time_range(),
-            "flows": [_flow()],
-            "freshness": {"state": "unknown", "observed_at": None, "source": "clickhouse"},
-        },
-        # port outside range
-        {
-            "state": "ok",
-            "time_range": _time_range(),
-            "flows": [_flow(destination_port=70000)],
-            "freshness": _freshness(),
-        },
-        # unknown direction vocabulary
-        {
-            "state": "ok",
-            "time_range": _time_range(),
-            "flows": [_flow(direction="sideways")],
-            "freshness": _freshness(),
-        },
-        # non-canonical source device id
-        {
-            "state": "ok",
-            "time_range": _time_range(),
-            "flows": [_flow(source_device_id="ip-10.1.2.3")],
-            "freshness": _freshness(),
-        },
-        # missing required key
-        {
-            "state": "ok",
-            "time_range": _time_range(),
-            "flows": [{k: v for k, v in _flow().items() if k != "user"}],
-            "freshness": _freshness(),
-        },
-    ],
-)
-def test_invalid_flows_contract(instance: dict[str, Any]) -> None:
-    with pytest.raises(ContractViolation):
-        validate("traffic_flows", instance)
-
-
 def test_top_model_rejects_non_ok_with_items() -> None:
     """The pydantic boundary enforces the same invariant as schema + parser."""
     with pytest.raises(ValidationError):
@@ -276,18 +188,6 @@ def test_top_model_rejects_non_ok_with_items() -> None:
             time_range=TrafficTimeRange.model_validate(_time_range()),
             items=[TrafficItem.model_validate(_item())],
             freshness=Freshness.model_validate(_freshness()),
-        )
-
-
-def test_flows_model_rejects_non_ok_with_rows() -> None:
-    with pytest.raises(ValidationError):
-        TrafficFlowsResponse(
-            state="not-connected",
-            time_range=TrafficTimeRange.model_validate(_time_range()),
-            flows=[TrafficFlow.model_validate(_flow())],
-            freshness=Freshness.model_validate(
-                {"state": "unknown", "observed_at": None, "source": None}
-            ),
         )
 
 
@@ -301,13 +201,11 @@ class _FakeTrafficSource:
         self,
         *,
         items: list[TrafficItem] | None = None,
-        flows: list[TrafficFlow] | None = None,
         error: Exception | None = None,
         observed_lag: timedelta = timedelta(0),
         no_observed: bool = False,
     ) -> None:
         self._items = items
-        self._flows = flows
         self._error = error
         self._observed_lag = observed_lag
         self._no_observed = no_observed
@@ -327,15 +225,6 @@ class _FakeTrafficSource:
         if self._error is not None:
             raise self._error
         return list(self._items or []), self._observed(end)
-
-    async def flows(
-        self, *, start: datetime, end: datetime, limit: int
-    ) -> tuple[list[TrafficFlow], datetime | None]:
-        self.calls.append({"method": "flows", "start": start, "end": end, "limit": limit})
-        if self._error is not None:
-            raise self._error
-        return list(self._flows or []), self._observed(end)
-
 
 def _override_source(source: _FakeTrafficSource) -> None:
     app.dependency_overrides[get_optional_traffic_source] = lambda: source
@@ -367,7 +256,7 @@ def test_traffic_forbidden_for_technician_role() -> None:
         "tech-1", frozenset({"technician"})
     )
 
-    response = TestClient(app).get("/api/v1/traffic/flows")
+    response = TestClient(app).get("/api/v1/traffic/top-talkers")
 
     assert response.status_code == 403
 
@@ -409,17 +298,6 @@ def test_top_destinations_dimension_is_echoed(monkeypatch: pytest.MonkeyPatch) -
     assert body["state"] == "not-connected"
     assert body["dimension"] == "destinations"
     validate("traffic_top", body)
-
-
-def test_flows_default_state_is_not_connected(monkeypatch: pytest.MonkeyPatch) -> None:
-    _dev_identity(monkeypatch)
-    response = TestClient(app).get("/api/v1/traffic/flows")
-
-    assert response.status_code == 200
-    body: dict[str, Any] = response.json()
-    assert body["state"] == "not-connected"
-    assert body["flows"] == []
-    validate("traffic_flows", body)
 
 
 def test_top_talkers_returns_source_reported_items(
@@ -484,42 +362,6 @@ def test_explicit_window_is_echoed_without_preset(
     validate("traffic_top", body)
 
 
-def test_flows_returns_source_reported_rows(monkeypatch: pytest.MonkeyPatch) -> None:
-    _dev_identity(monkeypatch)
-    source = _FakeTrafficSource(
-        flows=[
-            TrafficFlow(
-                observed_at=_OBSERVED_AT,
-                source_ip="10.1.2.3",
-                source_device_id=DEVICE_A,
-                destination_ip="203.0.113.9",
-                destination_host="cdn.example.net",
-                protocol="tcp",
-                destination_port=443,
-                bytes=987_654_321,
-                packets=700_000,
-                direction="outbound",
-                application="https",
-                user="alice",
-            )
-        ]
-    )
-    _override_source(source)
-
-    response = TestClient(app).get("/api/v1/traffic/flows?preset=1h")
-
-    assert response.status_code == 200
-    body: dict[str, Any] = response.json()
-    assert body["state"] == "ok"
-    assert len(body["flows"]) == 1
-    assert body["flows"][0]["source_device_id"] == DEVICE_A
-    validate("traffic_flows", body)
-
-    call = source.calls[0]
-    assert call["method"] == "flows"
-    assert call["end"] - call["start"] == timedelta(hours=1)
-
-
 def test_top_source_failure_degrades_to_unknown(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -539,21 +381,6 @@ def test_top_source_failure_degrades_to_unknown(
         "source": "clickhouse",
     }
     validate("traffic_top", body)
-
-
-def test_flows_source_failure_degrades_to_unknown(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    _dev_identity(monkeypatch)
-    _override_source(_FakeTrafficSource(error=RuntimeError("boom")))
-
-    response = TestClient(app).get("/api/v1/traffic/flows")
-
-    assert response.status_code == 200
-    body: dict[str, Any] = response.json()
-    assert body["state"] == "unknown"
-    assert body["flows"] == []
-    validate("traffic_flows", body)
 
 
 def test_contract_invalid_top_row_degrades_to_unknown_not_500(
@@ -586,35 +413,6 @@ def test_contract_invalid_top_row_degrades_to_unknown_not_500(
     validate("traffic_top", body)
 
 
-def test_contract_invalid_flow_row_degrades_to_unknown_not_500(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    _dev_identity(monkeypatch)
-    bad_flow: dict[str, Any] = {
-        "observed_at": "2026-10-06T07:59:00Z",
-        "source_ip": "10.1.2.3",
-        "source_device_id": None,
-        "destination_ip": "203.0.113.9",
-        "destination_host": None,
-        "protocol": "tcp",
-        "destination_port": 70000,  # outside the valid port range
-        "bytes": 100,
-        "packets": None,
-        "direction": "unknown",
-        "application": "https",
-        "user": None,
-    }
-    _override_source(_FakeTrafficSource(flows=[bad_flow]))  # type: ignore[list-item]
-
-    response = TestClient(app).get("/api/v1/traffic/flows")
-
-    assert response.status_code == 200
-    body: dict[str, Any] = response.json()
-    assert body["state"] == "unknown"
-    assert body["flows"] == []
-    validate("traffic_flows", body)
-
-
 # --- bounded window / query budget ------------------------------------------
 
 
@@ -636,15 +434,6 @@ def test_top_talkers_rejects_unbounded_or_invalid_requests(
 ) -> None:
     _dev_identity(monkeypatch)
     response = TestClient(app).get(f"/api/v1/traffic/top-talkers?{query}")
-    assert response.status_code == 422
-
-
-@pytest.mark.parametrize("query", ["limit=0", "limit=501", "preset=forever"])
-def test_flows_rejects_unbounded_or_invalid_requests(
-    monkeypatch: pytest.MonkeyPatch, query: str
-) -> None:
-    _dev_identity(monkeypatch)
-    response = TestClient(app).get(f"/api/v1/traffic/flows?{query}")
     assert response.status_code == 422
 
 

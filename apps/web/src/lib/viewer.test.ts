@@ -7,6 +7,8 @@ import {
   canExportInternet,
   canReadInternet,
   canReadPeople,
+  canReadTraffic,
+  canReadTrafficDetail,
   canReadUsersSummary,
   canResolveIdentity,
   canUseDiagnostics,
@@ -90,4 +92,14 @@ test('the users helpers follow the permission ladder and fail closed without a v
   assert.deepEqual([canReadPeople(limited), canResolveIdentity(limited), canReadUsersSummary(limited)], [false, true, true]);
   assert.deepEqual([canReadPeople(summary), canResolveIdentity(summary), canReadUsersSummary(summary)], [false, false, true]);
   assert.deepEqual([canReadPeople(null), canResolveIdentity(null), canReadUsersSummary(null)], [false, false, false]);
+});
+
+test('the traffic helpers follow the two rungs and fail closed without a viewer', () => {
+  const detail = viewerFromSession(session(['traffic:read', 'traffic:read-detail']));
+  const aggregate = viewerFromSession(session(['traffic:read']));
+  const neither = viewerFromSession(session(['incidents:read']));
+  assert.deepEqual([canReadTraffic(detail), canReadTrafficDetail(detail)], [true, true]);
+  assert.deepEqual([canReadTraffic(aggregate), canReadTrafficDetail(aggregate)], [true, false]);
+  assert.deepEqual([canReadTraffic(neither), canReadTrafficDetail(neither)], [false, false]);
+  assert.deepEqual([canReadTraffic(null), canReadTrafficDetail(null)], [false, false]);
 });

@@ -35,6 +35,7 @@ from netsight_api.identity.model import (
     PersonSummary,
     PersonView,
     Reason,
+    Resolution,
     hostname_ref,
     ip_ref,
     mac_ref,
@@ -69,6 +70,23 @@ class SecurityReader(Protocol):
     async def events(
         self, *, start: datetime, end: datetime, limit: int
     ) -> tuple[list[SecurityEvent], datetime | None]: ...
+
+
+MAX_RESOLUTIONS = 500
+
+
+@dataclass(frozen=True)
+class ManyResolutions:
+    """Answers for a batch of (address, time) questions against one snapshot.
+
+    ``as_of`` is the snapshot's end, ``None`` unless ``state`` is ``ok``. A question whose time
+    precedes the evidence window maps to ``None``: the sources were not asked about that time, so
+    "no evidence" would be a false statement.
+    """
+
+    state: SourceState
+    as_of: datetime | None
+    resolutions: dict[tuple[str, datetime], Resolution | None]
 
 
 @dataclass(frozen=True)
@@ -407,6 +425,39 @@ class IdentityService:
             endpoint=endpoint,
             notes=self._notes(snapshot, at),
         )
+
+    async def resolve_many(
+        self, now: datetime, questions: Sequence[tuple[str, datetime]]
+    ) -> ManyResolutions:
+        """Who is behind each address at each time, from one shared snapshot of "now".
+
+        Unparseable addresses are left out of the answer. Bounded to ``MAX_RESOLUTIONS`` distinct
+        questions; the work runs in a worker thread so a large batch never blocks the event loop.
+        """
+        distinct = list(dict.fromkeys(questions))
+        if len(distinct) > MAX_RESOLUTIONS:
+            raise ValueError("too many questions in one batch")
+        snapshot = await self._snapshot(now, None)
+        if snapshot.state != "ok":
+            return ManyResolutions(snapshot.state, None, {})
+
+        def work() -> dict[tuple[str, datetime], Resolution | None]:
+            answers: dict[tuple[str, datetime], Resolution | None] = {}
+            for text, moment in distinct:
+                try:
+                    subject = ip_ref(text)
+                except ValueError:
+                    continue
+                if moment < snapshot.start:
+                    answers[(text, moment)] = None
+                    continue
+                at = min(moment, snapshot.end)
+                answers[(text, moment)] = snapshot.index.resolve(
+                    subject, at, degraded=snapshot.degraded
+                )
+            return answers
+
+        return ManyResolutions(snapshot.state, snapshot.end, await asyncio.to_thread(work))
 
     @staticmethod
     def _notes(snapshot: Snapshot, at: datetime | None) -> list[api.ResolveNote]:

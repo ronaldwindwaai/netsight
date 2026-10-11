@@ -30,3 +30,21 @@ def _fresh_identity_guards() -> Iterator[None]:
 
     guards.reset_for_tests()
     yield
+
+
+@pytest.fixture(autouse=True)
+def _fresh_traffic_guards() -> Iterator[None]:
+    """The heavy-read cap is module state: each test starts with every slot free."""
+    from netsight_api.traffic import guards
+
+    guards.reset_for_tests()
+    yield
+
+
+@pytest.fixture(autouse=True)
+def _fresh_clickhouse_limit_capability() -> Iterator[None]:
+    """What the process learned about setting query limits is module state: tests start unlearned."""
+    from netsight_api.adapters import clickhouse_limits
+
+    clickhouse_limits.reset_for_tests()
+    yield

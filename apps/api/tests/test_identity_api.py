@@ -744,3 +744,25 @@ def test_a_historical_resolve_over_the_register_carries_the_note() -> None:
     body = Caller("administrator").get(RESOLVE, ip="10.0.0.10", at=before).json()
     validate("identity_resolve", body)
     assert body["notes"] == ["register-is-current-state"]  # the fixture includes an assignment
+
+
+def test_a_persons_traffic_needs_the_endpoint_level_traffic_permission(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Per-person traffic is built from source addresses, so it needs traffic:read-detail too."""
+    from netsight_api.rbac import ROLE_PERMISSIONS, Permission, Role
+
+    class _Source:
+        async def top(self, **_: Any) -> tuple[list[Any], None]:
+            return [], None
+
+    app.dependency_overrides[identity_routes.get_traffic_source] = lambda: _Source()
+    caller = Caller("security_analyst")
+    path = f"{USERS}/{person_id(caller)}"
+    assert caller.get(path).json()["traffic"]["state"] == "ok"
+    monkeypatch.setitem(
+        ROLE_PERMISSIONS,
+        Role.SECURITY_ANALYST,
+        frozenset(ROLE_PERMISSIONS[Role.SECURITY_ANALYST] - {Permission.TRAFFIC_READ_DETAIL}),
+    )
+    assert caller.get(path).json()["traffic"]["state"] == "not-connected"

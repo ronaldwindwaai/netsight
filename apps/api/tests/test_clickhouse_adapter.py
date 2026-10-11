@@ -30,7 +30,6 @@ _END = datetime(2026, 10, 6, 0, 0, tzinfo=UTC)
 _OBSERVED_EPOCH = int(datetime(2026, 10, 5, 23, 30, tzinfo=UTC).timestamp())
 
 _TOP_COLUMNS = ["TimeReceived", "SrcAddr", "DstAddr", "Proto", "Bytes", "Packets"]
-_FLOW_COLUMNS = [*_TOP_COLUMNS, "DstPort", "DstHostname", "Application", "User"]
 
 
 def _discovery(names: list[str]) -> httpx.Response:
@@ -181,19 +180,6 @@ async def test_unknown_table_raises_invalid_source_data() -> None:
 
 
 @pytest.mark.asyncio
-async def test_flows_missing_core_column_fails_closed() -> None:
-    def handler(request: httpx.Request) -> httpx.Response:
-        if _is_discovery(request):
-            return _discovery(["TimeReceived", "SrcAddr", "DstAddr", "Bytes"])  # no Proto
-        return httpx.Response(500, text="unexpected")
-
-    with pytest.raises(AdapterError) as excinfo:
-        await _client(handler).flows(start=_START, end=_END, limit=50)
-
-    assert excinfo.value.status is AdapterStatus.INVALID_SOURCE_DATA
-
-
-@pytest.mark.asyncio
 async def test_invalid_table_identifier_never_reaches_network() -> None:
     calls: list[httpx.Request] = []
 
@@ -313,64 +299,6 @@ async def test_readonly_settings_error_retries_without_setting() -> None:
     assert "max_execution_time" not in calls[2].url.params
 
 
-@pytest.mark.asyncio
-async def test_flows_maps_optional_columns_and_protocols() -> None:
-    def handler(request: httpx.Request) -> httpx.Response:
-        if _is_discovery(request):
-            return _discovery(_FLOW_COLUMNS)
-        return httpx.Response(
-            200,
-            json={
-                "data": [
-                    {
-                        "seen_at": _OBSERVED_EPOCH,
-                        "source_ip": "::ffff:10.1.2.3",
-                        "destination_ip": "2001:db8::9",
-                        "n_bytes": "900",
-                        "proto_num": 6,
-                        "n_packets": "7",
-                        "dest_port": 443,
-                        "dest_host": "cdn.example.net",
-                        "app_name": "https",
-                        "user_name": "alice",
-                    },
-                    {
-                        "seen_at": _OBSERVED_EPOCH - 10,
-                        "source_ip": "10.1.2.4",
-                        "destination_ip": "10.1.2.5",
-                        "n_bytes": 100,
-                        "proto_num": 47,
-                        "n_packets": None,
-                        "dest_port": None,
-                        "dest_host": "",
-                        "app_name": "<img src=x onerror=alert(1)>",
-                        "user_name": None,
-                    },
-                ],
-                "rows": 2,
-            },
-        )
-
-    flows, observed_at = await _client(handler).flows(start=_START, end=_END, limit=50)
-
-    assert observed_at == datetime(2026, 10, 5, 23, 30, tzinfo=UTC)
-    first, second = flows
-    assert first.source_ip == "10.1.2.3"
-    assert first.protocol == "tcp"
-    assert first.destination_port == 443
-    assert first.packets == 7
-    assert first.direction == "unknown"
-    assert first.source_device_id is None
-    assert first.application == "https"
-    assert first.user == "alice"
-    assert second.protocol == "other"
-    assert second.destination_port is None
-    assert second.packets is None
-    assert second.destination_host is None
-    assert second.application == "<img src=x onerror=alert(1)>"
-    assert second.user is None
-
-
 @pytest.mark.parametrize(
     ("number", "expected"),
     [(1, "icmp"), (6, "tcp"), (17, "udp"), (58, "icmp"), (47, "other"), (132, "other")],
@@ -383,19 +311,6 @@ def test_protocol_number_mapping(number: int, expected: str) -> None:
 def test_protocol_invalid_values_fail_closed(value: Any) -> None:
     with pytest.raises(AdapterError):
         _parse_protocol(value)
-
-
-@pytest.mark.asyncio
-async def test_empty_window_returns_no_observed_at() -> None:
-    def handler(request: httpx.Request) -> httpx.Response:
-        if _is_discovery(request):
-            return _discovery(_FLOW_COLUMNS)
-        return httpx.Response(200, json={"data": [], "rows": 0})
-
-    flows, observed_at = await _client(handler).flows(start=_START, end=_END, limit=50)
-
-    assert flows == []
-    assert observed_at is None
 
 
 @pytest.mark.asyncio

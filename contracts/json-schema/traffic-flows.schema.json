@@ -5,7 +5,13 @@
   "required": [
     "state",
     "time_range",
+    "filters",
+    "unsupported",
+    "flows_restricted",
+    "attribution",
     "flows",
+    "aggregations",
+    "cohort",
     "freshness"
   ],
   "additionalProperties": false,
@@ -20,12 +26,54 @@
     "time_range": {
       "$ref": "traffic.schema.json#/$defs/timeRange"
     },
+    "filters": {
+      "$ref": "#/$defs/filters"
+    },
+    "unsupported": {
+      "description": "Filters the request used that the flow source does not report; the read is unknown, never silently unfiltered.",
+      "type": "array",
+      "uniqueItems": true,
+      "maxItems": 10,
+      "items": {
+        "enum": [
+          "source_ip",
+          "destination_ip",
+          "device",
+          "vlan",
+          "application",
+          "protocol",
+          "port",
+          "country",
+          "asn",
+          "direction"
+        ]
+      }
+    },
+    "flows_restricted": {
+      "type": "boolean"
+    },
+    "attribution": {
+      "$ref": "#/$defs/attributionStatus"
+    },
     "flows": {
       "type": "array",
       "maxItems": 500,
       "items": {
         "$ref": "#/$defs/flow"
       }
+    },
+    "aggregations": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/aggregations"
+        }
+      ]
+    },
+    "cohort": {
+      "$ref": "traffic.schema.json#/$defs/cohort"
     },
     "freshness": {
       "$ref": "common.schema.json#/$defs/freshness"
@@ -41,18 +89,643 @@
               "unknown"
             ]
           }
-        }
+        },
+        "required": [
+          "state"
+        ]
       },
       "then": {
         "properties": {
           "flows": {
             "maxItems": 0
+          },
+          "aggregations": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "flows_restricted": {
+            "const": true
+          }
+        },
+        "required": [
+          "flows_restricted"
+        ]
+      },
+      "then": {
+        "properties": {
+          "flows": {
+            "maxItems": 0
+          },
+          "attribution": {
+            "properties": {
+              "level": {
+                "const": "none"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "unsupported": {
+            "minItems": 1
+          }
+        },
+        "required": [
+          "unsupported"
+        ]
+      },
+      "then": {
+        "properties": {
+          "state": {
+            "const": "unknown"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "enum": [
+              "not-connected",
+              "unknown"
+            ]
+          }
+        },
+        "required": [
+          "state"
+        ]
+      },
+      "then": {
+        "properties": {
+          "cohort": {
+            "properties": {
+              "state": {
+                "const": "not-applied"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "cohort": {
+            "properties": {
+              "state": {
+                "const": "too-few-sources"
+              }
+            }
+          }
+        },
+        "required": [
+          "cohort"
+        ]
+      },
+      "then": {
+        "properties": {
+          "flows": {
+            "maxItems": 0
+          },
+          "aggregations": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "const": "ok"
+          },
+          "flows_restricted": {
+            "const": false
+          }
+        },
+        "required": [
+          "state",
+          "flows_restricted"
+        ]
+      },
+      "then": {
+        "properties": {
+          "cohort": {
+            "properties": {
+              "state": {
+                "const": "not-applied"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "const": "ok"
+          },
+          "flows_restricted": {
+            "const": true
+          }
+        },
+        "required": [
+          "state",
+          "flows_restricted"
+        ]
+      },
+      "then": {
+        "properties": {
+          "cohort": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "sufficient",
+                  "too-few-sources"
+                ]
+              }
+            }
+          },
+          "aggregations": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "properties": {
+                  "destinations": {
+                    "items": {
+                      "properties": {
+                        "scope": {
+                          "const": "external"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            ]
           }
         }
       }
     }
   ],
   "$defs": {
+    "filters": {
+      "description": "The filters that were applied, echoed from the request (allow-listed fields only).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_ip",
+        "destination_ip",
+        "device",
+        "vlan",
+        "application",
+        "protocol",
+        "port",
+        "country",
+        "asn",
+        "direction"
+      ],
+      "properties": {
+        "source_ip": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 2,
+          "maxLength": 45
+        },
+        "destination_ip": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 2,
+          "maxLength": 45
+        },
+        "device": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "vlan": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 4094
+        },
+        "application": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "protocol": {
+          "enum": [
+            "tcp",
+            "udp",
+            "icmp",
+            "other",
+            null
+          ]
+        },
+        "port": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 65535
+        },
+        "country": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 2,
+          "maxLength": 2,
+          "pattern": "^[A-Z]{2}$"
+        },
+        "asn": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1,
+          "maximum": 4294967295
+        },
+        "direction": {
+          "enum": [
+            "inbound",
+            "outbound",
+            "internal",
+            null
+          ]
+        }
+      }
+    },
+    "personRef": {
+      "description": "A person as the identity service names them; the label is untrusted text.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "label"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^person-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "label": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 128
+        }
+      }
+    },
+    "deviceRef": {
+      "description": "The endpoint's device as the identity service names it; the label is untrusted text.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "label"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^device-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "label": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 128
+        }
+      }
+    },
+    "attributionStatus": {
+      "description": "What the caller may be told about the person behind an address, and whether the identity service answered. withheld: the role holds no users permission; not-evaluated: there were no rows to attribute.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "level",
+        "state",
+        "as_of"
+      ],
+      "properties": {
+        "level": {
+          "enum": [
+            "person",
+            "endpoint",
+            "none"
+          ]
+        },
+        "state": {
+          "enum": [
+            "ok",
+            "not-connected",
+            "unknown",
+            "withheld",
+            "not-evaluated"
+          ]
+        },
+        "as_of": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "level": {
+                "const": "none"
+              }
+            },
+            "required": [
+              "level"
+            ]
+          },
+          "then": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "withheld",
+                  "not-evaluated"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "withheld"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "level": {
+                "const": "none"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "not-connected",
+                  "unknown",
+                  "withheld",
+                  "not-evaluated"
+                ]
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "as_of": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "ok"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "as_of": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "flowAttribution": {
+      "description": "Who was behind the source address when the flow was seen, with its basis. An address alone is never identity: unknown carries no person; inferred is capped at 0.7.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "basis",
+        "reason",
+        "confidence",
+        "ambiguous",
+        "person",
+        "device"
+      ],
+      "properties": {
+        "basis": {
+          "enum": [
+            "observed",
+            "inferred",
+            "unknown"
+          ]
+        },
+        "reason": {
+          "enum": [
+            "declared-assignment",
+            "indirect-evidence",
+            "low-confidence",
+            "name-match",
+            "conflicting-evidence",
+            "no-evidence",
+            "expired",
+            "multiple-candidates",
+            "shared-address",
+            "vpn-no-session",
+            "guest-network",
+            "ip-only",
+            "source-unavailable",
+            "restricted",
+            null
+          ]
+        },
+        "confidence": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "ambiguous": {
+          "type": "boolean"
+        },
+        "person": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/personRef"
+            }
+          ]
+        },
+        "device": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/deviceRef"
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "basis": {
+                "const": "unknown"
+              }
+            },
+            "required": [
+              "basis"
+            ]
+          },
+          "then": {
+            "properties": {
+              "person": {
+                "type": "null"
+              },
+              "confidence": {
+                "type": "null"
+              },
+              "reason": {
+                "enum": [
+                  "no-evidence",
+                  "expired",
+                  "conflicting-evidence",
+                  "multiple-candidates",
+                  "shared-address",
+                  "vpn-no-session",
+                  "guest-network",
+                  "ip-only",
+                  "source-unavailable",
+                  "restricted"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "basis": {
+                "const": "observed"
+              }
+            },
+            "required": [
+              "basis"
+            ]
+          },
+          "then": {
+            "properties": {
+              "person": {
+                "type": "object"
+              },
+              "confidence": {
+                "type": "number"
+              },
+              "reason": {
+                "type": "null"
+              },
+              "ambiguous": {
+                "const": false
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "basis": {
+                "const": "inferred"
+              }
+            },
+            "required": [
+              "basis"
+            ]
+          },
+          "then": {
+            "properties": {
+              "person": {
+                "type": "object"
+              },
+              "confidence": {
+                "type": "number",
+                "maximum": 0.7
+              },
+              "reason": {
+                "enum": [
+                  "declared-assignment",
+                  "indirect-evidence",
+                  "low-confidence",
+                  "name-match",
+                  "conflicting-evidence"
+                ]
+              },
+              "ambiguous": {
+                "const": false
+              }
+            }
+          }
+        }
+      ]
+    },
     "flow": {
       "type": "object",
       "additionalProperties": false,
@@ -68,7 +741,7 @@
         "packets",
         "direction",
         "application",
-        "user"
+        "attribution"
       ],
       "properties": {
         "observed_at": {
@@ -130,7 +803,7 @@
           "minimum": 0
         },
         "direction": {
-          "description": "Relative to the observed network; unknown when not determinable.",
+          "description": "Derived only from the source's own interface boundary classification; unknown otherwise.",
           "enum": [
             "inbound",
             "outbound",
@@ -147,14 +820,232 @@
           "minLength": 1,
           "maxLength": 255
         },
-        "user": {
-          "description": "Source-reported identity; an IP alone is never definitive identity.",
+        "attribution": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/flowAttribution"
+            }
+          ]
+        }
+      }
+    },
+    "timelineBucket": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "start",
+        "bytes",
+        "packets",
+        "flows"
+      ],
+      "properties": {
+        "start": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "packets": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "flows": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "volume": {
+      "description": "Totals over the filtered window, summed from the source's own counters.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bytes",
+        "packets",
+        "flows",
+        "source_addresses",
+        "destination_addresses"
+      ],
+      "properties": {
+        "bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "packets": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "flows": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "source_addresses": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "destination_addresses": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "applicationMixItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "application",
+        "bytes",
+        "share"
+      ],
+      "properties": {
+        "application": {
           "type": [
             "string",
             "null"
           ],
           "minLength": 1,
           "maxLength": 255
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "share": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "applicationMix": {
+      "description": "Top applications by bytes; a null application is traffic the source labelled with none.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "items",
+        "other_bytes",
+        "total_bytes"
+      ],
+      "properties": {
+        "items": {
+          "type": "array",
+          "maxItems": 11,
+          "items": {
+            "$ref": "#/$defs/applicationMixItem"
+          }
+        },
+        "other_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total_bytes": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "destinationShare": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "address",
+        "host",
+        "scope",
+        "bytes",
+        "share"
+      ],
+      "properties": {
+        "address": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 45
+        },
+        "host": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "scope": {
+          "enum": [
+            "external",
+            "internal"
+          ],
+          "description": "internal: a private, loopback, link-local, shared or multicast address. The aggregate tier is never told about internal destinations."
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "share": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "aggregations": {
+      "description": "Bounded aggregations over the whole filtered window (not over the listed rows).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bucket_seconds",
+        "timeline",
+        "volume",
+        "application_mix",
+        "destinations"
+      ],
+      "properties": {
+        "bucket_seconds": {
+          "type": "integer",
+          "minimum": 60,
+          "maximum": 86400
+        },
+        "timeline": {
+          "type": "array",
+          "maxItems": 200,
+          "items": {
+            "$ref": "#/$defs/timelineBucket"
+          }
+        },
+        "volume": {
+          "$ref": "#/$defs/volume"
+        },
+        "application_mix": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/applicationMix"
+            }
+          ]
+        },
+        "destinations": {
+          "type": "array",
+          "maxItems": 10,
+          "items": {
+            "$ref": "#/$defs/destinationShare"
+          }
         }
       }
     }

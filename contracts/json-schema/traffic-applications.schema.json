@@ -1,0 +1,455 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TrafficApplicationsResponse",
+  "type": "object",
+  "required": [
+    "state",
+    "time_range",
+    "previous_range",
+    "policy",
+    "unsupported",
+    "total_bytes",
+    "items",
+    "cohort",
+    "freshness"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "state": {
+      "enum": [
+        "not-connected",
+        "ok",
+        "unknown"
+      ]
+    },
+    "time_range": {
+      "$ref": "traffic.schema.json#/$defs/timeRange"
+    },
+    "previous_range": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "traffic.schema.json#/$defs/timeRange"
+        }
+      ]
+    },
+    "policy": {
+      "$ref": "#/$defs/policy"
+    },
+    "unsupported": {
+      "type": "array",
+      "uniqueItems": true,
+      "maxItems": 1,
+      "items": {
+        "enum": [
+          "application"
+        ]
+      }
+    },
+    "total_bytes": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "items": {
+      "type": "array",
+      "maxItems": 100,
+      "items": {
+        "$ref": "#/$defs/application"
+      }
+    },
+    "cohort": {
+      "$ref": "traffic.schema.json#/$defs/cohort"
+    },
+    "freshness": {
+      "$ref": "common.schema.json#/$defs/freshness"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "enum": [
+              "not-connected",
+              "unknown"
+            ]
+          }
+        },
+        "required": [
+          "state"
+        ]
+      },
+      "then": {
+        "properties": {
+          "items": {
+            "maxItems": 0
+          },
+          "total_bytes": {
+            "type": "null"
+          },
+          "previous_range": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "unsupported": {
+            "minItems": 1
+          }
+        },
+        "required": [
+          "unsupported"
+        ]
+      },
+      "then": {
+        "properties": {
+          "state": {
+            "const": "unknown"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "enum": [
+              "not-connected",
+              "unknown"
+            ]
+          }
+        },
+        "required": [
+          "state"
+        ]
+      },
+      "then": {
+        "properties": {
+          "cohort": {
+            "properties": {
+              "state": {
+                "const": "not-applied"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "cohort": {
+            "properties": {
+              "state": {
+                "const": "too-few-sources"
+              }
+            }
+          }
+        },
+        "required": [
+          "cohort"
+        ]
+      },
+      "then": {
+        "properties": {
+          "items": {
+            "contains": {
+              "properties": {
+                "endpoints": {
+                  "type": "null"
+                }
+              },
+              "required": [
+                "endpoints"
+              ]
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "policy": {
+      "description": "Whether an operator policy file classified approval, risk and reputation. Without one they are unknown.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "not-configured",
+            "configured",
+            "invalid"
+          ]
+        }
+      }
+    },
+    "trend": {
+      "description": "Change against the immediately preceding window of equal length; flat is within 10 percent.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "previous_bytes",
+        "change_ratio"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "up",
+            "down",
+            "flat",
+            "new",
+            "unknown"
+          ]
+        },
+        "previous_bytes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "change_ratio": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": -1
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "unknown"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "previous_bytes": {
+                "type": "null"
+              },
+              "change_ratio": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "new"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "previous_bytes": {
+                "const": 0
+              },
+              "change_ratio": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "up",
+                  "down",
+                  "flat"
+                ]
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "previous_bytes": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "change_ratio": {
+                "type": "number"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "up"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "change_ratio": {
+                "exclusiveMinimum": 0.1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "down"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "change_ratio": {
+                "exclusiveMaximum": -0.1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "flat"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "change_ratio": {
+                "minimum": -0.1,
+                "maximum": 0.1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "application": {
+      "description": "Application name and category are source-reported and untrusted; risk and approval come only from the operator policy.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rank",
+        "application",
+        "category",
+        "bytes",
+        "packets",
+        "share",
+        "endpoints",
+        "users",
+        "trend",
+        "risk",
+        "approval"
+      ],
+      "properties": {
+        "rank": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "application": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "category": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "packets": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "share": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "endpoints": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "description": "Distinct source addresses seen using the application (not people, not inventory devices)."
+        },
+        "users": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "description": "Null: counting people needs per-flow identity attribution, which this surface does not do."
+        },
+        "trend": {
+          "$ref": "#/$defs/trend"
+        },
+        "risk": {
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            "unknown"
+          ]
+        },
+        "approval": {
+          "enum": [
+            "approved",
+            "unapproved",
+            "unknown"
+          ]
+        }
+      }
+    }
+  }
+}

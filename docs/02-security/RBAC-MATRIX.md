@@ -22,6 +22,8 @@
 
 Production roles must be mapped to least privilege and may be site-scoped.
 
+The **Traffic** row is split into two permissions (aggregates; endpoint rows) in "Traffic permissions (Step 7)" below.
+
 ## Incident permissions (S6-2)
 
 Backend enforcement lives in `apps/api/src/netsight_api/rbac.py`; unknown roles and permissions are denied.
@@ -188,3 +190,48 @@ Technician is limited), recorded here to be confirmed by the human owner. Three 
   raw subject. Per-identity limits after authorisation: list/detail 120/min, summary 60/min, resolve 30/min; a past-time resolve also spends a global (all identities) budget of 20/min. The UI uses the session `permissions` only to show or hide
   the entry and the sections; the API enforces every rule.
 
+## Traffic permissions (Step 7, 2026-10-11)
+
+Two permissions form a strict-subset ladder (`test_rbac_traffic.py`): `traffic:read-detail` implies `traffic:read`.
+Fail closed: unknown roles, no identity and unknown permission names are denied. Naming a *person* behind an address is a separate,
+human-only decision (`users:read`, above), so the traffic surface has three independent controls: aggregates, endpoint rows, people.
+
+| Permission | Admin | Network Engineer | Security Analyst | Technician | Management | Auditor |
+|---|---|---|---|---|---|---|
+| `traffic:read` (volumes, application mix, destinations, baselines/anomalies, top destinations: nothing that names an endpoint) | Yes | Yes | Yes | **No** | Yes | Yes |
+| `traffic:read-detail` (flow rows, top talkers, any filter that narrows to one address, device or VLAN, per-person traffic, destinations inside the organisation) | Yes | Yes | Yes | **No** | **No** | Yes |
+| people in flow rows: `users:read` (name + basis) / `users:read-limited` (device, person withheld) | Yes / Yes | Yes / Yes | Yes / Yes | No / Yes | No / No | No / No |
+
+* **Management ("Summary") is aggregate-only.** The Explorer answers with the aggregations and `flows_restricted: true`; for it **no flow
+  row is read from the flow store at all** (the API asks the adapter for aggregates only). A filter that narrows to a place
+  (`source_ip`, `destination_ip`, **`device`**, **`vlan`**) is a 403: narrowing an aggregate to one host, one exporter or one VLAN
+  is a per-endpoint read in disguise. The remaining filters (application, protocol, port, country, ASN, direction) describe the
+  traffic and stay open to the aggregate rung. `GET /traffic/top-talkers` is a 403.
+  This **tightens** S4, where Management held `traffic:read` for every route including raw flow rows.
+* **Small cohorts (aggregate rung only).** Management is never shown an answer that rests on fewer than
+  `NETSIGHT_TRAFFIC_MIN_COHORT` (default 5) distinct source addresses: an Explorer answer about fewer is withheld whole, an
+  `endpoints` count below the minimum is withheld, a first-seen row fewer sources reached is not listed, and each response
+  says so (`cohort.state`). Destinations inside the organisation are not listed to it. The detail rung is not subject to any of this.
+* **Auditor ("Read")** sees endpoint rows but never a person (it holds no `users:*` permission): attribution is `withheld`, and the
+  identity service is not even consulted.
+* **Technician ("Limited") still holds no traffic permission** (unchanged since S4). The matrix word "Limited" is ambiguous; the safe
+  reading is kept until the owner decides what it removes. The code already supports the intermediate rung: a role holding
+  `traffic:read` + `traffic:read-detail` + `users:read-limited` receives the *endpoint level* (device, person withheld); it is covered by a test
+  that grants it to a role temporarily.
+* **People in rows** (`users:read`, human principals only): a person is shown only with the identity service's basis (observed /
+  inferred / unknown), reason and confidence; inferred is capped at 0.7; two candidate persons, or an ambiguous answer, name nobody.
+  A service or AI principal with the Administrator role gets rows and never a person. The flow store's own `User` column is not read.
+* **Per-person traffic** (`GET /users/{id}`, Step 6) now needs `traffic:read-detail` (it is built from source addresses). All current
+  `users:read` holders hold it, so nothing changes today; a role holding one and not the other gets `not-connected` for that block.
+* **Limits and audit.** Authorise first, then per-identity budgets: Explorer 30/min, Applications 30/min, Destinations 30/min,
+  Anomalies 10/min (top talkers/destinations keep the shared 300/min); at most 3 heavy flow-store reads in flight across identities,
+  **one per identity** (429 `TRAFFIC_CONCURRENCY`) and **the last slot reserved for `traffic:read-detail`** (503 `TRAFFIC_BUSY`
+  + `Retry-After`, never queued). All four routes (`traffic.flows.read`, `.applications.read`, `.destinations.read`,
+  `.anomalies.read`) and `traffic.top-talkers.read` are audited for success, failure and every refusal (permission, rate limit,
+  filter needing detail, rejected input, busy), recording the actor, state, counts, the *names* of the filters used, the tier and the
+  cohort verdict; never a filter value, an address or a person's name (a detail-tier lookup may add a keyed fingerprint, see
+  AUDIT-LOGGING). Responses are `Cache-Control: no-store`.
+* **Decisions for the owner.** (1) Management aggregate-only and the 403 on address, device and VLAN filters; the minimum cohort `k`
+  (5 by default) and whether Management should see a destination inside the organisation at all. (2) Auditor sees endpoint rows (matrix: "Read")
+  but not people. (3) What Technician "Limited" removes (today: all of traffic). (4) Whether any non-Admin role may see people in flow rows
+  before the privacy/legal policy of PRD 92 exists. (5) Site/department scoping of traffic (does not exist).

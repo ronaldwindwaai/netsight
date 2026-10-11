@@ -166,6 +166,16 @@ the adapter); site scoping and "Basic"/"Technician-assigned" narrowing; overview
 6. Whether a privacy/legal review is required before any non-Admin role browses people (PRD 92: policy before broad user surveillance features).
 7. The evidence-id secret (`NETSIGHT_IDENTITY_ID_KEY`): provisioning and rotation (rotating changes every opaque id).
 
+## Used by the Flow Explorer (Step 7)
+
+`IdentityService.resolve_many(now, [(address, time), ...])` answers a bounded batch (<= 500 distinct questions) from the shared 30 s "now"
+snapshot, off the event loop. The Flow Explorer (`traffic/attribution.py`) asks about each flow's *source address at the time the flow was
+seen* and maps the answer without strengthening it: one person => `observed` / `inferred` with the engine's reason and confidence; several
+persons or an ambiguous answer => `unknown` / `multiple-candidates` (nobody is picked); the `users:read-limited` level => the device and
+`restricted` (the person is withheld); a flow older than the 24 h evidence window => `source-unavailable` (the sources were not asked about
+that time, so "no evidence" would be false). The caller's `users:read` / `users:read-limited` decides the level; a role with neither never
+reaches the service. The flow store's own user column is not used.
+
 ## Rollback
 Unregister `identity_router` in `main.py` and drop the Users menu entry; nothing was persisted, there is no schema change. Unset `WAZUH_INDEXER_URL` / `NETBOX_*` to return the
 sources to `not-connected`.

@@ -4,6 +4,9 @@ const DIAGNOSTICS_PERMISSION = 'diagnostics:read';
 const INTERNET_PERMISSION = 'internet:read';
 // The lowest rung of the users ladder: whoever can see any users surface (even counts) sees the entry.
 const USERS_PERMISSION = 'users:read-summary';
+// The aggregate rung of traffic: whoever can read any traffic surface sees the entry. Rows and
+// address, device and VLAN filters need traffic:read-detail on top (enforced by the API, hidden by the pages).
+const TRAFFIC_PERMISSION = 'traffic:read';
 
 interface MenuEntry {
   node: MenuNode;
@@ -20,7 +23,10 @@ const MENU_ENTRIES: readonly MenuEntry[] = [
     node: { type: 'item', text: 'Users', href: '/users', icon: 'bi-people' },
     requires: USERS_PERMISSION,
   },
-  { node: { type: 'item', text: 'Traffic', href: '/traffic', icon: 'bi-bar-chart-line' } },
+  {
+    node: { type: 'item', text: 'Traffic', href: '/traffic', icon: 'bi-bar-chart-line' },
+    requires: TRAFFIC_PERMISSION,
+  },
   {
     node: { type: 'item', text: 'Internet', href: '/internet', icon: 'bi-globe2' },
     requires: INTERNET_PERMISSION,

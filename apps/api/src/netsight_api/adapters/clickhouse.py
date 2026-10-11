@@ -14,7 +14,8 @@ Verified against the ClickHouse HTTP interface (26.10): ``param_*`` URL
 binding, backtick-qualified identifiers, ``GROUP BY .. WITH TOTALS ..
 FORMAT JSON`` (``totals`` is present even for zero rows), ``system.columns``
 discovery under a readonly identity, and readonly identities rejecting URL
-settings — handled by retrying once without ``max_execution_time``.
+settings. Server-side limits are sent when the identity may set them and the refusal is
+remembered for the process (``clickhouse_limits``).
 """
 
 from __future__ import annotations
@@ -31,7 +32,8 @@ from urllib.parse import unquote, urlsplit
 import httpx
 from pydantic import ValidationError
 
-from netsight_api.schemas import TrafficDimension, TrafficFlow, TrafficItem
+from netsight_api.adapters import clickhouse_limits as limits
+from netsight_api.schemas import TrafficDimension, TrafficItem
 
 ADAPTER_VERSION = "clickhouse/1"
 SOURCE_NAME = "clickhouse"
@@ -45,18 +47,9 @@ _IPV4_MAPPED = re.compile(r"^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$", re.IGNORECASE)
 # number is contractually "other"; non-numbers are invalid source data.
 _PROTOCOL_NUMBERS: dict[int, FlowProtocol] = {1: "icmp", 6: "tcp", 17: "udp", 58: "icmp"}
 
-# Client-side row bounds (the API layer already enforces these per endpoint).
+# Client-side row bound (the API layer already enforces it per endpoint). The Flow Explorer, the
+# Applications and Destinations roll-ups and the baseline reads live in ``clickhouse_explorer``.
 _MAX_TOP_LIMIT = 100
-_MAX_FLOWS_LIMIT = 500
-
-# Optional enrichment columns, used only when discovery finds them present.
-_FLOW_OPTIONAL_COLUMNS: dict[str, str] = {
-    "Packets": "toString(`Packets`) AS n_packets",
-    "DstPort": "`DstPort` AS dest_port",
-    "DstHostname": "toString(`DstHostname`) AS dest_host",
-    "Application": "toString(`Application`) AS app_name",
-    "User": "toString(`User`) AS user_name",
-}
 
 
 class AdapterStatus(StrEnum):
@@ -170,7 +163,9 @@ def _data_rows(payload: dict[str, Any]) -> list[dict[str, Any]]:
     result: list[dict[str, Any]] = []
     for row in rows:
         if not isinstance(row, dict):
-            raise AdapterError(AdapterStatus.INVALID_SOURCE_DATA, "clickhouse returned a malformed row")
+            raise AdapterError(
+                AdapterStatus.INVALID_SOURCE_DATA, "clickhouse returned a malformed row"
+            )
         result.append(row)
     return result
 
@@ -192,6 +187,20 @@ def _window_params(start: datetime, end: datetime) -> dict[str, int]:
     return {"start": int(start.timestamp()), "end": int(end.timestamp())}
 
 
+def _raise_for_status(response: httpx.Response, *, with_limits: bool) -> None:
+    """Typed errors for a refused or failed query; a refused *setting* is told apart."""
+    if 300 <= response.status_code < 400:
+        raise AdapterError(AdapterStatus.UNAVAILABLE, "clickhouse returned an unexpected redirect")
+    if response.status_code in (401, 403):
+        raise AdapterError(
+            AdapterStatus.FORBIDDEN, "clickhouse rejected the configured credentials"
+        )
+    if response.status_code >= 400:
+        if with_limits and limits.settings_refused(response.text):
+            raise _SettingsForbidden()
+        raise AdapterError(AdapterStatus.UNAVAILABLE, "clickhouse query failed")
+
+
 @dataclass
 class ClickhouseClient:
     """Read-only flow-query client for one configured ClickHouse endpoint.
@@ -208,7 +217,7 @@ class ClickhouseClient:
     timeout_seconds: float = 10.0
     _transport: httpx.AsyncBaseTransport | None = field(default=None, repr=False)
     _columns: frozenset[str] | None = field(default=None, init=False, repr=False)
-    _settings_allowed: bool = field(default=True, init=False, repr=False)
+    _types: dict[str, str] = field(default_factory=dict, init=False, repr=False)
 
     async def top(
         self,
@@ -275,79 +284,12 @@ class ClickhouseClient:
                 ) from exc
         return items, observed_at
 
-    async def flows(
-        self,
-        *,
-        start: datetime,
-        end: datetime,
-        limit: int,
-    ) -> tuple[list[TrafficFlow], datetime | None]:
-        """Highest-byte flows for a bounded window (source-reported fields).
-
-        ``direction`` is always ``unknown``: deriving it needs an internal
-        prefix view this adapter does not have, and guessing is forbidden.
-        """
-        params = _window_params(start, end)
-        columns = await self._ensure_columns()
-        self._require(columns, "TimeReceived", "SrcAddr", "DstAddr", "Proto", "Bytes")
-        bounded = max(1, min(int(limit), _MAX_FLOWS_LIMIT))
-        select = [
-            "toUnixTimestamp(`TimeReceived`) AS seen_at",
-            "toString(`SrcAddr`) AS source_ip",
-            "toString(`DstAddr`) AS destination_ip",
-            "toString(`Bytes`) AS n_bytes",
-            "`Proto` AS proto_num",
-        ]
-        for column, expression in _FLOW_OPTIONAL_COLUMNS.items():
-            if column in columns:
-                select.append(expression)
-        sql = (
-            f"SELECT {', '.join(select)} FROM {self._qualified_table()} "
-            "WHERE `TimeReceived` >= toDateTime({start:UInt32}) "
-            "AND `TimeReceived` < toDateTime({end:UInt32}) "
-            f"ORDER BY `Bytes` DESC LIMIT {bounded} FORMAT JSON"
-        )
-        payload = await self._query(sql, params=params)
-
-        flows: list[TrafficFlow] = []
-        observed_at: datetime | None = None
-        for row in _data_rows(payload):
-            seen = _parse_epoch(row.get("seen_at"))
-            observed_at = seen if observed_at is None or seen > observed_at else observed_at
-            destination_host = _parse_optional_text(row.get("dest_host"), "destination_host")
-            try:
-                flows.append(
-                    TrafficFlow(
-                        observed_at=seen,
-                        source_ip=_parse_address(row.get("source_ip"), "source_ip"),
-                        source_device_id=None,
-                        destination_ip=_parse_address(
-                            row.get("destination_ip"), "destination_ip"
-                        ),
-                        destination_host=destination_host,
-                        protocol=_parse_protocol(row.get("proto_num")),
-                        destination_port=_parse_port(row.get("dest_port")),
-                        bytes=_parse_counter(row.get("n_bytes"), "bytes"),
-                        packets=(
-                            _parse_optional_counter(row.get("n_packets"), "packets")
-                            if "Packets" in columns
-                            else None
-                        ),
-                        direction="unknown",
-                        application=_parse_optional_text(row.get("app_name"), "application"),
-                        user=_parse_optional_text(row.get("user_name"), "user"),
-                    )
-                )
-            except ValidationError as exc:
-                raise AdapterError(AdapterStatus.INVALID_SOURCE_DATA, "invalid flow row") from exc
-        return flows, observed_at
-
     async def _ensure_columns(self) -> frozenset[str]:
         """Discover the flows table's columns once per client instance."""
         if self._columns is None:
             database, table = self._split_table()
             payload = await self._query(
-                "SELECT name FROM system.columns "
+                "SELECT name, type FROM system.columns "
                 "WHERE database = {db:String} AND table = {table:String} FORMAT JSON",
                 params={"db": database, "table": table},
             )
@@ -355,10 +297,11 @@ class ClickhouseClient:
             for row in _data_rows(payload):
                 name = row.get("name")
                 if not isinstance(name, str) or not name:
-                    raise AdapterError(
-                        AdapterStatus.INVALID_SOURCE_DATA, "invalid column listing"
-                    )
+                    raise AdapterError(AdapterStatus.INVALID_SOURCE_DATA, "invalid column listing")
                 names.add(name)
+                column_type = row.get("type")
+                if isinstance(column_type, str):
+                    self._types[name] = column_type
             if not names:
                 raise AdapterError(AdapterStatus.INVALID_SOURCE_DATA, "flows table not found")
             self._columns = frozenset(names)
@@ -413,21 +356,36 @@ class ClickhouseClient:
         return base_url, (user, password) if user else None
 
     async def _query(self, sql: str, *, params: Mapping[str, str | int]) -> dict[str, Any]:
-        """Run one read, retrying once without settings when forbidden."""
-        try:
-            return await self._post(sql, params)
-        except _SettingsForbidden:
-            self._settings_allowed = False
-            return await self._post(sql, params)
+        """Run one read with the server-side limits, or without them for a readonly identity.
 
-    async def _post(self, sql: str, params: Mapping[str, str | int]) -> dict[str, Any]:
+        The first refusal marks the (endpoint, user) as profile-limited for the life of the process,
+        so later reads (on new client instances) do not repeat the failed attempt.
+        """
+        key = self._capability_key()
+        if not limits.may_send_settings(key):
+            return await self._post(sql, params, with_limits=False)
+        try:
+            payload = await self._post(sql, params, with_limits=True)
+        except _SettingsForbidden:
+            limits.mark_profile_only(key)
+            return await self._post(sql, params, with_limits=False)
+        limits.mark_enforced(key)
+        return payload
+
+    def _capability_key(self) -> limits.CapabilityKey:
+        base_url, auth = self._connection()
+        return base_url, auth[0] if auth else ""
+
+    async def _post(
+        self, sql: str, params: Mapping[str, str | int], *, with_limits: bool
+    ) -> dict[str, Any]:
         """POST one parameterised query; errors raise typed AdapterErrors."""
         base_url, auth = self._connection()
         url_params: dict[str, str | int] = {
             f"param_{name}": value for name, value in params.items()
         }
-        if self._settings_allowed:
-            url_params["max_execution_time"] = str(max(1, int(self.timeout_seconds)))
+        if with_limits:
+            url_params.update(limits.limit_settings(self.timeout_seconds))
         timeout = httpx.Timeout(self.timeout_seconds, connect=5.0)
         try:
             async with httpx.AsyncClient(
@@ -445,19 +403,7 @@ class ClickhouseClient:
         except httpx.HTTPError as exc:
             raise AdapterError(AdapterStatus.UNAVAILABLE, "clickhouse request failed") from exc
 
-        if 300 <= response.status_code < 400:
-            raise AdapterError(
-                AdapterStatus.UNAVAILABLE, "clickhouse returned an unexpected redirect"
-            )
-        if response.status_code in (401, 403):
-            raise AdapterError(
-                AdapterStatus.FORBIDDEN, "clickhouse rejected the configured credentials"
-            )
-        if response.status_code >= 400:
-            body = response.text
-            if self._settings_allowed and ("Code: 164." in body or "Cannot modify" in body):
-                raise _SettingsForbidden()
-            raise AdapterError(AdapterStatus.UNAVAILABLE, "clickhouse query failed")
+        _raise_for_status(response, with_limits=with_limits)
         try:
             payload = json.loads(response.text)
         except json.JSONDecodeError as exc:

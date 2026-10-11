@@ -1,0 +1,688 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TrafficAnomaliesResponse",
+  "type": "object",
+  "required": [
+    "state",
+    "time_range",
+    "evaluated_range",
+    "method",
+    "working_hours",
+    "evaluation",
+    "first_seen_status",
+    "anomalies",
+    "first_seen",
+    "cohort",
+    "freshness"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "state": {
+      "enum": [
+        "not-connected",
+        "ok",
+        "unknown"
+      ]
+    },
+    "time_range": {
+      "$ref": "traffic.schema.json#/$defs/timeRange"
+    },
+    "evaluated_range": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "traffic.schema.json#/$defs/timeRange"
+        }
+      ]
+    },
+    "method": {
+      "$ref": "#/$defs/method"
+    },
+    "working_hours": {
+      "$ref": "#/$defs/workingHours"
+    },
+    "evaluation": {
+      "$ref": "#/$defs/evaluation"
+    },
+    "first_seen_status": {
+      "$ref": "#/$defs/firstSeenStatus"
+    },
+    "anomalies": {
+      "type": "array",
+      "maxItems": 50,
+      "items": {
+        "$ref": "#/$defs/anomaly"
+      }
+    },
+    "first_seen": {
+      "type": "array",
+      "maxItems": 20,
+      "items": {
+        "$ref": "#/$defs/firstSeen"
+      }
+    },
+    "cohort": {
+      "$ref": "traffic.schema.json#/$defs/cohort"
+    },
+    "freshness": {
+      "$ref": "common.schema.json#/$defs/freshness"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "enum": [
+              "not-connected",
+              "unknown"
+            ]
+          }
+        },
+        "required": [
+          "state"
+        ]
+      },
+      "then": {
+        "properties": {
+          "anomalies": {
+            "maxItems": 0
+          },
+          "first_seen": {
+            "maxItems": 0
+          },
+          "evaluated_range": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "evaluation": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "insufficient-baseline",
+                  "no-data"
+                ]
+              }
+            },
+            "required": [
+              "status"
+            ]
+          }
+        },
+        "required": [
+          "evaluation"
+        ]
+      },
+      "then": {
+        "properties": {
+          "anomalies": {
+            "maxItems": 0
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "first_seen_status": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "insufficient",
+                  "unknown"
+                ]
+              }
+            },
+            "required": [
+              "state"
+            ]
+          }
+        },
+        "required": [
+          "first_seen_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "first_seen": {
+            "maxItems": 0
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "enum": [
+              "not-connected",
+              "unknown"
+            ]
+          }
+        },
+        "required": [
+          "state"
+        ]
+      },
+      "then": {
+        "properties": {
+          "cohort": {
+            "properties": {
+              "state": {
+                "const": "not-applied"
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "method": {
+      "description": "The deterministic comparison; see docs/12-implementation/TRAFFIC-BASELINES.md.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "algorithm",
+        "weeks",
+        "min_weeks",
+        "threshold",
+        "min_difference_bytes"
+      ],
+      "properties": {
+        "algorithm": {
+          "const": "same-hour-of-week-median-mad"
+        },
+        "weeks": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8
+        },
+        "min_weeks": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8
+        },
+        "threshold": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "min_difference_bytes": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "workingHours": {
+      "description": "Operator-configured working hours. Not configured: outside_working_hours is unknown, never assumed.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "timezone"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "not-configured",
+            "configured",
+            "invalid"
+          ]
+        },
+        "timezone": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 64
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "configured"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "timezone": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "not-configured",
+                  "invalid"
+                ]
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "timezone": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "evaluation": {
+      "description": "How much of the window could be judged. insufficient-baseline means fewer than min_weeks comparable weeks: nothing is flagged. Counts add up to the buckets; the status follows from them.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "series",
+        "buckets",
+        "evaluated",
+        "insufficient_baseline",
+        "no_data",
+        "anomalies_total",
+        "application_series",
+        "daylight_saving"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "evaluated",
+            "partial",
+            "insufficient-baseline",
+            "no-data"
+          ]
+        },
+        "series": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "buckets": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "evaluated": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "insufficient_baseline": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "no_data": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "anomalies_total": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "application_series": {
+          "enum": [
+            "evaluated",
+            "not-reported"
+          ]
+        },
+        "daylight_saving": {
+          "enum": [
+            "not-applicable",
+            "none",
+            "crossed"
+          ],
+          "description": "Whether the policy time zone changed its UTC offset between the first baseline week and the end of the evaluated range. The weeks compared are fixed 168-hour UTC weeks, so a change shifts the local hour of the earlier weeks. not-applicable: no time zone is configured."
+        }
+      }
+    },
+    "firstSeenStatus": {
+      "description": "First-seen flags need history before the window; without it everything would look new, so none are raised.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "required_days",
+        "oldest"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "sufficient",
+            "insufficient",
+            "unknown"
+          ]
+        },
+        "required_days": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 31
+        },
+        "oldest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "unknown"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "oldest": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "context": {
+      "description": "Context, not a verdict: outside working hours is not malicious. The patterns are common legitimate causes.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "outside_working_hours",
+        "common_legitimate_patterns"
+      ],
+      "properties": {
+        "outside_working_hours": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "common_legitimate_patterns": {
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 8,
+          "items": {
+            "enum": [
+              "backup",
+              "cloud-sync",
+              "cctv-or-nvr",
+              "patching-or-updates",
+              "replication",
+              "scheduled-maintenance",
+              "antivirus-update",
+              "authorised-remote-work"
+            ]
+          }
+        }
+      }
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "label"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "total",
+            "application"
+          ]
+        },
+        "label": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 255
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "total"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "label": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "application"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "label": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "anomaly": {
+      "description": "An hourly volume that differs from the median of the same hour in prior weeks. Evidence, not a verdict.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "subject",
+        "bucket_start",
+        "bucket_end",
+        "direction",
+        "observed",
+        "baseline",
+        "baseline_samples",
+        "difference",
+        "ratio",
+        "score",
+        "confidence",
+        "context"
+      ],
+      "properties": {
+        "kind": {
+          "const": "volume-deviation"
+        },
+        "subject": {
+          "$ref": "#/$defs/subject"
+        },
+        "bucket_start": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "bucket_end": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "direction": {
+          "enum": [
+            "above",
+            "below"
+          ]
+        },
+        "observed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "baseline": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "baseline_samples": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8
+        },
+        "difference": {
+          "type": "integer"
+        },
+        "ratio": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "score": {
+          "type": "number"
+        },
+        "confidence": {
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ]
+        },
+        "context": {
+          "$ref": "#/$defs/context"
+        }
+      }
+    },
+    "firstSeen": {
+      "description": "An ASN or destination not seen in the look-back before the window. Context, not a verdict.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "asn",
+        "address",
+        "domain",
+        "first_seen",
+        "bytes",
+        "context"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "first-seen-asn",
+            "first-seen-destination"
+          ]
+        },
+        "asn": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1,
+          "maximum": 4294967295
+        },
+        "address": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 45
+        },
+        "domain": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "first_seen": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "context": {
+          "$ref": "#/$defs/context"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "first-seen-asn"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "asn": {
+                "type": "integer"
+              },
+              "address": {
+                "type": "null"
+              },
+              "domain": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "first-seen-destination"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "address": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

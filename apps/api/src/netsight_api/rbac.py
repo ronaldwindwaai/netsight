@@ -36,7 +36,12 @@ class Permission(StrEnum):
     MAINTENANCE_READ = "maintenance:read"
     MAINTENANCE_WRITE = "maintenance:write"  # create / cancel a window below organisation scope
     MAINTENANCE_WRITE_ORGANISATION = "maintenance:write-organisation"  # silences everything
+    # Aggregate traffic: volumes, application mix, destinations, baselines. Names no endpoint.
     TRAFFIC_READ = "traffic:read"
+    # Endpoint-level traffic: flow rows and top talkers (source addresses), and any filter that
+    # narrows to one address. Implies TRAFFIC_READ. Naming the *person* behind an address is a
+    # separate, human-only decision (users:read); this one never does.
+    TRAFFIC_READ_DETAIL = "traffic:read-detail"
     SECURITY_READ = "security:read"
     DIAGNOSTICS_READ = "diagnostics:read"
     # Internet/WAN status, quality, availability and the monthly SLA figures (read-only).
@@ -129,6 +134,10 @@ _ALL_READ = {
 # The WAN card is an Overview widget and the matrix gives Overview to every role, so every role
 # reads the Internet surface (Technician included); the evidence export is narrower.
 _INTERNET_EXPORT = {Permission.INTERNET_EXPORT}
+# RBAC-MATRIX "Traffic": Full / Full / Full / Limited / Summary / Read. Summary (Management) is the
+# aggregate rung only; Read (Auditor) sees endpoint rows but never a person (no users:* permission).
+# Technician stays without traffic until the owner decides what "Limited" removes.
+_TRAFFIC_DETAIL = {Permission.TRAFFIC_READ_DETAIL}
 # Detail (public IP, gateway, ISP, throughput) is for the roles that run or defend the network.
 # Technician, Management and Auditor read status and the SLA summary only (security review M2).
 _INTERNET_DETAIL = {Permission.INTERNET_READ_DETAIL}
@@ -147,6 +156,7 @@ ROLE_PERMISSIONS: Mapping[Role, frozenset[Permission]] = {
     Role.ADMINISTRATOR: frozenset(Permission),
     Role.NETWORK_ENGINEER: frozenset(
         _ALL_READ
+        | _TRAFFIC_DETAIL
         | _DIAGNOSTICS
         | _INCIDENT_FULL
         | _ALERTING_AUTHOR
@@ -157,6 +167,7 @@ ROLE_PERMISSIONS: Mapping[Role, frozenset[Permission]] = {
     ),
     Role.SECURITY_ANALYST: frozenset(
         _ALL_READ
+        | _TRAFFIC_DETAIL
         | _DIAGNOSTICS
         | _INCIDENT_FULL
         | _ALERTING_AUTHOR
@@ -182,7 +193,11 @@ ROLE_PERMISSIONS: Mapping[Role, frozenset[Permission]] = {
         (_ALL_READ - {Permission.INCIDENTS_READ}) | _USERS_SUMMARY | {Permission.AUDIT_READ}
     ),
     Role.AUDITOR: frozenset(
-        _ALL_READ | _ALERTING_READ | _INTERNET_EXPORT | {Permission.AUDIT_READ}
+        _ALL_READ
+        | _TRAFFIC_DETAIL
+        | _ALERTING_READ
+        | _INTERNET_EXPORT
+        | {Permission.AUDIT_READ}
     ),
 }
 

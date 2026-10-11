@@ -1,0 +1,299 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TrafficDestinationsResponse",
+  "type": "object",
+  "required": [
+    "state",
+    "time_range",
+    "first_seen_since",
+    "policy",
+    "total_bytes",
+    "items",
+    "cohort",
+    "freshness"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "state": {
+      "enum": [
+        "not-connected",
+        "ok",
+        "unknown"
+      ]
+    },
+    "time_range": {
+      "$ref": "traffic.schema.json#/$defs/timeRange"
+    },
+    "first_seen_since": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "policy": {
+      "$ref": "traffic-applications.schema.json#/$defs/policy"
+    },
+    "total_bytes": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "items": {
+      "type": "array",
+      "maxItems": 100,
+      "items": {
+        "$ref": "#/$defs/destination"
+      }
+    },
+    "cohort": {
+      "$ref": "traffic.schema.json#/$defs/cohort"
+    },
+    "freshness": {
+      "$ref": "common.schema.json#/$defs/freshness"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "enum": [
+              "not-connected",
+              "unknown"
+            ]
+          }
+        },
+        "required": [
+          "state"
+        ]
+      },
+      "then": {
+        "properties": {
+          "items": {
+            "maxItems": 0
+          },
+          "total_bytes": {
+            "type": "null"
+          },
+          "first_seen_since": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "enum": [
+              "not-connected",
+              "unknown"
+            ]
+          }
+        },
+        "required": [
+          "state"
+        ]
+      },
+      "then": {
+        "properties": {
+          "cohort": {
+            "properties": {
+              "state": {
+                "const": "not-applied"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "cohort": {
+            "properties": {
+              "state": {
+                "const": "too-few-sources"
+              }
+            }
+          }
+        },
+        "required": [
+          "cohort"
+        ]
+      },
+      "then": {
+        "properties": {
+          "items": {
+            "contains": {
+              "properties": {
+                "endpoints": {
+                  "type": "null"
+                }
+              },
+              "required": [
+                "endpoints"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "cohort": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "sufficient",
+                  "too-few-sources"
+                ]
+              }
+            }
+          }
+        },
+        "required": [
+          "cohort"
+        ]
+      },
+      "then": {
+        "properties": {
+          "items": {
+            "items": {
+              "properties": {
+                "scope": {
+                  "const": "external"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "destination": {
+      "description": "Domain, ASN and country are source-reported; reputation comes only from the operator allow/deny list.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rank",
+        "address",
+        "scope",
+        "domain",
+        "asn",
+        "country",
+        "first_seen",
+        "last_seen",
+        "bytes",
+        "packets",
+        "share",
+        "endpoints",
+        "users",
+        "reputation"
+      ],
+      "properties": {
+        "rank": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "address": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 45
+        },
+        "scope": {
+          "enum": [
+            "external",
+            "internal"
+          ],
+          "description": "internal: a private, loopback, link-local, shared or multicast address. The aggregate tier is never told about internal destinations."
+        },
+        "domain": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "asn": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1,
+          "maximum": 4294967295
+        },
+        "country": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 2,
+          "maxLength": 2,
+          "pattern": "^[A-Z]{2}$"
+        },
+        "first_seen": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time",
+          "description": "Earliest time seen within the look-back (first_seen_since); null when not determined."
+        },
+        "last_seen": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "packets": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "share": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "endpoints": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "description": "Distinct source addresses that sent to the destination."
+        },
+        "users": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "description": "Null: counting people needs per-flow identity attribution, which this surface does not do."
+        },
+        "reputation": {
+          "enum": [
+            "allow-listed",
+            "deny-listed",
+            "unknown"
+          ]
+        }
+      }
+    }
+  }
+}

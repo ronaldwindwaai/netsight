@@ -420,7 +420,7 @@ async def get_user(
         body = await _service(slots, policy, cache).user_detail(
             now,
             user_id,
-            traffic=traffic if is_allowed(identity, Permission.TRAFFIC_READ.value) else None,
+            traffic=traffic if is_allowed(identity, Permission.TRAFFIC_READ_DETAIL.value) else None,
             security=security if is_allowed(identity, Permission.SECURITY_READ.value) else None,
         )
         if body is not None:

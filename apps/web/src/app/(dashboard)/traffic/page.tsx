@@ -1,306 +1,86 @@
-import type { ReactNode } from 'react';
-import Link from 'next/link';
-import { AppContent, Card } from '@adminlte/react';
+import { AppContent } from '@adminlte/react';
 
-import { DataFailure, FreshnessNotice } from '@/components/data-state';
+import { OverviewApplicationMix, OverviewTopTalkers } from '@/components/overview-traffic-cards';
+import { TimeRangePicker } from '@/components/time-range-picker';
+import { TrafficAccessDenied } from '@/components/traffic-access-denied';
 import { TrafficBars } from '@/components/traffic-bars';
-import { TrafficFlowsTable } from '@/components/traffic-flows-table';
+import { TrafficNav } from '@/components/traffic-nav';
+import { TrafficPanel } from '@/components/traffic-panel';
+import { StateSurface } from '@/components/state-surface';
+import { TrafficGate } from '@/components/traffic-surface';
 import { apiGet } from '@/lib/api';
-import type { FetchState } from '@/lib/api';
+import { parseSessionInfo, parseTrafficTopResponse } from '@/lib/api-contracts';
+import { parseTrafficApplicationsResponse } from '@/lib/api-contracts-traffic-explorer';
 import {
-  parseTrafficFlowsResponse,
-  parseTrafficTopResponse,
-} from '@/lib/api-contracts';
-import type {
-  TrafficFlowsResponse,
-  TrafficItem,
-  TrafficPreset,
-  TrafficTopResponse,
-} from '@/lib/api-contracts';
-import { applicationMix } from '@/lib/traffic-summary';
+  MAX_WINDOW_DAYS,
+  applicationsPath,
+  resolveTrafficWindow,
+} from '@/lib/traffic-view';
+import { canReadTraffic, canReadTrafficDetail, viewerFromSession } from '@/lib/viewer';
 
-const PRESETS: ReadonlyArray<{ id: TrafficPreset; label: string }> = [
-  { id: '1h', label: 'Last hour' },
-  { id: '6h', label: 'Last 6 hours' },
-  { id: '24h', label: 'Last 24 hours' },
-  { id: '7d', label: 'Last 7 days' },
-];
+type Params = { preset?: string | string[]; from?: string | string[]; to?: string | string[] };
 
-const PRESET_IDS = PRESETS.map((preset) => preset.id);
+export default async function TrafficPage({ searchParams }: { searchParams: Promise<Params> }) {
+  const params = await searchParams;
+  const sessionState = await apiGet('/api/v1/auth/session', parseSessionInfo);
+  const viewer = viewerFromSession(sessionState.kind === 'ok' ? sessionState.data : null);
+  const crumbs = [{ label: 'Overview', href: '/overview' }, { label: 'Traffic' }];
 
-function requestedPreset(raw: string | string[] | undefined): TrafficPreset {
-  const value = Array.isArray(raw) ? raw[0] : raw;
-  return PRESET_IDS.includes(value as TrafficPreset) ? (value as TrafficPreset) : '24h';
-}
-
-function TimeRangePicker({ selected }: { selected: TrafficPreset }) {
-  return (
-    <div className="btn-group btn-group-sm" role="group" aria-label="Traffic time range">
-      {PRESETS.map((preset) => {
-        const active = preset.id === selected;
-        return (
-          <Link
-            key={preset.id}
-            href={`/traffic?preset=${preset.id}`}
-            className={`btn btn-outline-secondary${active ? ' active' : ''}`}
-            aria-current={active ? 'true' : undefined}
-          >
-            {preset.label}
-          </Link>
-        );
-      })}
-    </div>
-  );
-}
-
-function StateSurface({ icon, title, detail }: { icon: string; title: string; detail: string }) {
-  return (
-    <div className="traffic-state text-center">
-      <i className={`${icon} fs-2 text-body-secondary`} aria-hidden="true" />
-      <p className="fw-semibold mb-1 mt-3">{title}</p>
-      <p className="small text-body-secondary mb-0">{detail}</p>
-    </div>
-  );
-}
-
-const NOT_CONNECTED = (
-  <StateSurface
-    icon="bi bi-bezier2"
-    title="Flow source not connected"
-    detail="Connect an approved flow source (Akvorado/ClickHouse) before Netsight can rank bandwidth use."
-  />
-);
-
-const UNKNOWN = (
-  <StateSurface
-    icon="bi bi-question-circle"
-    title="Traffic state unknown"
-    detail="A flow source is configured but its current state could not be confirmed. Nothing is estimated in its place."
-  />
-);
-
-const EMPTY_WINDOW = (
-  <StateSurface
-    icon="bi bi-inboxes"
-    title="No traffic in this window"
-    detail="The flow source reported a valid empty result for the selected time range."
-  />
-);
-
-type TrafficResponseState = TrafficTopResponse['state'];
-
-/**
- * The three traffic reads share one source, so when every read agrees the page
- * can show one source-level surface instead of repeating the same notice. Any
- * disagreement or request failure returns null so each panel reports itself.
- */
-function sharedSourceState(
-  ...states: Array<FetchState<TrafficTopResponse> | FetchState<TrafficFlowsResponse>>
-): TrafficResponseState | null {
-  const resolved: TrafficResponseState[] = [];
-  for (const state of states) {
-    if (state.kind !== 'ok') return null;
-    resolved.push(state.data.state);
-  }
-  return resolved.length > 0 && resolved.every((value) => value === resolved[0])
-    ? resolved[0]
-    : null;
-}
-
-function TopPanel({
-  title,
-  icon,
-  state,
-}: {
-  title: string;
-  icon: string;
-  state: FetchState<TrafficTopResponse>;
-}) {
-  let body: ReactNode;
-  if (state.kind !== 'ok') {
-    body = <DataFailure state={state} />;
-  } else if (state.data.state === 'not-connected') {
-    body = NOT_CONNECTED;
-  } else if (state.data.state === 'unknown') {
-    body = UNKNOWN;
-  } else if (state.data.items.length === 0) {
-    body = EMPTY_WINDOW;
-  } else {
-    body = (
-      <>
-        <FreshnessNotice freshness={state.data.freshness} />
-        <TrafficBars items={state.data.items} />
-      </>
+  if (!canReadTraffic(viewer)) {
+    // No traffic permission (Technician, today): no controls and no API call to be refused.
+    return (
+      <AppContent title="Traffic intelligence" breadcrumbs={crumbs}>
+        <TrafficAccessDenied />
+      </AppContent>
     );
   }
 
-  return (
-    <Card
-      className="operational-card"
-      title={title}
-      icon={icon}
-      variant="outline"
-      theme="primary"
-      bodyClass="pt-2"
-    >
-      {body}
-    </Card>
-  );
-}
-
-function ApplicationsCard({ state }: { state: FetchState<TrafficFlowsResponse> }) {
-  let body: ReactNode;
-
-  if (state.kind !== 'ok') {
-    body = <DataFailure state={state} />;
-  } else if (state.data.state === 'not-connected') {
-    body = NOT_CONNECTED;
-  } else if (state.data.state === 'unknown') {
-    body = UNKNOWN;
-  } else if (state.data.flows.length === 0) {
-    body = EMPTY_WINDOW;
-  } else {
-    const items: TrafficItem[] = applicationMix(state.data.flows).map((entry, index) => ({
-      rank: index + 1,
-      subject_kind: 'application',
-      subject_id: null,
-      label: entry.application ?? 'Unattributed (no application reported)',
-      bytes: entry.bytes,
-      packets: null,
-      share: entry.share,
-    }));
-
-    body =
-      items.length === 0 ? (
-        <StateSurface
-          icon="bi bi-question-circle"
-          title="No application metadata"
-          detail="The listed high-volume flows carry no application field, so no application mix can be shown."
-        />
-      ) : (
-        <>
-          <p className="small text-body-secondary mb-2">
-            Share of bytes across the {state.data.flows.length} listed high-volume flows, not the
-            full window. Flows without application metadata are shown as unattributed.
-          </p>
-          <TrafficBars items={items} />
-        </>
-      );
-  }
-
-  return (
-    <Card
-      className="operational-card"
-      title="Top applications"
-      icon="bi bi-pie-chart"
-      variant="outline"
-      theme="secondary"
-      bodyClass="pt-2"
-    >
-      {body}
-    </Card>
-  );
-}
-
-function FlowsCard({ state }: { state: FetchState<TrafficFlowsResponse> }) {
-  let body: ReactNode;
-
-  if (state.kind !== 'ok') {
-    body = (
-      <div className="p-3">
-        <DataFailure state={state} />
-      </div>
-    );
-  } else if (state.data.state === 'not-connected') {
-    body = NOT_CONNECTED;
-  } else if (state.data.state === 'unknown') {
-    body = UNKNOWN;
-  } else if (state.data.flows.length === 0) {
-    body = EMPTY_WINDOW;
-  } else {
-    body = (
-      <>
-        <div className="px-3 pt-3">
-          <FreshnessNotice freshness={state.data.freshness} />
-        </div>
-        <TrafficFlowsTable flows={state.data.flows} />
-      </>
-    );
-  }
-
-  return (
-    <Card
-      className="operational-card"
-      title="Recent high-volume flows"
-      icon="bi bi-list-columns"
-      variant="outline"
-      theme="primary"
-      bodyClass="p-0"
-    >
-      {body}
-    </Card>
-  );
-}
-
-export default async function TrafficPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ preset?: string | string[] }>;
-}) {
-  const preset = requestedPreset((await searchParams).preset);
-  const query = `preset=${preset}`;
-  const [talkersState, destinationsState, flowsState] = await Promise.all([
-    apiGet(`/api/v1/traffic/top-talkers?${query}&limit=10`, parseTrafficTopResponse),
-    apiGet(`/api/v1/traffic/top-destinations?${query}&limit=10`, parseTrafficTopResponse),
-    apiGet(`/api/v1/traffic/flows?${query}&limit=50`, parseTrafficFlowsResponse),
+  const window = resolveTrafficWindow(params, new Date(), MAX_WINDOW_DAYS);
+  const detail = canReadTrafficDetail(viewer);
+  const [talkers, destinations, applications] = await Promise.all([
+    detail ? apiGet(`/api/v1/traffic/top-talkers?${window.query}&limit=10`, parseTrafficTopResponse) : null,
+    apiGet(`/api/v1/traffic/top-destinations?${window.query}&limit=10`, parseTrafficTopResponse),
+    apiGet(applicationsPath(window, 6), parseTrafficApplicationsResponse),
   ]);
-  const shared = sharedSourceState(talkersState, destinationsState, flowsState);
 
   return (
-    <AppContent
-      title="Traffic intelligence"
-      breadcrumbs={[{ label: 'Overview', href: '/overview' }, { label: 'Traffic' }]}
-    >
-      <div className="page-intro d-flex flex-wrap align-items-end justify-content-between gap-2">
-        <p className="text-body-secondary mb-0">
+    <AppContent title="Traffic intelligence" breadcrumbs={crumbs}>
+      <div className="page-intro">
+        <p className="text-body-secondary mb-2">
           Read-only flow evidence from the connected source. Empty, unknown and not-connected are
-          shown distinctly — Netsight never estimates traffic.
+          shown distinctly: Netsight never estimates traffic. Showing {window.label.toLowerCase()}.
         </p>
-        <TimeRangePicker selected={preset} />
+        <TimeRangePicker section="overview" window={window} maxDays={MAX_WINDOW_DAYS} />
       </div>
+      <TrafficNav active="overview" window={window} />
 
-      {shared === 'not-connected' || shared === 'unknown' ? (
-        <Card
-          className="operational-card operational-card--primary"
-          title="Bandwidth ranking"
-          icon="bi bi-bar-chart-line"
-          variant="outline"
-          theme="primary"
-          bodyClass="pt-2"
-        >
-          {shared === 'not-connected' ? NOT_CONNECTED : UNKNOWN}
-        </Card>
-      ) : (
-        <>
-          <div className="row g-3">
-            <div className="col-xl-6">
-              <TopPanel title="Top talkers (source IP)" icon="bi bi-people" state={talkersState} />
-            </div>
-            <div className="col-xl-6">
-              <TopPanel title="Top destinations" icon="bi bi-globe2" state={destinationsState} />
-            </div>
-          </div>
-
-          <div className="row g-3">
-            <div className="col-xl-5">
-              <ApplicationsCard state={flowsState} />
-            </div>
-            <div className="col-xl-7">
-              <FlowsCard state={flowsState} />
-            </div>
-          </div>
-        </>
-      )}
+      <div className="row g-3 mb-3">
+        <div className="col-xl-6">
+          <OverviewTopTalkers state={talkers} window={window} />
+        </div>
+        <div className="col-xl-6">
+          <TrafficPanel title="Top destinations" icon="bi-globe2">
+            <TrafficGate state={destinations} noun="destinations" permission="traffic:read">
+              {(data) =>
+                data.items.length === 0 ? (
+                  <StateSurface
+                    icon="bi bi-inboxes"
+                    title="No traffic in this window"
+                    detail="The flow source reported a valid empty result for the selected time range."
+                  />
+                ) : (
+                  <TrafficBars items={data.items} />
+                )
+              }
+            </TrafficGate>
+          </TrafficPanel>
+        </div>
+      </div>
+      <div className="row g-3">
+        <div className="col-xl-6">
+          <OverviewApplicationMix state={applications} window={window} />
+        </div>
+      </div>
     </AppContent>
   );
 }

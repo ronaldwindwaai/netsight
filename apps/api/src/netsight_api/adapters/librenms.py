@@ -216,9 +216,7 @@ def _normalize_rfc3339_timestamp(timestamp: str, match: re.Match[str]) -> str:
     offset_hour = match.group("offset_hour")
     offset_minute = match.group("offset_minute")
     if offset_hour is not None and (
-        int(offset_hour) > 23
-        or offset_minute is None
-        or int(offset_minute) > 59
+        int(offset_hour) > 23 or offset_minute is None or int(offset_minute) > 59
     ):
         raise _invalid_alert_timestamp()
     normalized = f"{timestamp[:-1]}+00:00" if timestamp[-1] in "Zz" else timestamp
@@ -243,10 +241,7 @@ def _normalize_native_timestamp(timestamp: str, source_timezone: ZoneInfo | None
     for fold in (0, 1):
         candidate = naive_timestamp.replace(tzinfo=source_timezone, fold=fold)
         round_trip = candidate.astimezone(UTC).astimezone(source_timezone)
-        if (
-            round_trip.replace(tzinfo=None) == naive_timestamp
-            and round_trip.fold == fold
-        ):
+        if round_trip.replace(tzinfo=None) == naive_timestamp and round_trip.fold == fold:
             candidates.append(candidate)
     if len(candidates) != 1:
         raise _invalid_alert_timestamp()
@@ -672,11 +667,7 @@ class LibrenmsClient:
                 {
                     "id": f"librenms:{row['id']}",
                     "severity": _ALERT_SEVERITY_MAP.get(severity_raw, "info"),
-                    "state": (
-                        "open"
-                        if row.get("state") in (0, "0", "active")
-                        else "acknowledged"
-                    ),
+                    "state": ("open" if row.get("state") in (0, "0", "active") else "acknowledged"),
                     "title": row.get("name") or row.get("rule", "alert"),
                     "observed_at": _alert_timestamp(
                         row.get("timestamp"),

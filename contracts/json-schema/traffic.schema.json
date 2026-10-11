@@ -163,6 +163,60 @@
           "maximum": 1
         }
       }
+    },
+    "cohort": {
+      "description": "The small-cohort rule as applied to this answer. not-applied: the caller holds the detail tier (or nothing was read). sufficient: the aggregate tier, and the figures describe at least minimum source addresses. too-few-sources: the aggregate tier, and something was withheld because fewer than minimum source addresses stood behind it.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "minimum"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "not-applied",
+            "sufficient",
+            "too-few-sources"
+          ]
+        },
+        "minimum": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 2,
+          "maximum": 1000
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "not-applied"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "minimum": {
+                "type": "null"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "minimum": {
+                "type": "integer"
+              }
+            }
+          }
+        }
+      ]
     }
   }
 }

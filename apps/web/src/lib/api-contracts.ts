@@ -218,8 +218,6 @@ export type TrafficSubjectKind =
   | 'domain'
   | 'asn'
   | 'interface';
-export type FlowProtocol = 'tcp' | 'udp' | 'icmp' | 'other';
-export type FlowDirection = 'inbound' | 'outbound' | 'internal' | 'unknown';
 
 export interface TrafficTimeRange {
   from: string;
@@ -244,28 +242,6 @@ export interface TrafficTopResponse {
   dimension: TrafficDimension;
   time_range: TrafficTimeRange;
   items: TrafficItem[];
-  freshness: Freshness;
-}
-
-export interface TrafficFlow {
-  observed_at: string;
-  source_ip: string;
-  source_device_id: string | null;
-  destination_ip: string;
-  destination_host: string | null;
-  protocol: FlowProtocol;
-  destination_port: number | null;
-  bytes: number;
-  packets: number | null;
-  direction: FlowDirection;
-  application: string | null;
-  user: string | null;
-}
-
-export interface TrafficFlowsResponse {
-  state: TrafficState;
-  time_range: TrafficTimeRange;
-  flows: TrafficFlow[];
   freshness: Freshness;
 }
 
@@ -1001,8 +977,6 @@ const TRAFFIC_SUBJECT_KINDS = [
   'asn',
   'interface',
 ] as const;
-const FLOW_PROTOCOLS = ['tcp', 'udp', 'icmp', 'other'] as const;
-const FLOW_DIRECTIONS = ['inbound', 'outbound', 'internal', 'unknown'] as const;
 
 const TRAFFIC_TOP_RESPONSE_KEYS = [
   'state',
@@ -1021,22 +995,6 @@ const TRAFFIC_ITEM_KEYS = [
   'packets',
   'share',
 ] as const;
-const TRAFFIC_FLOWS_RESPONSE_KEYS = ['state', 'time_range', 'flows', 'freshness'] as const;
-const TRAFFIC_FLOW_KEYS = [
-  'observed_at',
-  'source_ip',
-  'source_device_id',
-  'destination_ip',
-  'destination_host',
-  'protocol',
-  'destination_port',
-  'bytes',
-  'packets',
-  'direction',
-  'application',
-  'user',
-] as const;
-
 export function parseTrafficTimeRange(value: unknown): TrafficTimeRange | null {
   if (!isRecord(value) || !hasContractKeys(value, TRAFFIC_TIME_RANGE_KEYS)) return null;
   if (typeof value.from !== 'string' || !isRfc3339(value.from)) return null;
@@ -1114,89 +1072,6 @@ export function parseTrafficTopResponse(value: unknown): TrafficTopResponse | nu
     dimension: value.dimension as TrafficDimension,
     time_range: timeRange,
     items: items as TrafficItem[],
-    freshness,
-  };
-}
-
-function parseTrafficFlow(value: unknown): TrafficFlow | null {
-  if (!isRecord(value) || !hasContractKeys(value, TRAFFIC_FLOW_KEYS)) return null;
-  if (typeof value.observed_at !== 'string' || !isRfc3339(value.observed_at)) return null;
-  if (
-    typeof value.source_ip !== 'string' ||
-    !isBoundedString(value.source_ip, 1, 45) ||
-    typeof value.destination_ip !== 'string' ||
-    !isBoundedString(value.destination_ip, 1, 45)
-  ) {
-    return null;
-  }
-  if (
-    value.source_device_id !== null &&
-    (typeof value.source_device_id !== 'string' ||
-      !DEVICE_ID_PATTERN.test(value.source_device_id))
-  ) {
-    return null;
-  }
-  if (
-    !isNullableString(value.destination_host) ||
-    (value.destination_host !== null && !isBoundedString(value.destination_host, 1, 255)) ||
-    typeof value.protocol !== 'string' ||
-    !FLOW_PROTOCOLS.includes(value.protocol as FlowProtocol) ||
-    (value.destination_port !== null &&
-      !isBoundedInteger(value.destination_port, 0, 65535)) ||
-    !isBoundedInteger(value.bytes, 0) ||
-    (value.packets !== null && !isBoundedInteger(value.packets, 0)) ||
-    typeof value.direction !== 'string' ||
-    !FLOW_DIRECTIONS.includes(value.direction as FlowDirection)
-  ) {
-    return null;
-  }
-  for (const key of ['application', 'user'] as const) {
-    const field = value[key];
-    if (field !== null && (typeof field !== 'string' || !isBoundedString(field, 1, 255))) {
-      return null;
-    }
-  }
-  return {
-    observed_at: value.observed_at,
-    source_ip: value.source_ip,
-    source_device_id: value.source_device_id,
-    destination_ip: value.destination_ip,
-    destination_host: value.destination_host,
-    protocol: value.protocol as FlowProtocol,
-    destination_port: value.destination_port as number | null,
-    bytes: value.bytes as number,
-    packets: value.packets as number | null,
-    direction: value.direction as FlowDirection,
-    application: value.application as string | null,
-    user: value.user as string | null,
-  };
-}
-
-export function parseTrafficFlowsResponse(value: unknown): TrafficFlowsResponse | null {
-  if (
-    !isRecord(value) ||
-    !hasContractKeys(value, TRAFFIC_FLOWS_RESPONSE_KEYS) ||
-    typeof value.state !== 'string' ||
-    !TRAFFIC_STATES.includes(value.state as TrafficState) ||
-    !Array.isArray(value.flows) ||
-    value.flows.length > 500
-  ) {
-    return null;
-  }
-
-  const timeRange = parseTrafficTimeRange(value.time_range);
-  const freshness = parseFreshness(value.freshness);
-  if (timeRange === null || freshness === null) return null;
-
-  const flows = value.flows.map(parseTrafficFlow);
-  if (flows.some((flow) => flow === null)) return null;
-  // Fail closed: a non-ok state must never carry source-derived rows.
-  if (value.state !== 'ok' && flows.length > 0) return null;
-
-  return {
-    state: value.state as TrafficState,
-    time_range: timeRange,
-    flows: flows as TrafficFlow[],
     freshness,
   };
 }

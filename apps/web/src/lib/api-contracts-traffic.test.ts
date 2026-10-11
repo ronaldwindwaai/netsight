@@ -1,9 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { parseTrafficFlowsResponse, parseTrafficTopResponse } from './api-contracts.ts';
+import { parseTrafficTopResponse } from './api-contracts.ts';
 
-const DEVICE_A = 'device-a7f3d9e1-1c2b-4a8e-9f0d-5b6c7d8e9f01';
 
 const UNKNOWN_FRESHNESS = {
   state: 'unknown',
@@ -35,35 +34,11 @@ const item = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
-/** Canonical flow row: always carries every contract key. */
-const flow = (overrides: Record<string, unknown> = {}) => ({
-  observed_at: '2026-10-06T07:59:00Z',
-  source_ip: '10.1.2.3',
-  source_device_id: DEVICE_A,
-  destination_ip: '203.0.113.9',
-  destination_host: 'cdn.example.net',
-  protocol: 'tcp',
-  destination_port: 443,
-  bytes: 987654321,
-  packets: 700000,
-  direction: 'outbound',
-  application: 'https',
-  user: 'alice',
-  ...overrides,
-});
-
 const NOT_CONNECTED_TOP = {
   state: 'not-connected',
   dimension: 'talkers',
   time_range: TIME_RANGE,
   items: [],
-  freshness: UNKNOWN_FRESHNESS,
-};
-
-const NOT_CONNECTED_FLOWS = {
-  state: 'not-connected',
-  time_range: TIME_RANGE,
-  flows: [],
   freshness: UNKNOWN_FRESHNESS,
 };
 
@@ -161,61 +136,4 @@ test('parseTrafficTopResponse rejects missing or extra keys', () => {
 
   const extra = { ...NOT_CONNECTED_TOP, fabricated: true } as Record<string, unknown>;
   assert.equal(parseTrafficTopResponse(extra), null);
-});
-
-test('parseTrafficFlowsResponse accepts explicit not-connected state', () => {
-  assert.deepEqual(parseTrafficFlowsResponse(NOT_CONNECTED_FLOWS), NOT_CONNECTED_FLOWS);
-});
-
-test('parseTrafficFlowsResponse accepts a valid ok payload', () => {
-  const payload = {
-    state: 'ok',
-    time_range: TIME_RANGE,
-    flows: [
-      flow(),
-      flow({
-        source_device_id: null,
-        destination_host: null,
-        protocol: 'udp',
-        destination_port: null,
-        packets: null,
-        direction: 'unknown',
-        application: null,
-        user: null,
-      }),
-    ],
-    freshness: FRESH_FRESHNESS,
-  };
-  assert.deepEqual(parseTrafficFlowsResponse(payload), payload);
-});
-
-test('parseTrafficFlowsResponse rejects flows on a non-ok state', () => {
-  const payload = { ...NOT_CONNECTED_FLOWS, state: 'unknown', flows: [flow()] };
-  assert.equal(parseTrafficFlowsResponse(payload), null);
-});
-
-test('parseTrafficFlowsResponse rejects out-of-bounds flow fields', () => {
-  const rejects: Array<Record<string, unknown>> = [
-    { destination_port: 70000 },
-    { destination_port: -1 },
-    { direction: 'sideways' },
-    { protocol: 'sctp-other' },
-    { source_device_id: 'ip-10.1.2.3' },
-    { source_ip: '' },
-    { bytes: -1 },
-    { observed_at: 'not-a-timestamp' },
-    { application: '' },
-    { user: 7 },
-  ];
-  for (const overrides of rejects) {
-    const payload = { ...NOT_CONNECTED_FLOWS, state: 'ok', flows: [flow(overrides)] };
-    assert.equal(parseTrafficFlowsResponse(payload), null, JSON.stringify(overrides));
-  }
-});
-
-test('parseTrafficFlowsResponse rejects a missing required key', () => {
-  const broken = flow();
-  delete (broken as Record<string, unknown>).user;
-  const payload = { ...NOT_CONNECTED_FLOWS, state: 'ok', flows: [broken] };
-  assert.equal(parseTrafficFlowsResponse(payload), null);
 });

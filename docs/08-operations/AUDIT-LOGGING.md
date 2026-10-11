@@ -96,3 +96,36 @@ Every read of per-person data is audited (PRD 92): `identity.users.list` (`state
 (`denied`, `permission`), a denied `identity.user.read` (with `target` = the person id when it is a canonical id), `denied` / `rate-limited` for any identity action, `denied` / `global-limit` and
 `denied` / `busy` for a past-time resolve, and `failure` / `subject-count`, `invalid-subject` or `invalid-time` for rejected resolve input (422; nothing echoed). They never carry a name, an e-mail address, an alert signature, a purpose or any text a
 source supplied; the aggregate `GET /users/summary` returns counts only and is not audited. The same interim JSON-lines sink and caveats apply.
+
+### Traffic reads (Step 7)
+
+`traffic.flows.read` and `traffic.top-talkers.read` are audited because they list endpoints and may name people (PRD 92); since the
+Step 7 security review the other three routes are audited on **success** too (`traffic.applications.read`,
+`traffic.destinations.read`, `traffic.anomalies.read`), because they are the aggregate tier's view of the same data. Fields common to
+all four: `outcome` (`success` for `ok` and `not-connected`, `failure` for `unknown`, `denied` for refusals), `state`, `tier`
+(`detail` | `aggregate`), `cohort` (the small-cohort verdict: `not-applied` | `sufficient` | `too-few-sources`), `window_seconds`. Per route:
+
+| Action | Further fields |
+| --- | --- |
+| `traffic.flows.read` | `row_count`, `attributed_count` (rows that name a person), `restricted` (rows withheld), `attribution_level` (`person` / `endpoint` / `none`), `attribution_state`, `filters` (the **names** of the filters used, e.g. `source_ip,port`, never their values), and the optional `fp_*` fingerprints below |
+| `traffic.applications.read`, `traffic.destinations.read` | `row_count`, `policy` (state of the operator policy file) |
+| `traffic.anomalies.read` | `row_count` (anomalies listed), `first_seen_count`, `evaluation` (status), `daylight_saving` |
+
+Refusals and rejected input carry a static `reason` and no caller input, on every route: `permission`, `rate-limited`,
+`filter-needs-detail` (an address, device or VLAN filter without `traffic:read-detail`), `busy` (the heavy-read cap is full, 503),
+`identity-busy` (this identity already has a heavy read running, 429), and, for a rejected request (422, `outcome = failure`),
+`unknown-parameter`, `repeated-parameter`, `invalid-filter`, `invalid-window`, `window-too-long` (anomalies over 7 days) or
+`invalid-request` (FastAPI itself rejected a malformed `limit`, `preset`, `from` or `to`). No record contains an address, a hostname,
+an application name, a policy entry or a person's name.
+
+**Fingerprints of endpoint-level lookups (optional, default on).** When a *detail-tier* caller filters the Explorer by `source_ip`,
+`destination_ip`, `device` or `vlan`, the record may carry `fp_source_ip`, `fp_destination_ip`, `fp_device`, `fp_vlan`: the first 16 hex
+characters of `HMAC-SHA256(key, "netsight.audit.filter.v1" 0x00 filter-name 0x00 canonical-value)`. An auditor answers "who looked up
+10.1.2.3?" by computing the same HMAC for the (canonical) address and searching the trail; repeated lookups of one target show up as
+equal fingerprints. The key makes it non-reversible by hashing the address space.
+
+* `NETSIGHT_AUDIT_FILTER_FINGERPRINT`: `on` (default) or `off` / `0` / `false` / `no`.
+* `NETSIGHT_AUDIT_FILTER_KEY`: the HMAC key, at least 32 characters; when unset the identity evidence-id key
+  (`NETSIGHT_IDENTITY_ID_KEY`) is used. With no usable key the fingerprints are **omitted** (never degraded to a plain hash) and one
+  warning is logged. Rotating the key makes old and new fingerprints incomparable: keep the old key to search old records.
+* Only values the caller already has the detail tier to filter by are fingerprinted; the aggregate tier cannot use these filters.

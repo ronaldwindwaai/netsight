@@ -445,6 +445,83 @@ See IDENTITY-CORRELATION.md.
   answers); persisted history and its retention; site/security scoping; the Auditor and Network Engineer decisions in RBAC-MATRIX; a shared (non per-worker) cache and limiter; a
   Playwright run of the Users pages; tamper-evident audit; whether to withhold the evidence `source` names from the limited rung.
 
+## Traffic intelligence delta (Step 7: Flow Explorer, Applications, Destinations, Anomalies)
+
+New read-only surface: `GET /traffic/flows` (filters, aggregations, attribution), `/traffic/applications`, `/traffic/destinations`,
+`/traffic/anomalies`; the existing `/traffic/top-talkers` and `/traffic/top-destinations` are re-gated. RBAC is in RBAC-MATRIX
+("Traffic permissions (Step 7)"). Reviewed against the same checklist as Steps 5 and 6.
+
+- **Injection into the flow store (the new query surface).** Every caller-controlled value (ten filter fields, the window, the limit)
+  enters only as a typed `param_*` placeholder; the SQL text is built from constants and the validated table identifier
+  (`adapters/clickhouse_queries.py`, asserted by tests that put `'; DROP TABLE` in each text filter and check it is absent from the SQL body).
+  Filters are an **allow-list**: an unknown or repeated parameter is a 422 (never ignored, so a typo cannot widen a query), values are
+  canonicalised (one spelling per address), control and invisible characters are refused, and a refusal names the field, never the value
+  (so it is not reflected into an error body, a log line or the audit trail). The read-only ClickHouse identity remains the backstop.
+- **A filter that cannot be honoured must not become an unfiltered answer.** A filter whose column the source lacks makes the read
+  `unknown` with the filter named in `unsupported`; no query is run. (A silently dropped filter would show unfiltered data as if
+  filtered.)
+- **Privacy: inference and aggregation abuse (PRD 92).** (a) Rows name endpoints, so they need `traffic:read-detail`; Management gets
+  aggregates only and *no row is read from the store for it*; an address filter is a 403 for it (a one-host aggregate is a row). (b) A
+  person is named only through the Step 6 identity service, only for `users:read` (human principals), with the basis; the source's
+  own user field is ignored. Ambiguity names nobody; `restricted` says the person is withheld. (c) Per-person traffic is audited,
+  rate-limited (Explorer 30/min), cached nowhere (`no-store`) and bounded (<= 500 rows, <= 500 distinct (address, time) questions per
+  request). (d) No per-user baseline, ranking or "behaviour score" is produced: anomalies are organisation-wide totals and applications.
+  Residual: an authorised `users:read` caller can still enumerate people by walking filters over time; the per-identity budget, the
+  audit trail and the 31-day cap are the controls, and the "who can see people at all" decision is open (RBAC-MATRIX).
+- **Attribution is not fact.** `observed` / `inferred` (capped 0.7) / `unknown`, with a reason; flows older than the evidence window
+  (24 h) are `source-unavailable`, not "no evidence"; external and shared addresses are never attributed (Step 6 policy). Hostile labels
+  (a person's display name, a hostname, an application name) are untrusted text rendered as data (hostile-markup component tests).
+- **Spoofable labels cannot buy trust.** A destination hostname comes from reverse DNS, controlled by the address owner: the operator
+  policy lets a hostname **deny** but never **allow** (a domain in `allow` invalidates the file); application approval matches the
+  name exactly (no prefix match), so `Zoom-malware` cannot inherit `Zoom`'s approval.
+- **Policy file as input.** `NETSIGHT_TRAFFIC_POLICY_FILE` is operator-controlled, read-only, <= 256 KiB, <= 1 000 entries per list,
+  duplicate keys and unknown keys refused, time zone name pattern-checked before it reaches `ZoneInfo`, re-read on change. An invalid
+  file makes every classification `Unknown` (fail closed), never a partial application; an edited file takes effect without a restart.
+- **Anomaly integrity.** The comparison is deterministic arithmetic (median/MAD over the same hour of the prior weeks, explained in
+  TRAFFIC-BASELINES.md), so there is no model to poison or prompt-inject. Baseline poisoning: robust statistics (one bad week in four does
+  not move the median); every read recomputes from source data (nothing adapts incrementally). **Open:** excluding confirmed-incident
+  periods from the baseline and operator "expected behaviour" labels. "Insufficient baseline", "no data" and "no history" are explicit
+  results; a gap in flow collection is never read as a drop. Outside-working-hours is context from operator policy, never a finding,
+  and the response names the common legitimate causes rather than a verdict.
+- **Denial of service / cost.** Windows <= 31 days (baselines <= 7 days of judged hours, over 28 + 7 days of data), row limits (flows
+  500; lists 100; timeline 200 buckets; mix 11; destinations 10), a per-read time budget (25 s) with sibling cancellation, **server-side
+  query limits** (below), admission control of at most 3 heavy reads, one per identity, the last slot reserved for the detail tier
+  (429 / 503 + `Retry-After`), per-identity budgets (30/min; baselines 10/min), a 300 s single-flight cache for the baseline
+  inputs (<= 16 windows, failures never cached). The Explorer is up to 6 ClickHouse calls per request. Per-worker limits and caches, as
+  elsewhere (open). A hot dashboard refresh loop is bounded by the budgets, not eliminated.
+- **Resource exhaustion of ClickHouse itself (security review HIGH-1).** A client timeout only stops waiting. Every query now carries
+  `max_execution_time`, `max_memory_usage`, `max_rows_to_read`, `max_bytes_to_read`, `max_result_rows`, `max_result_bytes`, the three
+  overflow modes pinned to `throw` (a limit fails the read, never truncates it) and `cancel_http_readonly_queries_on_client_close`
+  whenever the identity may set them. A `readonly = 1` identity may not, and then **nothing in the API can bound a query**: the
+  capability is learned once per process and a single warning says the user profile MUST enforce the limits; the exact profile is
+  in AKVORADO-CLICKHOUSE.md ("Resource limits (deployment requirement)"). Distinct counts use `uniq`, not `uniqExact`. **Residual:**
+  the limits are only as good as the deployed profile; the API cannot verify a `readonly` profile from the outside.
+- **Small cohorts (security review HIGH-2).** An aggregate filtered to one machine is that machine's traffic. `device` and `vlan` are now
+  endpoint-level filters (detail tier only), and the aggregate tier is held to a minimum cohort `k` (`NETSIGHT_TRAFFIC_MIN_COHORT`,
+  default 5, at least 2): an Explorer answer about fewer than `k` source addresses is withheld whole (so two overlapping filters cannot
+  be subtracted to isolate it), endpoint counts below `k` and first-seen rows reached by fewer than `k` sources are withheld, and every
+  response states the verdict (`cohort`). Destinations inside the organisation are never listed to the aggregate tier. **Residual:**
+  two answers that each pass can still be differenced by a caller who tries (a 6-source filter against a 5-source one); the per-identity
+  budget, the one-read-at-a-time rule and the audit trail are the controls. A query-set-overlap control is a deferral.
+- **Accountability for endpoint lookups.** Every read of all four routes is audited (names, counts, tier, cohort verdict; never
+  values), rejected input too, each with a static reason code. A detail-tier lookup of an address, device or VLAN may carry a keyed
+  HMAC fingerprint of the value so "who looked up X" is answerable without the trail holding X (AUDIT-LOGGING); it is omitted, never
+  weakened, when no key is configured.
+- **Policy file hardening.** Labels are compared by `casefold` only and a label that changes under NFKC is `unknown` (so a
+  compatibility look-alike cannot borrow an approval or a risk); an `allow` range wider than IPv4 /8 or IPv6 /16 invalidates the whole
+  file; the file is opened once and measured with `fstat` (no stat-then-read race). **Residual:** a hostname deny matches reverse DNS the
+  address owner controls, so it can be evaded and can be made to match a benign address (TRAFFIC-BASELINES, "Reverse-DNS deny false
+  positives").
+- **Fail closed / honest states.** Every response is validated against its canonical JSON Schema before it leaves; a violation is
+  `unknown` (HTTP 200, no values), never a 500 and never a guess. Not connected, unknown, restricted, withheld, not-evaluated and
+  unsupported are distinct states with distinct UI.
+- **Output handling.** Names, domains, applications, hostnames, labels and device names are untrusted source text: carried as data in
+  the API, rendered only as React text nodes (no raw HTML anywhere; the existing source scan test covers the new files), never
+  interpreted by any AI. The overview and the Explorer name people only for roles allowed to see them.
+- **Still open.** A live ClickHouse run of the new SQL (none available here); a shared (non per-worker) limiter and cache; excluding
+  incident periods from baselines; operator labels; per-site scoping; the people-in-rows decision; an index strategy for address filters
+  on very large tables; reading `SamplingRate` (an explicit, labelled scaled view); a Playwright run of the four pages.
+
 ## AI-specific threats
 - prompt injection in logs/hostnames/knowledge;
 - tool injection;

@@ -9,7 +9,7 @@ import os
 import re
 from collections.abc import AsyncIterator, Awaitable, Mapping
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from typing import Annotated, Any, NoReturn, Protocol, cast
 from urllib.parse import urlsplit
 from uuid import uuid4
@@ -23,7 +23,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.base import RequestResponseEndpoint
 from starlette.responses import Response
 
-from netsight_api.adapters.clickhouse import ClickhouseClient
+from netsight_api.adapters.clickhouse_explorer import ExplorerClickhouse
 from netsight_api.adapters.librenms import (
     AdapterError,
     AdapterStatus,
@@ -47,7 +47,7 @@ from netsight_api.adapters.netbox import (
     canonical_device_id as netbox_canonical_device_id,
 )
 from netsight_api.alert_rule_routes import router as alert_rule_router
-from netsight_api.audit import configure_audit_logging
+from netsight_api.audit import configure_audit_logging, record_audit
 from netsight_api.auth.deps import get_current_identity
 from netsight_api.auth.oidc import aclose as oidc_aclose
 from netsight_api.auth.routes import router as auth_router
@@ -90,8 +90,6 @@ from netsight_api.schemas import (
     TopologyNodeFinding,
     TopologyResponse,
     TrafficDimension,
-    TrafficFlow,
-    TrafficFlowsResponse,
     TrafficItem,
     TrafficPreset,
     TrafficTimeRange,
@@ -99,6 +97,8 @@ from netsight_api.schemas import (
 )
 from netsight_api.security_routes import router as security_router
 from netsight_api.timewindow import resolve_window
+from netsight_api.traffic.responses import freshness_for
+from netsight_api.traffic_routes import router as traffic_router
 from netsight_api.wan.wiring import build_wan_collector, start_wan_sampling
 
 API_PREFIX = "/api/v1"
@@ -133,7 +133,11 @@ async def lifespan(app_: FastAPI) -> AsyncIterator[None]:
 
 # Routes whose error responses must carry ``Cache-Control: no-store`` as well (the success path sets
 # it in the route): the people and identity surfaces.
-_NO_STORE_ERROR_PREFIXES = (f"{API_PREFIX}/users", f"{API_PREFIX}/identity/")
+_NO_STORE_ERROR_PREFIXES = (
+    f"{API_PREFIX}/users",
+    f"{API_PREFIX}/identity/",
+    f"{API_PREFIX}/traffic/",
+)
 
 app = FastAPI(title="Netsight Platform API", version="0.1.0", lifespan=lifespan)
 # Registered before the correlation middleware below, so it runs inside it and its 413
@@ -367,19 +371,6 @@ class TrafficSource(Protocol):
         """
         ...
 
-    async def flows(
-        self,
-        *,
-        start: datetime,
-        end: datetime,
-        limit: int,
-    ) -> tuple[list[TrafficFlow], datetime | None]:
-        """Return high-volume flows and the newest flow timestamp included.
-
-        ``None`` means the window carried no rows: the read succeeded but
-        reports no data currency.
-        """
-        ...
 
 
 def get_optional_traffic_source() -> TrafficSource | None:
@@ -392,7 +383,7 @@ def get_optional_traffic_source() -> TrafficSource | None:
     dsn = os.environ.get("CLICKHOUSE_DSN", "").strip()
     if not dsn:
         return None
-    return ClickhouseClient(
+    return ExplorerClickhouse(
         dsn=dsn,
         user=os.environ.get("CLICKHOUSE_USER", "").strip(),
         password=os.environ.get("CLICKHOUSE_PASSWORD", ""),
@@ -442,9 +433,25 @@ def require_traffic_reader(identity: CurrentIdentity) -> Identity:
     return identity
 
 
+def require_traffic_detail_reader(request: Request, identity: CurrentIdentity) -> Identity:
+    """Endpoint-level traffic (source addresses): needs ``traffic:read-detail``; denials are audited."""
+    if not is_allowed(identity, Permission.TRAFFIC_READ_DETAIL.value):
+        record_audit(
+            "traffic.top-talkers.read",
+            outcome="denied",
+            actor_id=identity.id,
+            correlation_id=_request_correlation_id(request),
+            reason="permission",
+        )
+        raise ApiError(403, "FORBIDDEN", "Permission is required")
+    enforce_read_limit(identity, "traffic")
+    return identity
+
+
 DeviceReader = Annotated[Identity, Depends(require_device_reader)]
 AlertReader = Annotated[Identity, Depends(require_alert_reader)]
 TrafficReader = Annotated[Identity, Depends(require_traffic_reader)]
+TrafficDetailReader = Annotated[Identity, Depends(require_traffic_detail_reader)]
 
 _STANDARD_ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {
     401: {"model": ErrorEnvelope, "description": "Authentication required"},
@@ -840,25 +847,6 @@ async def topology(
     return response
 
 
-_TRAFFIC_FRESH_THRESHOLD = timedelta(hours=1)
-
-
-def _traffic_freshness(window_end: datetime, observed_at: datetime | None) -> Freshness:
-    """Source-reported recency for an ``ok`` read.
-
-    ``fresh`` when the newest flow is within an hour of the window end,
-    ``stale`` when the source lags the window, ``unknown`` when no row
-    carried a timestamp (the read succeeded but reports no currency).
-    """
-    if observed_at is None:
-        return Freshness(state="unknown", observed_at=None, source="clickhouse")
-    return Freshness(
-        state=("fresh" if observed_at >= window_end - _TRAFFIC_FRESH_THRESHOLD else "stale"),
-        observed_at=observed_at,
-        source="clickhouse",
-    )
-
-
 def _validate_top(body: TrafficTopResponse) -> TrafficTopResponse:
     """Canonical boundary validation applied on every return path.
 
@@ -866,12 +854,6 @@ def _validate_top(body: TrafficTopResponse) -> TrafficTopResponse:
     enforced uniformly rather than only on the source-backed branch.
     """
     validate("traffic_top", body.model_dump(mode="json", by_alias=True))
-    return body
-
-
-def _validate_flows(body: TrafficFlowsResponse) -> TrafficFlowsResponse:
-    """Canonical boundary validation for every traffic-flows return path."""
-    validate("traffic_flows", body.model_dump(mode="json", by_alias=True))
     return body
 
 
@@ -933,7 +915,7 @@ async def _traffic_top(
             dimension=dimension,
             time_range=time_range,
             items=items,
-            freshness=_traffic_freshness(window_end, observed_at),
+            freshness=freshness_for(window_end, observed_at),
         )
         # Canonical contract enforced at the boundary, like every other endpoint.
         _validate_top(response)
@@ -958,7 +940,7 @@ async def _traffic_top(
 )
 async def traffic_top_talkers(
     request: Request,
-    _identity: TrafficReader,
+    identity: TrafficDetailReader,
     source: OptionalTrafficDependency,
     preset: Annotated[TrafficPreset, Query()] = "24h",
     start: Annotated[datetime | None, Query(alias="from")] = None,
@@ -970,7 +952,16 @@ async def traffic_top_talkers(
     States are explicit: not-connected without a source, unknown when the
     source read fails, ok only with source-reported aggregates.
     """
-    return await _traffic_top(request, source, "talkers", preset, start, end, limit)
+    body = await _traffic_top(request, source, "talkers", preset, start, end, limit)
+    record_audit(
+        "traffic.top-talkers.read",
+        outcome="failure" if body.state == "unknown" else "success",
+        actor_id=identity.id,
+        correlation_id=_request_correlation_id(request),
+        state=body.state,
+        row_count=len(body.items),
+    )
+    return body
 
 
 @api.get(
@@ -990,80 +981,6 @@ async def traffic_top_destinations(
 ) -> TrafficTopResponse:
     """Top destinations for a bounded window (same explicit states)."""
     return await _traffic_top(request, source, "destinations", preset, start, end, limit)
-
-
-@api.get(
-    "/traffic/flows",
-    response_model=TrafficFlowsResponse,
-    responses=_TRAFFIC_ERROR_RESPONSES,
-    tags=["traffic"],
-)
-async def traffic_flows(
-    request: Request,
-    _identity: TrafficReader,
-    source: OptionalTrafficDependency,
-    preset: Annotated[TrafficPreset, Query()] = "24h",
-    start: Annotated[datetime | None, Query(alias="from")] = None,
-    end: Annotated[datetime | None, Query(alias="to")] = None,
-    limit: Annotated[int, Query(ge=1, le=500)] = 50,
-) -> TrafficFlowsResponse:
-    """Recent high-volume flows for a bounded window (explicit states)."""
-    window_start, window_end, resolved_preset = resolve_window(preset, start, end)
-    time_range = TrafficTimeRange.model_validate(
-        {"from": window_start, "to": window_end, "preset": resolved_preset}
-    )
-    correlation_id = _request_correlation_id(request)
-
-    def _degraded() -> TrafficFlowsResponse:
-        return _validate_flows(
-            TrafficFlowsResponse(
-                state="unknown",
-                time_range=time_range,
-                flows=[],
-                freshness=Freshness(state="unknown", observed_at=None, source="clickhouse"),
-            )
-        )
-
-    if source is None:
-        return _validate_flows(
-            TrafficFlowsResponse(
-                state="not-connected",
-                time_range=time_range,
-                flows=[],
-                freshness=Freshness(state="unknown", observed_at=None, source=None),
-            )
-        )
-    result = await _capture(source.flows(start=window_start, end=window_end, limit=limit))
-    if isinstance(result, Exception):
-        _LOGGER.warning(
-            "traffic flow source read failed",
-            extra={
-                "correlation_id": correlation_id,
-                "source": "clickhouse",
-                "error_type": type(result).__name__,
-            },
-        )
-        return _degraded()
-    flows, observed_at = result
-    try:
-        response = TrafficFlowsResponse(
-            state="ok",
-            time_range=time_range,
-            flows=flows,
-            freshness=_traffic_freshness(window_end, observed_at),
-        )
-        _validate_flows(response)
-    except (ValidationError, ContractViolation) as exc:
-        _LOGGER.warning(
-            "traffic flow response rejected by canonical contract",
-            extra={
-                "correlation_id": correlation_id,
-                "source": "clickhouse",
-                "error_type": type(exc).__name__,
-            },
-        )
-        return _degraded()
-    return response
 
 
 @api.get(
@@ -1283,6 +1200,7 @@ app.include_router(diagnostic_router, prefix=API_PREFIX)
 app.include_router(diagnostic_session_router, prefix=API_PREFIX)
 app.include_router(internet_router, prefix=API_PREFIX)
 app.include_router(identity_router, prefix=API_PREFIX)
+app.include_router(traffic_router, prefix=API_PREFIX)
 # Authentication lives under the same versioned prefix as every other platform
 # route (contracts/openapi/netsight-api.yaml declares `servers: /api/v1` with
 # `/auth/providers` relative to it). Serving it unversioned broke the server

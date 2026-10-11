@@ -32,6 +32,14 @@ Identity confidence, current devices/IPs, activity, traffic, security, history.
 
 ## Traffic
 Time range, scope, top talkers, apps, destinations, upload/download, anomalous flows. Drill to user/device.
+Built (Step 7) as five sections sharing one time-range picker: Overview (`/traffic`), Flow Explorer (`/traffic/flows`: allow-listed filters,
+volume, timeline, application mix, top destinations, rows with attribution by basis), Applications (`/traffic/applications`),
+Destinations (`/traffic/destinations`) and Anomalies (`/traffic/anomalies`: hours that differ from the same hour in prior weeks, with the
+arithmetic shown). Every value is source-reported or Unknown / Not reported; people appear only through the identity service, with the basis.
+A role without the detail permission (Management) gets a "Too few sources" status instead of an emptier-looking answer when fewer than the minimum cohort of
+source addresses stand behind it, "Withheld (fewer than k)" in place of a small endpoint count, no destinations inside the organisation (the detail tier sees them
+labelled "Inside the organisation"), and no address, exporter or VLAN filter fields. The Anomalies page notes when the baseline weeks cross a daylight-saving change in
+the policy time zone (the weeks are fixed 168-hour UTC weeks).
 
 ## Security Centre
 Severity overview, correlated detections, endpoint/network evidence, investigation queue.

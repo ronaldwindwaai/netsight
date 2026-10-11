@@ -207,7 +207,7 @@ paths:
           $ref: '#/components/responses/SourceUnavailable'
   /traffic/top-talkers:
     get:
-      summary: Top traffic talkers for a bounded time window (explicit source state)
+      summary: Top traffic talkers (source addresses) for a bounded time window (explicit source state; needs traffic:read-detail)
       operationId: getTrafficTopTalkers
       parameters:
         - in: query
@@ -248,9 +248,11 @@ paths:
           $ref: '#/components/responses/PermissionDenied'
         '422':
           $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
   /traffic/top-destinations:
     get:
-      summary: Top traffic destinations for a bounded time window (explicit source state)
+      summary: Top traffic destinations for a bounded time window (explicit source state; needs traffic:read)
       operationId: getTrafficTopDestinations
       parameters:
         - in: query
@@ -291,9 +293,11 @@ paths:
           $ref: '#/components/responses/PermissionDenied'
         '422':
           $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
   /traffic/flows:
     get:
-      summary: Recent high-volume flows for a bounded time window (explicit source state)
+      summary: "Flow Explorer: filtered flows with bounded aggregations and attribution by basis (explicit source state)"
       operationId: getTrafficFlows
       parameters:
         - in: query
@@ -318,9 +322,48 @@ paths:
             minimum: 1
             maximum: 500
             default: 50
+        - in: query
+          name: source_ip
+          description: Exact IPv4 or IPv6 address (endpoint-level; needs traffic:read-detail).
+          schema: {type: string, minLength: 2, maxLength: 45}
+        - in: query
+          name: destination_ip
+          description: Exact IPv4 or IPv6 address (endpoint-level; needs traffic:read-detail).
+          schema: {type: string, minLength: 2, maxLength: 45}
+        - in: query
+          name: device
+          description: The flow exporter (reporting router or switch) as the flow source names it (endpoint-level; needs traffic:read-detail).
+          schema: {type: string, minLength: 1, maxLength: 128}
+        - in: query
+          name: vlan
+          description: Matches the source or destination VLAN (endpoint-level; needs traffic:read-detail).
+          schema: {type: integer, minimum: 0, maximum: 4094}
+        - in: query
+          name: application
+          description: Exact application name as the flow source reports it.
+          schema: {type: string, minLength: 1, maxLength: 128}
+        - in: query
+          name: protocol
+          schema: {enum: [tcp, udp, icmp, other]}
+        - in: query
+          name: port
+          description: Matches the destination port (and the source port when the source reports it).
+          schema: {type: integer, minimum: 0, maximum: 65535}
+        - in: query
+          name: country
+          description: ISO 3166-1 alpha-2 code, upper case; matches the source or destination country.
+          schema: {type: string, pattern: '^[A-Z]{2}$'}
+        - in: query
+          name: asn
+          description: Matches the source or destination autonomous system number.
+          schema: {type: integer, minimum: 1, maximum: 4294967295}
+        - in: query
+          name: direction
+          description: Derived only from the source's own interface boundary classification.
+          schema: {enum: [inbound, outbound, internal]}
       responses:
         '200':
-          description: High-volume flows, or an explicit not-connected/unknown state without flows
+          description: "Filtered flows and aggregations, or an explicit not-connected/unknown state without rows. Rows need traffic:read-detail; a caller without it receives the aggregations only, and only when at least the minimum cohort of source addresses (cohort.minimum) stands behind them: otherwise they are withheld and cohort.state is too-few-sources."
           headers:
             X-Correlation-ID:
               $ref: '#/components/headers/CorrelationId'
@@ -334,6 +377,180 @@ paths:
           $ref: '#/components/responses/PermissionDenied'
         '422':
           $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          description: The read budget is busy; retry shortly
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            Retry-After:
+              schema: {type: integer}
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /traffic/applications:
+    get:
+      summary: "Applications by volume with trend and operator-policy approval and risk (explicit source state)"
+      operationId: getTrafficApplications
+      parameters:
+        - in: query
+          name: preset
+          schema:
+            enum: [1h, 6h, 24h, 7d]
+            default: 24h
+        - in: query
+          name: from
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: to
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 25
+      responses:
+        '200':
+          description: "Application rows, or an explicit not-connected/unknown state without rows"
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrafficApplicationsResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          description: The read budget is busy; retry shortly
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            Retry-After:
+              schema: {type: integer}
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /traffic/destinations:
+    get:
+      summary: "Destinations by volume with first and last seen and operator allow/deny reputation (explicit source state)"
+      operationId: getTrafficDestinations
+      parameters:
+        - in: query
+          name: preset
+          schema:
+            enum: [1h, 6h, 24h, 7d]
+            default: 24h
+        - in: query
+          name: from
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: to
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 25
+      responses:
+        '200':
+          description: "Destination rows, or an explicit not-connected/unknown state without rows"
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrafficDestinationsResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          description: The read budget is busy; retry shortly
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            Retry-After:
+              schema: {type: integer}
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /traffic/anomalies:
+    get:
+      summary: "Deterministic same-hour-of-week baseline comparison (explicit source state; no ML)"
+      operationId: getTrafficAnomalies
+      parameters:
+        - in: query
+          name: preset
+          schema:
+            enum: [1h, 6h, 24h, 7d]
+            default: 24h
+        - in: query
+          name: from
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: to
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: "Anomalies with baseline, observed value, difference and confidence; nothing is reported without a sufficient baseline"
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrafficAnomaliesResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          description: The read budget is busy; retry shortly
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            Retry-After:
+              schema: {type: integer}
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /security/events:
     get:
       summary: Security events for a bounded time window (explicit source state)
@@ -2041,10 +2258,324 @@ components:
             $ref: '#/components/schemas/TrafficItem'
         freshness:
           $ref: '#/components/schemas/Freshness'
+    TrafficFlowFilters:
+      description: The filters that were applied, echoed from the request (allow-listed fields only).
+      type: object
+      additionalProperties: false
+      required:
+      - source_ip
+      - destination_ip
+      - device
+      - vlan
+      - application
+      - protocol
+      - port
+      - country
+      - asn
+      - direction
+      properties:
+        source_ip:
+          type:
+          - string
+          - 'null'
+          minLength: 2
+          maxLength: 45
+        destination_ip:
+          type:
+          - string
+          - 'null'
+          minLength: 2
+          maxLength: 45
+        device:
+          type:
+          - string
+          - 'null'
+          minLength: 1
+          maxLength: 128
+        vlan:
+          type:
+          - integer
+          - 'null'
+          minimum: 0
+          maximum: 4094
+        application:
+          type:
+          - string
+          - 'null'
+          minLength: 1
+          maxLength: 128
+        protocol:
+          enum:
+          - tcp
+          - udp
+          - icmp
+          - other
+          - null
+        port:
+          type:
+          - integer
+          - 'null'
+          minimum: 0
+          maximum: 65535
+        country:
+          type:
+          - string
+          - 'null'
+          minLength: 2
+          maxLength: 2
+          pattern: ^[A-Z]{2}$
+        asn:
+          type:
+          - integer
+          - 'null'
+          minimum: 1
+          maximum: 4294967295
+        direction:
+          enum:
+          - inbound
+          - outbound
+          - internal
+          - null
+    TrafficPersonRef:
+      description: A person as the identity service names them; the label is untrusted text.
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - label
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 128
+          pattern: ^person-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+        label:
+          type:
+          - string
+          - 'null'
+          minLength: 1
+          maxLength: 128
+    TrafficDeviceRef:
+      description: The endpoint's device as the identity service names it; the label is untrusted text.
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - label
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 128
+          pattern: ^device-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+        label:
+          type:
+          - string
+          - 'null'
+          minLength: 1
+          maxLength: 128
+    TrafficAttributionStatus:
+      description: 'What the caller may be told about the person behind an address, and whether the identity service answered. withheld: the role holds no users permission; not-evaluated: there were no rows to attribute.'
+      type: object
+      additionalProperties: false
+      required:
+      - level
+      - state
+      - as_of
+      properties:
+        level:
+          enum:
+          - person
+          - endpoint
+          - none
+        state:
+          enum:
+          - ok
+          - not-connected
+          - unknown
+          - withheld
+          - not-evaluated
+        as_of:
+          type:
+          - string
+          - 'null'
+          format: date-time
+      allOf:
+      - if:
+          properties:
+            level:
+              const: none
+          required:
+          - level
+        then:
+          properties:
+            state:
+              enum:
+              - withheld
+              - not-evaluated
+      - if:
+          properties:
+            state:
+              const: withheld
+          required:
+          - state
+        then:
+          properties:
+            level:
+              const: none
+      - if:
+          properties:
+            state:
+              enum:
+              - not-connected
+              - unknown
+              - withheld
+              - not-evaluated
+          required:
+          - state
+        then:
+          properties:
+            as_of:
+              type: 'null'
+      - if:
+          properties:
+            state:
+              const: ok
+          required:
+          - state
+        then:
+          properties:
+            as_of:
+              type: string
+    TrafficFlowAttribution:
+      description: 'Who was behind the source address when the flow was seen, with its basis. An address alone is never identity: unknown carries no person; inferred is capped at 0.7.'
+      type: object
+      additionalProperties: false
+      required:
+      - basis
+      - reason
+      - confidence
+      - ambiguous
+      - person
+      - device
+      properties:
+        basis:
+          enum:
+          - observed
+          - inferred
+          - unknown
+        reason:
+          enum:
+          - declared-assignment
+          - indirect-evidence
+          - low-confidence
+          - name-match
+          - conflicting-evidence
+          - no-evidence
+          - expired
+          - multiple-candidates
+          - shared-address
+          - vpn-no-session
+          - guest-network
+          - ip-only
+          - source-unavailable
+          - restricted
+          - null
+        confidence:
+          type:
+          - number
+          - 'null'
+          minimum: 0
+          maximum: 1
+        ambiguous:
+          type: boolean
+        person:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/TrafficPersonRef'
+        device:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/TrafficDeviceRef'
+      allOf:
+      - if:
+          properties:
+            basis:
+              const: unknown
+          required:
+          - basis
+        then:
+          properties:
+            person:
+              type: 'null'
+            confidence:
+              type: 'null'
+            reason:
+              enum:
+              - no-evidence
+              - expired
+              - conflicting-evidence
+              - multiple-candidates
+              - shared-address
+              - vpn-no-session
+              - guest-network
+              - ip-only
+              - source-unavailable
+              - restricted
+      - if:
+          properties:
+            basis:
+              const: observed
+          required:
+          - basis
+        then:
+          properties:
+            person:
+              type: object
+            confidence:
+              type: number
+            reason:
+              type: 'null'
+            ambiguous:
+              const: false
+      - if:
+          properties:
+            basis:
+              const: inferred
+          required:
+          - basis
+        then:
+          properties:
+            person:
+              type: object
+            confidence:
+              type: number
+              maximum: 0.7
+            reason:
+              enum:
+              - declared-assignment
+              - indirect-evidence
+              - low-confidence
+              - name-match
+              - conflicting-evidence
+            ambiguous:
+              const: false
     TrafficFlow:
       type: object
       additionalProperties: false
-      required: [observed_at, source_ip, source_device_id, destination_ip, destination_host, protocol, destination_port, bytes, packets, direction, application, user]
+      required:
+      - observed_at
+      - source_ip
+      - source_device_id
+      - destination_ip
+      - destination_host
+      - protocol
+      - destination_port
+      - bytes
+      - packets
+      - direction
+      - application
+      - attribution
       properties:
         observed_at:
           type: string
@@ -2054,54 +2585,1353 @@ components:
           minLength: 1
           maxLength: 45
         source_device_id:
-          type: [string, 'null']
-          pattern: '^device-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+          description: Canonical device ID when resolvable; null otherwise.
+          type:
+          - string
+          - 'null'
+          pattern: ^device-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
         destination_ip:
           type: string
           minLength: 1
           maxLength: 45
         destination_host:
-          type: [string, 'null']
+          description: rDNS/domain as reported by the source; never inferred.
+          type:
+          - string
+          - 'null'
           minLength: 1
           maxLength: 255
         protocol:
-          enum: [tcp, udp, icmp, other]
+          enum:
+          - tcp
+          - udp
+          - icmp
+          - other
         destination_port:
-          type: [integer, 'null']
+          type:
+          - integer
+          - 'null'
           minimum: 0
           maximum: 65535
         bytes:
           type: integer
           minimum: 0
         packets:
-          type: [integer, 'null']
+          type:
+          - integer
+          - 'null'
           minimum: 0
         direction:
-          enum: [inbound, outbound, internal, unknown]
+          description: Derived only from the source's own interface boundary classification; unknown otherwise.
+          enum:
+          - inbound
+          - outbound
+          - internal
+          - unknown
         application:
-          type: [string, 'null']
+          description: Source-reported application/enrichment metadata only.
+          type:
+          - string
+          - 'null'
           minLength: 1
           maxLength: 255
-        user:
-          type: [string, 'null']
-          minLength: 1
-          maxLength: 255
-    TrafficFlowsResponse:
+        attribution:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/TrafficFlowAttribution'
+    TrafficTimelineBucket:
       type: object
       additionalProperties: false
-      required: [state, time_range, flows, freshness]
+      required:
+      - start
+      - bytes
+      - packets
+      - flows
+      properties:
+        start:
+          type: string
+          format: date-time
+        bytes:
+          type: integer
+          minimum: 0
+        packets:
+          type:
+          - integer
+          - 'null'
+          minimum: 0
+        flows:
+          type: integer
+          minimum: 0
+    TrafficVolume:
+      description: Totals over the filtered window, summed from the source's own counters.
+      type: object
+      additionalProperties: false
+      required:
+      - bytes
+      - packets
+      - flows
+      - source_addresses
+      - destination_addresses
+      properties:
+        bytes:
+          type: integer
+          minimum: 0
+        packets:
+          type:
+          - integer
+          - 'null'
+          minimum: 0
+        flows:
+          type: integer
+          minimum: 0
+        source_addresses:
+          type: integer
+          minimum: 0
+        destination_addresses:
+          type: integer
+          minimum: 0
+    TrafficApplicationMixItem:
+      type: object
+      additionalProperties: false
+      required:
+      - application
+      - bytes
+      - share
+      properties:
+        application:
+          type:
+          - string
+          - 'null'
+          minLength: 1
+          maxLength: 255
+        bytes:
+          type: integer
+          minimum: 0
+        share:
+          type:
+          - number
+          - 'null'
+          minimum: 0
+          maximum: 1
+    TrafficApplicationMix:
+      description: Top applications by bytes; a null application is traffic the source labelled with none.
+      type: object
+      additionalProperties: false
+      required:
+      - items
+      - other_bytes
+      - total_bytes
+      properties:
+        items:
+          type: array
+          maxItems: 11
+          items:
+            $ref: '#/components/schemas/TrafficApplicationMixItem'
+        other_bytes:
+          type: integer
+          minimum: 0
+        total_bytes:
+          type: integer
+          minimum: 0
+    TrafficDestinationShare:
+      type: object
+      additionalProperties: false
+      required:
+      - address
+      - host
+      - scope
+      - bytes
+      - share
+      properties:
+        address:
+          type: string
+          minLength: 1
+          maxLength: 45
+        host:
+          type:
+          - string
+          - 'null'
+          minLength: 1
+          maxLength: 255
+        scope:
+          enum:
+          - external
+          - internal
+          description: 'internal: a private, loopback, link-local, shared or multicast address. The aggregate tier is never told about internal destinations.'
+        bytes:
+          type: integer
+          minimum: 0
+        share:
+          type:
+          - number
+          - 'null'
+          minimum: 0
+          maximum: 1
+    TrafficAggregations:
+      description: Bounded aggregations over the whole filtered window (not over the listed rows).
+      type: object
+      additionalProperties: false
+      required:
+      - bucket_seconds
+      - timeline
+      - volume
+      - application_mix
+      - destinations
+      properties:
+        bucket_seconds:
+          type: integer
+          minimum: 60
+          maximum: 86400
+        timeline:
+          type: array
+          maxItems: 200
+          items:
+            $ref: '#/components/schemas/TrafficTimelineBucket'
+        volume:
+          $ref: '#/components/schemas/TrafficVolume'
+        application_mix:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/TrafficApplicationMix'
+        destinations:
+          type: array
+          maxItems: 10
+          items:
+            $ref: '#/components/schemas/TrafficDestinationShare'
+    TrafficCohort:
+      description: 'The small-cohort rule as applied to this answer. not-applied: the caller holds the detail tier (or nothing was read). sufficient: the aggregate tier, and the figures describe at least minimum source addresses. too-few-sources: the aggregate tier, and something was withheld because fewer than minimum source addresses stood behind it.'
+      type: object
+      additionalProperties: false
+      required:
+      - state
+      - minimum
       properties:
         state:
-          enum: [not-connected, ok, unknown]
+          enum:
+          - not-applied
+          - sufficient
+          - too-few-sources
+        minimum:
+          type:
+          - integer
+          - 'null'
+          minimum: 2
+          maximum: 1000
+      allOf:
+      - if:
+          properties:
+            state:
+              const: not-applied
+          required:
+          - state
+        then:
+          properties:
+            minimum:
+              type: 'null'
+        else:
+          properties:
+            minimum:
+              type: integer
+    TrafficFlowsResponse:
+      type: object
+      required:
+      - state
+      - time_range
+      - filters
+      - unsupported
+      - flows_restricted
+      - attribution
+      - flows
+      - aggregations
+      - cohort
+      - freshness
+      additionalProperties: false
+      properties:
+        state:
+          enum:
+          - not-connected
+          - ok
+          - unknown
         time_range:
           $ref: '#/components/schemas/TrafficTimeRange'
+        filters:
+          $ref: '#/components/schemas/TrafficFlowFilters'
+        unsupported:
+          description: Filters the request used that the flow source does not report; the read is unknown, never silently unfiltered.
+          type: array
+          uniqueItems: true
+          maxItems: 10
+          items:
+            enum:
+            - source_ip
+            - destination_ip
+            - device
+            - vlan
+            - application
+            - protocol
+            - port
+            - country
+            - asn
+            - direction
+        flows_restricted:
+          type: boolean
+        attribution:
+          $ref: '#/components/schemas/TrafficAttributionStatus'
         flows:
           type: array
           maxItems: 500
           items:
             $ref: '#/components/schemas/TrafficFlow'
+        aggregations:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/TrafficAggregations'
+        cohort:
+          $ref: '#/components/schemas/TrafficCohort'
         freshness:
           $ref: '#/components/schemas/Freshness'
+      allOf:
+      - if:
+          properties:
+            state:
+              enum:
+              - not-connected
+              - unknown
+          required:
+          - state
+        then:
+          properties:
+            flows:
+              maxItems: 0
+            aggregations:
+              type: 'null'
+      - if:
+          properties:
+            flows_restricted:
+              const: true
+          required:
+          - flows_restricted
+        then:
+          properties:
+            flows:
+              maxItems: 0
+            attribution:
+              properties:
+                level:
+                  const: none
+      - if:
+          properties:
+            unsupported:
+              minItems: 1
+          required:
+          - unsupported
+        then:
+          properties:
+            state:
+              const: unknown
+      - if:
+          properties:
+            state:
+              enum:
+              - not-connected
+              - unknown
+          required:
+          - state
+        then: &id001
+          properties:
+            cohort:
+              properties:
+                state:
+                  const: not-applied
+      - if:
+          properties:
+            cohort:
+              properties:
+                state:
+                  const: too-few-sources
+          required:
+          - cohort
+        then:
+          properties:
+            flows:
+              maxItems: 0
+            aggregations:
+              type: 'null'
+      - if:
+          properties:
+            state:
+              const: ok
+            flows_restricted:
+              const: false
+          required:
+          - state
+          - flows_restricted
+        then: *id001
+      - if:
+          properties:
+            state:
+              const: ok
+            flows_restricted:
+              const: true
+          required:
+          - state
+          - flows_restricted
+        then:
+          properties:
+            cohort:
+              properties:
+                state:
+                  enum:
+                  - sufficient
+                  - too-few-sources
+            aggregations:
+              anyOf:
+              - type: 'null'
+              - properties:
+                  destinations:
+                    items:
+                      properties:
+                        scope:
+                          const: external
+    TrafficPolicy:
+      description: Whether an operator policy file classified approval, risk and reputation. Without one they are unknown.
+      type: object
+      additionalProperties: false
+      required:
+      - state
+      properties:
+        state:
+          enum:
+          - not-configured
+          - configured
+          - invalid
+    TrafficAppTrend:
+      description: Change against the immediately preceding window of equal length; flat is within 10 percent.
+      type: object
+      additionalProperties: false
+      required:
+      - state
+      - previous_bytes
+      - change_ratio
+      properties:
+        state:
+          enum:
+          - up
+          - down
+          - flat
+          - new
+          - unknown
+        previous_bytes:
+          type:
+          - integer
+          - 'null'
+          minimum: 0
+        change_ratio:
+          type:
+          - number
+          - 'null'
+          minimum: -1
+      allOf:
+      - if:
+          properties:
+            state:
+              const: unknown
+          required:
+          - state
+        then:
+          properties:
+            previous_bytes:
+              type: 'null'
+            change_ratio:
+              type: 'null'
+      - if:
+          properties:
+            state:
+              const: new
+          required:
+          - state
+        then:
+          properties:
+            previous_bytes:
+              const: 0
+            change_ratio:
+              type: 'null'
+      - if:
+          properties:
+            state:
+              enum:
+              - up
+              - down
+              - flat
+          required:
+          - state
+        then:
+          properties:
+            previous_bytes:
+              type: integer
+              minimum: 1
+            change_ratio:
+              type: number
+      - if:
+          properties:
+            state:
+              const: up
+          required:
+          - state
+        then:
+          properties:
+            change_ratio:
+              exclusiveMinimum: 0.1
+      - if:
+          properties:
+            state:
+              const: down
+          required:
+          - state
+        then:
+          properties:
+            change_ratio:
+              exclusiveMaximum: -0.1
+      - if:
+          properties:
+            state:
+              const: flat
+          required:
+          - state
+        then:
+          properties:
+            change_ratio:
+              minimum: -0.1
+              maximum: 0.1
+    TrafficApplication:
+      description: Application name and category are source-reported and untrusted; risk and approval come only from the operator policy.
+      type: object
+      additionalProperties: false
+      required:
+      - rank
+      - application
+      - category
+      - bytes
+      - packets
+      - share
+      - endpoints
+      - users
+      - trend
+      - risk
+      - approval
+      properties:
+        rank:
+          type: integer
+          minimum: 1
+          maximum: 100
+        application:
+          type: string
+          minLength: 1
+          maxLength: 255
+        category:
+          type:
+          - string
+          - 'null'
+          minLength: 1
+          maxLength: 128
+        bytes:
+          type: integer
+          minimum: 0
+        packets:
+          type:
+          - integer
+          - 'null'
+          minimum: 0
+        share:
+          type:
+          - number
+          - 'null'
+          minimum: 0
+          maximum: 1
+        endpoints:
+          type:
+          - integer
+          - 'null'
+          minimum: 0
+          description: Distinct source addresses seen using the application (not people, not inventory devices).
+        users:
+          type:
+          - integer
+          - 'null'
+          minimum: 0
+          description: 'Null: counting people needs per-flow identity attribution, which this surface does not do.'
+        trend:
+          $ref: '#/components/schemas/TrafficAppTrend'
+        risk:
+          enum:
+          - low
+          - medium
+          - high
+          - unknown
+        approval:
+          enum:
+          - approved
+          - unapproved
+          - unknown
+    TrafficApplicationsResponse:
+      type: object
+      required:
+      - state
+      - time_range
+      - previous_range
+      - policy
+      - unsupported
+      - total_bytes
+      - items
+      - cohort
+      - freshness
+      additionalProperties: false
+      properties:
+        state:
+          enum:
+          - not-connected
+          - ok
+          - unknown
+        time_range:
+          $ref: '#/components/schemas/TrafficTimeRange'
+        previous_range:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/TrafficTimeRange'
+        policy:
+          $ref: '#/components/schemas/TrafficPolicy'
+        unsupported:
+          type: array
+          uniqueItems: true
+          maxItems: 1
+          items:
+            enum:
+            - application
+        total_bytes:
+          type:
+          - integer
+          - 'null'
+          minimum: 0
+        items:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/TrafficApplication'
+        cohort:
+          $ref: '#/components/schemas/TrafficCohort'
+        freshness:
+          $ref: '#/components/schemas/Freshness'
+      allOf:
+      - if:
+          properties:
+            state:
+              enum:
+              - not-connected
+              - unknown
+          required:
+          - state
+        then:
+          properties:
+            items:
+              maxItems: 0
+            total_bytes:
+              type: 'null'
+            previous_range:
+              type: 'null'
+      - if:
+          properties:
+            unsupported:
+              minItems: 1
+          required:
+          - unsupported
+        then:
+          properties:
+            state:
+              const: unknown
+      - if:
+          properties:
+            state:
+              enum:
+              - not-connected
+              - unknown
+          required:
+          - state
+        then:
+          properties:
+            cohort:
+              properties:
+                state:
+                  const: not-applied
+      - if:
+          properties:
+            cohort:
+              properties:
+                state:
+                  const: too-few-sources
+          required:
+          - cohort
+        then:
+          properties:
+            items:
+              contains:
+                properties:
+                  endpoints:
+                    type: 'null'
+                required:
+                - endpoints
+    TrafficDestination:
+      description: Domain, ASN and country are source-reported; reputation comes only from the operator allow/deny list.
+      type: object
+      additionalProperties: false
+      required:
+      - rank
+      - address
+      - scope
+      - domain
+      - asn
+      - country
+      - first_seen
+      - last_seen
+      - bytes
+      - packets
+      - share
+      - endpoints
+      - users
+      - reputation
+      properties:
+        rank:
+          type: integer
+          minimum: 1
+          maximum: 100
+        address:
+          type: string
+          minLength: 1
+          maxLength: 45
+        scope:
+          enum:
+          - external
+          - internal
+          description: 'internal: a private, loopback, link-local, shared or multicast address. The aggregate tier is never told about internal destinations.'
+        domain:
+          type:
+          - string
+          - 'null'
+          minLength: 1
+          maxLength: 255
+        asn:
+          type:
+          - integer
+          - 'null'
+          minimum: 1
+          maximum: 4294967295
+        country:
+          type:
+          - string
+          - 'null'
+          minLength: 2
+          maxLength: 2
+          pattern: ^[A-Z]{2}$
+        first_seen:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: Earliest time seen within the look-back (first_seen_since); null when not determined.
+        last_seen:
+          type: string
+          format: date-time
+        bytes:
+          type: integer
+          minimum: 0
+        packets:
+          type:
+          - integer
+          - 'null'
+          minimum: 0
+        share:
+          type:
+          - number
+          - 'null'
+          minimum: 0
+          maximum: 1
+        endpoints:
+          type:
+          - integer
+          - 'null'
+          minimum: 0
+          description: Distinct source addresses that sent to the destination.
+        users:
+          type:
+          - integer
+          - 'null'
+          minimum: 0
+          description: 'Null: counting people needs per-flow identity attribution, which this surface does not do.'
+        reputation:
+          enum:
+          - allow-listed
+          - deny-listed
+          - unknown
+    TrafficDestinationsResponse:
+      type: object
+      required:
+      - state
+      - time_range
+      - first_seen_since
+      - policy
+      - total_bytes
+      - items
+      - cohort
+      - freshness
+      additionalProperties: false
+      properties:
+        state:
+          enum:
+          - not-connected
+          - ok
+          - unknown
+        time_range:
+          $ref: '#/components/schemas/TrafficTimeRange'
+        first_seen_since:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        policy:
+          $ref: '#/components/schemas/TrafficPolicy'
+        total_bytes:
+          type:
+          - integer
+          - 'null'
+          minimum: 0
+        items:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/TrafficDestination'
+        cohort:
+          $ref: '#/components/schemas/TrafficCohort'
+        freshness:
+          $ref: '#/components/schemas/Freshness'
+      allOf:
+      - if:
+          properties:
+            state:
+              enum:
+              - not-connected
+              - unknown
+          required:
+          - state
+        then:
+          properties:
+            items:
+              maxItems: 0
+            total_bytes:
+              type: 'null'
+            first_seen_since:
+              type: 'null'
+      - if:
+          properties:
+            state:
+              enum:
+              - not-connected
+              - unknown
+          required:
+          - state
+        then:
+          properties:
+            cohort:
+              properties:
+                state:
+                  const: not-applied
+      - if:
+          properties:
+            cohort:
+              properties:
+                state:
+                  const: too-few-sources
+          required:
+          - cohort
+        then:
+          properties:
+            items:
+              contains:
+                properties:
+                  endpoints:
+                    type: 'null'
+                required:
+                - endpoints
+      - if:
+          properties:
+            cohort:
+              properties:
+                state:
+                  enum:
+                  - sufficient
+                  - too-few-sources
+          required:
+          - cohort
+        then:
+          properties:
+            items:
+              items:
+                properties:
+                  scope:
+                    const: external
+    TrafficBaselineMethod:
+      description: The deterministic comparison; see docs/12-implementation/TRAFFIC-BASELINES.md.
+      type: object
+      additionalProperties: false
+      required:
+      - algorithm
+      - weeks
+      - min_weeks
+      - threshold
+      - min_difference_bytes
+      properties:
+        algorithm:
+          const: same-hour-of-week-median-mad
+        weeks:
+          type: integer
+          minimum: 1
+          maximum: 8
+        min_weeks:
+          type: integer
+          minimum: 1
+          maximum: 8
+        threshold:
+          type: number
+          exclusiveMinimum: 0
+        min_difference_bytes:
+          type: integer
+          minimum: 0
+    TrafficWorkingHours:
+      description: 'Operator-configured working hours. Not configured: outside_working_hours is unknown, never assumed.'
+      type: object
+      additionalProperties: false
+      required:
+      - state
+      - timezone
+      properties:
+        state:
+          enum:
+          - not-configured
+          - configured
+          - invalid
+        timezone:
+          type:
+          - string
+          - 'null'
+          minLength: 1
+          maxLength: 64
+      allOf:
+      - if:
+          properties:
+            state:
+              const: configured
+          required:
+          - state
+        then:
+          properties:
+            timezone:
+              type: string
+      - if:
+          properties:
+            state:
+              enum:
+              - not-configured
+              - invalid
+          required:
+          - state
+        then:
+          properties:
+            timezone:
+              type: 'null'
+    TrafficEvaluation:
+      description: 'How much of the window could be judged. insufficient-baseline means fewer than min_weeks comparable weeks: nothing is flagged. Counts add up to the buckets; the status follows from them.'
+      type: object
+      additionalProperties: false
+      required:
+      - status
+      - series
+      - buckets
+      - evaluated
+      - insufficient_baseline
+      - no_data
+      - anomalies_total
+      - application_series
+      - daylight_saving
+      properties:
+        status:
+          enum:
+          - evaluated
+          - partial
+          - insufficient-baseline
+          - no-data
+        series:
+          type: integer
+          minimum: 0
+        buckets:
+          type: integer
+          minimum: 0
+        evaluated:
+          type: integer
+          minimum: 0
+        insufficient_baseline:
+          type: integer
+          minimum: 0
+        no_data:
+          type: integer
+          minimum: 0
+        anomalies_total:
+          type: integer
+          minimum: 0
+        application_series:
+          enum:
+          - evaluated
+          - not-reported
+        daylight_saving:
+          enum:
+          - not-applicable
+          - none
+          - crossed
+          description: 'Whether the policy time zone changed its UTC offset between the first baseline week and the end of the evaluated range. The weeks compared are fixed 168-hour UTC weeks, so a change shifts the local hour of the earlier weeks. not-applicable: no time zone is configured.'
+    TrafficFirstSeenStatus:
+      description: First-seen flags need history before the window; without it everything would look new, so none are raised.
+      type: object
+      additionalProperties: false
+      required:
+      - state
+      - required_days
+      - oldest
+      properties:
+        state:
+          enum:
+          - sufficient
+          - insufficient
+          - unknown
+        required_days:
+          type: integer
+          minimum: 1
+          maximum: 31
+        oldest:
+          type:
+          - string
+          - 'null'
+          format: date-time
+      allOf:
+      - if:
+          properties:
+            state:
+              const: unknown
+          required:
+          - state
+        then:
+          properties:
+            oldest:
+              type: 'null'
+    TrafficAnomalyContext:
+      description: 'Context, not a verdict: outside working hours is not malicious. The patterns are common legitimate causes.'
+      type: object
+      additionalProperties: false
+      required:
+      - outside_working_hours
+      - common_legitimate_patterns
+      properties:
+        outside_working_hours:
+          type:
+          - boolean
+          - 'null'
+        common_legitimate_patterns:
+          type: array
+          uniqueItems: true
+          maxItems: 8
+          items:
+            enum:
+            - backup
+            - cloud-sync
+            - cctv-or-nvr
+            - patching-or-updates
+            - replication
+            - scheduled-maintenance
+            - antivirus-update
+            - authorised-remote-work
+    TrafficAnomalySubject:
+      type: object
+      additionalProperties: false
+      required:
+      - kind
+      - label
+      properties:
+        kind:
+          enum:
+          - total
+          - application
+        label:
+          type:
+          - string
+          - 'null'
+          minLength: 1
+          maxLength: 255
+      allOf:
+      - if:
+          properties:
+            kind:
+              const: total
+          required:
+          - kind
+        then:
+          properties:
+            label:
+              type: 'null'
+      - if:
+          properties:
+            kind:
+              const: application
+          required:
+          - kind
+        then:
+          properties:
+            label:
+              type: string
+    TrafficAnomaly:
+      description: An hourly volume that differs from the median of the same hour in prior weeks. Evidence, not a verdict.
+      type: object
+      additionalProperties: false
+      required:
+      - kind
+      - subject
+      - bucket_start
+      - bucket_end
+      - direction
+      - observed
+      - baseline
+      - baseline_samples
+      - difference
+      - ratio
+      - score
+      - confidence
+      - context
+      properties:
+        kind:
+          const: volume-deviation
+        subject:
+          $ref: '#/components/schemas/TrafficAnomalySubject'
+        bucket_start:
+          type: string
+          format: date-time
+        bucket_end:
+          type: string
+          format: date-time
+        direction:
+          enum:
+          - above
+          - below
+        observed:
+          type: integer
+          minimum: 0
+        baseline:
+          type: integer
+          minimum: 0
+        baseline_samples:
+          type: integer
+          minimum: 1
+          maximum: 8
+        difference:
+          type: integer
+        ratio:
+          type:
+          - number
+          - 'null'
+          minimum: 0
+        score:
+          type: number
+        confidence:
+          enum:
+          - low
+          - medium
+          - high
+        context:
+          $ref: '#/components/schemas/TrafficAnomalyContext'
+    TrafficFirstSeen:
+      description: An ASN or destination not seen in the look-back before the window. Context, not a verdict.
+      type: object
+      additionalProperties: false
+      required:
+      - kind
+      - asn
+      - address
+      - domain
+      - first_seen
+      - bytes
+      - context
+      properties:
+        kind:
+          enum:
+          - first-seen-asn
+          - first-seen-destination
+        asn:
+          type:
+          - integer
+          - 'null'
+          minimum: 1
+          maximum: 4294967295
+        address:
+          type:
+          - string
+          - 'null'
+          minLength: 1
+          maxLength: 45
+        domain:
+          type:
+          - string
+          - 'null'
+          minLength: 1
+          maxLength: 255
+        first_seen:
+          type: string
+          format: date-time
+        bytes:
+          type: integer
+          minimum: 0
+        context:
+          $ref: '#/components/schemas/TrafficAnomalyContext'
+      allOf:
+      - if:
+          properties:
+            kind:
+              const: first-seen-asn
+          required:
+          - kind
+        then:
+          properties:
+            asn:
+              type: integer
+            address:
+              type: 'null'
+            domain:
+              type: 'null'
+      - if:
+          properties:
+            kind:
+              const: first-seen-destination
+          required:
+          - kind
+        then:
+          properties:
+            address:
+              type: string
+    TrafficAnomaliesResponse:
+      type: object
+      required:
+      - state
+      - time_range
+      - evaluated_range
+      - method
+      - working_hours
+      - evaluation
+      - first_seen_status
+      - anomalies
+      - first_seen
+      - cohort
+      - freshness
+      additionalProperties: false
+      properties:
+        state:
+          enum:
+          - not-connected
+          - ok
+          - unknown
+        time_range:
+          $ref: '#/components/schemas/TrafficTimeRange'
+        evaluated_range:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/TrafficTimeRange'
+        method:
+          $ref: '#/components/schemas/TrafficBaselineMethod'
+        working_hours:
+          $ref: '#/components/schemas/TrafficWorkingHours'
+        evaluation:
+          $ref: '#/components/schemas/TrafficEvaluation'
+        first_seen_status:
+          $ref: '#/components/schemas/TrafficFirstSeenStatus'
+        anomalies:
+          type: array
+          maxItems: 50
+          items:
+            $ref: '#/components/schemas/TrafficAnomaly'
+        first_seen:
+          type: array
+          maxItems: 20
+          items:
+            $ref: '#/components/schemas/TrafficFirstSeen'
+        cohort:
+          $ref: '#/components/schemas/TrafficCohort'
+        freshness:
+          $ref: '#/components/schemas/Freshness'
+      allOf:
+      - if:
+          properties:
+            state:
+              enum:
+              - not-connected
+              - unknown
+          required:
+          - state
+        then:
+          properties:
+            anomalies:
+              maxItems: 0
+            first_seen:
+              maxItems: 0
+            evaluated_range:
+              type: 'null'
+      - if:
+          properties:
+            evaluation:
+              properties:
+                status:
+                  enum:
+                  - insufficient-baseline
+                  - no-data
+              required:
+              - status
+          required:
+          - evaluation
+        then:
+          properties:
+            anomalies:
+              maxItems: 0
+      - if:
+          properties:
+            first_seen_status:
+              properties:
+                state:
+                  enum:
+                  - insufficient
+                  - unknown
+              required:
+              - state
+          required:
+          - first_seen_status
+        then:
+          properties:
+            first_seen:
+              maxItems: 0
+      - if:
+          properties:
+            state:
+              enum:
+              - not-connected
+              - unknown
+          required:
+          - state
+        then:
+          properties:
+            cohort:
+              properties:
+                state:
+                  const: not-applied
     SecurityEvent:
       type: object
       additionalProperties: false

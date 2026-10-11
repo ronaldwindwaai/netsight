@@ -319,37 +319,6 @@ class TrafficTopResponse(ApiModel):
         return self
 
 
-class TrafficFlow(ApiModel):
-    """One high-volume flow row; all enrichment fields are source-reported."""
-
-    observed_at: datetime
-    source_ip: str = Field(min_length=1, max_length=45)
-    source_device_id: str | None = Field(..., pattern=_DEVICE_ID_PATTERN, max_length=43)
-    destination_ip: str = Field(min_length=1, max_length=45)
-    destination_host: str | None = Field(..., min_length=1, max_length=255)
-    protocol: Literal["tcp", "udp", "icmp", "other"]
-    destination_port: int | None = Field(..., ge=0, le=65535)
-    bytes: int = Field(ge=0)
-    packets: int | None = Field(..., ge=0)
-    direction: Literal["inbound", "outbound", "internal", "unknown"]
-    application: str | None = Field(..., min_length=1, max_length=255)
-    user: str | None = Field(..., min_length=1, max_length=255)
-
-
-class TrafficFlowsResponse(ApiModel):
-    state: TrafficState
-    time_range: TrafficTimeRange
-    flows: list[TrafficFlow] = Field(max_length=500)
-    freshness: Freshness
-
-    @model_validator(mode="after")
-    def _non_ok_carries_no_rows(self) -> TrafficFlowsResponse:
-        """A degraded state must never assert flow data (see top response)."""
-        if self.state != "ok" and self.flows:
-            raise ValueError("non-ok traffic state must not carry flows")
-        return self
-
-
 # --- Security (S5) ----------------------------------------------------------
 
 SecurityState = Literal["not-connected", "ok", "unknown"]

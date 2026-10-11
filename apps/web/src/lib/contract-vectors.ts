@@ -40,6 +40,15 @@ const IDENTITY_VECTOR_URL = new URL(
   import.meta.url,
 );
 
+const TRAFFIC_VECTOR_URL = new URL(
+  '../../../../contracts/test-vectors/traffic.vectors.json',
+  import.meta.url,
+);
+
+export function loadTrafficVectors(): Record<string, VectorBlock> {
+  return JSON.parse(readFileSync(TRAFFIC_VECTOR_URL, 'utf-8')) as Record<string, VectorBlock>;
+}
+
 export function loadIdentityVectors(): Record<string, VectorBlock> {
   return JSON.parse(readFileSync(IDENTITY_VECTOR_URL, 'utf-8')) as Record<string, VectorBlock>;
 }

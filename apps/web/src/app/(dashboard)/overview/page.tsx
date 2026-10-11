@@ -3,10 +3,17 @@ import { AppContent, Card, InfoBox } from '@adminlte/react';
 
 import { DataFailure, FreshnessNotice } from '@/components/data-state';
 import { OverviewInternetKpi } from '@/components/overview-internet-kpi';
+import { OverviewApplicationMix, OverviewTopTalkers } from '@/components/overview-traffic-cards';
 import { apiGet } from '@/lib/api';
-import { parseOverviewResponse } from '@/lib/api-contracts';
+import {
+  parseOverviewResponse,
+  parseSessionInfo,
+  parseTrafficTopResponse,
+} from '@/lib/api-contracts';
 import { parseInternetResponse } from '@/lib/api-contracts-internet';
+import { parseTrafficApplicationsResponse } from '@/lib/api-contracts-traffic-explorer';
 import { deviceHealthSummary, sourceProvenance } from '@/lib/overview-summary';
+import { canReadTraffic, canReadTrafficDetail, viewerFromSession } from '@/lib/viewer';
 
 function UnavailableSurface({
   icon,
@@ -31,9 +38,23 @@ function UnavailableSurface({
 }
 
 export default async function OverviewPage() {
-  const [state, internet] = await Promise.all([
+  const [state, internet, session] = await Promise.all([
     apiGet('/api/v1/overview', parseOverviewResponse),
     apiGet('/api/v1/internet', parseInternetResponse),
+    apiGet('/api/v1/auth/session', parseSessionInfo),
+  ]);
+  // Traffic is fetched only for a role that holds the permission; the others see "Restricted"
+  // rather than a refused request. When the session itself could not be read the API decides (its
+  // refusal also renders as Restricted). The API enforces the same rules on its own.
+  const viewer = viewerFromSession(session.kind === 'ok' ? session.data : null);
+  const sessionUnread = session.kind !== 'ok';
+  const [talkers, applications] = await Promise.all([
+    sessionUnread || canReadTrafficDetail(viewer)
+      ? apiGet('/api/v1/traffic/top-talkers?preset=24h&limit=5', parseTrafficTopResponse)
+      : null,
+    sessionUnread || canReadTraffic(viewer)
+      ? apiGet('/api/v1/traffic/applications?preset=24h&limit=6', parseTrafficApplicationsResponse)
+      : null,
   ]);
   const overview = state.kind === 'ok' ? state.data : null;
   const health = overview
@@ -142,34 +163,10 @@ export default async function OverviewPage() {
 
       <div className="row g-3">
         <div className="col-xl-6">
-          <Card
-            className="operational-card"
-            title="Top bandwidth users"
-            icon="bi bi-bar-chart-line"
-            variant="outline"
-            theme="primary"
-          >
-            <UnavailableSurface
-              icon="bi-activity"
-              title="Flow telemetry not connected"
-              detail="Bandwidth rankings will appear only after an approved flow source is available."
-            />
-          </Card>
+          <OverviewTopTalkers state={talkers} />
         </div>
         <div className="col-xl-6">
-          <Card
-            className="operational-card"
-            title="Application mix"
-            icon="bi bi-pie-chart"
-            variant="outline"
-            theme="primary"
-          >
-            <UnavailableSurface
-              icon="bi-pie-chart"
-              title="Application telemetry not connected"
-              detail="Netsight will not estimate application usage without source evidence."
-            />
-          </Card>
+          <OverviewApplicationMix state={applications} />
         </div>
       </div>
     </AppContent>

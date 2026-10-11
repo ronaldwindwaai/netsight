@@ -34,7 +34,7 @@ test('the menu offers Internet only to a session holding internet:read, and fail
 });
 
 test('the Internet entry points at /internet, next to Traffic', () => {
-  const items = menuItemsFor(['internet:read']);
+  const items = menuItemsFor(['internet:read', 'traffic:read']);
   const entry = items.find((item) => item.type === 'item' && item.text === 'Internet');
   assert.ok(entry && entry.type === 'item' && entry.href === '/internet');
   const order = labels(items);
@@ -56,4 +56,13 @@ test('the Users entry points at /users, after Devices', () => {
   assert.ok(entry && entry.type === 'item' && entry.href === '/users');
   const order = labels(items);
   assert.equal(order.indexOf('Users'), order.indexOf('Devices') + 1);
+});
+
+test('the menu offers Traffic only to a session holding traffic:read, and fails closed without one', () => {
+  assert.ok(labels(menuItemsFor(['traffic:read'])).includes('Traffic'));
+  assert.ok(labels(menuItemsFor(['traffic:read', 'traffic:read-detail'])).includes('Traffic'));
+  // Technician holds no traffic permission (an open decision), so the entry is absent.
+  assert.ok(!labels(menuItemsFor(['incidents:read', 'diagnostics:read'])).includes('Traffic'));
+  assert.ok(!labels(menuItemsFor([])).includes('Traffic'));
+  assert.ok(!labels(menuItemsFor(null)).includes('Traffic'));
 });

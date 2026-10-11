@@ -47,3 +47,13 @@ export function canResolveIdentity(viewer: Viewer | null): boolean {
 export function canReadUsersSummary(viewer: Viewer | null): boolean {
   return viewer !== null && viewer.permissions.includes('users:read-summary');
 }
+
+/** True when the viewer holds traffic:read (aggregates: volumes, applications, destinations, baselines). Advisory only. */
+export function canReadTraffic(viewer: Viewer | null): boolean {
+  return viewer !== null && viewer.permissions.includes('traffic:read');
+}
+
+/** True when the viewer holds traffic:read-detail (flow rows and address, device and VLAN filters). Advisory only. */
+export function canReadTrafficDetail(viewer: Viewer | null): boolean {
+  return viewer !== null && viewer.permissions.includes('traffic:read-detail');
+}
