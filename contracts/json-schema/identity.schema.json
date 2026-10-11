@@ -1,0 +1,1156 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "state",
+    "subject",
+    "as_of",
+    "window",
+    "sources",
+    "attribution",
+    "endpoint",
+    "notes"
+  ],
+  "properties": {
+    "state": {
+      "enum": [
+        "not-connected",
+        "unknown",
+        "ok"
+      ]
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "value"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "ip",
+            "mac",
+            "hostname"
+          ]
+        },
+        "value": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      }
+    },
+    "as_of": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "window": {
+      "$ref": "#/$defs/window"
+    },
+    "sources": {
+      "type": "array",
+      "maxItems": 8,
+      "items": {
+        "$ref": "#/$defs/sourceStatus"
+      }
+    },
+    "attribution": {
+      "$ref": "#/$defs/attribution"
+    },
+    "endpoint": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "$ref": "#/$defs/link"
+      }
+    },
+    "notes": {
+      "type": "array",
+      "maxItems": 4,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "register-is-current-state"
+        ]
+      },
+      "description": "Server notes that qualify the answer. register-is-current-state: the answer is for an earlier time but rests on a register (NetBox) that records current state only."
+    }
+  },
+  "title": "IdentityResolveResponse",
+  "description": "GET /api/v1/identity/resolve. Who is behind an IP, MAC or hostname at a time, with the basis of every correlation. An IP address alone is never identity: without an account or an assignment the attribution is unknown.",
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "enum": [
+              "not-connected",
+              "unknown"
+            ]
+          }
+        },
+        "required": [
+          "state"
+        ]
+      },
+      "then": {
+        "properties": {
+          "attribution": {
+            "properties": {
+              "basis": {
+                "const": "unknown"
+              },
+              "ambiguous": {
+                "const": false
+              }
+            }
+          },
+          "endpoint": {
+            "maxItems": 0
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "entity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "id",
+        "label"
+      ],
+      "properties": {
+        "type": {
+          "enum": [
+            "person",
+            "account",
+            "device",
+            "ip",
+            "mac",
+            "switch",
+            "ap",
+            "port",
+            "vlan",
+            "hostname"
+          ]
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "label": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "\\S",
+          "description": "Untrusted display text (a hostname, a user name). Rendered as data only."
+        }
+      },
+      "description": "One node of Person -> Account -> Device -> IP -> MAC -> Switch/AP -> Port -> VLAN. Identity is (type, id); ids are canonical, never an e-mail address or a display name.",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "person"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "id": {
+                "pattern": "^person-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "account"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "id": {
+                "pattern": "^account-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "device"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "id": {
+                "pattern": "^device-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "switch"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "id": {
+                "pattern": "^device-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "ap"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "id": {
+                "pattern": "^device-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "port"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "id": {
+                "pattern": "^port-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "ip"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "id": {
+                "pattern": "^[0-9a-f:.]{2,45}$"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "mac"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "id": {
+                "pattern": "^([0-9a-f]{2}:){5}[0-9a-f]{2}$"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "vlan"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "id": {
+                "pattern": "^vlan-([1-9][0-9]{0,2}|[1-3][0-9]{3}|40[0-8][0-9]|409[0-4])$"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "hostname"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "id": {
+                "pattern": "^[a-z0-9]([a-z0-9._-]{0,126}[a-z0-9])?$"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "evidenceRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "source",
+        "kind",
+        "observed_at",
+        "valid_from",
+        "valid_to",
+        "confidence"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 161,
+          "pattern": "^[a-z0-9][a-z0-9_.-]{0,31}:.+$"
+        },
+        "source": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_.-]{0,31}$"
+        },
+        "kind": {
+          "enum": [
+            "dhcp-lease",
+            "radius-session",
+            "vpn-session",
+            "wifi-association",
+            "switch-mac-table",
+            "endpoint-agent",
+            "directory-account",
+            "idp-signin",
+            "dns-record",
+            "asset-assignment"
+          ]
+        },
+        "observed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "valid_from": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "valid_to": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time",
+          "description": "Null when the source recorded no end; the engine then trusts it only for a bounded time after observed_at."
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "description": "A pointer to the evidence behind a link (drill-down). It names the source and the window, never the entities."
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "entity",
+        "basis",
+        "confidence",
+        "evidence"
+      ],
+      "properties": {
+        "entity": {
+          "$ref": "identity.schema.json#/$defs/entity"
+        },
+        "basis": {
+          "enum": [
+            "observed",
+            "inferred"
+          ]
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "evidence": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "$ref": "identity.schema.json#/$defs/evidenceRef"
+          }
+        }
+      },
+      "description": "One entity a link or an attribution could point at. Its basis describes that candidate's own evidence only."
+    },
+    "link": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "relation",
+        "source",
+        "target",
+        "basis",
+        "confidence",
+        "valid_from",
+        "valid_to",
+        "as_of",
+        "reason",
+        "evidence",
+        "ambiguous",
+        "candidates"
+      ],
+      "properties": {
+        "relation": {
+          "enum": [
+            "person-account",
+            "account-device",
+            "person-device",
+            "account-mac",
+            "account-ip",
+            "device-ip",
+            "device-mac",
+            "ip-mac",
+            "mac-switch",
+            "mac-ap",
+            "mac-port",
+            "mac-vlan",
+            "port-vlan",
+            "hostname-ip",
+            "hostname-device",
+            "identity"
+          ]
+        },
+        "source": {
+          "$ref": "identity.schema.json#/$defs/entity"
+        },
+        "target": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "identity.schema.json#/$defs/entity"
+            }
+          ]
+        },
+        "basis": {
+          "enum": [
+            "observed",
+            "inferred",
+            "unknown"
+          ]
+        },
+        "confidence": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "valid_from": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "valid_to": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "as_of": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "reason": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "enum": [
+                "conflicting-evidence",
+                "declared-assignment",
+                "expired",
+                "guest-network",
+                "indirect-evidence",
+                "ip-only",
+                "low-confidence",
+                "multiple-candidates",
+                "name-match",
+                "no-evidence",
+                "restricted",
+                "shared-address",
+                "source-unavailable",
+                "vpn-no-session"
+              ]
+            }
+          ]
+        },
+        "evidence": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "$ref": "identity.schema.json#/$defs/evidenceRef"
+          }
+        },
+        "ambiguous": {
+          "type": "boolean"
+        },
+        "candidates": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "$ref": "identity.schema.json#/$defs/candidate"
+          }
+        }
+      },
+      "description": "One correlation, in walk order (source is nearer the subject). observed: a direct source saw it, with a target, confidence, window and evidence. inferred: a declaration or weak association, confidence capped at 0.7, with a reason. unknown: no target and no confidence; ambiguous when several candidates conflict (never silently picked).",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "basis": {
+                "const": "observed"
+              }
+            },
+            "required": [
+              "basis"
+            ]
+          },
+          "then": {
+            "properties": {
+              "target": {
+                "$ref": "identity.schema.json#/$defs/entity"
+              },
+              "confidence": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "valid_from": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "valid_to": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "reason": {
+                "type": "null"
+              },
+              "evidence": {
+                "minItems": 1
+              },
+              "ambiguous": {
+                "const": false
+              },
+              "candidates": {
+                "maxItems": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "basis": {
+                "const": "inferred"
+              }
+            },
+            "required": [
+              "basis"
+            ]
+          },
+          "then": {
+            "properties": {
+              "target": {
+                "$ref": "identity.schema.json#/$defs/entity"
+              },
+              "confidence": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 0.7
+              },
+              "valid_from": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "valid_to": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "reason": {
+                "enum": [
+                  "declared-assignment",
+                  "indirect-evidence",
+                  "low-confidence",
+                  "name-match",
+                  "conflicting-evidence"
+                ]
+              },
+              "evidence": {
+                "minItems": 1
+              },
+              "ambiguous": {
+                "const": false
+              },
+              "candidates": {
+                "maxItems": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "basis": {
+                "const": "unknown"
+              }
+            },
+            "required": [
+              "basis"
+            ]
+          },
+          "then": {
+            "properties": {
+              "target": {
+                "type": "null"
+              },
+              "confidence": {
+                "type": "null"
+              },
+              "valid_from": {
+                "type": "null"
+              },
+              "valid_to": {
+                "type": "null"
+              },
+              "reason": {
+                "enum": [
+                  "no-evidence",
+                  "expired",
+                  "conflicting-evidence",
+                  "multiple-candidates",
+                  "shared-address",
+                  "vpn-no-session",
+                  "guest-network",
+                  "ip-only",
+                  "source-unavailable",
+                  "restricted"
+                ]
+              }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "ambiguous": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "ambiguous"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "candidates": {
+                      "minItems": 2
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "ambiguous": {
+                      "const": false
+                    }
+                  },
+                  "required": [
+                    "ambiguous"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "candidates": {
+                      "maxItems": 0
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "session": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "basis",
+        "confidence",
+        "valid_from",
+        "valid_to",
+        "links"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "wired",
+            "wifi",
+            "vpn",
+            "network"
+          ]
+        },
+        "basis": {
+          "enum": [
+            "observed",
+            "inferred"
+          ]
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "valid_from": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "valid_to": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "links": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 80,
+          "items": {
+            "allOf": [
+              {
+                "$ref": "identity.schema.json#/$defs/link"
+              },
+              {
+                "properties": {
+                  "basis": {
+                    "enum": [
+                      "observed",
+                      "inferred"
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          "prefixItems": [
+            {
+              "allOf": [
+                {
+                  "$ref": "identity.schema.json#/$defs/link"
+                },
+                {
+                  "properties": {
+                    "basis": {
+                      "enum": [
+                        "observed",
+                        "inferred"
+                      ]
+                    },
+                    "relation": {
+                      "const": "person-account"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "identity.schema.json#/$defs/link"
+                },
+                {
+                  "properties": {
+                    "basis": {
+                      "enum": [
+                        "observed",
+                        "inferred"
+                      ]
+                    },
+                    "relation": {
+                      "enum": [
+                        "account-mac",
+                        "account-ip"
+                      ]
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "description": "One current way a person is on the network, as an ordered link list. basis is the weakest link's basis and confidence the lowest link confidence (cross-field, checked by the model and the parsers)."
+    },
+    "attribution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "basis",
+        "reason",
+        "ambiguous",
+        "links",
+        "candidates"
+      ],
+      "properties": {
+        "basis": {
+          "enum": [
+            "observed",
+            "inferred",
+            "unknown"
+          ]
+        },
+        "reason": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "enum": [
+                "conflicting-evidence",
+                "declared-assignment",
+                "expired",
+                "guest-network",
+                "indirect-evidence",
+                "ip-only",
+                "low-confidence",
+                "multiple-candidates",
+                "name-match",
+                "no-evidence",
+                "restricted",
+                "shared-address",
+                "source-unavailable",
+                "vpn-no-session"
+              ]
+            }
+          ]
+        },
+        "ambiguous": {
+          "type": "boolean"
+        },
+        "links": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "allOf": [
+              {
+                "$ref": "identity.schema.json#/$defs/link"
+              },
+              {
+                "properties": {
+                  "relation": {
+                    "const": "identity"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "candidates": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "$ref": "identity.schema.json#/$defs/candidate"
+          }
+        }
+      },
+      "description": "Who is behind the subject. observed or inferred: one or more identity links, strongest first. unknown: no links, with a reason; ambiguous (two or more candidates, never picked) when the evidence names several persons or conflicts.",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "basis": {
+                "const": "observed"
+              }
+            },
+            "required": [
+              "basis"
+            ]
+          },
+          "then": {
+            "properties": {
+              "reason": {
+                "type": "null"
+              },
+              "links": {
+                "minItems": 1
+              },
+              "ambiguous": {
+                "const": false
+              },
+              "candidates": {
+                "maxItems": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "basis": {
+                "const": "inferred"
+              }
+            },
+            "required": [
+              "basis"
+            ]
+          },
+          "then": {
+            "properties": {
+              "reason": {
+                "enum": [
+                  "declared-assignment",
+                  "indirect-evidence",
+                  "low-confidence",
+                  "name-match",
+                  "conflicting-evidence"
+                ]
+              },
+              "links": {
+                "minItems": 1
+              },
+              "ambiguous": {
+                "const": false
+              },
+              "candidates": {
+                "maxItems": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "basis": {
+                "const": "unknown"
+              }
+            },
+            "required": [
+              "basis"
+            ]
+          },
+          "then": {
+            "properties": {
+              "reason": {
+                "enum": [
+                  "no-evidence",
+                  "expired",
+                  "conflicting-evidence",
+                  "multiple-candidates",
+                  "shared-address",
+                  "vpn-no-session",
+                  "guest-network",
+                  "ip-only",
+                  "source-unavailable",
+                  "restricted"
+                ]
+              },
+              "links": {
+                "maxItems": 0
+              }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "ambiguous": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "ambiguous"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "candidates": {
+                      "minItems": 2
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "ambiguous": {
+                      "const": false
+                    }
+                  },
+                  "required": [
+                    "ambiguous"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "candidates": {
+                      "maxItems": 0
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "sourceStatus": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "state",
+        "record_count",
+        "truncated",
+        "freshness"
+      ],
+      "properties": {
+        "source": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_.-]{0,31}$"
+        },
+        "state": {
+          "enum": [
+            "not-connected",
+            "unknown",
+            "ok"
+          ]
+        },
+        "record_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5000
+        },
+        "truncated": {
+          "type": "boolean"
+        },
+        "freshness": {
+          "$ref": "common.schema.json#/$defs/freshness"
+        }
+      },
+      "description": "The state of one evidence source. A source that is not configured is not-connected; one that failed is unknown, and absence of evidence from it is not evidence of absence.",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "not-connected",
+                  "unknown"
+                ]
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "record_count": {
+                "const": 0
+              },
+              "truncated": {
+                "const": false
+              }
+            }
+          }
+        }
+      ]
+    },
+    "window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "from",
+        "to"
+      ],
+      "properties": {
+        "from": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "to": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "description": "The evidence window the server read (server-bounded, never caller-chosen)."
+    }
+  }
+}

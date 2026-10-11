@@ -384,6 +384,67 @@ tables (migration 0005: `wan_probe_samples`, `wan_link_cycles`), a LibreNMS port
   status only); whether probe targets in the export should be withheld too; whether Technician and Auditor should hold the detail; a live LibreNMS check that the
   ports list carries the rate and `poll_time` columns; a partition-readiness alert (the next month's partition missing) beyond the collector's error log.
 
+### Step 6 - identity correlation, Users & Identity (2026-10-11) - threat-model delta
+New surface: `GET /users`, `/users/summary`, `/users/{id}`, `/identity/resolve`; a pure correlation engine fed by read-only Wazuh-agent and NetBox-assignment adapters (and a
+generic `EvidenceSource` interface); `/users` and `/users/[userId]` pages. Nothing is persisted (compute on read; no migration), nothing is written to any external system.
+See IDENTITY-CORRELATION.md.
+
+- **Privacy (PRD 92).** Per-person network history is sensitive. Controls: three permissions on a strict-subset ladder (`users:read` Admin/Network Engineer/Security Analyst;
+  `users:read-limited` adds Technician, endpoint only; `users:read-summary` adds Management, counts only; Auditor none), the two per-user ones human-only (no service/AI
+  principal), authorisation before the rate limit (30/min resolve, 120/min list/detail, 60/min summary), every per-user read audited with actor, target and counts only
+  (no name, e-mail, signature or purpose text; denied and failed attempts too), `Cache-Control: no-store`, no per-person row for Management, and the person withheld
+  (`restricted`) from the limited rung. Persons are keyed by canonical ids minted per source: **never by e-mail or display name**.
+- **Inference abuse (presenting a guess as a person).** The central risk of this feature. Mitigated by construction, not convention: a link is `observed` only from a direct
+  evidence kind at >= 0.8 inside its window; declarations, sign-ins, DNS and name matches are `inferred` and capped at 0.7; an unknown link has no target and no confidence;
+  conflicting evidence is `ambiguous` with every candidate listed and **never picked**; a chain is as weak as its weakest hop; an **IP address alone is never identity** (the walk
+  needs an account or an assignment; shared/NAT/public/CGNAT addresses are never walked through; VPN pool addresses only through a VPN session; guest/BYOD never attributed;
+  ports/VLANs/switches/APs are never bridges between endpoints). The invariants live in the domain type, the pydantic model, the JSON Schema and the TS parser (four-way agreement,
+  310 shared vectors), so a mapping bug is rejected as `unknown` rather than shown. The UI words uncertainty ("Inferred: possibly", "Not identified", "Ambiguous: n possible
+  people") and shows the basis as a word plus an icon, never colour alone.
+- **Untrusted evidence (tampering, spoofing, poisoning).** Evidence from monitored systems is untrusted. A source may only emit records stamped with its own name and of the kinds
+  it declares, and a kind may only assert its own relations (an IdP sign-in cannot assert a MAC binding); a truncated, oversized, slow, malformed or impersonating batch makes that
+  source `unknown`; bounds (<= 2 500 records/source, <= 5 000 total, 15 s, 24 h window, <= 16 evidence refs and <= 8 candidates per link) cap the work an attacker-controlled feed can
+  cause. An attacker who can inject overlapping leases/sessions can force *ambiguity* (a loss of attribution) but not a false attribution; **a compromised direct source
+  (RADIUS, VPN, directory) can still assert false observed links: that is the trust boundary** and is why every link names its evidence. Hostile hostnames, usernames, agent names,
+  contact names and alert signatures are carried as data (length bounded in adapters, rendered as text, hostile-markup component tests, `no-raw-html` test) and are never interpreted as
+  instructions; the AI copilot has no path to this data (human-only permissions).
+- **Information disclosure through evidence ids.** A source's native record id can embed a user name (found by a test: a RADIUS session id carried an account id). A caller without
+  `users:read` therefore receives opaque, stable evidence ids and endpoint links only. Authorised callers see the raw id (needed to find the record in the source). **Review fix:**
+  the opaque id is now an **HMAC-SHA-256 under a server secret** (`NETSIGHT_IDENTITY_ID_KEY`, >= 32 characters), not an unkeyed hash: native ids are low-entropy (`owner-7-12`), so an
+  unkeyed hash is a membership oracle (hash a guess, compare). Without the key the limited rung gets `unknown` (fail closed); only `NETSIGHT_ENV=development` generates a per-process key
+  (logged once). The hostname name-match no longer cites person-device (assignment) records as endpoint evidence, so a read-limited caller cannot learn who a device is assigned to
+  through a hostname lookup.
+- **Spoofing across sources (review H1/M2).** Wazuh and NetBox mint different device entities, so one host conflicts with itself unless joined. The join is **only** an explicit,
+  operator-controlled key (a NetBox device custom field holding the manager-assigned Wazuh agent id, `NETSIGHT_NETBOX_WAZUH_AGENT_FIELD`); **never a hostname or an agent name**, which a
+  rogue host chooses. A key claimed by two NetBox devices joins neither. Without the key the answer stays `conflicting-evidence` (honest, never a wrong pick). A rogue agent reporting a
+  registered address is ignored inside `NETSIGHT_IDENTITY_STATIC_CIDRS` and is otherwise a visible conflict that can lower, never raise or redirect, an attribution. Residual: someone who
+  can write the NetBox custom field can join a device to an agent; and an unlisted static/guest/NAT network is treated as ordinary internal space (a deployment prerequisite, documented).
+- **Enumeration / scraping.** Resolve is the scraping vector (any address -> a person): smallest budget (30/min per identity), audited with the subject, validated strictly (one subject,
+  canonical IP/MAC/hostname, no reflection of the input in errors), `at` bounded to 7 days and never in the future, list pages bounded (<= 100 x 1000). A 404 for an unknown person
+  reveals existence only to a `users:read` holder. **Review fix:** the audit target of a resolve is a fingerprint (short SHA-256), never the raw address, MAC or hostname asked about (the
+  audit log would otherwise be a copy of every lookup); the summary denial, a denied detail (with its person id), every 429 and every rejected resolve input (422) are audited with
+  static reason codes and no echo; error responses on the identity routes carry `Cache-Control: no-store` (API middleware).
+- **SSRF / outbound.** The adapters call only operator-configured URLs (`WAZUH_INDEXER_URL`, `NETBOX_BASE_URL`); TLS verification stays on, redirects are refused, credentials are
+  excluded from `repr`, https is required with credentials, the Wazuh index must match `wazuh-*`, NetBox pagination must stay on the configured origin and within 10 pages, response
+  bodies are size-capped (Wazuh 8 MiB; **NetBox 8 MiB, declared length and streamed bytes, `Accept-Encoding: identity`** - added in the review fix). The routes take no URL from the caller.
+- **One bad row must not blank a source (review fix).** A malformed Wazuh agent row (CIDR or scoped address, unknown status) or NetBox row (a contact without an id, a bad address) is
+  skipped and counted in the log; the source stays `ok`. When most rows are malformed (more skipped than usable) the read fails (`invalid-source-data`), because a changed response shape
+  is not "no evidence". The skipped count is logged, not yet in the API.
+- **Denial of service.** Bounded gather (above), a 30 s single-entry snapshot cache shared by concurrent requests (no stampede), per-identity limits, no unbounded query or loop (the walk
+  is depth-limited to 5 and path-limited to 2 000). The cache and limiter are per worker (open, as elsewhere). **Review fix:** the people computation (the heaviest step) is cached per
+  snapshot and runs off the event loop (`asyncio.to_thread`, as does building the index), shared by list, detail and summary; a past-time question cannot be cached, so it spends a
+  **global** budget (20/min across identities) and one of 2 concurrent slots (429 / 503 `IDENTITY_BUSY`, audited, per worker).
+- **Repudiation.** `identity.users.list`, `identity.user.read`, `identity.resolve` (success, failure, denied) go to the interim audit sink with the actor and correlation id; a
+  tamper-evident store remains open platform-wide.
+- **Time and replay.** Evidence is trusted only inside `[valid_from, effective_end)`; an open session is trusted for a bounded TTL after it was last seen (15 min RADIUS/VPN/Wi-Fi/MAC
+  table, 30 min agent and sign-in, 1 h DHCP, 24 h directory/assignment; defaults pending owner confirmation), so a stale record cannot vouch for the present. A future-dated record
+  never applies. Clock drift between sources shifts windows, never creates a link.
+- **Retention / legal.** Nothing is stored here, so no retention period is invented. Persisting correlation history (needed for incident reconstruction beyond the sources' own
+  retention) needs an owner decision and likely a privacy/legal review first (PRD 92); until then history is as long as the sources keep (NetBox: current state only; a past-time answer resting on the register carries the note `register-is-current-state`).
+- **Still open.** Live verification of the Wazuh monitoring-index and NetBox response shapes; the DHCP/RADIUS/VPN/Wi-Fi/DNS/IdP adapters (the only way to get genuinely *observed*
+  answers); persisted history and its retention; site/security scoping; the Auditor and Network Engineer decisions in RBAC-MATRIX; a shared (non per-worker) cache and limiter; a
+  Playwright run of the Users pages; tamper-evident audit; whether to withhold the evidence `source` names from the limited rung.
+
 ## AI-specific threats
 - prompt injection in logs/hostnames/knowledge;
 - tool injection;

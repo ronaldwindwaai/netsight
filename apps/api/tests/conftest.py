@@ -15,3 +15,18 @@ def _fresh_read_limiter(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     """Each test gets its own read limiter so request counts never leak between tests."""
     monkeypatch.setattr(read_limit, "_read_limiter", RateLimiter())
     yield
+
+
+@pytest.fixture(autouse=True)
+def _identity_id_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A fixed evidence-id key so opaque ids work; the tests of the fail-closed path remove it."""
+    monkeypatch.setenv("NETSIGHT_IDENTITY_ID_KEY", "test-only-key-0123456789abcdef0123456789")
+
+
+@pytest.fixture(autouse=True)
+def _fresh_identity_guards() -> Iterator[None]:
+    """The global identity limits are module state: each test starts with a full budget."""
+    from netsight_api.identity import guards
+
+    guards.reset_for_tests()
+    yield

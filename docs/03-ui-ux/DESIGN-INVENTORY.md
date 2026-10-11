@@ -61,7 +61,10 @@ Recommended rename (do not rename without design-owner approval):
 Incidents list/board, Reports, Settings/Administration, Users & Identity, Device
 detail (tab structure exists in SCREEN-SPECS.md), Configuration/Change history,
 Internet / WAN (`/internet`, Step 5: only the overview "Internet" KPI card is
-designed; the page follows SCREEN-SPECS.md "Internet card and `/internet`").
+designed; the page follows SCREEN-SPECS.md "Internet card and `/internet`"),
+Users & Identity (`/users`, `/users/[userId]`, Step 6: no design exists; built from SCREEN-SPECS.md "Users"
+and the key/value user card of the Incident Detail design, using only fields a source provides; the
+"At Risk" badge, department, manager and MFA fields of that card are not data and are not shown).
 For these screens: derive layout only from SCREEN-SPECS.md + the global shell
 above, and request approved designs before polishing. Do not create alternative
 visual concepts.

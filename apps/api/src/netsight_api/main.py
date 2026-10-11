@@ -58,6 +58,7 @@ from netsight_api.diagnostic_routes import router as diagnostic_router
 from netsight_api.diagnostic_session_routes import router as diagnostic_session_router
 from netsight_api.errors import ApiError
 from netsight_api.evaluation.wiring import build_evaluation_service, start_evaluation
+from netsight_api.identity_routes import router as identity_router
 from netsight_api.incident_list_routes import router as incident_list_router
 from netsight_api.incident_routes import router as incident_router
 from netsight_api.internet_routes import router as internet_router
@@ -130,6 +131,10 @@ async def lifespan(app_: FastAPI) -> AsyncIterator[None]:
         await oidc_aclose()
 
 
+# Routes whose error responses must carry ``Cache-Control: no-store`` as well (the success path sets
+# it in the route): the people and identity surfaces.
+_NO_STORE_ERROR_PREFIXES = (f"{API_PREFIX}/users", f"{API_PREFIX}/identity/")
+
 app = FastAPI(title="Netsight Platform API", version="0.1.0", lifespan=lifespan)
 # Registered before the correlation middleware below, so it runs inside it and its 413
 # responses carry the request's correlation id.
@@ -180,6 +185,9 @@ async def correlation_id_middleware(
     )
     response = await call_next(request)
     response.headers[CORRELATION_ID_HEADER] = request.state.correlation_id
+    if response.status_code >= 400 and request.url.path.startswith(_NO_STORE_ERROR_PREFIXES):
+        # Per-user routes: not even an error (a 403 for a named person, a 429) may be stored.
+        response.headers["Cache-Control"] = "no-store"
     return response
 
 
@@ -1274,6 +1282,7 @@ app.include_router(maintenance_router, prefix=API_PREFIX)
 app.include_router(diagnostic_router, prefix=API_PREFIX)
 app.include_router(diagnostic_session_router, prefix=API_PREFIX)
 app.include_router(internet_router, prefix=API_PREFIX)
+app.include_router(identity_router, prefix=API_PREFIX)
 # Authentication lives under the same versioned prefix as every other platform
 # route (contracts/openapi/netsight-api.yaml declares `servers: /api/v1` with
 # `/auth/providers` relative to it). Serving it unversioned broke the server

@@ -46,6 +46,12 @@ class Permission(StrEnum):
     # The sensitive part of the Internet surface: public IP, gateway, ISP name and per-link
     # throughput. Without it those fields are withheld (null, detail_redacted=true).
     INTERNET_READ_DETAIL = "internet:read_detail"
+    # Per-user identity data (PRD 10, 92). A strict-subset ladder: read (browse people, name the
+    # person behind an address) > read-limited (resolve an address to its endpoint, never to a
+    # person) > read-summary (aggregate counts only: no names, no identifiers).
+    USERS_READ = "users:read"
+    USERS_READ_LIMITED = "users:read-limited"
+    USERS_READ_SUMMARY = "users:read-summary"
     ACTIONS_PROPOSE = "actions:propose"
     ACTIONS_APPROVE = "actions:approve"
     ADMIN_CONFIG = "admin:config"
@@ -73,6 +79,10 @@ HUMAN_ONLY_PERMISSIONS: frozenset[Permission] = frozenset(
         Permission.ALERT_RULES_DISABLE,
         Permission.MAINTENANCE_WRITE,
         Permission.MAINTENANCE_WRITE_ORGANISATION,
+        # Per-user data is never browsed by a service or AI principal (inference abuse, PRD 92):
+        # a person decides to look, and the read is audited under their name.
+        Permission.USERS_READ,
+        Permission.USERS_READ_LIMITED,
     }
 )
 
@@ -127,6 +137,11 @@ _INTERNET_DETAIL = {Permission.INTERNET_READ_DETAIL}
 # yet, so every holder gets the same read-only surface. Held on its own (not in _ALL_READ) so a
 # role that reads everything else is not given diagnostics by accident.
 _DIAGNOSTICS = {Permission.DIAGNOSTICS_READ}
+# Identity: the ladder is held as three nested sets so a role can never have a rung without the ones
+# below it (asserted in test_rbac_identity.py). Auditor holds none until the owner decides.
+_USERS_SUMMARY = {Permission.USERS_READ_SUMMARY}
+_USERS_LIMITED = _USERS_SUMMARY | {Permission.USERS_READ_LIMITED}
+_USERS_FULL = _USERS_LIMITED | {Permission.USERS_READ}
 
 ROLE_PERMISSIONS: Mapping[Role, frozenset[Permission]] = {
     Role.ADMINISTRATOR: frozenset(Permission),
@@ -137,6 +152,7 @@ ROLE_PERMISSIONS: Mapping[Role, frozenset[Permission]] = {
         | _ALERTING_AUTHOR
         | _INTERNET_EXPORT
         | _INTERNET_DETAIL
+        | _USERS_FULL
         | {Permission.ACTIONS_PROPOSE}
     ),
     Role.SECURITY_ANALYST: frozenset(
@@ -145,6 +161,7 @@ ROLE_PERMISSIONS: Mapping[Role, frozenset[Permission]] = {
         | _INCIDENT_FULL
         | _ALERTING_AUTHOR
         | _INTERNET_DETAIL
+        | _USERS_FULL
         | {Permission.ACTIONS_PROPOSE}
     ),
     Role.TECHNICIAN: frozenset(
@@ -157,10 +174,13 @@ ROLE_PERMISSIONS: Mapping[Role, frozenset[Permission]] = {
             Permission.DIAGNOSTICS_READ,
             Permission.INTERNET_READ,
             Permission.ACTIONS_PROPOSE,
+            *_USERS_LIMITED,
         }
     ),
     # Summary only: the full incident read is withheld (human decision 2026-10-10).
-    Role.MANAGEMENT: frozenset((_ALL_READ - {Permission.INCIDENTS_READ}) | {Permission.AUDIT_READ}),
+    Role.MANAGEMENT: frozenset(
+        (_ALL_READ - {Permission.INCIDENTS_READ}) | _USERS_SUMMARY | {Permission.AUDIT_READ}
+    ),
     Role.AUDITOR: frozenset(
         _ALL_READ | _ALERTING_READ | _INTERNET_EXPORT | {Permission.AUDIT_READ}
     ),

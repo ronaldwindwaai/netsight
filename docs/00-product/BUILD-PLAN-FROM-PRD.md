@@ -14,7 +14,7 @@ Status: living plan. Sources consumed in order: `AGENTS.md`, `docs/00-product/PR
 - S1 slice implemented: OIDC login + local credentials with MFA (ADR 0010), sessions, RBAC, AdminLTE shell, overview aggregate, LibreNMS devices/interfaces/alerts, device table/detail, interface table, source-health states, E2E harness + security matrix tests.
 - NetBox (NS-030): read-only adapter + `/api/v1/sources/netbox/health`, `/api/v1/netbox/devices`, `/api/v1/netbox/devices/{id}`, `/api/v1/reconcile/findings`. Contract + parser contract surfaces updated for overview source state.
 - Topology (S3 steps 1–4): canonical `topology.schema.json`, `/api/v1/topology` endpoint, NetBox active cables as the only edge source (states `not-connected` / `unknown` / `ok`; only terminations that resolve to devices on both ends become edges), `/network/map` UI with explicit states + interactive layered canvas (pan/zoom/fit), contract + parser tests (no-source/empty/valid graph). Reconciliation findings consumed in edge context: nodes carry `reconciled` + `finding` (`missing-discovered` / `status-mismatch` only, finding requires `reconciled=true` in schema/pydantic/parser); `unknown-discovered` stays in `/reconcile/findings`. Reviewed: independent review (1 MAJOR contract-agreement finding fixed: `TopologyNode.name` now required-nullable across pydantic/OpenAPI/JSON-schema/TS parser) + security review (negative authz tests, SSRF pagination-origin test, hostile-name test, token-echo test added; threat-model delta recorded).
-- Web overview placeholders: topology, incidents, traffic, applications, users, security are explicitly "not connected" surfaces; no fabricated metrics. The Internet KPI is real since Step 5 (E08): it shows source-reported WAN status/throughput/utilisation only and otherwise stays "Not connected"/"Restricted"/"Unknown".
+- Web overview placeholders: topology, incidents, traffic, applications, users (the overview Users KPI is still a placeholder; the real `/users` surface landed in Step 6), security are explicitly "not connected" surfaces; no fabricated metrics. The Internet KPI is real since Step 5 (E08): it shows source-reported WAN status/throughput/utilisation only and otherwise stays "Not connected"/"Restricted"/"Unknown".
 - Traffic (S4-1 + S4-2): canonical `traffic.schema.json` (top responses) + `traffic-flows.schema.json`, pydantic models, OpenAPI paths and TS parsers in three-way agreement; `/api/v1/traffic/top-talkers`, `/api/v1/traffic/top-destinations`, `/api/v1/traffic/flows` gated by `traffic:read` with server-bounded windows (`preset` `1h`/`6h`/`24h`/`7d` or explicit `from`/`to`, ≤31 days, `limit` ≤100/≤500 → 422 on violations) and explicit `not-connected`/`unknown`/`ok` states. S4-2 wires the read-only ClickHouse/Akvorado `TrafficSource` (unset `CLICKHOUSE_DSN` → `not-connected`; configured-but-invalid or failed read → `unknown`; real reads → `ok` with source-reported freshness) — never fabricated sample rows.
 
 ## Build plan (next slices, DoD-gated)
@@ -38,7 +38,7 @@ Steps:
 4. Overview wiring replaces the traffic placeholder only with real data. (Deferred — the overview keeps its explicit placeholder surfaces; track with the next overview pass.)
 5. ✅ Tests/contract tests; independent review + security review (S4-4 slice gate). Independent review returned CHANGES REQUIRED (pydantic not enforcing the non-ok⇒no-rows invariant; `ok`-path construction outside the contract guard; application-mix denominator), all fixed in `5fca09d` and confirmed APPROVE on re-review. Security review returned PASS WITH FOLLOW-UPS; redirect/TLS hardening and secret-repr fix landed, with per-identity rate limiting (F2), traffic ABAC/site scoping (F3) and read auditing (F4) recorded as platform follow-ups in the threat model.
 
-Out of slice pass (P1 follow-ups): NS-043 identity correlation framework, NS-044 after-hours baselines.
+Out of slice pass (P1 follow-ups): ~~NS-043 identity correlation framework~~ (done, Step 6: see E05/NS-043 below), NS-044 after-hours baselines.
 
 ### E05 — Security operations
 Stories: NS-050..NS-052.
@@ -274,6 +274,61 @@ Design doc: `docs/12-implementation/INTERNET-WAN.md`. No approved design exists 
      heavy; read auditing for status/SLA; live LibreNMS check that the ports list carries `ifInOctets_rate`, `ifOutOctets_rate` and `poll_time`; latency/loss SLA terms (only uptime violations
      exist); a persisted/scheduled SLA report; a Playwright run of `/internet` against a real stack; a shared (non-per-worker) rate limiter; a cap that tolerates a sampling interval raised
      after a dense month was stored (today such a month reads as an error, never a wrong figure).
+
+### E05/NS-043 — Identity correlation, Users & Identity (PRD 10, 19-20, 36, 92)
+Design doc: `docs/12-implementation/IDENTITY-CORRELATION.md`. No approved design exists for Users & Identity (DESIGN-INVENTORY gap): the pages follow SCREEN-SPECS "Users".
+
+1. ✅ **Step 6 - identity correlation framework** (2026-10-11, **uncommitted on `main`**; strict TDD: every slice's tests were written and seen to fail first; contract-first). Delivered:
+   - **(a) Domain + pure, deterministic engine** (`identity/model.py`, `identity/engine.py`). Evidence records (source, observed_at, validity window, confidence, relations) -> links with `basis`
+     observed | inferred | unknown, the evidence list, confidence (inferred capped at 0.7), the window they hold for and an as-of time. Person -> Account -> Device -> IP -> MAC -> Switch/AP
+     -> Port -> VLAN. Handles shared PCs (in turn: by time; at once: ambiguous), multiple devices per user, DHCP reuse over time (overlap = ambiguous, contested from both ends), NAT/public/CGNAT
+     (never identity, never a bridge), VPN (identity only through a VPN session), guest/BYOD (never attributed), expired sessions (half-open windows, bounded trust in open sessions,
+     `expired` vs `no-evidence`), conflicting evidence (ambiguous with every candidate listed, never picked). **An IP address alone is never identity.** 68 scenario + 5 symmetric-dispute
+     tests, 150 seeded random-evidence property runs (order independence, no person without an account/assignment, observed rests only on direct evidence valid at the instant) and a
+     4 000-record bound test; mutation spot-checks confirmed the tests fail when conflict detection or the shared-address rule is removed.
+   - **(b) Adapters (read-only, SSRF-safe, bounded, fail closed).** `EvidenceSource` Protocol + `MemoryEvidenceSource`; **Wazuh agent inventory** (`WazuhIndexerClient.agents`, monitoring index,
+     `size = limit + 1` truncation detection, existing TLS/redirect/size/prefix hardening; `_search` extracted from `events` with its 105 existing tests unchanged) and **NetBox assignments**
+     (`ip_assignments`, `contact_assignments`: only owner-role contacts, static active interface addresses, same-origin bounded pagination). A source may only emit its own name and declared kinds;
+     truncation, oversize, timeout or any error makes it `unknown`. **Not wired (documented): DHCP, RADIUS/802.1X, VPN, Wi-Fi controller, switch MAC table, DNS, Entra/Google directory and sign-in logs;
+     Wazuh and NetBox shapes are mock-transport tested only, not against a live system.**
+   - **(c) Storage: compute on read, nothing persisted, no migration 0006.** Bounded snapshot (<= 2 500 records/source, <= 5 000 total, 24 h window, 15 s/source), 30 s single-entry cache for "now",
+     none for the past. History is only as long as the sources' retention (stated, not hidden); persisting it is a human decision (DATA-RETENTION-MATRIX; retention period **not invented**).
+   - **(d) API.** `GET /users` (paged <= 100 x 1000), `/users/{id}`, `/users/summary`, `/identity/resolve?ip=|mac=|hostname=[&at=]` (one subject, canonical forms, `at` <= 7 days back). RBAC: three
+     permissions on a strict-subset ladder (`users:read` Admin/Network Engineer/Security Analyst; `users:read-limited` + Technician; `users:read-summary` + Management; **Auditor none**), per-user ones
+     human-only, endpoint-only answers for the limited rung (person withheld, evidence ids opaque), counts only for Management. Authorise, then rate-limit (resolve 30/min, list/detail 120, summary 60).
+     **Every per-user read audited** (actor, target, counts; no names/purpose; denied and failed too). `no-store`. Explicit `not-connected` / `unknown`; every response validated against its canonical schema.
+   - **(e) UI.** `/users` (lookup form + people list or aggregate, by permission) and `/users/[userId]` (accounts, current sessions, assigned devices, traffic and security attributed by address), sidebar
+     entry gated by `users:read-summary`. Basis badge (word + icon) on every correlation with reason, confidence, window, as-of and evidence drill-down; ambiguity lists every candidate and selects none; full
+     state matrix (loading, empty, not-connected, unknown, partial, stale, permission, unauthenticated, rate-limited, error, not found); untrusted text as data; no behaviour/risk fields (no such data).
+   - **Contracts.** `identity.schema.json`, `identity-users.schema.json`, 18 OpenAPI components + 4 paths, pydantic `schemas_identity.py`, TS parsers (`api-contracts-identity*.ts`/`api-contracts-users.ts`),
+     shared vectors `identity.vectors.json` (18 entities, 310 cases, incl. cross-field cases JSON Schema cannot express) driving all four verdicts plus an OpenAPI-vs-JSON-schema structural diff.
+   - **Verification** (2026-10-11): ruff clean (src, tests); mypy (`src`, 130 files) clean; `scripts/security-verify.sh` passes; default pytest **6775 passed / 544 skipped** (baseline 5361 / 544; +1414);
+     no storage was added so there is no live PostgreSQL delta (no ephemeral server was started); coverage of the new modules 97-100% (`identity/engine.py` 99%, `model.py` 98%, `service.py` 97%, `netbox_source.py`
+     100%); web typecheck and lint clean, **1399 unit + 296 component tests** (baseline 1066 + 212), `next build` succeeds (`/users`, `/users/[userId]` compile). UI verified by jsdom component tests, typecheck, lint
+     and build only (no browser run); no real-process E2E was added (the harness has no NetBox/Wazuh stub, and wiring NetBox into the shared API would change the diagnostics scenario).
+   - **Found by a test, fixed.** A RADIUS native record id embedded an account id and reached the Technician's endpoint evidence: ids are now opaque hashes for callers without `users:read`.
+   - **Review.** Self-reviewed against the security checklist (threat-model delta recorded). Independent code review: **CHANGES REQUIRED** (H1); security review: **PASS WITH FOLLOW-UPS** - both addressed in the
+     review fix pass below.
+   - **Review fix pass (2026-10-11, uncommitted, strict TDD: tests first, seen red).** **H1:** Wazuh and NetBox minted different devices for one host (device-ip is exclusive), so the same host always
+     conflicted. Fixed without trusting spoofable text: the only join is an operator-controlled NetBox device custom field holding the Wazuh agent id (`NETSIGHT_NETBOX_WAZUH_AGENT_FIELD`; a key
+     claimed twice joins neither; unset = no join); keyed => `inferred` / `declared-assignment`, unkeyed => `conflicting-evidence`, never a wrong pick; hostile hostname/agent name cannot merge or steal
+     a link (cross-source tests). IDENTITY-CORRELATION.md now says plainly what Wazuh+NetBox alone can and cannot attribute. **M2:** agent claims inside `NETSIGHT_IDENTITY_STATIC_CIDRS` are ignored.
+     **Security medium:** a bad Wazuh/NetBox row is skipped and counted, not fatal (mostly-bad fails the read); NetBox 8 MiB response cap; people() cached per snapshot and run in a thread (also the index
+     build); global historical budget (20/min) + 2-slot concurrency cap; resolve audit target is a fingerprint; summary denial, denied-detail target, 429s and resolve 422s audited with static reasons;
+     `no-store` on identity error responses. **Low:** HMAC evidence ids (`NETSIGHT_IDENTITY_ID_KEY`, fail closed); name-match no longer cites person-device records; security panel reworded ("events involving
+     an address attributed to this person"); guest/shared CIDRs documented as a deployment prerequisite; `_expand` and `resolve_identity` split under 50 lines; historical register note
+     (`notes: ["register-is-current-state"]`, contract-first four-way: schema, OpenAPI, pydantic, TS, +4 vectors = 314); fuzz test asserts observed needs direct evidence >= 0.8, the 0.7 inferred cap and
+     that a conflict never yields a single confident pick, and the wall-clock assertion is replaced by a counted-work bound. Verification: ruff clean (src, tests), mypy 132 files clean,
+     `scripts/security-verify.sh` passes, pytest **6876 passed / 544 skipped** (+101), web typecheck/lint clean, **1403 unit + 297 component tests**, `next build` succeeds.
+   - **Rollback.** Unregister `identity_router` in `main.py`, drop the Users menu entry and the three `users:*` permissions; unset `WAZUH_INDEXER_URL` / `NETBOX_*` to return the sources to `not-connected`. Nothing was
+     persisted and there is no schema change.
+   - **Human decisions needed.** (1) Persistence and retention of identity history (none stored; no period invented). (2) The RBAC reading (Network Engineer `users:read`; Technician limited; Management aggregate;
+     Auditor none) and whether a privacy/legal review must precede non-Admin browsing (PRD 92). (3) The trust TTLs and thresholds (open session 15 min RADIUS/VPN/Wi-Fi/MAC table, DHCP 1 h, agent and sign-in 30 min, directory/
+     assignment 24 h; observed >= 0.8; inferred cap 0.7). (4) Which NetBox contact roles mean "uses this device" (default `Owner,User`). (5) The network classification for the real estate (NAT, VPN, guest, internal public blocks, server/static ranges): a deployment prerequisite. (6) Adopt the NetBox
+     custom field carrying the Wazuh agent id (and who may edit it); provision and rotate `NETSIGHT_IDENTITY_ID_KEY`.
+   - **Follow-ups.** The DHCP/RADIUS/VPN/Wi-Fi/MAC-table/DNS/IdP adapters (the only route to genuinely *observed* answers); live Wazuh/NetBox verification (and Wazuh syscollector MACs, NetBox interface MACs); persisted
+     history; source-specific supersede rules in adapters (a DHCP release ends the old lease); a Playwright run of the Users pages; the overview Users KPI and global-search integration of `/identity/resolve`; site scoping and the
+     meaning of "limited"; a shared (non per-worker) cache and limiter; tamper-evident audit; the skipped-row count in the API (logged only); live check of the NetBox `cf_<field>__empty` filter.
 
 ### E09 — AI copilot
 Stories: per PRD E9.

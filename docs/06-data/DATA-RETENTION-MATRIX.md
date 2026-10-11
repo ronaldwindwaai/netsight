@@ -11,7 +11,7 @@ Set organisation-specific periods before production.
 | Flow aggregates | 1 year+ | trends/capacity |
 | Security events | 90–365 days+ | risk/regulatory |
 | Device metrics | 90 days detailed + aggregates | source dependent |
-| Identity correlations | limited by operational need | privacy sensitive |
+| Identity correlations | **PENDING HUMAN DECISION** ("limited by operational need"; no period is set) | privacy sensitive. **Nothing is stored today** (Step 6 computes correlations on read from bounded evidence, no migration): the effective history is the sources' own retention (Wazuh monitoring index; NetBox current state only), up to 7 days back through `GET /identity/resolve?at=`. Persisting history (append-only, audited, migrator-owned prune, like the diagnostic and WAN tables) needs the decision below first |
 | AI traces | short, redacted | do not retain secrets |
 | Notification delivery attempts | 90 days–1 year | identifiers and static codes only; append-only. **No prune path exists yet**: the application has no delete, and the append-only triggers (`ENABLE ALWAYS`) stop the owner as well, so rows accumulate until an audited migrator step (disable trigger, delete, re-enable, in one transaction, with the deletion audited) is designed and approved. Until then plan disk for the volume (one row per attempt, <= 5 per notification) |
 | Diagnostic sessions | **PENDING HUMAN DECISION** (candidate range 90 days-1 year; no period is set) | one immutable snapshot per finished run (<= 1 MiB, typically a few KiB); holds the operator-typed target and symptom (free text), probe details, NetBox device names and alert titles, so treat as operationally sensitive. Incident titles are **not** stored (references only; joined at read time for `incidents:read` holders). The UI warns not to paste secrets or personal data into the target or symptom, but free text cannot be screened, so a pasted secret would be retained as long as the session. **No prune path is built**: no application delete, and the append-only triggers stop the owner as well. Growth is limited by the 10 runs/minute/identity run limit and a configurable daily storage cap (`NETSIGHT_DIAGNOSTIC_SESSIONS_DAILY_CAP`, default 5000, over which runs are answered but not stored; a warning is logged at 80%) |
@@ -32,3 +32,11 @@ delete and no trigger disabling is needed): `DROP TABLE wan_probe_samples_pYYYYM
 wan_link_cycles_pYYYYMM;` then `DROP TABLE wan_link_cycles_pYYYYMM;` (detach instead of dropping to archive first). The step must be audited (who,
 which months, row counts) and must never run for a month that was exported for an open dispute. Scheduling it is **deliberately unbuilt** until a
 period is approved. Until then the tables only grow, bounded by the sampling interval and the link and target caps.
+
+## Decision needed: identity correlation history (open, human)
+
+Not decided and **not invented here**: (1) whether identity correlations are persisted at all (needed to answer "who had this address on Tuesday" beyond the sources' own retention, and for
+incident reconstruction, per IDENTITY-CORRELATION.md "Preserve historical correlation"); (2) if so, the retention period and whether per-person detail may be kept as long as the
+aggregate; (3) who may prune and how a prune is audited; (4) whether a privacy/legal review (PRD 92) must precede any persistence of per-person network history. Constraints any answer must
+respect: the table would be Netsight app state in PostgreSQL (DATABASE-OWNERSHIP), append-only with audited, migrator-owned deletion, least-privilege roles, a guarded `down`, and
+evidence references rather than copies of source records. Until decided, **no migration 0006 exists and nothing is stored**.

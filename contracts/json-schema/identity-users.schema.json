@@ -1,0 +1,809 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "state",
+    "as_of",
+    "window",
+    "sources",
+    "items",
+    "page",
+    "page_size",
+    "total"
+  ],
+  "properties": {
+    "state": {
+      "enum": [
+        "not-connected",
+        "unknown",
+        "ok"
+      ]
+    },
+    "as_of": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "window": {
+      "$ref": "identity.schema.json#/$defs/window"
+    },
+    "sources": {
+      "type": "array",
+      "maxItems": 8,
+      "items": {
+        "$ref": "identity.schema.json#/$defs/sourceStatus"
+      }
+    },
+    "items": {
+      "type": "array",
+      "maxItems": 100,
+      "items": {
+        "$ref": "#/$defs/userSummary"
+      }
+    },
+    "page": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1000
+    },
+    "page_size": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 100
+    },
+    "total": {
+      "type": "integer",
+      "minimum": 0
+    }
+  },
+  "title": "UserListResponse",
+  "description": "GET /api/v1/users. A bounded, paged list of people known to the evidence. A non-ok state carries no rows and a zero total.",
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "enum": [
+              "not-connected",
+              "unknown"
+            ]
+          }
+        },
+        "required": [
+          "state"
+        ]
+      },
+      "then": {
+        "properties": {
+          "items": {
+            "maxItems": 0
+          },
+          "total": {
+            "const": 0
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "userSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "display_name",
+        "account_count",
+        "assigned_device_count",
+        "session_count",
+        "presence",
+        "last_evidence_at"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^person-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "display_name": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "\\S"
+        },
+        "account_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "assigned_device_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "session_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "presence": {
+          "enum": [
+            "observed",
+            "inferred",
+            "unknown"
+          ],
+          "description": "Basis of the person's current session evidence. unknown means no session is evidenced, which is not the same as offline."
+        },
+        "last_evidence_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        }
+      },
+      "description": "One person known to the evidence. Persons are keyed by canonical id, never by e-mail address or name.",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "presence": {
+                "const": "unknown"
+              }
+            },
+            "required": [
+              "presence"
+            ]
+          },
+          "then": {
+            "properties": {
+              "session_count": {
+                "const": 0
+              }
+            }
+          }
+        }
+      ]
+    },
+    "trafficItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "address",
+        "bytes",
+        "covers_window"
+      ],
+      "properties": {
+        "address": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 45,
+          "pattern": "^[0-9a-f:.]{2,45}$"
+        },
+        "bytes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "covers_window": {
+          "type": "boolean"
+        }
+      },
+      "description": "Traffic of one address currently attributed to the person. bytes is null when the address was not among the source's listed top talkers or its link does not cover the whole window (never zero).",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "covers_window": {
+                "const": false
+              }
+            },
+            "required": [
+              "covers_window"
+            ]
+          },
+          "then": {
+            "properties": {
+              "bytes": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "traffic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "basis",
+        "window",
+        "top_n",
+        "items"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "not-connected",
+            "unknown",
+            "ok"
+          ]
+        },
+        "basis": {
+          "enum": [
+            "inferred",
+            "unknown"
+          ]
+        },
+        "window": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "identity.schema.json#/$defs/window"
+            }
+          ]
+        },
+        "top_n": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "items": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "$ref": "#/$defs/trafficItem"
+          }
+        }
+      },
+      "description": "Traffic by address over a short window, attributed by IP and therefore inferred. Not-connected without a traffic source; a non-ok state carries no values.",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "not-connected",
+                  "unknown"
+                ]
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "basis": {
+                "const": "unknown"
+              },
+              "window": {
+                "type": "null"
+              },
+              "top_n": {
+                "const": 0
+              },
+              "items": {
+                "maxItems": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "ok"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "basis": {
+                "const": "inferred"
+              },
+              "window": {
+                "$ref": "identity.schema.json#/$defs/window"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "securityItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event_id",
+        "observed_at",
+        "severity",
+        "signature",
+        "address",
+        "link"
+      ],
+      "properties": {
+        "event_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "observed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "severity": {
+          "enum": [
+            "info",
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ]
+        },
+        "signature": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "address": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 45,
+          "pattern": "^[0-9a-f:.]{2,45}$"
+        },
+        "link": {
+          "allOf": [
+            {
+              "$ref": "identity.schema.json#/$defs/link"
+            },
+            {
+              "properties": {
+                "relation": {
+                  "const": "identity"
+                },
+                "basis": {
+                  "enum": [
+                    "observed",
+                    "inferred"
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      },
+      "description": "A security event at an address that was attributed to the person at the time of the event. The link says how (basis and evidence); the signature is untrusted source text."
+    },
+    "security": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "window",
+        "items",
+        "truncated"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "not-connected",
+            "unknown",
+            "ok"
+          ]
+        },
+        "window": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "identity.schema.json#/$defs/window"
+            }
+          ]
+        },
+        "items": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "$ref": "#/$defs/securityItem"
+          }
+        },
+        "truncated": {
+          "type": "boolean"
+        }
+      },
+      "description": "Security events at addresses attributed to the person when they happened. Not-connected without a security source; a non-ok state carries no values.",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "not-connected",
+                  "unknown"
+                ]
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "window": {
+                "type": "null"
+              },
+              "items": {
+                "maxItems": 0
+              },
+              "truncated": {
+                "const": false
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "ok"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "window": {
+                "$ref": "identity.schema.json#/$defs/window"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "display_name",
+        "accounts",
+        "assigned_devices",
+        "sessions"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^person-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "display_name": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "\\S"
+        },
+        "accounts": {
+          "type": "array",
+          "maxItems": 50,
+          "items": {
+            "allOf": [
+              {
+                "$ref": "identity.schema.json#/$defs/link"
+              },
+              {
+                "properties": {
+                  "relation": {
+                    "const": "person-account"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "assigned_devices": {
+          "type": "array",
+          "maxItems": 50,
+          "items": {
+            "allOf": [
+              {
+                "$ref": "identity.schema.json#/$defs/link"
+              },
+              {
+                "properties": {
+                  "relation": {
+                    "const": "person-device"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "sessions": {
+          "type": "array",
+          "maxItems": 50,
+          "items": {
+            "$ref": "identity.schema.json#/$defs/session"
+          }
+        }
+      },
+      "description": "A person's profile: accounts, assigned devices (a declaration, never proof of use) and current sessions."
+    },
+    "detail": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "as_of",
+        "window",
+        "sources",
+        "user",
+        "traffic",
+        "security"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "not-connected",
+            "unknown",
+            "ok"
+          ]
+        },
+        "as_of": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "window": {
+          "$ref": "identity.schema.json#/$defs/window"
+        },
+        "sources": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "$ref": "identity.schema.json#/$defs/sourceStatus"
+          }
+        },
+        "user": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/profile"
+            }
+          ]
+        },
+        "traffic": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/traffic"
+            }
+          ]
+        },
+        "security": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/security"
+            }
+          ]
+        }
+      },
+      "description": "GET /api/v1/users/{id}. A non-ok state carries no profile and no activity blocks.",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "not-connected",
+                  "unknown"
+                ]
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "user": {
+                "type": "null"
+              },
+              "traffic": {
+                "type": "null"
+              },
+              "security": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "ok"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "user": {
+                "$ref": "#/$defs/profile"
+              },
+              "traffic": {
+                "$ref": "#/$defs/traffic"
+              },
+              "security": {
+                "$ref": "#/$defs/security"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "aggregate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "as_of",
+        "window",
+        "sources",
+        "people_total",
+        "with_observed_session",
+        "with_inferred_session",
+        "without_session_evidence",
+        "vpn_sessions"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "not-connected",
+            "unknown",
+            "ok"
+          ]
+        },
+        "as_of": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "window": {
+          "$ref": "identity.schema.json#/$defs/window"
+        },
+        "sources": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "$ref": "identity.schema.json#/$defs/sourceStatus"
+          }
+        },
+        "people_total": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "with_observed_session": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "with_inferred_session": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "without_session_evidence": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "vpn_sessions": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        }
+      },
+      "description": "GET /api/v1/users/summary. Aggregate counts only: no names, no identifiers, no per-user rows. Counts are null unless the state is ok. with_observed_session + with_inferred_session + without_session_evidence = people_total (cross-field).",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "not-connected",
+                  "unknown"
+                ]
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "people_total": {
+                "type": "null"
+              },
+              "with_observed_session": {
+                "type": "null"
+              },
+              "with_inferred_session": {
+                "type": "null"
+              },
+              "without_session_evidence": {
+                "type": "null"
+              },
+              "vpn_sessions": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "ok"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "people_total": {
+                "type": "integer"
+              },
+              "with_observed_session": {
+                "type": "integer"
+              },
+              "with_inferred_session": {
+                "type": "integer"
+              },
+              "without_session_evidence": {
+                "type": "integer"
+              },
+              "vpn_sessions": {
+                "type": "integer"
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

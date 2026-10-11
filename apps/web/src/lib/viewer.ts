@@ -29,3 +29,21 @@ export function canReadInternet(viewer: Viewer | null): boolean {
 export function canExportInternet(viewer: Viewer | null): boolean {
   return viewer !== null && viewer.permissions.includes('internet:export');
 }
+
+/** True when the viewer holds users:read (browse people, name the person behind an address). Advisory only. */
+export function canReadPeople(viewer: Viewer | null): boolean {
+  return viewer !== null && viewer.permissions.includes('users:read');
+}
+
+/** True when the viewer may resolve an address to its endpoint (users:read or users:read-limited). Advisory only. */
+export function canResolveIdentity(viewer: Viewer | null): boolean {
+  return (
+    viewer !== null &&
+    (viewer.permissions.includes('users:read') || viewer.permissions.includes('users:read-limited'))
+  );
+}
+
+/** True when the viewer holds users:read-summary (aggregate counts; Management's only users surface). Advisory only. */
+export function canReadUsersSummary(viewer: Viewer | null): boolean {
+  return viewer !== null && viewer.permissions.includes('users:read-summary');
+}

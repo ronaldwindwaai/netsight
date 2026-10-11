@@ -56,6 +56,14 @@ _SOURCE_FIELDS = [
 ]
 
 
+# The agent inventory comes from the monitoring index (one status snapshot per agent about every
+# 15 minutes). 2 500 agents per read is the identity framework's per-source bound.
+_AGENT_FIELDS = ["id", "name", "ip", "status", "lastKeepAlive", "timestamp"]
+_MAX_AGENTS = 2500
+_AGENT_STATUSES = frozenset({"active", "disconnected", "pending", "never_connected"})
+_UNUSABLE_AGENT_ADDRESSES = frozenset({"", "any", "0.0.0.0", "::"})
+
+
 class AdapterStatus(StrEnum):
     """Typed source outcomes (same vocabulary as the other adapters)."""
 
@@ -196,6 +204,59 @@ def parse_hit(hit: Any) -> SecurityEvent:
         raise _invalid("invalid security event row") from exc
 
 
+@dataclass(frozen=True)
+class WazuhAgent:
+    """One agent-status snapshot. Every text field is untrusted telemetry, bounded and unparsed."""
+
+    agent_id: str
+    name: str | None
+    ip: str | None
+    status: str
+    observed_at: datetime
+    last_keep_alive: datetime | None
+
+
+@dataclass(frozen=True)
+class AgentInventory:
+    """The agents read, whether more existed than were asked for, and how many rows were skipped."""
+
+    agents: tuple[WazuhAgent, ...]
+    truncated: bool
+    skipped: int
+
+
+def _agent_address(value: Any) -> str | None:
+    """The agent's reported address, or None when it has none worth using ("any", blank)."""
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise _invalid("invalid agent address")
+    text = value.strip()
+    return None if text in _UNUSABLE_AGENT_ADDRESSES else text[:45]
+
+
+def parse_agent_hit(hit: Any) -> WazuhAgent:
+    """Convert one monitoring-index hit into an agent snapshot or raise invalid data."""
+    if not isinstance(hit, dict) or not isinstance(hit.get("_source"), dict):
+        raise _invalid("hit is not an agent document")
+    source = hit["_source"]
+    agent_id = source.get("id")
+    if not isinstance(agent_id, str) or not agent_id.strip():
+        raise _invalid("agent has no id")
+    status = source.get("status")
+    if not isinstance(status, str) or status not in _AGENT_STATUSES:
+        raise _invalid("agent has an unknown status")
+    keep_alive = source.get("lastKeepAlive")
+    return WazuhAgent(
+        agent_id=agent_id.strip()[:64],
+        name=_optional_text(source.get("name"), "name", 128),
+        ip=_agent_address(source.get("ip")),
+        status=status,
+        observed_at=_parse_timestamp(source.get("timestamp")),
+        last_keep_alive=None if keep_alive is None else _parse_timestamp(keep_alive),
+    )
+
+
 @dataclass
 class WazuhIndexerClient:
     """Read-only alert-search client for one configured Wazuh indexer.
@@ -211,13 +272,14 @@ class WazuhIndexerClient:
     user: str = field(default="", repr=False)
     password: str = field(default="", repr=False)
     index_pattern: str = "wazuh-alerts-*"
+    agents_index_pattern: str = "wazuh-monitoring-*"
     timeout_seconds: float = 10.0
     verify: bool | str = True
     allow_insecure_http: bool = False
     max_response_bytes: int = _MAX_RESPONSE_BYTES
     _transport: httpx.AsyncBaseTransport | None = field(default=None, repr=False)
 
-    def _connection(self) -> tuple[str, str]:
+    def _connection(self, index_pattern: str) -> tuple[str, str]:
         try:
             parsed = urlsplit(self.base_url)
             port = parsed.port
@@ -230,7 +292,7 @@ class WazuhIndexerClient:
             or parsed.query
             or parsed.fragment
             or parsed.path not in ("", "/")
-            or not _INDEX_PATTERN.fullmatch(self.index_pattern)
+            or not _INDEX_PATTERN.fullmatch(index_pattern)
         ):
             raise AdapterError(AdapterStatus.UNAVAILABLE, "wazuh indexer is misconfigured")
         if parsed.scheme == "http" and self.user and not self.allow_insecure_http:
@@ -238,7 +300,7 @@ class WazuhIndexerClient:
                 AdapterStatus.UNAVAILABLE, "wazuh indexer credentials require an https URL"
             )
         host = f"[{parsed.hostname}]" if ":" in parsed.hostname else parsed.hostname
-        return f"{parsed.scheme}://{host}{f':{port}' if port else ''}", self.index_pattern
+        return f"{parsed.scheme}://{host}{f':{port}' if port else ''}", index_pattern
 
     def _tls_verify(self) -> bool | ssl.SSLContext:
         """Verification setting for httpx; a CA bundle path becomes an ``SSLContext``."""
@@ -284,17 +346,9 @@ class WazuhIndexerClient:
             },
         }
 
-    async def events(
-        self,
-        *,
-        start: datetime,
-        end: datetime,
-        limit: int,
-    ) -> tuple[list[SecurityEvent], datetime | None]:
-        """Newest alerts in a bounded window and the newest timestamp seen."""
-        if start >= end:
-            raise ValueError("security window must be ordered")
-        base_url, index = self._connection()
+    async def _search(self, index_pattern: str, query: dict[str, Any]) -> list[Any]:
+        """POST a bounded ``_search`` and return the hit list, or raise a typed failure."""
+        base_url, index = self._connection(index_pattern)
         verify = self._tls_verify()
         timeout = httpx.Timeout(self.timeout_seconds, connect=5.0)
         try:
@@ -310,9 +364,7 @@ class WazuhIndexerClient:
                     # The size cap counts decoded bytes, so refuse compressed bodies outright.
                     headers={"Accept-Encoding": "identity"},
                 ) as client,
-                client.stream(
-                    "POST", f"/{index}/_search", json=self._query(start, end, limit)
-                ) as response,
+                client.stream("POST", f"/{index}/_search", json=query) as response,
             ):
                 status_code = response.status_code
                 body = await self._read_body(response) if status_code < 300 else b""
@@ -334,7 +386,65 @@ class WazuhIndexerClient:
         hits = _dig(payload, "hits", "hits")
         if not isinstance(hits, list):
             raise _invalid("wazuh returned an unexpected response")
+        return hits
 
+    async def events(
+        self,
+        *,
+        start: datetime,
+        end: datetime,
+        limit: int,
+    ) -> tuple[list[SecurityEvent], datetime | None]:
+        """Newest alerts in a bounded window and the newest timestamp seen."""
+        if start >= end:
+            raise ValueError("security window must be ordered")
+        hits = await self._search(self.index_pattern, self._query(start, end, limit))
         events = [parse_hit(hit) for hit in hits[:_MAX_LIMIT]]
         newest = max((event.observed_at for event in events), default=None)
         return events, newest
+
+    @staticmethod
+    def _agent_query(start: datetime, end: datetime, limit: int) -> dict[str, Any]:
+        return {
+            # One more than asked for: a full page means the inventory was cut short.
+            "size": max(1, min(int(limit), _MAX_AGENTS)) + 1,
+            "sort": [{"timestamp": {"order": "desc"}}],
+            "collapse": {"field": "id"},
+            "_source": {"includes": _AGENT_FIELDS},
+            "query": {
+                "bool": {
+                    "filter": [
+                        {
+                            "range": {
+                                "timestamp": {
+                                    "gte": start.astimezone(UTC).isoformat(),
+                                    "lt": end.astimezone(UTC).isoformat(),
+                                }
+                            }
+                        }
+                    ]
+                }
+            },
+        }
+
+    async def agents(self, *, start: datetime, end: datetime, limit: int) -> AgentInventory:
+        """The newest status snapshot of each agent in a bounded window.
+
+        One malformed document (an unknown status, an unusable address) is skipped and counted: a
+        single bad agent must not blank the whole inventory. When most of what came back is
+        malformed the read fails instead, because an index whose shape changed is not "no agents".
+        """
+        if start >= end:
+            raise ValueError("agent window must be ordered")
+        bound = max(1, min(int(limit), _MAX_AGENTS))
+        hits = await self._search(self.agents_index_pattern, self._agent_query(start, end, bound))
+        agents: list[WazuhAgent] = []
+        skipped = 0
+        for hit in hits[: bound + 1]:
+            try:
+                agents.append(parse_agent_hit(hit))
+            except AdapterError:
+                skipped += 1
+        if skipped > len(agents):
+            raise _invalid("most agent documents are malformed")
+        return AgentInventory(tuple(agents[:bound]), len(agents) > bound, skipped)

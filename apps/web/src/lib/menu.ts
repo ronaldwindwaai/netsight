@@ -2,6 +2,8 @@ import type { MenuNode } from '@adminlte/react';
 
 const DIAGNOSTICS_PERMISSION = 'diagnostics:read';
 const INTERNET_PERMISSION = 'internet:read';
+// The lowest rung of the users ladder: whoever can see any users surface (even counts) sees the entry.
+const USERS_PERMISSION = 'users:read-summary';
 
 interface MenuEntry {
   node: MenuNode;
@@ -14,6 +16,10 @@ const MENU_ENTRIES: readonly MenuEntry[] = [
   { node: { type: 'item', text: 'Overview', href: '/overview', icon: 'bi-speedometer2' } },
   { node: { type: 'item', text: 'Network Map', href: '/network/map', icon: 'bi-diagram-3' } },
   { node: { type: 'item', text: 'Devices', href: '/devices', icon: 'bi-hdd-network' } },
+  {
+    node: { type: 'item', text: 'Users', href: '/users', icon: 'bi-people' },
+    requires: USERS_PERMISSION,
+  },
   { node: { type: 'item', text: 'Traffic', href: '/traffic', icon: 'bi-bar-chart-line' } },
   {
     node: { type: 'item', text: 'Internet', href: '/internet', icon: 'bi-globe2' },

@@ -4,7 +4,7 @@
 - organisations/sites;
 - platform identities/roles;
 - canonical entity aliases;
-- identity correlations;
+- identity correlations (**not persisted yet**: Step 6 computes them on read from bounded evidence; persisting them is a pending human decision, see DATA-RETENTION-MATRIX and IDENTITY-CORRELATION.md);
 - incidents;
 - alert rules/policies;
 - maintenance windows;

@@ -86,3 +86,13 @@ carries `reason` (`no-public-url`); a page dropped because the backlog was full 
 `failure` when the evidence could not be read (the answered `state` is `unknown`; a `not-connected` answer is still a `success`) and `denied` (reason
 `permission`) when a caller without `internet:export` asks for it. Status and SLA reads are not audited (read auditing remains an open
 platform follow-up). The WAN collector writes no audit records: it performs no operator action and stores only probe outcomes.
+
+## Identity reads (Step 6)
+
+Every read of per-person data is audited (PRD 92): `identity.users.list` (`state`, `result_count`, `page`, `page_size`), `identity.user.read` (`target` = the person id, `state`,
+`session_count`) and `identity.resolve` (`target` = `ip:<fingerprint>`, `mac:<fingerprint>` or `hostname:<fingerprint>`, where the fingerprint is the short SHA-256 of the canonical value and **never the raw address, MAC or hostname**; `state`, `basis` of the answer, `redacted`, `historical`,
+`identified_count` = how many persons or candidates were disclosed, `endpoint_links`). They record `success`, `failure` (an unreadable source, `state = unknown`, or an unknown person with
+`reason = not-found`) and `denied` (`reason = permission`) with the actor and correlation id. Refusals are audited too, each with a static `reason` and no caller input: `identity.summary`
+(`denied`, `permission`), a denied `identity.user.read` (with `target` = the person id when it is a canonical id), `denied` / `rate-limited` for any identity action, `denied` / `global-limit` and
+`denied` / `busy` for a past-time resolve, and `failure` / `subject-count`, `invalid-subject` or `invalid-time` for rejected resolve input (422; nothing echoed). They never carry a name, an e-mail address, an alert signature, a purpose or any text a
+source supplied; the aggregate `GET /users/summary` returns counts only and is not audited. The same interim JSON-lines sink and caveats apply.

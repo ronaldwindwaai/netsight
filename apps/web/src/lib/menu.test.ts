@@ -40,3 +40,20 @@ test('the Internet entry points at /internet, next to Traffic', () => {
   const order = labels(items);
   assert.equal(order.indexOf('Internet'), order.indexOf('Traffic') + 1);
 });
+
+test('the menu offers Users only to a session holding a users permission, and fails closed without one', () => {
+  assert.ok(labels(menuItemsFor(['users:read-summary'])).includes('Users'));
+  assert.ok(labels(menuItemsFor(['users:read', 'users:read-limited', 'users:read-summary'])).includes('Users'));
+  // Auditor holds none (an open decision), so the entry is absent rather than a page that refuses.
+  assert.ok(!labels(menuItemsFor(['audit:read', 'incidents:read'])).includes('Users'));
+  assert.ok(!labels(menuItemsFor([])).includes('Users'));
+  assert.ok(!labels(menuItemsFor(null)).includes('Users'));
+});
+
+test('the Users entry points at /users, after Devices', () => {
+  const items = menuItemsFor(['users:read-summary']);
+  const entry = items.find((item) => item.type === 'item' && item.text === 'Users');
+  assert.ok(entry && entry.type === 'item' && entry.href === '/users');
+  const order = labels(items);
+  assert.equal(order.indexOf('Users'), order.indexOf('Devices') + 1);
+});

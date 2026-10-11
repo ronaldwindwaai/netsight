@@ -35,6 +35,15 @@ const INTERNET_VECTOR_URL = new URL(
   import.meta.url,
 );
 
+const IDENTITY_VECTOR_URL = new URL(
+  '../../../../contracts/test-vectors/identity.vectors.json',
+  import.meta.url,
+);
+
+export function loadIdentityVectors(): Record<string, VectorBlock> {
+  return JSON.parse(readFileSync(IDENTITY_VECTOR_URL, 'utf-8')) as Record<string, VectorBlock>;
+}
+
 export function loadInternetVectors(): Record<string, VectorBlock> {
   return JSON.parse(readFileSync(INTERNET_VECTOR_URL, 'utf-8')) as Record<string, VectorBlock>;
 }

@@ -18,6 +18,7 @@
 | Integrations | Full | No | No | No | No | Read |
 | IAM/RBAC | Full | No | No | No | No | Read |
 | Audit | Full | Scoped | Scoped | Own/assigned | Summary | Full |
+| Users & identity (not in the original matrix; see below) | Full | Full | Full | Endpoint only | Aggregate only | **No** |
 
 Production roles must be mapped to least privilege and may be site-scoped.
 
@@ -159,3 +160,31 @@ export should be withheld too (they are operator-declared host names, kept today
 | Capability (RBAC-MATRIX table above) | Admin | Network Engineer | Security Analyst | Technician | Management | Auditor |
 |---|---|---|---|---|---|---|
 | Internet / WAN detail (public IP, gateway, ISP, throughput) | Full | Full | Read | **No** | **No** | **No** |
+
+## Users and identity permissions (Step 6, 2026-10-11)
+
+The original matrix has no Users row. This is the privacy-first interpretation (PRD 92: role restrictions are mandatory; Management is aggregate-only with no per-user browsing;
+Technician is limited), recorded here to be confirmed by the human owner. Three permissions form a strict-subset ladder (a role never holds a rung without the ones below it;
+`test_rbac_identity.py`). Fail closed: unknown roles, no identity and unknown permission names are denied.
+
+| Permission | Admin | Network Engineer | Security Analyst | Technician | Management | Auditor |
+|---|---|---|---|---|---|---|
+| `users:read` (browse people, read one person, resolve an address to the person behind it) | Yes | Yes | Yes | **No** | **No** | **No** |
+| `users:read-limited` (resolve an address to its endpoint: device, MAC, port, VLAN, with the person withheld) | Yes | Yes | Yes | Yes | **No** | **No** |
+| `users:read-summary` (`GET /users/summary`: counts only; the `/users` page and menu entry) | Yes | Yes | Yes | Yes | Yes | **No** |
+
+- **Human-only.** `users:read` and `users:read-limited` are in `HUMAN_ONLY_PERMISSIONS`: no service or AI principal may browse or resolve people, whatever role it carries
+  (inference abuse; the AI copilot must not become a people-lookup tool). `users:read-summary` is not human-only.
+- **Management** sees only aggregate counts (people known, with an observed session, with an inferred session only, without session evidence, VPN sessions): no names,
+  identifiers or rows, and `403` on `/users`, `/users/{id}` and `/identity/resolve`.
+- **Technician ("Limited")** may resolve an address to its endpoint (`restricted` attribution: the person is withheld and the response says so; the source's own record ids
+  are replaced by opaque keyed ids - HMAC-SHA-256 under `NETSIGHT_IDENTITY_ID_KEY`, fail closed without it - because a native id can embed a user name and an unkeyed hash is guessable). Technician cannot browse or open a person.
+- **Auditor holds none (open decision).** The matrix grants Auditor "Read" broadly, but PRD 4 scopes Auditor to actions, incidents, authentication, configuration changes and
+  reports, and per-person network history is neither. Granting `users:read-summary` (counts) is the smallest next step; granting `users:read` needs the privacy/legal review below.
+- **Open decisions.** (1) Network Engineer holds `users:read` here because "who is on this port" is core troubleshooting; the alternative is the limited rung. (2) Site and
+  security scoping does not exist, so "scoped" roles see everyone. (3) Whether any non-Admin role may browse people before the privacy/legal policy PRD 92 asks for exists.
+- **Every read of per-user data is audited** (`identity.users.list`, `identity.user.read`, `identity.resolve`): actor, target and counts only, no purpose field and no names;
+  denied attempts too (including the summary and a denied detail with its person id), 429s and rejected resolve input, each with a static reason code. A resolve target is a fingerprint, never the
+  raw subject. Per-identity limits after authorisation: list/detail 120/min, summary 60/min, resolve 30/min; a past-time resolve also spends a global (all identities) budget of 20/min. The UI uses the session `permissions` only to show or hide
+  the entry and the sections; the API enforces every rule.
+

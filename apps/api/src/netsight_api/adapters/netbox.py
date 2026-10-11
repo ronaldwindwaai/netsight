@@ -9,6 +9,10 @@ impersonate source-of-truth records; this adapter only reports them.
 
 from __future__ import annotations
 
+import ipaddress
+import json
+import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import StrEnum
@@ -30,6 +34,16 @@ from netsight_api.schemas import (
 ADAPTER_VERSION = "netbox/1"
 SOURCE_NAME = "netbox"
 _MAX_CABLE_PAGES = 10
+# Identity evidence reads: 500 rows a page, at most 10 pages. More than that is a failure (a partial
+# list would hide a second owner or a duplicate address), never a silent truncation.
+_ASSIGNMENT_PAGE_SIZE = 500
+_MAX_ASSIGNMENT_PAGES = 10
+_MAX_TEXT = 128
+# Upper bound on one decoded response body: a hostile or broken NetBox cannot make a read hold more.
+_MAX_RESPONSE_BYTES = 8 * 1024 * 1024
+# A custom-field name as NetBox allows it, and the agent key a device may carry in it.
+CUSTOM_FIELD_NAME = re.compile(r"[a-z][a-z0-9_]{0,49}")
+AGENT_KEY_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,63}")
 
 
 class AdapterStatus(StrEnum):
@@ -87,6 +101,57 @@ class CableLink:
 class CableCollection:
     links: tuple[CableLink, ...]
     observed_at: datetime
+
+
+@dataclass(frozen=True)
+class IpAssignment:
+    """A static address NetBox assigned to a device interface (declared intent, not observation)."""
+
+    address: str
+    device_native_id: str
+    device_name: str | None
+    last_updated: datetime | None
+
+
+@dataclass(frozen=True)
+class IpAssignmentCollection:
+    items: tuple[IpAssignment, ...]
+    observed_at: datetime
+    skipped: int = 0
+
+
+@dataclass(frozen=True)
+class ContactAssignment:
+    """A NetBox contact assigned to a device with a role. Every text field is untrusted."""
+
+    contact_native_id: str
+    contact_name: str | None
+    device_native_id: str
+    device_name: str | None
+    role: str | None
+    last_updated: datetime | None
+
+
+@dataclass(frozen=True)
+class ContactAssignmentCollection:
+    items: tuple[ContactAssignment, ...]
+    observed_at: datetime
+    skipped: int = 0
+
+
+@dataclass(frozen=True)
+class DeviceAgentKey:
+    """The Wazuh agent id an operator recorded on a NetBox device (the cross-source join key)."""
+
+    device_native_id: str
+    agent_key: str
+
+
+@dataclass(frozen=True)
+class DeviceAgentKeyCollection:
+    items: tuple[DeviceAgentKey, ...]
+    observed_at: datetime
+    skipped: int = 0
 
 
 def canonical_device_id(native_id: str) -> str:
@@ -201,6 +266,104 @@ def _cable_timestamp(row: dict[str, Any]) -> datetime | None:
     return None
 
 
+def _bounded_text(value: object) -> str | None:
+    if isinstance(value, str) and value.strip():
+        return value.strip()[:_MAX_TEXT]
+    return None
+
+
+def _native_text(value: object) -> str | None:
+    if isinstance(value, bool) or not isinstance(value, (int, str)):
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def _status_value(row: dict[str, Any]) -> str | None:
+    status = row.get("status")
+    value = status.get("value") if isinstance(status, dict) else status
+    return value.strip().lower() if isinstance(value, str) else None
+
+
+def _ip_assignment(row: dict[str, Any]) -> IpAssignment | None:
+    """A static interface assignment, or None when the row is not one (DHCP, VM, unassigned)."""
+    if _status_value(row) != "active" or row.get("assigned_object_type") != "dcim.interface":
+        return None
+    assigned = row.get("assigned_object")
+    device = assigned.get("device") if isinstance(assigned, dict) else None
+    device_id = _native_text(device.get("id")) if isinstance(device, dict) else None
+    if device_id is None or not isinstance(device, dict):
+        return None
+    raw = row.get("address")
+    if not isinstance(raw, str):
+        raise AdapterError(AdapterStatus.INVALID_SOURCE_DATA, "invalid ip address row")
+    try:
+        address = str(ipaddress.ip_interface(raw.strip()).ip)
+    except ValueError as exc:
+        raise AdapterError(AdapterStatus.INVALID_SOURCE_DATA, "invalid ip address row") from exc
+    return IpAssignment(
+        address=address,
+        device_native_id=device_id,
+        device_name=_bounded_text(device.get("name")),
+        last_updated=_cable_timestamp(row),
+    )
+
+
+def _contact_assignment(row: dict[str, Any]) -> ContactAssignment | None:
+    """A contact assigned to a device, or None when the row is about another kind of object."""
+    if row.get("object_type") != "dcim.device":
+        return None
+    contact = row.get("contact")
+    contact_id = _native_text(contact.get("id")) if isinstance(contact, dict) else None
+    obj = row.get("object")
+    device_id = _native_text(row.get("object_id")) or (
+        _native_text(obj.get("id")) if isinstance(obj, dict) else None
+    )
+    if contact_id is None or device_id is None or not isinstance(contact, dict):
+        raise AdapterError(AdapterStatus.INVALID_SOURCE_DATA, "invalid contact assignment row")
+    role = row.get("role")
+    return ContactAssignment(
+        contact_native_id=contact_id,
+        contact_name=_bounded_text(contact.get("name")) or _bounded_text(contact.get("display")),
+        device_native_id=device_id,
+        device_name=_bounded_text(obj.get("name")) if isinstance(obj, dict) else None,
+        role=_bounded_text(role.get("name")) if isinstance(role, dict) else _bounded_text(role),
+        last_updated=_cable_timestamp(row),
+    )
+
+
+def _device_agent_key(row: dict[str, Any], field_name: str) -> DeviceAgentKey | None:
+    """The device's agent key, None when it carries none; raises when the value is unusable."""
+    fields = row.get("custom_fields")
+    value = fields.get(field_name) if isinstance(fields, dict) else None
+    if value is None or value == "":
+        return None
+    device_id = _native_text(row.get("id"))
+    key = _native_text(value)
+    if device_id is None or key is None or AGENT_KEY_PATTERN.fullmatch(key) is None:
+        raise AdapterError(AdapterStatus.INVALID_SOURCE_DATA, "invalid agent key")
+    return DeviceAgentKey(device_native_id=device_id, agent_key=key)
+
+
+def _tolerant[T](
+    rows: list[dict[str, Any]], parse: Callable[[dict[str, Any]], T | None]
+) -> tuple[list[T], int]:
+    """Parse every row; a malformed one is skipped and counted. Mostly-malformed output is a failure."""
+    items: list[T] = []
+    skipped = 0
+    for row in rows:
+        try:
+            item = parse(row)
+        except AdapterError:
+            skipped += 1
+            continue
+        if item is not None:
+            items.append(item)
+    if skipped > len(items):
+        raise AdapterError(AdapterStatus.INVALID_SOURCE_DATA, "most rows are malformed")
+    return items, skipped
+
+
 def _netbox_status(row: dict[str, Any]) -> DeviceStatus:
     status = row.get("status")
     if isinstance(status, dict):
@@ -250,7 +413,11 @@ def _map_device(row: dict[str, Any], observed_at: datetime) -> Device:
     display = _optional_display_text(row.get("name")) or _optional_display_text(row.get("display"))
     name = _required_text(display, "device name")
     hostname = _optional_text(row.get("name")) or name
-    device_type = _optional_display_text(row.get("role")) or _optional_display_text(row.get("device_type")) or "unknown"
+    device_type = (
+        _optional_display_text(row.get("role"))
+        or _optional_display_text(row.get("device_type"))
+        or "unknown"
+    )
     site_name = _optional_display_text(row.get("site"))
     ip = _primary_ip(row)
     try:
@@ -276,39 +443,57 @@ class NetboxClient:
     base_url: str
     token: str = field(repr=False)
     timeout_seconds: float = 10.0
+    max_response_bytes: int = _MAX_RESPONSE_BYTES
     _transport: httpx.AsyncBaseTransport | None = field(default=None, repr=False)
 
     def _headers(self) -> dict[str, str]:
         return {
             "Authorization": f"Token {self.token}",
             "Accept": "application/json",
+            # The size cap counts decoded bytes, so refuse compressed bodies outright.
+            "Accept-Encoding": "identity",
         }
+
+    async def _read_body(self, response: httpx.Response) -> bytes:
+        declared = response.headers.get("content-length", "")
+        if declared.isdigit() and int(declared) > self.max_response_bytes:
+            raise AdapterError(AdapterStatus.INVALID_SOURCE_DATA, "response is too large")
+        body = bytearray()
+        async for chunk in response.aiter_bytes():
+            body.extend(chunk)
+            if len(body) > self.max_response_bytes:
+                raise AdapterError(AdapterStatus.INVALID_SOURCE_DATA, "response is too large")
+        return bytes(body)
 
     async def _get(self, path: str, *, not_found_is_device: bool = False) -> dict[str, Any]:
         url = f"{self.base_url.rstrip('/')}{path}"
         try:
-            async with httpx.AsyncClient(
-                timeout=self.timeout_seconds,
-                transport=self._transport,
-                follow_redirects=False,
-            ) as client:
-                response = await client.get(url, headers=self._headers())
+            async with (
+                httpx.AsyncClient(
+                    timeout=self.timeout_seconds,
+                    transport=self._transport,
+                    follow_redirects=False,
+                ) as client,
+                client.stream("GET", url, headers=self._headers()) as response,
+            ):
+                status_code = response.status_code
+                content = await self._read_body(response) if status_code < 300 else b""
         except httpx.TimeoutException as exc:
             raise AdapterError(AdapterStatus.UNAVAILABLE, "request timed out") from exc
         except httpx.HTTPError as exc:
             raise AdapterError(AdapterStatus.UNAVAILABLE, "request failed") from exc
 
-        if response.status_code == 404 and not_found_is_device:
+        if status_code == 404 and not_found_is_device:
             raise DeviceNotFoundError
-        if response.status_code in (401, 403):
+        if status_code in (401, 403):
             raise AdapterError(AdapterStatus.FORBIDDEN, "source denied the request")
-        if response.status_code >= 500 or response.status_code in (408, 425, 429):
+        if status_code >= 500 or status_code in (408, 425, 429):
             raise AdapterError(AdapterStatus.UNAVAILABLE, "source is unavailable")
-        if response.status_code >= 400:
+        if status_code >= 300:
             raise AdapterError(AdapterStatus.INVALID_SOURCE_DATA, "unexpected source response")
 
         try:
-            raw_body: object = response.json()
+            raw_body: object = json.loads(content)
         except ValueError as exc:
             raise AdapterError(AdapterStatus.INVALID_SOURCE_DATA, "non-json response") from exc
         if not isinstance(raw_body, dict):
@@ -393,6 +578,57 @@ class NetboxClient:
             path = self._next_path(body)
             pages += 1
         return CableCollection(links=tuple(links), observed_at=datetime.now(UTC))
+
+    async def _paged_rows(self, first_path: str) -> list[dict[str, Any]]:
+        """Every row of a list endpoint, bounded: too many pages is a failure, not a truncation."""
+        rows: list[dict[str, Any]] = []
+        path: str | None = first_path
+        pages = 0
+        while path is not None:
+            if pages >= _MAX_ASSIGNMENT_PAGES:
+                raise AdapterError(AdapterStatus.UNAVAILABLE, "assignment pagination exceeded")
+            body = await self._get(path)
+            raw = body.get("results")
+            if not isinstance(raw, list) or any(not isinstance(item, dict) for item in raw):
+                raise AdapterError(AdapterStatus.INVALID_SOURCE_DATA, "invalid assignment list")
+            rows.extend(cast(list[dict[str, Any]], raw))
+            path = self._next_path(body)
+            pages += 1
+        return rows
+
+    async def ip_assignments(self) -> IpAssignmentCollection:
+        """Static, active addresses NetBox assigned to device interfaces (read-only).
+
+        A malformed row is skipped and counted, not fatal; mostly-malformed output fails the read.
+        """
+        rows = await self._paged_rows(
+            f"/api/ipam/ip-addresses/?limit={_ASSIGNMENT_PAGE_SIZE}"
+            "&assigned_to_interface=true&status=active"
+        )
+        items, skipped = _tolerant(rows, _ip_assignment)
+        return IpAssignmentCollection(tuple(items), datetime.now(UTC), skipped)
+
+    async def contact_assignments(self) -> ContactAssignmentCollection:
+        """Contacts assigned to devices, with their role (read-only; other objects are ignored)."""
+        rows = await self._paged_rows(
+            f"/api/tenancy/contact-assignments/?limit={_ASSIGNMENT_PAGE_SIZE}"
+        )
+        items, skipped = _tolerant(rows, _contact_assignment)
+        return ContactAssignmentCollection(tuple(items), datetime.now(UTC), skipped)
+
+    async def device_agent_keys(self, field_name: str) -> DeviceAgentKeyCollection:
+        """The agent id an operator recorded in the device custom field ``field_name`` (read-only).
+
+        Only devices that carry a usable value are returned; the filter is repeated client side so a
+        NetBox that ignores it cannot widen what is trusted.
+        """
+        if CUSTOM_FIELD_NAME.fullmatch(field_name) is None:
+            raise AdapterError(AdapterStatus.UNAVAILABLE, "the agent-key field name is invalid")
+        rows = await self._paged_rows(
+            f"/api/dcim/devices/?limit={_ASSIGNMENT_PAGE_SIZE}&cf_{field_name}__empty=false"
+        )
+        items, skipped = _tolerant(rows, lambda row: _device_agent_key(row, field_name))
+        return DeviceAgentKeyCollection(tuple(items), datetime.now(UTC), skipped)
 
     async def get_device(self, native_id: str) -> Device:
         encoded_native_id = quote(native_id, safe="")
