@@ -59,6 +59,13 @@ export function UnknownDeviceScanPanel() {
                 Endpoints that could not be checked against NetBox are not reported as unknown devices.
               </p>
             ) : null}
+            {result.scan.incomplete_sources.length > 0 ? (
+              <p className="small mb-1">
+                Comparison left unverified for incomplete sources:{' '}
+                {result.scan.incomplete_sources.join(', ')}. Those sources answered with some rows
+                unreadable, so nothing missing from them is reported as an unknown device.
+              </p>
+            ) : null}
             {result.scan.truncated ? (
               <p className="small mb-1">The scan reached its size limit, so some endpoints were not examined.</p>
             ) : null}

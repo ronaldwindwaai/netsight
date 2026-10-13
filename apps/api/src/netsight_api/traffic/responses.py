@@ -31,6 +31,23 @@ def freshness_for(window_end: datetime, observed_at: datetime | None) -> Freshne
     )
 
 
+def freshness_for_tier(
+    window_end: datetime,
+    observed_at: datetime | None,
+    source_observed_at: datetime | None,
+    *,
+    aggregate: bool,
+) -> Freshness:
+    """Freshness the caller's tier may be told.
+
+    The newest flow behind a *filtered* answer can be one machine's last activity, so the aggregate
+    tier is told the source's own newest flow in the window (not tied to any filter or cohort) and
+    never falls back to the filtered time: a source that reports none yields ``unknown``. The detail
+    tier keeps the time of the answer it asked for.
+    """
+    return freshness_for(window_end, source_observed_at if aggregate else observed_at)
+
+
 def no_freshness(*, connected: bool) -> Freshness:
     """Freshness for a state that carries no values (nothing was read, or the read failed)."""
     return Freshness(state="unknown", observed_at=None, source=SOURCE_NAME if connected else None)

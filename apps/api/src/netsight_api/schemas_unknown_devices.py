@@ -27,7 +27,7 @@ from pydantic import AwareDatetime, Field, StrictBool, model_validator
 
 from netsight_api.schemas import ApiModel
 from netsight_api.schemas_inventory import BlockState
-from netsight_api.schemas_sources import SourceStatus, check_unique_sources
+from netsight_api.schemas_sources import SourceName, SourceStatus, check_unique_sources
 
 UUID_PATTERN = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
 FINDING_ID_PATTERN = rf"^unknown-device-{UUID_PATTERN}$"
@@ -60,6 +60,9 @@ SlotReason = Literal[
 ]
 CheckField = Literal["ip", "mac", "hostname"]
 CheckResult = Literal["match", "no-match", "not-checked"]
+# Why the endpoint is a finding: nothing matched, or the name matched but the MAC did not (a name is
+# corroboration only: anyone can claim one, so it never clears an endpoint).
+ComparisonReason = Literal["no-match", "name-matches-mac-does-not"]
 EventKind = Literal[
     "detected",
     "evidence-updated",
@@ -67,6 +70,7 @@ EventKind = Literal[
     "state-changed",
     "assignee-changed",
     "comment",
+    "suppressed-sighting",
 ]
 OutcomeState = Literal["resolved", "false-positive"]
 
@@ -161,15 +165,23 @@ class UnknownDeviceCheck(ApiModel):
 class UnknownDeviceComparison(ApiModel):
     checks: list[UnknownDeviceCheck] = Field(min_length=3, max_length=3)
     checked_at: AwareDatetime
+    reason: ComparisonReason
 
     @model_validator(mode="after")
-    def _nothing_matched_and_something_was_asked(self) -> UnknownDeviceComparison:
+    def _nothing_cleared_it_and_something_was_asked(self) -> UnknownDeviceComparison:
         if tuple(c.field for c in self.checks) != CHECK_ORDER:
             raise ValueError("one check per field, in order")
-        results = {c.result for c in self.checks}
-        if "match" in results:
-            raise ValueError("a finding exists only when NetBox matched nothing")
-        if results == {"not-checked"}:
+        results = {c.field: c.result for c in self.checks}
+        if self.reason == "name-matches-mac-does-not":
+            # the one allowed match: the name, which is corroboration; the MAC was asked and said no
+            if (results["ip"] == "match" or results["mac"] != "no-match") or (
+                results["hostname"] != "match"
+            ):
+                raise ValueError("a name match is a finding only when the MAC was asked and differs")
+            return self
+        if "match" in results.values():
+            raise ValueError("a finding exists only when nothing cleared the endpoint")
+        if set(results.values()) == {"not-checked"}:
             raise ValueError("a comparison where nothing could be checked proves nothing")
         return self
 
@@ -188,6 +200,10 @@ class UnknownDeviceFinding(ApiModel):
     state: FindingState
     severity: Severity
     severity_basis: SeverityBasis
+    # Counts changes of the evidence (endpoint, chain, comparison results, severity, proposal), not
+    # sightings: a write that decides on the evidence it was shown quotes this and loses with 409
+    # STALE_EVIDENCE if the evidence changed since.
+    evidence_version: int = Field(ge=1, le=MAX_COUNT, strict=True)
     assignee_id: str | None = Field(..., min_length=1, max_length=MAX_ASSIGNEE)
     first_seen_at: AwareDatetime
     last_seen_at: AwareDatetime
@@ -350,6 +366,9 @@ class UnknownDeviceScanResponse(_Page):
     suppressed: Count
     unverified: Count
     truncated: StrictBool
+    # Sources that answered, but with rows dropped as malformed: their absence from the result
+    # proves nothing, so the comparison they feed was left unverified.
+    incomplete_sources: list[SourceName] = Field(max_length=3)
 
     @model_validator(mode="after")
     def _a_scan_needs_netbox(self) -> UnknownDeviceScanResponse:
@@ -357,15 +376,31 @@ class UnknownDeviceScanResponse(_Page):
         netbox = next(s for s in self.sources if s.source == "netbox")
         if (self.state == "ok") != (netbox.state == "ok"):
             raise ValueError("a scan is ok exactly when NetBox could be read")
+        if len(set(self.incomplete_sources)) != len(self.incomplete_sources):
+            raise ValueError("an incomplete source is listed once")
         if self.state != "ok" and (
-            self.created or self.refreshed or self.suppressed or self.unverified
+            self.created
+            or self.refreshed
+            or self.suppressed
+            or self.unverified
+            or self.incomplete_sources
         ):
             raise ValueError("a scan that could not compare changed nothing")
         return self
 
 
+EvidenceVersion = Annotated[int, Field(ge=1, le=MAX_COUNT, strict=True)]
+
+
+class UnknownDeviceTransitionRequest(ApiModel):
+    """Acknowledge or investigate: names the evidence version the person was looking at."""
+
+    expected_evidence_version: EvidenceVersion
+
+
 class UnknownDeviceAssignRequest(ApiModel):
     assignee_id: str | None = Field(..., min_length=1, max_length=MAX_ASSIGNEE)
+    expected_evidence_version: EvidenceVersion
 
 
 class UnknownDeviceCommentRequest(ApiModel):
@@ -380,6 +415,7 @@ class UnknownDeviceCommentRequest(ApiModel):
 class UnknownDeviceResolveRequest(ApiModel):
     outcome: OutcomeState
     reason: str = Field(min_length=1, max_length=MAX_REASON)
+    expected_evidence_version: EvidenceVersion
 
     @model_validator(mode="after")
     def _not_blank(self) -> UnknownDeviceResolveRequest:

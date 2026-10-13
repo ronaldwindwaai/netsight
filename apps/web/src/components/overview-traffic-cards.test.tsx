@@ -5,17 +5,21 @@ import { afterEach, describe, it } from 'node:test';
 
 import { cleanup, render, screen, within } from '@testing-library/react';
 
-import { OverviewApplicationMix, OverviewTopTalkers } from '@/components/overview-traffic-cards';
-import type { TrafficTopResponse } from '@/lib/api-contracts';
-import type { TrafficApplicationsResponse } from '@/lib/api-contracts-traffic-explorer';
+import { OverviewApplicationMix, OverviewTopDestinations } from '@/components/overview-traffic-cards';
+import type {
+  TrafficApplicationsResponse,
+  TrafficDestinationsResponse,
+} from '@/lib/api-contracts-traffic-explorer';
 import {
-  FRESH,
+  COHORT_SUFFICIENT,
+  COHORT_TOO_FEW,
   HOSTILE,
-  NO_FRESHNESS,
-  TIME_RANGE,
   applicationFixture,
   applicationsFixture,
+  destinationFixture,
+  destinationsFixture,
   emptyApplications,
+  emptyDestinations,
   failureState,
   okState,
 } from '@/test/traffic-fixtures';
@@ -24,80 +28,108 @@ afterEach(() => cleanup());
 
 const text = () => document.body.textContent ?? '';
 
-function talkers(over: Partial<TrafficTopResponse> = {}): TrafficTopResponse {
-  return {
-    state: 'ok',
-    dimension: 'talkers',
-    time_range: { ...TIME_RANGE },
+const WITHHELD = {
+  visibility: 'withheld',
+  bytes: null,
+  packets: null,
+  share: null,
+  endpoints: null,
+  users: null,
+  domain: null,
+  asn: null,
+  country: null,
+  first_seen: null,
+  last_seen: null,
+} as const;
+
+function destinations(over: Partial<TrafficDestinationsResponse> = {}): TrafficDestinationsResponse {
+  return destinationsFixture({
     items: [
-      { rank: 1, subject_kind: 'ip', subject_id: null, label: '10.0.0.10', bytes: 600_000_000, packets: null, share: 0.6 },
-      { rank: 2, subject_kind: 'ip', subject_id: null, label: '10.0.0.11', bytes: 400_000_000, packets: null, share: 0.4 },
+      destinationFixture({ rank: 1, address: '203.0.113.9', bytes: 600_000_000, share: 0.6 }),
+      destinationFixture({ rank: 2, address: '198.51.100.7', bytes: 400_000_000, share: 0.4 }),
     ],
-    freshness: { ...FRESH },
     ...over,
-  };
+  });
 }
 
-describe('Top bandwidth users', () => {
-  it('is Restricted, not empty, for a role without endpoint-level traffic', () => {
-    render(<OverviewTopTalkers state={null} />);
-    const card = screen.getByRole('region', { name: /Top bandwidth users/i });
+describe('Top destinations', () => {
+  it('is Restricted, not empty, for a role without traffic access', () => {
+    render(<OverviewTopDestinations state={null} />);
+    const card = screen.getByRole('region', { name: /Top destinations/i });
     assert.match(card.textContent ?? '', /Restricted/);
-    assert.match(card.textContent ?? '', /traffic:read-detail/);
+    assert.match(card.textContent ?? '', /traffic:read/);
     assert.equal(within(card).queryAllByRole('listitem').length, 0);
   });
 
   it('a refusal from the API is also Restricted', () => {
-    render(<OverviewTopTalkers state={failureState<TrafficTopResponse>('forbidden', 403)} />);
+    render(<OverviewTopDestinations state={failureState<TrafficDestinationsResponse>('forbidden', 403)} />);
     assert.match(text(), /Restricted/);
   });
 
   it('not connected keeps the explicit not-connected surface', () => {
-    render(
-      <OverviewTopTalkers
-        state={okState(talkers({ state: 'not-connected', items: [], freshness: { ...NO_FRESHNESS } }))}
-      />,
-    );
+    render(<OverviewTopDestinations state={okState(emptyDestinations('not-connected'))} />);
     assert.match(text(), /Flow telemetry not connected/);
     assert.equal(screen.queryAllByRole('listitem').length, 0);
   });
 
   it('unknown is unknown and nothing is ranked', () => {
-    render(<OverviewTopTalkers state={okState(talkers({ state: 'unknown', items: [] }))} />);
+    render(<OverviewTopDestinations state={okState(emptyDestinations('unknown'))} />);
     assert.match(text(), /Traffic state unknown/);
     assert.equal(screen.queryAllByRole('listitem').length, 0);
   });
 
   it('an API error is an error', () => {
-    render(<OverviewTopTalkers state={failureState<TrafficTopResponse>('error', 500)} />);
+    render(<OverviewTopDestinations state={failureState<TrafficDestinationsResponse>('error', 500)} />);
     assert.match(text(), /Unable to load data/);
   });
 
   it('a valid empty window is empty, not a failure', () => {
-    render(<OverviewTopTalkers state={okState(talkers({ items: [] }))} />);
+    render(<OverviewTopDestinations state={okState(destinations({ items: [] }))} />);
     assert.match(text(), /No traffic in this window/);
   });
 
-  it('ranks real source addresses and says they are addresses, not people', () => {
-    render(<OverviewTopTalkers state={okState(talkers())} />);
-    const card = screen.getByRole('region', { name: /Top bandwidth users/i });
-    assert.match(card.textContent ?? '', /10\.0\.0\.10/);
+  it('ranks destination addresses with their volume and links to the destinations page', () => {
+    render(<OverviewTopDestinations state={okState(destinations())} />);
+    const card = screen.getByRole('region', { name: /Top destinations/i });
+    assert.match(card.textContent ?? '', /203\.0\.113\.9/);
     assert.match(card.textContent ?? '', /600 MB/);
-    assert.match(card.textContent ?? '', /Addresses, not people/);
     assert.equal(within(card).getAllByRole('listitem').length, 2);
     assert.equal(
-      within(card).getByRole('link', { name: /Flow Explorer/ }).getAttribute('href'),
-      '/traffic/flows?preset=24h',
+      within(card).getByRole('link', { name: /All destinations/ }).getAttribute('href'),
+      '/traffic/destinations?preset=24h',
     );
   });
 
-  it('hostile labels are only text', () => {
-    const hostile = talkers({
-      items: [{ rank: 1, subject_kind: 'ip', subject_id: null, label: HOSTILE, bytes: 5, packets: null, share: null }],
-    });
-    render(<OverviewTopTalkers state={okState(hostile)} />);
+  it('a destination a small group reached shows its address and no figure at all', () => {
+    const state = okState(
+      destinations({
+        cohort: COHORT_TOO_FEW,
+        items: [
+          destinationFixture({ rank: 1, address: '203.0.113.9', bytes: 600_000_000, share: 0.6 }),
+          destinationFixture({ rank: 2, address: '198.51.100.7', ...WITHHELD }),
+        ],
+      }),
+    );
+    render(<OverviewTopDestinations state={state} />);
+    const card = screen.getByRole('region', { name: /Top destinations/i });
+    const rows = within(card).getAllByRole('listitem');
+    assert.match(rows[1].textContent ?? '', /198\.51\.100\.7/);
+    assert.match(rows[1].textContent ?? '', /Withheld \(fewer than 5 endpoints\)/);
+    assert.doesNotMatch(rows[1].textContent ?? '', /\d+(\.\d+)? ?(B|KB|MB|GB)|%/);
+    assert.equal(rows[1].querySelectorAll('.progress').length, 0);
+    assert.match(card.textContent ?? '', /withheld because fewer than 5 internal endpoints/);
+  });
+
+  it('a sufficient cohort says nothing is withheld', () => {
+    render(<OverviewTopDestinations state={okState(destinations({ cohort: COHORT_SUFFICIENT }))} />);
+    assert.match(text(), /at least 5 internal endpoints/);
+    assert.doesNotMatch(text(), /Withheld/);
+  });
+
+  it('hostile addresses are only text', () => {
+    const hostile = destinations({ items: [destinationFixture({ address: HOSTILE.slice(0, 40) })] });
+    render(<OverviewTopDestinations state={okState(hostile)} />);
     assert.equal(document.querySelectorAll('img, script, iframe').length, 0);
-    assert.ok(text().includes(HOSTILE));
   });
 });
 
@@ -164,4 +196,33 @@ describe('Application mix', () => {
     assert.equal(document.querySelectorAll('img, script, iframe').length, 0);
     assert.ok(text().includes(HOSTILE));
   });
+
+  it('an application a small group used is named without a bar or a figure', () => {
+    show(
+      okState(
+        applicationsFixture({
+          cohort: COHORT_TOO_FEW,
+          items: [
+            applicationFixture(),
+            applicationFixture({
+              rank: 2,
+              application: 'BitTorrent',
+              visibility: 'withheld',
+              bytes: null,
+              packets: null,
+              share: null,
+              endpoints: null,
+              trend: { state: 'unknown', previous_bytes: null, change_ratio: null },
+            }),
+          ],
+        }),
+      ),
+    );
+    const card = screen.getByRole('region', { name: /Application mix/i });
+    const rows = within(card).getAllByRole('listitem');
+    assert.match(rows[1].textContent ?? '', /BitTorrent/);
+    assert.match(rows[1].textContent ?? '', /Withheld/);
+    assert.equal(rows[1].querySelectorAll('.progress').length, 0);
+  });
 });
+

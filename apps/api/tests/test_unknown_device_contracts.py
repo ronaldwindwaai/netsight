@@ -39,6 +39,10 @@ ENTITIES: dict[str, tuple[type[BaseModel], str]] = {
     "unknown_device_detail": (m.UnknownDeviceDetailResponse, "UnknownDeviceDetailResponse"),
     "unknown_device_summary": (m.UnknownDeviceSummaryResponse, "UnknownDeviceSummaryResponse"),
     "unknown_device_timeline": (m.UnknownDeviceTimelineResponse, "UnknownDeviceTimelineResponse"),
+    "unknown_device_transition_request": (
+        m.UnknownDeviceTransitionRequest,
+        "UnknownDeviceTransitionRequest",
+    ),
     "unknown_device_assign_request": (m.UnknownDeviceAssignRequest, "UnknownDeviceAssignRequest"),
     "unknown_device_comment_request": (
         m.UnknownDeviceCommentRequest,
@@ -81,6 +85,7 @@ PAIRS: list[tuple[str, str | None, str]] = [
     ("unknown-devices.schema.json", "detailResponse", "UnknownDeviceDetailResponse"),
     ("unknown-devices.schema.json", "summaryResponse", "UnknownDeviceSummaryResponse"),
     ("unknown-devices.schema.json", "timelineResponse", "UnknownDeviceTimelineResponse"),
+    ("unknown-devices.schema.json", "transitionRequest", "UnknownDeviceTransitionRequest"),
     ("unknown-devices.schema.json", "assignRequest", "UnknownDeviceAssignRequest"),
     ("unknown-devices.schema.json", "commentRequest", "UnknownDeviceCommentRequest"),
     ("unknown-devices.schema.json", "resolveRequest", "UnknownDeviceResolveRequest"),

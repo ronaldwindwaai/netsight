@@ -167,10 +167,13 @@ def test_a_primary_or_assigned_address_makes_the_endpoint_known() -> None:
     assert len(run([obs(ip="10.0.5.11")], netbox=known).detections) == 1
 
 
-def test_a_device_name_makes_the_endpoint_known_whatever_the_case() -> None:
+def test_a_device_name_is_matched_whatever_the_case_but_never_clears_on_its_own() -> None:
+    # (the full rule is in test_unknown_device_name_corroboration.py): a name nothing can verify is
+    # neither a finding nor cleared, it is counted as unverified
     known = facts(device_names=frozenset({"core-sw-1"}))
-    assert run([obs(hostname="CORE-SW-1")], netbox=known).detections == ()
-    assert run([obs(hostname="core-sw-1.")], netbox=known).detections == ()
+    for name in ("CORE-SW-1", "core-sw-1."):
+        result = run([obs(hostname=name)], netbox=known)
+        assert (result.detections, result.unverified) == ((), 1), name
     assert len(run([obs(hostname="core-sw-1.example.com")], netbox=known).detections) == 1
 
 

@@ -5,10 +5,17 @@ devices and Wazuh agents today, and any ``EvidenceSource`` records such as DHCP 
 tables or Wi-Fi associations when an adapter for them exists), what NetBox *intends* (device names and
 addresses, a MAC lookup per candidate) and the operator's severity policy.
 
-* An endpoint is *known* the moment any observed field matches NetBox; only an endpoint where every
-  field that could be asked about did not match is a finding. If NetBox could not be asked about an
-  observed MAC (error, lookup limit) the endpoint is *unverified* and no finding is made: absence of an
-  answer is never taken as "unknown to NetBox".
+* An endpoint is *cleared* by an address NetBox assigned to a device, a MAC NetBox records on an
+  interface, or the operator's keyed Wazuh join. **A device name never clears it**: anyone on the
+  network can call themselves ``core-sw-1``, so a matching name is corroboration only. A name that
+  matches while the observed MAC does not is the spoofing pattern and is recorded as a finding with
+  the reason ``name-matches-mac-does-not`` and a severity one step below the policy's; a name that
+  matches with no MAC to verify it against is *unverified* (neither cleared nor accused).
+* If NetBox could not be asked about an observed MAC (error, lookup limit), or the NetBox data was
+  read incompletely (rows dropped as malformed), the endpoint is *unverified* and no finding is
+  made: absence of an answer is never taken as "unknown to NetBox".
+* One candidate that cannot be assembled into a valid finding is counted unverified; it never
+  aborts the comparison of the others.
 * The evidence chain is IP, MAC, switch or AP, port, VLAN. A hop is filled in only from evidence that
   asserts it (the Step 6 identity engine composes the records, so conflicting or expired evidence is
   handled by the same rules); every other hop is ``unknown`` with the reason: ``no-evidence`` when a
@@ -20,6 +27,8 @@ addresses, a MAC lookup per candidate) and the operator's severity policy.
 from __future__ import annotations
 
 import ipaddress
+import logging
+import unicodedata
 from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -40,6 +49,8 @@ from netsight_api.identity.model import (
 )
 from netsight_api.schemas_unknown_devices import (
     CheckResult,
+    ComparisonReason,
+    Severity,
     SlotName,
     SlotReason,
     UnknownDeviceCheck,
@@ -51,6 +62,8 @@ from netsight_api.schemas_unknown_devices import (
 )
 from netsight_api.unknown_devices.model import Detection, subject_key_for
 from netsight_api.unknown_devices.policy import SeverityPolicy
+
+_LOGGER: Final = logging.getLogger("netsight_api")
 
 MAX_CANDIDATES: Final = 500
 MAX_HOSTNAME: Final = 255
@@ -92,6 +105,9 @@ class NetboxFacts:
     primary_ips: Mapping[str, str] = field(default_factory=dict)
     assigned_ips: Mapping[str, str] = field(default_factory=dict)
     keyed_agents: Mapping[str, str] = field(default_factory=dict)
+    # Rows were dropped as malformed: a positive match still clears, but "NetBox does not have it"
+    # can no longer be said, so no finding is made from this data.
+    incomplete: bool = False
 
 
 @dataclass(frozen=True)
@@ -142,10 +158,21 @@ def _clean_mac(value: str | None) -> str | None:
         return None
 
 
+_HIDDEN_CATEGORIES: Final = frozenset({"Cc", "Cf", "Cs", "Zl", "Zp"})
+
+
 def _clean_name(value: str | None) -> str | None:
-    if value is None or not value.strip():
+    """A displayable name: control, NUL, bidirectional and zero-width characters are removed.
+
+    A name is untrusted text from the network. Stripping (not escaping) keeps a hostile name from
+    reordering the display, hiding behind invisible characters or reaching PostgreSQL's ``jsonb``
+    (which refuses NUL); a name with nothing left is no name.
+    """
+    if value is None:
         return None
-    return value.strip()[:MAX_HOSTNAME]
+    visible = "".join(ch for ch in value if unicodedata.category(ch) not in _HIDDEN_CATEGORIES)
+    visible = visible.strip()[:MAX_HOSTNAME].strip()
+    return visible or None
 
 
 def _engine_pair(
@@ -251,22 +278,49 @@ def collect_candidates(
     return candidates[:MAX_CANDIDATES], len(candidates) > MAX_CANDIDATES
 
 
-def macs_to_check(candidates: Sequence[Candidate], facts: NetboxFacts | None = None) -> list[str]:
-    """The MACs worth asking NetBox about: those of endpoints no other field already cleared."""
-    return sorted(
-        {
-            c.mac
-            for c in candidates
-            if c.mac is not None
-            and (
-                facts is None
-                or not (
-                    _ip_check(c, facts).result == "match"
-                    or _hostname_check(c, facts).result == "match"
-                )
-            )
-        }
+def candidate_keys(candidate: Candidate) -> tuple[str, ...]:
+    """The finding keys an earlier sighting of this endpoint may have been recorded under."""
+    keys: list[str] = []
+    if candidate.mac is not None:
+        keys.append(f"mac:{candidate.mac}")
+    if candidate.ip is not None:
+        keys.append(f"ip:{candidate.ip}")
+    return tuple(keys)
+
+
+def _latest(candidate: Candidate) -> float:
+    return max((o.observed_at.timestamp() for o in candidate.observations), default=0.0)
+
+
+def macs_to_check(
+    candidates: Sequence[Candidate],
+    facts: NetboxFacts | None = None,
+    *,
+    known_subjects: Collection[str] = frozenset(),
+) -> list[str]:
+    """The MACs worth asking NetBox about, most worth asking first.
+
+    Those of endpoints an assigned address or a keyed agent already cleared are left out; a matching
+    *name* does not leave one out (it is only corroboration). The scan can ask about a bounded
+    number, so the order decides who is verified: endpoints with no earlier finding come first
+    (a new device is the thing being looked for), then the most recently seen, then by MAC so the
+    order is deterministic. A plain ascending sort would let low MACs starve high ones every scan.
+    """
+    wanted = [
+        c
+        for c in candidates
+        if c.mac is not None
+        and (facts is None or not (_ip_check(c, facts).result == "match" or _keyed(c, facts)))
+    ]
+    ranked = sorted(
+        wanted,
+        key=lambda c: (
+            any(key in known_subjects for key in candidate_keys(c)),
+            -_latest(c),
+            c.mac or "",
+        ),
     )
+    return [c.mac for c in ranked if c.mac is not None]
 
 
 # --- comparison with NetBox --------------------------------------------------------------------------------
@@ -285,10 +339,15 @@ def _ip_check(candidate: Candidate, facts: NetboxFacts) -> UnknownDeviceCheck:
     return UnknownDeviceCheck(field="ip", result="no-match", detail=None)
 
 
-def _hostname_check(candidate: Candidate, facts: NetboxFacts) -> UnknownDeviceCheck:
-    if any(
+def _keyed(candidate: Candidate, facts: NetboxFacts) -> bool:
+    """A Wazuh agent the operator joined to a NetBox device by a key (not by name)."""
+    return any(
         o.source == "wazuh" and o.native_id in facts.keyed_agents for o in candidate.observations
-    ):
+    )
+
+
+def _hostname_check(candidate: Candidate, facts: NetboxFacts) -> UnknownDeviceCheck:
+    if _keyed(candidate, facts):
         return UnknownDeviceCheck(
             field="hostname",
             result="match",
@@ -300,7 +359,9 @@ def _hostname_check(candidate: Candidate, facts: NetboxFacts) -> UnknownDeviceCh
         )
     if candidate.hostname.strip().lower().rstrip(".") in facts.device_names:
         return UnknownDeviceCheck(
-            field="hostname", result="match", detail="NetBox has a device of this name"
+            field="hostname",
+            result="match",
+            detail="NetBox has a device of this name (corroboration only: a name can be claimed)",
         )
     return UnknownDeviceCheck(field="hostname", result="no-match", detail=None)
 
@@ -397,52 +458,68 @@ def _absent_reason(
     return "no-evidence" if any(r in capabilities for r in relations) else "source-unavailable"
 
 
+def _observed_slot(
+    name: SlotName, value: str, refs: list[UnknownDeviceEvidenceRef]
+) -> UnknownDeviceLinkSlot:
+    return UnknownDeviceLinkSlot(
+        slot=name,
+        basis="observed",
+        value=value,
+        label=None,
+        attachment_kind=None,
+        confidence=None,
+        reason=None,
+        evidence=refs,
+    )
+
+
+def _link_evidence_for(links: Sequence[Link], value: str) -> list[UnknownDeviceEvidenceRef]:
+    """The evidence of every link that names ``value`` (an address or MAC), each record once."""
+    refs: dict[str, UnknownDeviceEvidenceRef] = {}
+    for link in links:
+        ends = (link.source.id, link.target.id if link.target is not None else "")
+        if value in ends:
+            for ref in _evidence(link):
+                refs.setdefault(ref.id, ref)
+    return list(refs.values())[:16]
+
+
+def _endpoint_slot(
+    name: SlotName,
+    value: str | None,
+    candidate: Candidate,
+    links: Sequence[Link],
+    ip_link: Link | None,
+    kind: EntityType,
+) -> UnknownDeviceLinkSlot | None:
+    """The IP or MAC hop: from what telemetry reported, else from the records that name it.
+
+    ``None`` when the value is known but nothing can be shown for it (the finding would claim a
+    hop it can not evidence); the caller then counts the endpoint unverified instead of failing.
+    """
+    if value is None:
+        return _unknown(name, "no-evidence")
+    refs = _observation_evidence(candidate, name)
+    if refs:
+        return _observed_slot(name, value, refs)
+    if ip_link is not None:
+        slot = _slot_from(name, ip_link, kind)
+        if slot.value == value:
+            return slot
+    refs = _link_evidence_for(links, value)
+    return _observed_slot(name, value, refs) if refs else None
+
+
 def build_chain(
     candidate: Candidate,
     links: Sequence[Link],
     capabilities: Collection[Relation],
-) -> tuple[UnknownDeviceLinkSlot, ...]:
+) -> tuple[UnknownDeviceLinkSlot, ...] | None:
     ip_link = _link_for(links, Relation.IP_MAC)
-    if candidate.ip is not None:
-        refs = _observation_evidence(candidate, "ip")
-        if refs:
-            ip_slot = UnknownDeviceLinkSlot(
-                slot="ip",
-                basis="observed",
-                value=candidate.ip,
-                label=None,
-                attachment_kind=None,
-                confidence=None,
-                reason=None,
-                evidence=refs,
-            )
-        elif ip_link is not None:
-            ip_slot = _slot_from("ip", ip_link, EntityType.IP)
-        else:
-            ip_slot = _unknown("ip", "no-evidence")
-    else:
-        ip_slot = _unknown("ip", "no-evidence")
-    if candidate.mac is not None:
-        refs = _observation_evidence(candidate, "mac")
-        if refs:
-            mac_slot = UnknownDeviceLinkSlot(
-                slot="mac",
-                basis="observed",
-                value=candidate.mac,
-                label=None,
-                attachment_kind=None,
-                confidence=None,
-                reason=None,
-                evidence=refs,
-            )
-        else:
-            mac_slot = (
-                _slot_from("mac", ip_link, EntityType.MAC)
-                if ip_link
-                else _unknown("mac", "no-evidence")
-            )
-    else:
-        mac_slot = _unknown("mac", "no-evidence")
+    ip_slot = _endpoint_slot("ip", candidate.ip, candidate, links, ip_link, EntityType.IP)
+    mac_slot = _endpoint_slot("mac", candidate.mac, candidate, links, ip_link, EntityType.MAC)
+    if ip_slot is None or mac_slot is None:
+        return None
     return (ip_slot, mac_slot, *_where(links, capabilities))
 
 
@@ -484,12 +561,110 @@ def _where(
 
 
 def _vlan_number(slot: UnknownDeviceLinkSlot) -> int | None:
+    """The VLAN number, only when a source *observed* it; an inferred VLAN never decides anything."""
+    if slot.basis != "observed":
+        return None
     if slot.value is not None and slot.value.startswith("vlan-") and slot.value[5:].isdigit():
         return int(slot.value[5:])
     return None
 
 
 # --- the whole comparison ----------------------------------------------------------------------------------
+
+_LOWER: Final[Mapping[str, Severity]] = {
+    "critical": "high",
+    "high": "medium",
+    "medium": "low",
+    "low": "low",
+    "unknown": "unknown",
+}
+_Checks = tuple[UnknownDeviceCheck, UnknownDeviceCheck, UnknownDeviceCheck]
+
+
+@dataclass(frozen=True)
+class _Verdict:
+    """What the checks say about one candidate: cleared, unverified, or a finding for a reason."""
+
+    kind: str  # "cleared" | "unverified" | "finding"
+    reason: ComparisonReason = "no-match"
+
+
+_CLEARED: Final = _Verdict("cleared")
+_UNVERIFIED: Final = _Verdict("unverified")
+
+
+def _judge(
+    candidate: Candidate,
+    checks: _Checks,
+    facts: NetboxFacts,
+    mac_results: Mapping[str, MacCheck],
+) -> _Verdict:
+    ip_check, mac_check, host_check = checks
+    if ip_check.result == "match" or mac_check.result == "match" or _keyed(candidate, facts):
+        return _CLEARED  # an assigned address, a recorded MAC or the keyed join: never a name
+    mac_answer = mac_results.get(candidate.mac) if candidate.mac else None
+    if candidate.mac is not None and (mac_answer is None or mac_answer.incomplete):
+        return _UNVERIFIED  # NetBox could not be asked: never read as "unknown to NetBox"
+    if facts.incomplete:
+        return _UNVERIFIED  # rows were dropped: "NetBox does not have it" can not be said
+    if host_check.result == "match":
+        # A name is corroboration only. With a MAC NetBox answered "no" to, this is the spoofing
+        # pattern; with no MAC to verify it against, the claim is neither cleared nor accused.
+        if candidate.mac is None or mac_check.result != "no-match":
+            return _UNVERIFIED
+        return _Verdict("finding", "name-matches-mac-does-not")
+    if all(c.result == "not-checked" for c in checks):
+        return _UNVERIFIED
+    return _Verdict("finding", "no-match")
+
+
+def _detection(
+    candidate: Candidate,
+    checks: _Checks,
+    reason: ComparisonReason,
+    *,
+    index: CorrelationIndex,
+    policy: SeverityPolicy,
+    capabilities: Collection[Relation],
+    now: datetime,
+) -> Detection | None:
+    """The finding for one candidate, or ``None`` when its chain can not be shown honestly."""
+    subject = (
+        mac_ref(candidate.mac)
+        if candidate.mac
+        else ip_ref(candidate.ip)
+        if candidate.ip
+        else None
+    )
+    links = list(index.resolve(subject, now).endpoint) if subject is not None else []
+    chain = build_chain(candidate, links, capabilities)
+    if chain is None:
+        return None
+    endpoint = UnknownDeviceEndpoint(ip=candidate.ip, mac=candidate.mac, hostname=candidate.hostname)
+    severity, basis = policy.decide(candidate.ip, _vlan_number(chain[4]))
+    if reason == "name-matches-mac-does-not":
+        severity = _LOWER[severity]  # a claimed name is weaker evidence than a plain unknown
+    action = (
+        UnknownDeviceProposedAction(
+            action_type="endpoint.isolate",
+            state="proposed",
+            risk="C",
+            executable=False,
+            awaiting="action-engine",
+            rationale=_QUARANTINE_RATIONALE.format(severity=severity),
+        )
+        if policy.recommends_quarantine(severity)
+        else None
+    )
+    return Detection(
+        subject_key=subject_key_for(endpoint),
+        endpoint=endpoint,
+        chain=chain,
+        comparison=UnknownDeviceComparison(checks=list(checks), checked_at=now, reason=reason),
+        severity=severity,
+        severity_basis=basis,
+        proposed_action=action,
+    )
 
 
 def detect(
@@ -510,51 +685,25 @@ def detect(
             _mac_check(candidate, mac_results),
             _hostname_check(candidate, facts),
         )
-        if any(c.result == "match" for c in checks):
+        verdict = _judge(candidate, checks, facts, mac_results)
+        if verdict.kind == "cleared":
             continue
-        mac_answer = mac_results.get(candidate.mac) if candidate.mac else None
-        if candidate.mac is not None and (mac_answer is None or mac_answer.incomplete):
-            unverified += (
-                1  # NetBox could not be asked about this MAC: never read as "unknown to NetBox"
-            )
-            continue
-        if all(c.result == "not-checked" for c in checks):
+        detection: Detection | None = None
+        if verdict.kind == "finding":
+            try:
+                detection = _detection(
+                    candidate,
+                    checks,
+                    verdict.reason,
+                    index=index,
+                    policy=policy,
+                    capabilities=capabilities,
+                    now=now,
+                )
+            except ValueError:  # includes pydantic's ValidationError: one bad candidate only
+                _LOGGER.warning("an endpoint could not be built into a finding; counted unverified")
+        if detection is None:
             unverified += 1
             continue
-        subject = (
-            mac_ref(candidate.mac)
-            if candidate.mac
-            else ip_ref(candidate.ip)
-            if candidate.ip
-            else None
-        )
-        links = list(index.resolve(subject, now).endpoint) if subject is not None else []
-        chain = build_chain(candidate, links, capabilities)
-        endpoint = UnknownDeviceEndpoint(
-            ip=candidate.ip, mac=candidate.mac, hostname=candidate.hostname
-        )
-        severity, basis = policy.decide(candidate.ip, _vlan_number(chain[4]))
-        action = (
-            UnknownDeviceProposedAction(
-                action_type="endpoint.isolate",
-                state="proposed",
-                risk="C",
-                executable=False,
-                awaiting="action-engine",
-                rationale=_QUARANTINE_RATIONALE.format(severity=severity),
-            )
-            if policy.recommends_quarantine(severity)
-            else None
-        )
-        found.append(
-            Detection(
-                subject_key=subject_key_for(endpoint),
-                endpoint=endpoint,
-                chain=chain,
-                comparison=UnknownDeviceComparison(checks=list(checks), checked_at=now),
-                severity=severity,
-                severity_basis=basis,
-                proposed_action=action,
-            )
-        )
+        found.append(detection)
     return DetectResult(tuple(found), unverified)

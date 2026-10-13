@@ -390,7 +390,8 @@
       "additionalProperties": false,
       "required": [
         "checks",
-        "checked_at"
+        "checked_at",
+        "reason"
       ],
       "properties": {
         "checks": {
@@ -404,9 +405,15 @@
         "checked_at": {
           "type": "string",
           "format": "date-time"
+        },
+        "reason": {
+          "enum": [
+            "no-match",
+            "name-matches-mac-does-not"
+          ]
         }
       },
-      "description": "The comparison against NetBox, one check per field in the order ip, mac, hostname. A finding exists only when no check matched."
+      "description": "The comparison against NetBox, one check per field in the order ip, mac, hostname. A finding exists only when nothing cleared the endpoint. reason no-match: no check matched. reason name-matches-mac-does-not: the device name matched a NetBox device but the MAC was asked and did not (the spoofing pattern): the only comparison that carries a match, because a name is corroboration only and never clears an endpoint (cross-field, checked by pydantic and the TS parser)."
     },
     "proposedAction": {
       "type": "object",
@@ -451,6 +458,7 @@
         "state",
         "severity",
         "severity_basis",
+        "evidence_version",
         "assignee_id",
         "first_seen_at",
         "last_seen_at",
@@ -492,6 +500,11 @@
             "policy-default",
             "no-policy"
           ]
+        },
+        "evidence_version": {
+          "minimum": 1,
+          "maximum": 1000000,
+          "type": "integer"
         },
         "assignee_id": {
           "minLength": 1,
@@ -622,7 +635,7 @@
           ]
         }
       },
-      "description": "An unknown-device finding: something telemetry saw that NetBox does not know. The chain holds only the links actually observed; the rest are unknown. Severity comes from the operator's policy, never from a guess.",
+      "description": "An unknown-device finding: something telemetry saw that NetBox does not know. The chain holds only the links actually observed; the rest are unknown. Severity comes from the operator's policy, never from a guess. evidence_version counts changes of the evidence (not sightings): a write quotes the version it was shown and loses with 409 STALE_EVIDENCE if the evidence changed since.",
       "allOf": [
         {
           "if": {
@@ -795,7 +808,8 @@
             "action-proposed",
             "state-changed",
             "assignee-changed",
-            "comment"
+            "comment",
+            "suppressed-sighting"
           ]
         },
         "state_from": {
@@ -855,7 +869,7 @@
           ]
         }
       },
-      "description": "One append-only timeline entry. State changes carry both states; a resolution or dismissal carries its reason; a comment carries its text. subject_id names the assignee of an assignment.",
+      "description": "One append-only timeline entry. State changes carry both states; a resolution or dismissal carries its reason; a comment carries its text. subject_id names the assignee of an assignment. suppressed-sighting: a dismissed endpoint was seen again with different evidence (at most one a day).",
       "allOf": [
         {
           "if": {
@@ -885,7 +899,8 @@
                   "evidence-updated",
                   "action-proposed",
                   "assignee-changed",
-                  "comment"
+                  "comment",
+                  "suppressed-sighting"
                 ]
               }
             }
@@ -1103,11 +1118,27 @@
         }
       ]
     },
+    "transitionRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "expected_evidence_version"
+      ],
+      "properties": {
+        "expected_evidence_version": {
+          "minimum": 1,
+          "maximum": 1000000,
+          "type": "integer"
+        }
+      },
+      "description": "POST /unknown-devices/{id}/acknowledge and /investigate: the evidence version the person was looking at; 409 STALE_EVIDENCE if it changed."
+    },
     "assignRequest": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "assignee_id"
+        "assignee_id",
+        "expected_evidence_version"
       ],
       "properties": {
         "assignee_id": {
@@ -1117,9 +1148,14 @@
             "string",
             "null"
           ]
+        },
+        "expected_evidence_version": {
+          "minimum": 1,
+          "maximum": 1000000,
+          "type": "integer"
         }
       },
-      "description": "POST /unknown-devices/{id}/assign. null unassigns."
+      "description": "POST /unknown-devices/{id}/assign. null unassigns. expected_evidence_version is the evidence version the person was shown."
     },
     "commentRequest": {
       "type": "object",
@@ -1142,7 +1178,8 @@
       "additionalProperties": false,
       "required": [
         "outcome",
-        "reason"
+        "reason",
+        "expected_evidence_version"
       ],
       "properties": {
         "outcome": {
@@ -1156,9 +1193,14 @@
           "maxLength": 1000,
           "pattern": "\\S",
           "type": "string"
+        },
+        "expected_evidence_version": {
+          "minimum": 1,
+          "maximum": 1000000,
+          "type": "integer"
         }
       },
-      "description": "POST /unknown-devices/{id}/resolve. A false-positive suppresses later detections of the same endpoint, so the reason is mandatory."
+      "description": "POST /unknown-devices/{id}/resolve. A false-positive suppresses later detections of the same endpoint, so the reason is mandatory. expected_evidence_version is the evidence version the person was shown."
     },
     "scanResponse": {
       "type": "object",
@@ -1171,7 +1213,8 @@
         "refreshed",
         "suppressed",
         "unverified",
-        "truncated"
+        "truncated",
+        "incomplete_sources"
       ],
       "properties": {
         "state": {
@@ -1214,9 +1257,21 @@
         },
         "truncated": {
           "type": "boolean"
+        },
+        "incomplete_sources": {
+          "type": "array",
+          "maxItems": 3,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "netbox",
+              "librenms",
+              "wazuh"
+            ]
+          }
         }
       },
-      "description": "POST /api/v1/unknown-devices/scan: what one comparison of telemetry with NetBox did. unverified: endpoints skipped because NetBox could not be asked about them. A non-ok state changed nothing.",
+      "description": "POST /api/v1/unknown-devices/scan: what one comparison of telemetry with NetBox did. unverified: endpoints skipped because NetBox could not be asked about them. A non-ok state changed nothing. incomplete_sources: sources that answered with rows dropped as malformed; the comparison they feed was left unverified (no finding from incomplete data).",
       "allOf": [
         {
           "if": {
@@ -1242,6 +1297,9 @@
               },
               "unverified": {
                 "const": 0
+              },
+              "incomplete_sources": {
+                "maxItems": 0
               }
             }
           }

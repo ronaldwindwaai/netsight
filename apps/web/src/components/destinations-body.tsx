@@ -18,13 +18,31 @@ import {
   policyNotice,
   reputationPresentation,
   withheldCountText,
+  withheldRowText,
 } from '@/lib/traffic-view';
 
 function count(value: number | null, cohort: CohortStatus): string {
   return value === null ? withheldCountText(cohort) : value.toLocaleString('en-GB');
 }
 
+function WithheldRow({ item, cohort }: { item: DestinationRow; cohort: CohortStatus }) {
+  return (
+    <tr className="text-body-secondary" data-visibility="withheld">
+      <td>
+        <span className="fw-semibold">{item.address}</span>
+      </td>
+      <td colSpan={7}>{withheldRowText(cohort)}</td>
+      <td>
+        <StatusWord {...reputationPresentation(item.reputation)} />
+      </td>
+    </tr>
+  );
+}
+
 function Row({ item, cohort }: { item: DestinationRow; cohort: CohortStatus }) {
+  if (item.visibility === 'withheld' || item.bytes === null || item.last_seen === null) {
+    return <WithheldRow item={item} cohort={cohort} />;
+  }
   return (
     <tr>
       <td>
@@ -117,8 +135,9 @@ export function DestinationsBody({ state }: { state: FetchState<TrafficDestinati
                     the address owner.
                   </li>
                   <li>
-                    Endpoints are distinct source addresses. Users are Unknown: counting people needs
-                    per-flow identity attribution, which this page does not do.
+                    Endpoints are distinct internal endpoints. Users are Unknown: counting people
+                    needs per-flow identity attribution, which this page does not do. A destination
+                    that fewer endpoints than the minimum reached is listed by address only.
                   </li>
                   <li>
                     {data.cohort.state === 'not-applied'

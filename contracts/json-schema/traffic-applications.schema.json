@@ -149,6 +149,67 @@
           "cohort": {
             "properties": {
               "state": {
+                "const": "not-applied"
+              }
+            }
+          }
+        },
+        "required": [
+          "cohort"
+        ]
+      },
+      "then": {
+        "properties": {
+          "items": {
+            "items": {
+              "properties": {
+                "visibility": {
+                  "const": "shown"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "cohort": {
+            "properties": {
+              "state": {
+                "const": "sufficient"
+              }
+            }
+          }
+        },
+        "required": [
+          "cohort"
+        ]
+      },
+      "then": {
+        "properties": {
+          "items": {
+            "items": {
+              "properties": {
+                "visibility": {
+                  "const": "shown"
+                },
+                "endpoints": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "cohort": {
+            "properties": {
+              "state": {
                 "const": "too-few-sources"
               }
             }
@@ -163,12 +224,12 @@
           "items": {
             "contains": {
               "properties": {
-                "endpoints": {
-                  "type": "null"
+                "visibility": {
+                  "const": "withheld"
                 }
               },
               "required": [
-                "endpoints"
+                "visibility"
               ]
             }
           }
@@ -368,6 +429,7 @@
         "rank",
         "application",
         "category",
+        "visibility",
         "bytes",
         "packets",
         "share",
@@ -396,8 +458,18 @@
           "minLength": 1,
           "maxLength": 128
         },
+        "visibility": {
+          "enum": [
+            "shown",
+            "withheld"
+          ],
+          "description": "withheld: fewer than the cohort minimum of internal endpoints stood behind the row, so its volume, share, trend, counts and dates are null. Only the aggregate tier ever sees withheld rows; the detail tier sees every row shown."
+        },
         "bytes": {
-          "type": "integer",
+          "type": [
+            "integer",
+            "null"
+          ],
           "minimum": 0
         },
         "packets": {
@@ -421,7 +493,7 @@
             "null"
           ],
           "minimum": 0,
-          "description": "Distinct source addresses seen using the application (not people, not inventory devices)."
+          "description": "Distinct internal endpoints (the internal side of each flow) seen using the application; not people, not inventory devices."
         },
         "users": {
           "type": [
@@ -449,7 +521,54 @@
             "unknown"
           ]
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "visibility": {
+                "const": "withheld"
+              }
+            },
+            "required": [
+              "visibility"
+            ]
+          },
+          "then": {
+            "properties": {
+              "bytes": {
+                "type": "null"
+              },
+              "packets": {
+                "type": "null"
+              },
+              "share": {
+                "type": "null"
+              },
+              "endpoints": {
+                "type": "null"
+              },
+              "users": {
+                "type": "null"
+              },
+              "trend": {
+                "properties": {
+                  "state": {
+                    "const": "unknown"
+                  }
+                }
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "bytes": {
+                "type": "integer"
+              }
+            }
+          }
+        }
+      ]
     }
   }
 }

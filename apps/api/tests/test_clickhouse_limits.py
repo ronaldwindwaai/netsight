@@ -29,6 +29,7 @@ FORBIDDEN_BODY = (
     "Code: 164. DB::Exception: Cannot modify 'max_execution_time' setting in readonly mode. "
     "(READONLY)"
 )
+CODE_HEADER = "X-ClickHouse-Exception-Code"
 EXPECTED_SETTINGS = {
     "readonly",
     "max_execution_time",
@@ -42,6 +43,11 @@ EXPECTED_SETTINGS = {
     "result_overflow_mode",
     "timeout_overflow_mode",
 }
+
+
+def _refusal(code: int = 164, body: str = FORBIDDEN_BODY) -> httpx.Response:
+    """What ClickHouse answers: the exception code travels in a response header, not only in text."""
+    return httpx.Response(500, headers={CODE_HEADER: str(code)}, text=body)
 
 
 def _discovery() -> httpx.Response:
@@ -124,7 +130,7 @@ async def test_forbidden_settings_are_learned_once_and_cached_across_clients() -
     def handler(request: httpx.Request) -> httpx.Response:
         calls.append(request)
         if _settings_in(request):
-            return httpx.Response(500, text=FORBIDDEN_BODY)
+            return _refusal()
         return _answer(request)
 
     await _read(_client(handler))
@@ -159,7 +165,7 @@ async def test_permitted_settings_are_cached_too_so_a_later_refusal_is_not_retri
 async def test_capability_is_per_endpoint_and_identity() -> None:
     def refuse(request: httpx.Request) -> httpx.Response:
         if _settings_in(request):
-            return httpx.Response(500, text=FORBIDDEN_BODY)
+            return _refusal()
         return _answer(request)
 
     seen: list[httpx.Request] = []
@@ -179,7 +185,7 @@ async def test_unverifiable_limits_are_logged_once_with_the_profile_requirement(
 ) -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         if _settings_in(request):
-            return httpx.Response(500, text=FORBIDDEN_BODY)
+            return _refusal()
         return _answer(request)
 
     with caplog.at_level(logging.WARNING, logger="netsight_api"):
@@ -216,11 +222,84 @@ async def test_a_pinned_setting_constraint_is_treated_as_a_profile_enforced_limi
 
     def handler(request: httpx.Request) -> httpx.Response:
         if _settings_in(request):
-            return httpx.Response(500, text=body)
+            return _refusal(452, body)
         return _answer(request)
 
     await _read(_client(handler))
     assert clickhouse_limits.capability_for(("http://clickhouse.test:8123", "")) == "profile-only"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("code", ["164", " 164 ", "452"])
+async def test_only_the_exception_code_header_decides(code: str) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if _settings_in(request):
+            return httpx.Response(500, headers={CODE_HEADER: code}, text="unrelated text")
+        return _answer(request)
+
+    await _read(_client(handler))
+    assert clickhouse_limits.capability_for(("http://clickhouse.test:8123", "")) == "profile-only"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "headers",
+    [
+        {},
+        {CODE_HEADER: "60"},
+        {CODE_HEADER: "691"},
+        {CODE_HEADER: "164abc"},
+        {CODE_HEADER: "0x164"},
+        {CODE_HEADER: "-164"},
+        {CODE_HEADER: "164, 60"},
+        {CODE_HEADER: "9" * 40},
+    ],
+)
+async def test_text_that_looks_like_a_refusal_is_not_one_without_the_header_code(
+    headers: dict[str, str],
+) -> None:
+    # An Enum echo of a caller-controlled filter value puts attacker text in the error body. The body
+    # says "Cannot modify" and "Code: 164." here; only the server's own header may decide.
+    echoed = "Code: 691. DB::Exception: Unknown element 'Code: 164. Cannot modify x' for enum"
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(500, headers=headers, text=echoed)
+
+    with pytest.raises(AdapterError):
+        await _read(_client(handler))
+    assert clickhouse_limits.capability_for(("http://clickhouse.test:8123", "")) == "unverified"
+
+
+@pytest.mark.asyncio
+async def test_a_constraint_that_still_fails_the_read_is_named_in_a_distinct_warning(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    body = "Code: 452. DB::Exception: Setting max_memory_usage shouldn't be greater than 1000"
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return _refusal(452, body)  # fails with and without the per-query limits
+
+    with caplog.at_level(logging.WARNING, logger="netsight_api"), pytest.raises(AdapterError):
+        await _read(_client(handler))
+    notes = [r.getMessage() for r in caplog.records if "constraint" in r.getMessage()]
+    assert notes, "a profile constraint that fails reads must be reported distinctly"
+    assert all("max_memory_usage" not in note and "1000" not in note for note in notes)
+
+
+@pytest.mark.asyncio
+async def test_a_constraint_refusal_is_reported_as_a_constraint_not_a_readonly_profile(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if _settings_in(request):
+            return _refusal(452, "Code: 452. DB::Exception: out of range")
+        return _answer(request)
+
+    with caplog.at_level(logging.WARNING, logger="netsight_api"):
+        await _read(_client(handler))
+    messages = " ".join(r.getMessage() for r in caplog.records)
+    assert "constraint" in messages
+    assert "profile" in messages
 
 
 @pytest.mark.asyncio

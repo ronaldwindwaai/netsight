@@ -9,7 +9,17 @@ A scheduled scan is **off by default** (``NETSIGHT_UNKNOWN_DEVICE_SCAN_ENABLED``
 ``0|false|no|off`` or unset keep it off; anything else fails start-up). Enabled, it needs
 ``DATABASE_URL`` and runs only while this process holds a PostgreSQL advisory lock of its own, so
 several API workers never scan at once. ``NETSIGHT_UNKNOWN_DEVICE_SCAN_INTERVAL_SECONDS`` is 300 to
-86400 (default 900). An operator can always scan on demand from the findings page.
+86400 (default 900). An operator can always scan on demand from the findings page. The scheduled
+and the on-demand scan share one ``ScanGuard``: one at a time, at most one a minute.
+
+``NETSIGHT_UNKNOWN_DEVICE_FP_TTL_DAYS`` (1 to 3650, default 90) is how long a "false positive"
+dismissal suppresses an endpoint before the next sighting opens a new finding for review; an
+invalid value fails start-up.
+
+The severity policy (``NETSIGHT_UNKNOWN_DEVICE_POLICY[_FILE]``), the identity classification
+variables and the inventory class map are read once per process and cached: **changing them needs a
+restart** of the API to take effect (a reload endpoint would be a second way to change what the
+scan concludes, and has none).
 """
 
 from __future__ import annotations
@@ -28,14 +38,14 @@ from netsight_api.identity.model import CorrelationPolicy
 from netsight_api.identity.netbox_source import AGENT_FIELD_ENV, agent_key_field_from_env
 from netsight_api.inventory.wiring import configured_wazuh, utc_now
 from netsight_api.storage import StorageConfigurationError, StorageError
-from netsight_api.storage.unknown_devices import UnknownDeviceRepository
+from netsight_api.storage.unknown_devices import UnknownDeviceRepository, fp_ttl_from_env
 from netsight_api.unknown_devices.policy import (
     POLICY_ENV,
     POLICY_FILE_ENV,
     SeverityPolicy,
     load_policy,
 )
-from netsight_api.unknown_devices.scanner import UnknownDeviceScanner
+from netsight_api.unknown_devices.scanner import ScanGuard, UnknownDeviceScanner
 
 _LOGGER: Final = logging.getLogger("netsight_api")
 
@@ -46,6 +56,7 @@ MIN_INTERVAL_SECONDS: Final = 300
 MAX_INTERVAL_SECONDS: Final = 86400
 # Arbitrary, fixed 64-bit key for "the Netsight unknown-device scanner" (advisory locks are per database).
 SCAN_LOCK_KEY: Final = 0x4E53_5544_5300_0001
+SCAN_GUARD = ScanGuard()  # shared by the scheduled scan and the API in this process
 _TRUE: Final = frozenset({"1", "true", "yes", "on"})
 _FALSE: Final = frozenset({"0", "false", "no", "off", ""})
 _CORRELATION_VARIABLES: Final = (
@@ -77,9 +88,10 @@ def get_optional_store() -> UnknownDeviceRepository | None:
 
     try:
         settings = PostgresSettings.from_env()
-    except StorageConfigurationError:
+        fp_ttl = fp_ttl_from_env(os.environ)
+    except (StorageConfigurationError, ValueError):
         return cast(UnknownDeviceRepository, _UnavailableStore())
-    return PostgresUnknownDeviceRepository(settings)
+    return PostgresUnknownDeviceRepository(settings, fp_ttl=fp_ttl)
 
 
 @cache
@@ -113,12 +125,15 @@ def build_scanner(store: UnknownDeviceRepository) -> UnknownDeviceScanner:
             tuple((n, os.environ.get(n, "")) for n in _CORRELATION_VARIABLES)
         ),
         clock=utc_now,
+        guard=SCAN_GUARD,
     )
 
 
 def reset_for_tests() -> None:
+    global SCAN_GUARD
     _policy_for.cache_clear()
     _correlation_for.cache_clear()
+    SCAN_GUARD = ScanGuard()
 
 
 # --- the scheduled scan -------------------------------------------------------------------------------------
@@ -159,6 +174,7 @@ def scan_interval(env: Mapping[str, str]) -> int:
 def build_scan_service(env: Mapping[str, str] | None = None) -> ScanService | None:
     """The scheduled scan, or ``None`` when it is not enabled. Invalid configuration raises."""
     source = os.environ if env is None else env
+    fp_ttl_from_env(source)  # the dismissal lifetime is validated at start-up, scan or no scan
     if not scan_enabled(source):
         return None
     interval = scan_interval(source)

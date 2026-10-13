@@ -17,13 +17,36 @@ import {
   riskPresentation,
   trendPresentation,
   withheldCountText,
+  withheldRowText,
 } from '@/lib/traffic-view';
 
 function count(value: number | null, cohort: CohortStatus): string {
   return value === null ? withheldCountText(cohort) : value.toLocaleString('en-GB');
 }
 
+function WithheldRow({ item, cohort }: { item: ApplicationRow; cohort: CohortStatus }) {
+  const reason = withheldRowText(cohort);
+  return (
+    <tr className="text-body-secondary" data-visibility="withheld">
+      <td>
+        <span className="fw-semibold">{item.application}</span>
+        <span className="d-block small">{item.category ?? 'Category not reported'}</span>
+      </td>
+      <td colSpan={4}>{reason}</td>
+      <td>
+        <StatusWord {...riskPresentation(item.risk)} />
+      </td>
+      <td>
+        <StatusWord {...approvalPresentation(item.approval)} />
+      </td>
+    </tr>
+  );
+}
+
 function Row({ item, cohort }: { item: ApplicationRow; cohort: CohortStatus }) {
+  if (item.visibility === 'withheld' || item.bytes === null) {
+    return <WithheldRow item={item} cohort={cohort} />;
+  }
   const trend = trendPresentation(item.trend);
   return (
     <tr>
@@ -100,7 +123,7 @@ export function ApplicationsBody({ state }: { state: FetchState<TrafficApplicati
                       <tr>
                         <th scope="col">Application</th>
                         <th scope="col">Volume</th>
-                        <th scope="col">Endpoints (source addresses)</th>
+                        <th scope="col">Endpoints (internal)</th>
                         <th scope="col">Users</th>
                         <th scope="col">Trend</th>
                         <th scope="col">Risk</th>
@@ -116,8 +139,9 @@ export function ApplicationsBody({ state }: { state: FetchState<TrafficApplicati
                 </div>
                 <ul className="small text-body-secondary px-3 py-2 mb-0">
                   <li>
-                    Endpoints are the distinct source addresses seen using the application: not
-                    people, and not inventory devices.
+                    Endpoints are the distinct internal endpoints (the inside of each flow) seen
+                    using the application: not people, and not inventory devices. An application
+                    that fewer endpoints than the minimum used is listed by name only.
                   </li>
                   <li>
                     Users are Unknown here: counting people needs per-flow identity attribution,

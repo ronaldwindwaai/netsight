@@ -56,7 +56,8 @@ def unknown(slot: str, reason: str = "source-unavailable") -> UnknownDeviceLinkS
     )
 
 
-def comparison(**results: str) -> UnknownDeviceComparison:
+def comparison(reason: str = "no-match", **results: str) -> UnknownDeviceComparison:
+    """One check per field; ``results`` overrides the default ``no-match`` of any of them."""
     return UnknownDeviceComparison(
         checks=[
             UnknownDeviceCheck(
@@ -69,6 +70,7 @@ def comparison(**results: str) -> UnknownDeviceComparison:
             for name in ("ip", "mac", "hostname")
         ],
         checked_at=NOW,
+        reason=reason,  # type: ignore[arg-type]
     )
 
 
@@ -92,6 +94,8 @@ def detection(
     basis: str = "policy-default",
     with_action: bool = False,
     port: bool = False,
+    reason: str = "no-match",
+    results: dict[str, str] | None = None,
     **checks: str,
 ) -> Detection:
     endpoint = UnknownDeviceEndpoint(ip=ip, mac=mac, hostname=hostname)
@@ -106,7 +110,7 @@ def detection(
         subject_key=subject_key_for(endpoint),
         endpoint=endpoint,
         chain=chain,
-        comparison=comparison(**checks),
+        comparison=comparison(reason, **{**checks, **(results or {})}),
         severity=severity,  # type: ignore[arg-type]
         severity_basis=basis,  # type: ignore[arg-type]
         proposed_action=action() if with_action else None,

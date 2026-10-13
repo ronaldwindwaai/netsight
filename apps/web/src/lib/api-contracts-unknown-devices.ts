@@ -48,7 +48,11 @@ export const EVENT_KINDS = [
   'state-changed',
   'assignee-changed',
   'comment',
+  'suppressed-sighting',
 ] as const;
+export const COMPARISON_REASONS = ['no-match', 'name-matches-mac-does-not'] as const;
+export const SCAN_SOURCES = ['netbox', 'librenms', 'wazuh'] as const;
+export const MAX_EVIDENCE_VERSION = 1_000_000;
 
 export type FindingState = (typeof FINDING_STATES)[number];
 export type Severity = (typeof SEVERITIES)[number];
@@ -59,6 +63,8 @@ export type SlotReason = (typeof SLOT_REASONS)[number];
 export type CheckField = (typeof CHECK_FIELDS)[number];
 export type CheckResult = (typeof CHECK_RESULTS)[number];
 export type EventKind = (typeof EVENT_KINDS)[number];
+export type ComparisonReason = (typeof COMPARISON_REASONS)[number];
+export type ScanSource = (typeof SCAN_SOURCES)[number];
 
 /** The lifecycle: resolved and false-positive are final. Mirrors schemas_unknown_devices.py. */
 export const ALLOWED_TRANSITIONS: Record<FindingState, readonly FindingState[]> = {
@@ -113,6 +119,7 @@ export interface UnknownDeviceCheck {
 export interface UnknownDeviceComparison {
   checks: UnknownDeviceCheck[];
   checked_at: string;
+  reason: ComparisonReason;
 }
 
 export interface UnknownDeviceProposedAction {
@@ -129,6 +136,7 @@ export interface UnknownDeviceFinding {
   state: FindingState;
   severity: Severity;
   severity_basis: SeverityBasis;
+  evidence_version: number;
   assignee_id: string | null;
   first_seen_at: string;
   last_seen_at: string;
@@ -209,6 +217,7 @@ export interface UnknownDeviceScan {
   suppressed: number;
   unverified: number;
   truncated: boolean;
+  incomplete_sources: ScanSource[];
 }
 
 const EVIDENCE_KEYS = ['id', 'source', 'kind', 'observed_at', 'confidence'] as const;
@@ -224,13 +233,14 @@ const SLOT_KEYS = [
 ] as const;
 const ENDPOINT_KEYS = ['ip', 'mac', 'hostname'] as const;
 const CHECK_KEYS = ['field', 'result', 'detail'] as const;
-const COMPARISON_KEYS = ['checks', 'checked_at'] as const;
+const COMPARISON_KEYS = ['checks', 'checked_at', 'reason'] as const;
 const ACTION_KEYS = ['action_type', 'state', 'risk', 'executable', 'awaiting', 'rationale'] as const;
 const FINDING_KEYS = [
   'id',
   'state',
   'severity',
   'severity_basis',
+  'evidence_version',
   'assignee_id',
   'first_seen_at',
   'last_seen_at',
@@ -373,11 +383,22 @@ export function parseUnknownDeviceComparison(value: unknown): UnknownDeviceCompa
   if (checks === null || checks.some((check, index) => check.field !== CHECK_FIELDS[index])) {
     return null;
   }
-  // A finding exists only when NetBox matched nothing, and "nothing could be checked" proves nothing.
-  if (checks.some((c) => c.result === 'match') || checks.every((c) => c.result === 'not-checked')) {
+  if (!isOneOf(record.reason, COMPARISON_REASONS)) return null;
+  const result = (field: CheckField): CheckResult => checks[CHECK_FIELDS.indexOf(field)].result;
+  if (record.reason === 'name-matches-mac-does-not') {
+    // The one comparison that carries a match: the name corroborates, but the MAC was asked and differs.
+    if (result('ip') === 'match' || result('mac') !== 'no-match' || result('hostname') !== 'match') {
+      return null;
+    }
+  } else if (
+    // Otherwise a finding exists only when NetBox matched nothing, and "nothing could be checked"
+    // proves nothing.
+    checks.some((c) => c.result === 'match') ||
+    checks.every((c) => c.result === 'not-checked')
+  ) {
     return null;
   }
-  return { checks, checked_at: record.checked_at };
+  return { checks, checked_at: record.checked_at, reason: record.reason };
 }
 
 export function parseUnknownDeviceProposedAction(
@@ -407,6 +428,15 @@ export function parseUnknownDeviceProposedAction(
 
 // --- finding -----------------------------------------------------------------------------------------------
 
+export function isEvidenceVersion(value: unknown): value is number {
+  return (
+    typeof value === 'number' &&
+    Number.isInteger(value) &&
+    value >= 1 &&
+    value <= MAX_EVIDENCE_VERSION
+  );
+}
+
 function isFindingId(value: unknown): value is string {
   return typeof value === 'string' && FINDING_ID.test(value);
 }
@@ -419,6 +449,7 @@ export function parseUnknownDeviceFinding(value: unknown): UnknownDeviceFinding 
     !isOneOf(record.state, FINDING_STATES) ||
     !isOneOf(record.severity, SEVERITIES) ||
     !isOneOf(record.severity_basis, SEVERITY_BASES) ||
+    !isEvidenceVersion(record.evidence_version) ||
     !isNullableText(record.assignee_id, 255) ||
     !isTimestamp(record.first_seen_at) ||
     !isTimestamp(record.last_seen_at) ||
@@ -452,6 +483,7 @@ export function parseUnknownDeviceFinding(value: unknown): UnknownDeviceFinding 
     state: record.state,
     severity: record.severity,
     severity_basis: record.severity_basis,
+    evidence_version: record.evidence_version,
     assignee_id: record.assignee_id,
     first_seen_at: record.first_seen_at,
     last_seen_at: record.last_seen_at,
@@ -652,6 +684,10 @@ export function parseUnknownDeviceTimeline(value: unknown): UnknownDeviceTimelin
   };
 }
 
+function parseScanSource(value: unknown): ScanSource | null {
+  return isOneOf(value, SCAN_SOURCES) ? value : null;
+}
+
 export function parseUnknownDeviceScan(value: unknown): UnknownDeviceScan | null {
   const record = exactRecord(value, [
     'state',
@@ -662,6 +698,7 @@ export function parseUnknownDeviceScan(value: unknown): UnknownDeviceScan | null
     'suppressed',
     'unverified',
     'truncated',
+    'incomplete_sources',
   ]);
   const head = record === null ? null : frame(record);
   if (
@@ -676,12 +713,17 @@ export function parseUnknownDeviceScan(value: unknown): UnknownDeviceScan | null
     return null;
   }
   const sources = parseSourceStatuses(record.sources, 'netbox');
-  if (sources === null) return null;
+  const incomplete = parseArray(record.incomplete_sources, 0, 3, parseScanSource);
+  if (sources === null || incomplete === null || new Set(incomplete).size !== incomplete.length) {
+    return null;
+  }
   const netbox = sources.find((source) => source.source === 'netbox');
   if ((head.state === 'ok') !== (netbox?.state === 'ok')) return null;
   if (
     head.state !== 'ok' &&
-    (record.created > 0 || record.refreshed > 0 || record.suppressed > 0 || record.unverified > 0)
+    (record.created > 0 || record.refreshed > 0 || record.suppressed > 0 ||
+      record.unverified > 0 ||
+      incomplete.length > 0)
   ) {
     return null;
   }
@@ -693,5 +735,6 @@ export function parseUnknownDeviceScan(value: unknown): UnknownDeviceScan | null
     suppressed: record.suppressed,
     unverified: record.unverified,
     truncated: record.truncated,
+    incomplete_sources: incomplete,
   };
 }

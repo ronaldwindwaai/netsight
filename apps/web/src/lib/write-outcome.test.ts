@@ -53,6 +53,15 @@ test('a 409 is a conflict and tells the operator to reload before retrying', () 
   }
 });
 
+test('a stale-evidence 409 says the evidence changed and to reload, not a generic conflict', () => {
+  const result = describe({ kind: 'error', code: 'STALE_EVIDENCE', status: 409, message: 'ignored' });
+  assert.equal(result.category, 'conflict');
+  assert.equal(result.advice, 'reload');
+  assert.match(result.message, /evidence.*changed/i);
+  assert.match(result.message, /reload/i);
+  assert.match(result.message, /nothing was changed/i);
+});
+
 test('a 422 is a validation failure the operator can fix', () => {
   const result = describe({ kind: 'error', code: 'VALIDATION_ERROR', status: 422 });
   assert.equal(result.category, 'invalid');

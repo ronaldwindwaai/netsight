@@ -14,9 +14,13 @@ Honesty rules, enforced here and not only by construction:
   no person; ``inferred`` is capped at 0.7; an ambiguous answer picks nobody. A row's attribution
   must agree with the response-level attribution status (a role that may not see people sees none);
 * the aggregate tier (``traffic:read`` without ``traffic:read-detail``) is protected against small
-  cohorts: when the figures would describe fewer than ``cohort.minimum`` source addresses they are
-  withheld and ``cohort.state`` says ``too-few-sources`` (never a silently emptier answer), and a
-  destination inside the organisation is not listed to that tier;
+  cohorts, counted in **internal endpoints** (the inside-the-organisation side of each flow, not every
+  source address): an answer that would describe fewer than ``cohort.minimum`` is withheld whole, and a
+  row (application, destination, mix item, destination share) that fewer stood behind keeps its name
+  but loses its volume, share, trend, counts and dates (``visibility`` is ``withheld``, and it is
+  listed after the shown rows). ``cohort.state`` says ``too-few-sources`` whenever anything was
+  withheld (never a silently emptier answer), and a destination inside the organisation is not listed
+  to that tier;
 * an anomaly is a documented comparison, not a verdict: it carries its baseline, the observed value,
   the difference and a confidence, and nothing below the stated threshold, minimum difference or
   minimum number of comparable weeks is ever reported. Outside working hours is context only.
@@ -28,8 +32,10 @@ interpreted.
 from __future__ import annotations
 
 import math
+from collections.abc import Sequence
 from datetime import timedelta
-from typing import Annotated, Literal
+from itertools import pairwise
+from typing import Annotated, Literal, Protocol
 
 from pydantic import AwareDatetime, ConfigDict, Field, model_validator
 
@@ -106,6 +112,7 @@ _UNKNOWN_REASONS = frozenset(
 AttributionLevel = Literal["person", "endpoint", "none"]
 AttributionState = Literal["ok", "not-connected", "unknown", "withheld", "not-evaluated"]
 CohortState = Literal["not-applied", "sufficient", "too-few-sources"]
+RowVisibility = Literal["shown", "withheld"]
 DestinationScope = Literal["external", "internal"]
 DaylightSaving = Literal["not-applicable", "none", "crossed"]
 MIN_COHORT_FLOOR = 2
@@ -137,13 +144,42 @@ def _sequential(ranks: list[int], what: str) -> None:
         raise ValueError(f"{what} ranks run 1..n in order")
 
 
+def _withheld_last(flags: list[bool], what: str) -> None:
+    """Withheld rows follow the shown ones, so a row's position says nothing about its volume."""
+    if any(early and not late for early, late in pairwise(flags)):
+        raise ValueError(f"{what}: withheld rows are listed after the shown rows")
+
+
+def _visibility_matches(
+    visibility: RowVisibility, withheld: dict[str, object], shown: dict[str, object]
+) -> None:
+    """A withheld row carries none of its figures; a shown row carries the ones it must."""
+    if visibility == "withheld":
+        if any(value is not None for value in withheld.values()):
+            raise ValueError("a withheld row carries no figures")
+    elif any(value is None for value in shown.values()):
+        raise ValueError("a shown row carries its figures")
+
+
+class _Counted(Protocol):
+    """A row the cohort rule applies to."""
+
+    @property
+    def visibility(self) -> RowVisibility: ...
+
+    @property
+    def endpoints(self) -> int | None: ...
+
+
 class CohortStatus(TrafficModel):
     """The small-cohort rule as applied to this answer.
 
     ``not-applied``: the caller holds the detail tier (or nothing was read), so no rule was applied.
-    ``sufficient``: the aggregate tier, and the figures describe at least ``minimum`` source addresses.
+    ``sufficient``: the aggregate tier, and every figure describes at least ``minimum`` internal
+    endpoints.
     ``too-few-sources``: the aggregate tier, and something was withheld because fewer than ``minimum``
-    source addresses stood behind it (an Explorer answer, an endpoint count, a first-seen destination).
+    internal endpoints stood behind it (a whole Explorer answer, a row, a series, a first-seen
+    destination).
     """
 
     state: CohortState
@@ -158,6 +194,37 @@ class CohortStatus(TrafficModel):
 
 def cohort_not_applied() -> CohortStatus:
     return CohortStatus(state="not-applied", minimum=None)
+
+
+def _rows_follow_cohort(
+    state: str, cohort: CohortStatus, rows: Sequence[_Counted], what: str
+) -> None:
+    """The per-row cohort rule shared by every list the aggregate tier is shown.
+
+    The detail tier sees every row shown. The aggregate tier sees a row only with an endpoint count
+    that meets the minimum; anything else is withheld, withheld rows come last, and the answer says
+    ``too-few-sources`` exactly when it withheld a row.
+    """
+    if state != "ok":
+        if cohort.state != "not-applied":
+            raise ValueError("a read that returned nothing applied no cohort rule")
+        return
+    withheld = [row.visibility == "withheld" for row in rows]
+    if cohort.state == "not-applied":
+        if any(withheld):
+            raise ValueError("the detail tier is never shown a withheld row")
+        return
+    minimum = cohort.minimum or MIN_COHORT_FLOOR
+    for row in rows:
+        if row.visibility == "shown" and (row.endpoints is None or row.endpoints < minimum):
+            raise ValueError(
+                f"{what}: a row below the cohort minimum or without a count is withheld"
+            )
+    if cohort.state == "sufficient" and any(withheld):
+        raise ValueError(f"{what}: sufficient means no row is withheld")
+    if cohort.state == "too-few-sources" and not any(withheld):
+        raise ValueError(f"{what}: too few sources means at least one row is withheld")
+    _withheld_last(withheld, what)
 
 
 # --- Flow Explorer -------------------------------------------------------------------------------
@@ -266,12 +333,24 @@ class Volume(TrafficModel):
     flows: Count
     source_addresses: Count
     destination_addresses: Count
+    internal_endpoints: Count | None
 
 
 class ApplicationMixItem(TrafficModel):
     application: str | None = Field(..., min_length=1, max_length=255)
-    bytes: Count
+    visibility: RowVisibility
+    bytes: Count | None
     share: Share | None
+    endpoints: Count | None
+
+    @model_validator(mode="after")
+    def _visible(self) -> ApplicationMixItem:
+        _visibility_matches(
+            self.visibility,
+            {"bytes": self.bytes, "share": self.share, "endpoints": self.endpoints},
+            {"bytes": self.bytes},
+        )
+        return self
 
 
 class ApplicationMix(TrafficModel):
@@ -281,8 +360,11 @@ class ApplicationMix(TrafficModel):
 
     @model_validator(mode="after")
     def _adds_up(self) -> ApplicationMix:
-        if sum(item.bytes for item in self.items) + self.other_bytes != self.total_bytes:
-            raise ValueError("the application mix adds up to its total")
+        shown = sum(item.bytes or 0 for item in self.items)
+        if shown + self.other_bytes != self.total_bytes:
+            raise ValueError(
+                "the application mix adds up to its total (withheld bytes are in other)"
+            )
         return self
 
 
@@ -290,8 +372,24 @@ class DestinationShare(TrafficModel):
     address: str = Field(min_length=1, max_length=45)
     host: str | None = Field(..., min_length=1, max_length=255)
     scope: DestinationScope
-    bytes: Count
+    visibility: RowVisibility
+    bytes: Count | None
     share: Share | None
+    endpoints: Count | None
+
+    @model_validator(mode="after")
+    def _visible(self) -> DestinationShare:
+        _visibility_matches(
+            self.visibility,
+            {
+                "bytes": self.bytes,
+                "share": self.share,
+                "endpoints": self.endpoints,
+                "host": self.host,
+            },
+            {"bytes": self.bytes},
+        )
+        return self
 
 
 class FlowAggregations(TrafficModel):
@@ -338,13 +436,49 @@ class TrafficFlowsResponse(TrafficModel):
             return
         if applied != self.flows_restricted:
             raise ValueError("exactly the aggregate tier is held to the cohort rule")
-        if self.cohort.state == "too-few-sources" and self.aggregations is not None:
-            raise ValueError("too few sources: the aggregates are withheld, not thinned")
-        internal = self.aggregations is not None and any(
-            share.scope == "internal" for share in self.aggregations.destinations
+        aggregations = self.aggregations
+        mix = (
+            aggregations.application_mix.items
+            if aggregations and aggregations.application_mix
+            else []
         )
-        if self.flows_restricted and internal:
+        shares = aggregations.destinations if aggregations else []
+        if not applied:
+            _rows_follow_cohort("ok", self.cohort, [*mix, *shares], "aggregations")
+            return
+        if any(share.scope == "internal" for share in shares):
             raise ValueError("the aggregate tier is not told about internal destinations")
+        if aggregations is None:
+            if self.cohort.state == "sufficient":
+                raise ValueError("sufficient means the aggregates are shown")
+            return
+        counted = aggregations.volume.internal_endpoints
+        if counted is None or counted < (self.cohort.minimum or MIN_COHORT_FLOOR):
+            raise ValueError(
+                "fewer internal endpoints than the minimum: the answer is withheld whole"
+            )
+        self._items_follow_cohort(mix, shares)
+
+    def _items_follow_cohort(
+        self, mix: Sequence[ApplicationMixItem], shares: Sequence[DestinationShare]
+    ) -> None:
+        """Each list is held to the per-row rule; the answer withheld something iff an item is."""
+        lists: tuple[tuple[Sequence[_Counted], str], ...] = (
+            (mix, "application mix"),
+            (shares, "destinations"),
+        )
+        for items, what in lists:
+            minimum = self.cohort.minimum or MIN_COHORT_FLOOR
+            for item in items:
+                if item.visibility == "shown" and (
+                    item.endpoints is None or item.endpoints < minimum
+                ):
+                    raise ValueError(f"{what}: a row below the cohort minimum is withheld")
+            _withheld_last([item.visibility == "withheld" for item in items], what)
+        everything: list[_Counted] = [*mix, *shares]
+        withheld = any(item.visibility == "withheld" for item in everything)
+        if (self.cohort.state == "too-few-sources") != withheld:
+            raise ValueError("too few sources means exactly that an item was withheld")
 
     def _attribution_matches_rows(self) -> None:
         rows = [flow.attribution for flow in self.flows]
@@ -357,22 +491,6 @@ class TrafficFlowsResponse(TrafficModel):
             raise ValueError("an answered attribution covers every row")
         if status.level == "endpoint" and any(row and row.person for row in rows):
             raise ValueError("the endpoint level never names a person")
-
-
-def _endpoint_counts_follow_cohort(
-    state: str, cohort: CohortStatus, counts: list[int | None]
-) -> None:
-    """Under the cohort rule no listed endpoint count is below the minimum; a withheld one is null."""
-    if state != "ok":
-        if cohort.state != "not-applied":
-            raise ValueError("a read that returned nothing applied no cohort rule")
-        return
-    minimum = cohort.minimum
-    below = minimum is not None and any(count is not None and count < minimum for count in counts)
-    if cohort.state == "sufficient" and below:
-        raise ValueError("a count below the cohort minimum is withheld, not listed")
-    if cohort.state == "too-few-sources" and all(count is not None for count in counts):
-        raise ValueError("too few sources: at least one endpoint count is withheld")
 
 
 # --- Applications ---------------------------------------------------------------------------------
@@ -416,7 +534,8 @@ class ApplicationRow(TrafficModel):
     rank: int = Field(ge=1, le=100)
     application: str = Field(min_length=1, max_length=255)
     category: str | None = Field(..., min_length=1, max_length=128)
-    bytes: Count
+    visibility: RowVisibility
+    bytes: Count | None
     packets: Count | None
     share: Share | None
     endpoints: Count | None
@@ -426,10 +545,28 @@ class ApplicationRow(TrafficModel):
     approval: Literal["approved", "unapproved", "unknown"]
 
     @model_validator(mode="after")
+    def _visible(self) -> ApplicationRow:
+        _visibility_matches(
+            self.visibility,
+            {
+                "bytes": self.bytes,
+                "packets": self.packets,
+                "share": self.share,
+                "endpoints": self.endpoints,
+                "users": self.users,
+            },
+            {"bytes": self.bytes},
+        )
+        if self.visibility == "withheld" and self.trend.state != "unknown":
+            raise ValueError("a withheld row carries no trend (not even the earlier bytes)")
+        return self
+
+    @model_validator(mode="after")
     def _trend_matches_bytes(self) -> ApplicationRow:
         previous = self.trend.previous_bytes
         if (
-            self.trend.state in ("up", "down", "flat")
+            self.bytes is not None
+            and self.trend.state in ("up", "down", "flat")
             and previous
             and self.trend.change_ratio is not None
         ):
@@ -456,14 +593,14 @@ class TrafficApplicationsResponse(TrafficModel):
             self.items or self.total_bytes is not None or self.previous_range is not None
         ):
             raise ValueError("non-ok traffic state must not carry values")
-        _endpoint_counts_follow_cohort(self.state, self.cohort, [i.endpoints for i in self.items])
+        _rows_follow_cohort(self.state, self.cohort, self.items, "applications")
         _unique(list(self.unsupported), "unsupported")
         if self.unsupported and self.state != "unknown":
             raise ValueError("an unsupported field makes the read unknown")
         if self.state == "ok":
             if self.total_bytes is None:
                 raise ValueError("an ok read states its total")
-            if sum(item.bytes for item in self.items) > self.total_bytes:
+            if sum(item.bytes or 0 for item in self.items) > self.total_bytes:
                 raise ValueError("the rows cannot exceed the total")
         _sequential([item.rank for item in self.items], "application")
         return self
@@ -476,12 +613,13 @@ class DestinationRow(TrafficModel):
     rank: int = Field(ge=1, le=100)
     address: str = Field(min_length=1, max_length=45)
     scope: DestinationScope
+    visibility: RowVisibility
     domain: str | None = Field(..., min_length=1, max_length=255)
     asn: int | None = Field(..., ge=1, le=4294967295)
     country: str | None = Field(..., min_length=2, max_length=2, pattern=r"^[A-Z]{2}$")
     first_seen: AwareDatetime | None
-    last_seen: AwareDatetime
-    bytes: Count
+    last_seen: AwareDatetime | None
+    bytes: Count | None
     packets: Count | None
     share: Share | None
     endpoints: Count | None
@@ -489,8 +627,32 @@ class DestinationRow(TrafficModel):
     reputation: Literal["allow-listed", "deny-listed", "unknown"]
 
     @model_validator(mode="after")
+    def _visible(self) -> DestinationRow:
+        _visibility_matches(
+            self.visibility,
+            {
+                "bytes": self.bytes,
+                "packets": self.packets,
+                "share": self.share,
+                "endpoints": self.endpoints,
+                "users": self.users,
+                "domain": self.domain,
+                "asn": self.asn,
+                "country": self.country,
+                "first_seen": self.first_seen,
+                "last_seen": self.last_seen,
+            },
+            {"bytes": self.bytes, "last_seen": self.last_seen},
+        )
+        return self
+
+    @model_validator(mode="after")
     def _ordered(self) -> DestinationRow:
-        if self.first_seen is not None and self.first_seen > self.last_seen:
+        if (
+            self.first_seen is not None
+            and self.last_seen is not None
+            and self.first_seen > self.last_seen
+        ):
             raise ValueError("a destination is first seen before it is last seen")
         return self
 
@@ -511,13 +673,13 @@ class TrafficDestinationsResponse(TrafficModel):
             self.items or self.total_bytes is not None or self.first_seen_since is not None
         ):
             raise ValueError("non-ok traffic state must not carry values")
-        _endpoint_counts_follow_cohort(self.state, self.cohort, [i.endpoints for i in self.items])
+        _rows_follow_cohort(self.state, self.cohort, self.items, "destinations")
         if self.cohort.state != "not-applied" and any(i.scope == "internal" for i in self.items):
             raise ValueError("the aggregate tier is not told about internal destinations")
         if self.state == "ok":
             if self.total_bytes is None:
                 raise ValueError("an ok read states its total")
-            if sum(item.bytes for item in self.items) > self.total_bytes:
+            if sum(item.bytes or 0 for item in self.items) > self.total_bytes:
                 raise ValueError("the rows cannot exceed the total")
         _sequential([item.rank for item in self.items], "destination")
         since = self.first_seen_since
@@ -563,6 +725,7 @@ class Evaluation(TrafficModel):
 
     status: Literal["evaluated", "partial", "insufficient-baseline", "no-data"]
     series: Count
+    series_withheld: Count
     buckets: Count
     evaluated: Count
     insufficient_baseline: Count
@@ -702,6 +865,10 @@ class TrafficAnomaliesResponse(TrafficModel):
             raise ValueError("non-ok traffic state must not carry values")
         if self.state != "ok" and self.cohort.state != "not-applied":
             raise ValueError("a read that returned nothing applied no cohort rule")
+        if self.evaluation.series_withheld and self.cohort.state != "too-few-sources":
+            raise ValueError(
+                "a series is withheld only under the cohort rule, and the answer says so"
+            )
         if self.evaluation.status in ("insufficient-baseline", "no-data") and self.anomalies:
             raise ValueError("no anomaly is reported without a sufficient baseline")
         if self.first_seen_status.state != "sufficient" and self.first_seen:

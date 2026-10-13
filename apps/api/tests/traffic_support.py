@@ -75,10 +75,15 @@ def make_destination(**overrides: Any) -> DestinationRow:
     return DestinationRow.model_validate_json(json.dumps(values))
 
 
-def volume_of(sources: int, **overrides: Any) -> dict[str, Any]:
-    """The ``volume`` block of an aggregation, with ``sources`` distinct source addresses."""
+def volume_of(internal: int, **overrides: Any) -> dict[str, Any]:
+    """The ``volume`` block of an aggregation, with ``internal`` distinct internal endpoints.
+
+    The source-address count follows it unless overridden (a host talking to many remote servers has
+    few internal endpoints but, seen from the other side, many addresses).
+    """
     volume = base("traffic_aggregations")["volume"]
-    volume.update(source_addresses=sources, **overrides)
+    volume.update(source_addresses=internal, internal_endpoints=internal)
+    volume.update(overrides)
     return volume  # type: ignore[no-any-return]
 
 
@@ -88,6 +93,7 @@ def exploration(flows: list[TrafficFlow] | None = None, **overrides: Any) -> Exp
         aggregations=overrides.pop("aggregations", make_aggregations()),
         unsupported=overrides.pop("unsupported", ()),
         observed_at=overrides.pop("observed_at", NOW - timedelta(minutes=1)),
+        source_observed_at=overrides.pop("source_observed_at", NOW - timedelta(minutes=2)),
     )
 
 
@@ -179,6 +185,7 @@ def applications_read(
         ),
         unsupported=overrides.pop("unsupported", ()),
         observed_at=overrides.pop("observed_at", NOW - timedelta(minutes=1)),
+        source_observed_at=overrides.pop("source_observed_at", NOW - timedelta(minutes=2)),
     )
 
 
@@ -191,6 +198,7 @@ def destinations_read(
         total_bytes=overrides.pop("total_bytes", max(400_000_000, sum(r.bytes for r in chosen))),
         first_seen_since=overrides.pop("first_seen_since", NOW - timedelta(days=31)),
         observed_at=overrides.pop("observed_at", NOW - timedelta(minutes=1)),
+        source_observed_at=overrides.pop("source_observed_at", NOW - timedelta(minutes=2)),
     )
 
 
@@ -220,8 +228,11 @@ def inputs(**overrides: Any) -> AnomalyInputs:
         "oldest": NOW - timedelta(days=30),
         "first_seen": (),
         "observed_at": NOW - timedelta(hours=1),
+        "sources_total": 50,
     }
     values.update(overrides)
+    apps = values["hourly_apps"]
+    values.setdefault("sources_by_application", {name: 50 for name in apps})
     return AnomalyInputs(**values)
 
 

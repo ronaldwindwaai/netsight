@@ -79,6 +79,7 @@ describe('the baseline', () => {
           evaluation: {
             status: 'insufficient-baseline',
             series: 1,
+            series_withheld: 0,
             buckets: 24,
             evaluated: 0,
             insufficient_baseline: 24,
@@ -105,6 +106,7 @@ describe('the baseline', () => {
           evaluation: {
             status: 'no-data',
             series: 1,
+            series_withheld: 0,
             buckets: 24,
             evaluated: 0,
             insufficient_baseline: 0,
@@ -139,6 +141,7 @@ describe('the baseline', () => {
           evaluation: {
             status: 'partial',
             series: 6,
+            series_withheld: 0,
             buckets: 100,
             evaluated: 80,
             insufficient_baseline: 15,

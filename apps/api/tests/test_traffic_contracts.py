@@ -108,7 +108,7 @@ def test_every_vector_entity_has_valid_and_invalid_cases() -> None:
 
 
 def test_the_suite_exercises_enough_cases_to_matter() -> None:
-    assert sum(len(block["cases"]) for block in VECTORS.values()) >= 280
+    assert sum(len(block["cases"]) for block in VECTORS.values()) >= 400
 
 
 @pytest.mark.parametrize(("entity", "case"), _all_cases())
@@ -276,7 +276,7 @@ def test_every_new_openapi_traffic_component_is_paired() -> None:
         name
         for name in OPENAPI["components"]["schemas"]
         if name.startswith("Traffic")
-        and name not in {"TrafficTimeRange", "TrafficItem", "TrafficTopResponse"}
+        and name not in {"TrafficTimeRange"}
     }
     assert declared == paired
 

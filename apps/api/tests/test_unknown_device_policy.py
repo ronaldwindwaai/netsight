@@ -196,3 +196,17 @@ def test_a_file_and_inline_json_together_are_ambiguous() -> None:
 
 def test_a_hostile_address_is_just_no_match() -> None:
     assert inline(VALID).decide("<script>", None) == ("medium", "policy-default")
+
+
+# --- a hostile document can not crash the loader (security low) ------------------------------------------------
+
+
+def test_a_deeply_nested_document_is_invalid_not_a_crash(tmp_path: Path) -> None:
+    from netsight_api.inventory.operator_file import read_operator_document
+
+    deep = "[" * 20_000 + "]" * 20_000  # 40 kB: under the size limit, far over the parser's depth
+    assert read_operator_document({"INLINE": deep}, "INLINE", "FILE").state == "invalid"
+    path = tmp_path / "policy.json"
+    path.write_text(deep, encoding="utf-8")
+    assert read_operator_document({"FILE": str(path)}, "INLINE", "FILE").state == "invalid"
+    assert load_policy({POLICY_ENV: deep}).state == "invalid"

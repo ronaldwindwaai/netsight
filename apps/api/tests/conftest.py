@@ -61,3 +61,24 @@ def _fresh_step8_caches() -> Iterator[None]:
     ipam_wiring.reset_for_tests()
     unknown_wiring.reset_for_tests()
     yield
+
+
+@pytest.fixture(autouse=True)
+def _fresh_internal_prefixes(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    """The parsed internal-prefix list is module state: no test inherits another's environment."""
+    from netsight_api.traffic import addresses
+
+    monkeypatch.delenv(addresses.PREFIXES_ENV, raising=False)
+    addresses.reset_for_tests()
+    yield
+    addresses.reset_for_tests()
+
+
+@pytest.fixture(autouse=True)
+def _fresh_shared_clickhouse_client() -> Iterator[None]:
+    """The process-wide flow client is module state: no test inherits another's client."""
+    from netsight_api.adapters import clickhouse_shared
+
+    clickhouse_shared.reset_for_tests()
+    yield
+    clickhouse_shared.reset_for_tests()

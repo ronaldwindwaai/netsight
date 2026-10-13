@@ -87,6 +87,8 @@ export function parseWorkingHours(value: unknown): WorkingHours | null {
 export interface Evaluation {
   status: EvaluationStatus;
   series: number;
+  /** Series left out under the cohort rule (aggregate tier); the other counts cover the rest. */
+  series_withheld: number;
   buckets: number;
   evaluated: number;
   insufficient_baseline: number;
@@ -100,6 +102,7 @@ export interface Evaluation {
 const EVALUATION_KEYS = [
   'status',
   'series',
+  'series_withheld',
   'buckets',
   'evaluated',
   'insufficient_baseline',
@@ -120,6 +123,7 @@ export function parseEvaluation(value: unknown): Evaluation | null {
   if (
     !isOneOf(v.status, EVALUATION_STATUSES) ||
     !count(v.series) ||
+    !count(v.series_withheld) ||
     !count(v.buckets) ||
     !count(v.evaluated) ||
     !count(v.insufficient_baseline) ||
@@ -136,6 +140,7 @@ export function parseEvaluation(value: unknown): Evaluation | null {
   return {
     status: v.status,
     series: v.series,
+    series_withheld: v.series_withheld,
     buckets: v.buckets,
     evaluated: v.evaluated,
     insufficient_baseline: v.insufficient_baseline,
@@ -396,6 +401,8 @@ export function parseTrafficAnomaliesResponse(value: unknown): TrafficAnomaliesR
   }
   if (history.state !== 'sufficient' && firstSeen.length > 0) return null;
   if (!cohortMatchesState(value.state, cohort)) return null;
+  // A series is withheld only under the cohort rule, and the answer says so.
+  if (evaluation.series_withheld > 0 && cohort.state !== 'too-few-sources') return null;
   if (anomalies.length > evaluation.anomalies_total) return null;
   for (const item of anomalies) {
     if (

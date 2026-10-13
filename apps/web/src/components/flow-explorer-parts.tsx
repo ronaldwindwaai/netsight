@@ -14,7 +14,12 @@ import type {
 } from '@/lib/api-contracts-traffic-explorer';
 import { formatBytes, formatShare } from '@/lib/format-bytes';
 import { formatUtcTimestamp } from '@/lib/format-time';
-import { NOT_REPORTED, attributionPresentation, destinationScopeText } from '@/lib/traffic-view';
+import {
+  NOT_REPORTED,
+  WITHHELD_ITEM,
+  attributionPresentation,
+  destinationScopeText,
+} from '@/lib/traffic-view';
 
 const DIRECTION: Record<FlowDirection, { label: string; theme: string }> = {
   inbound: { label: 'Inbound', theme: 'text-bg-info' },
@@ -211,6 +216,12 @@ export function VolumeSummary({ volume }: { volume: Volume }) {
           volume.packets === null ? NOT_REPORTED : volume.packets.toLocaleString('en-GB'),
         )}
         {stat('Source addresses', volume.source_addresses.toLocaleString('en-GB'))}
+        {stat(
+          'Internal endpoints',
+          volume.internal_endpoints === null
+            ? NOT_REPORTED
+            : volume.internal_endpoints.toLocaleString('en-GB'),
+        )}
         {stat('Destination addresses', volume.destination_addresses.toLocaleString('en-GB'))}
       </dl>
     </TrafficPanel>
@@ -243,11 +254,17 @@ export function ApplicationMixPanel({ mix }: { mix: ApplicationMix | null }) {
                 {item.application ?? 'No application reported'}
               </span>
               <span className="traffic-bars__value">
-                {formatBytes(item.bytes)}
-                <span className="text-body-secondary"> · {formatShare(item.share)}</span>
+                {item.bytes === null ? (
+                  <span className="text-body-secondary">{WITHHELD_ITEM}</span>
+                ) : (
+                  <>
+                    {formatBytes(item.bytes)}
+                    <span className="text-body-secondary"> · {formatShare(item.share)}</span>
+                  </>
+                )}
               </span>
             </div>
-            <Bar ratio={item.share ?? item.bytes / largest} />
+            {item.bytes === null ? null : <Bar ratio={item.share ?? item.bytes / largest} />}
           </li>
         ))}
         {mix.other_bytes > 0 ? (
@@ -269,7 +286,7 @@ export function DestinationSharePanel({
 }: {
   destinations: readonly DestinationShare[];
 }) {
-  const largest = Math.max(1, ...destinations.map((destination) => destination.bytes));
+  const largest = Math.max(1, ...destinations.map((destination) => destination.bytes ?? 0));
   return (
     <TrafficPanel
       title="Top destinations"
@@ -297,11 +314,22 @@ export function DestinationSharePanel({
                   ) : null}
                 </span>
                 <span className="traffic-bars__value">
-                  {formatBytes(destination.bytes)}
-                  <span className="text-body-secondary"> · {formatShare(destination.share)}</span>
+                  {destination.bytes === null ? (
+                    <span className="text-body-secondary">{WITHHELD_ITEM}</span>
+                  ) : (
+                    <>
+                      {formatBytes(destination.bytes)}
+                      <span className="text-body-secondary">
+                        {' '}
+                        · {formatShare(destination.share)}
+                      </span>
+                    </>
+                  )}
                 </span>
               </div>
-              <Bar ratio={destination.share ?? destination.bytes / largest} />
+              {destination.bytes === null ? null : (
+                <Bar ratio={destination.share ?? destination.bytes / largest} />
+              )}
             </li>
           ))}
         </ol>

@@ -20,6 +20,7 @@ import {
   formatSignedBytes,
   historyNotice,
   patternLabel,
+  seriesWithheldNotice,
   workingHoursText,
   daylightSavingNotice,
 } from '@/lib/traffic-view';
@@ -169,6 +170,7 @@ export function AnomaliesBody({ state }: { state: FetchState<TrafficAnomaliesRes
       {(data) => {
         const notice = evaluationNotice(data.evaluation, data.method);
         const history = historyNotice(data.first_seen_status);
+        const withheld = seriesWithheldNotice(data.evaluation.series_withheld, data.cohort.minimum);
         const dst = daylightSavingNotice(data.evaluation.daylight_saving, data.working_hours.timezone);
         const judged = data.evaluation.status === 'evaluated' || data.evaluation.status === 'partial';
         return (
@@ -176,6 +178,12 @@ export function AnomaliesBody({ state }: { state: FetchState<TrafficAnomaliesRes
             <FreshnessNotice freshness={data.freshness} />
             <MethodPanel method={data.method} hours={workingHoursText(data.working_hours)} />
             {notice !== '' ? <p className="small mb-3">{notice}</p> : null}
+            {withheld !== '' ? (
+              <div role="status" aria-label="Series withheld" className="alert alert-info small py-2">
+                <i className="bi bi-people me-1" aria-hidden="true" />
+                <span>{withheld}</span>
+              </div>
+            ) : null}
             {dst !== '' ? (
               <p role="note" aria-label="Daylight saving" className="small text-body-secondary">
                 {dst}

@@ -3,8 +3,10 @@
 Approval, risk and reputation come only from the operator policy. What each tier is then shown:
 
 * the detail tier gets the rows as read, internal destinations included and labelled;
-* the aggregate tier loses the destinations inside the organisation and any endpoint count below the
-  cohort minimum (``traffic.cohort``), and the response says whether anything was withheld.
+* the aggregate tier loses the destinations inside the organisation, and every row that fewer than the
+  cohort minimum of internal endpoints stood behind is withheld whole (``traffic.cohort``): it keeps its
+  name and loses its volume, trend, counts and dates, and is listed last. The response says whether
+  anything was withheld, and its freshness is the source's, not that of the filtered rows.
 """
 
 from __future__ import annotations
@@ -16,7 +18,7 @@ from netsight_api.schemas_traffic import (
 )
 from netsight_api.traffic import cohort
 from netsight_api.traffic.policy import TrafficPolicy
-from netsight_api.traffic.responses import freshness_for
+from netsight_api.traffic.responses import freshness_for_tier
 from netsight_api.traffic.route_support import Window, time_range
 from netsight_api.traffic.source import ApplicationsRead, DestinationsRead
 
@@ -33,7 +35,7 @@ def applications_ok(
         )
         for row in result.rows
     ]
-    rows, cohort_status = cohort.withhold_small_counts(classified, minimum)
+    rows, cohort_status = cohort.withhold_small_applications(classified, minimum)
     previous = (
         time_range(result.previous_range[0], result.previous_range[1], None)
         if result.previous_range is not None
@@ -48,7 +50,9 @@ def applications_ok(
         total_bytes=result.total_bytes,
         items=rows,
         cohort=cohort_status,
-        freshness=freshness_for(window.end, result.observed_at),
+        freshness=freshness_for_tier(
+            window.end, result.observed_at, result.source_observed_at, aggregate=minimum is not None
+        ),
     )
 
 
@@ -62,7 +66,7 @@ def destinations_ok(
         for row in result.rows
     ]
     visible = cohort.external_destinations(classified) if minimum is not None else classified
-    rows, cohort_status = cohort.withhold_small_counts(visible, minimum)
+    rows, cohort_status = cohort.withhold_small_destinations(visible, minimum)
     return TrafficDestinationsResponse(
         state="ok",
         time_range=window.time_range,
@@ -71,5 +75,7 @@ def destinations_ok(
         total_bytes=result.total_bytes,
         items=rows,
         cohort=cohort_status,
-        freshness=freshness_for(window.end, result.observed_at),
+        freshness=freshness_for_tier(
+            window.end, result.observed_at, result.source_observed_at, aggregate=minimum is not None
+        ),
     )

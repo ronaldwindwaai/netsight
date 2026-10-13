@@ -299,26 +299,6 @@ class TrafficItem(ApiModel):
     share: float | None = Field(..., ge=0, le=1)
 
 
-class TrafficTopResponse(ApiModel):
-    state: TrafficState
-    dimension: TrafficDimension
-    time_range: TrafficTimeRange
-    items: list[TrafficItem] = Field(max_length=1000)
-    freshness: Freshness
-
-    @model_validator(mode="after")
-    def _non_ok_carries_no_rows(self) -> TrafficTopResponse:
-        """A degraded state must never assert traffic data.
-
-        This mirrors the canonical JSON schema `if state != ok then no items`
-        rule and the browser parser, so the invariant is enforced at the
-        platform boundary rather than only by construction convention.
-        """
-        if self.state != "ok" and self.items:
-            raise ValueError("non-ok traffic state must not carry items")
-        return self
-
-
 # --- Security (S5) ----------------------------------------------------------
 
 SecurityState = Literal["not-connected", "ok", "unknown"]

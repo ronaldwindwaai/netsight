@@ -167,6 +167,32 @@ describe('finding detail', () => {
     assert.match(text(), /NetBox is read, never written/);
   });
 
+  it('explains a name-matches-mac-does-not comparison and keeps the plain one quiet', () => {
+    const spoof = finding({
+      comparison: {
+        checked_at: '2026-10-11T12:00:00Z',
+        reason: 'name-matches-mac-does-not',
+        checks: [
+          { field: 'ip', result: 'no-match', detail: null },
+          { field: 'mac', result: 'no-match', detail: null },
+          { field: 'hostname', result: 'match', detail: null },
+        ],
+      },
+    });
+    const { unmount } = render(detail(okState(findingDetail(spoof))));
+    assert.match(text(), /name matched a NetBox device but the MAC address did not/);
+    unmount();
+    render(detail(okState(findingDetail())));
+    assert.doesNotMatch(text(), /name matched a NetBox device/);
+  });
+
+  it('labels a suppressed sighting on the timeline', () => {
+    const base = timeline().events[0];
+    const sighting = { ...base, id: 'unknown-device-event-6f1c2a9e-0b1d-5c3e-8f4a-123456789009', seq: 9, kind: 'suppressed-sighting' as const };
+    render(detail(okState(findingDetail()), okState(timeline({ events: [sighting] }))));
+    assert.match(text(), /Seen again while dismissed/);
+  });
+
   it('shows a proposed quarantine as a recommendation with no control to execute it', () => {
     render(detail(okState(findingDetail(finding({ proposed_action: proposedAction })))));
     assert.match(text(), /Isolate this endpoint \(quarantine\)/);

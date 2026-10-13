@@ -10,6 +10,14 @@ Distinct counts use ``uniq`` (adaptive sampling over a 64-bit hash; exact in pra
 cardinalities the cohort rule cares about, a close estimate above that), not ``uniqExact``, which holds
 every key in memory. Filters compare the typed column; they do not render a string per row.
 
+**The cohort denominator is internal endpoints.** ``internal_endpoints`` counts the distinct addresses
+on the *inside* of each flow: the destination of an inbound flow (``InIfBoundary`` external,
+``OutIfBoundary`` internal), the source of every other flow (and of every flow when the table has no
+interface boundaries). An address only counts when it lies in one of the internal prefixes, bound as the
+``{internal:Array(String)}`` parameter from the same list that classifies a destination as internal
+(``traffic.addresses``). One host talking to many remote servers is one endpoint, not many; the
+remote side of a flow is never counted.
+
 ``Bytes`` is summed as stored. Akvorado's own UI scales by ``SamplingRate``; this surface does not,
 because an extrapolation is an estimate (docs/04-integrations/AKVORADO-CLICKHOUSE.md).
 """
@@ -20,6 +28,7 @@ from collections.abc import Collection, Mapping
 from typing import Final
 
 from netsight_api.schemas_traffic import FilterName
+from netsight_api.traffic.addresses import internal_prefix_texts
 from netsight_api.traffic.filters import FlowFilterSet, ip_candidates
 
 Params = dict[str, str | int]
@@ -52,6 +61,36 @@ _DIRECTION_CLAUSES: Final = {
     "outbound": "(`InIfBoundary` = 'internal' AND `OutIfBoundary` = 'external')",
     "internal": "(`InIfBoundary` = 'internal' AND `OutIfBoundary` = 'internal')",
 }
+
+
+def internal_params() -> Params:
+    """The ``internal`` parameter: the internal prefixes as a ClickHouse ``Array(String)`` literal.
+
+    The prefixes are validated CIDR text (digits, hex, ``.``, ``:``, ``/``), so quoting them is safe.
+    """
+    return {"internal": "[" + ",".join(f"'{prefix}'" for prefix in internal_prefix_texts()) + "]"}
+
+
+def internal_side(columns: Collection[str]) -> str:
+    """The address on the inside of a flow: the destination when it enters the network."""
+    if "InIfBoundary" in columns and "OutIfBoundary" in columns:
+        return (
+            "if(`InIfBoundary` = 'external' AND `OutIfBoundary` = 'internal', `DstAddr`, `SrcAddr`)"
+        )
+    return "`SrcAddr`"
+
+
+def internal_endpoints(columns: Collection[str], also: str | None = None) -> str:
+    """``uniqIf`` over the inside address of each flow that lies in the internal prefixes.
+
+    ``also`` narrows the rows counted (a window half, say). Needs ``internal_params()`` bound.
+    """
+    side = internal_side(columns)
+    inside = (
+        f"arrayExists(p -> isIPAddressInRange(replaceRegexpOne(toString({side}), '^::ffff:', ''), p), "
+        "{internal:Array(String)})"
+    )
+    return f"uniqIf({side}, {inside}{f' AND {also}' if also else ''})"
 
 
 def bucket_seconds(window_seconds: int) -> int:
@@ -206,14 +245,24 @@ def volume(where: str, columns: Collection[str]) -> str:
         f"SELECT toString(sum(`Bytes`)) AS agg_bytes{packets}, toString(count()) AS agg_flows, "
         "toString(uniq(`SrcAddr`)) AS agg_sources, "
         "toString(uniq(`DstAddr`)) AS agg_destinations, "
+        f"toString({internal_endpoints(columns)}) AS agg_internal, "
         "toUnixTimestamp(max(`TimeReceived`)) AS agg_seen "
         f"FROM {{table}} WHERE {where} LIMIT 1 FORMAT JSON"
     )
 
 
-def application_mix(where: str) -> str:
+def source_seen() -> str:
+    """The newest flow the source holds in the window, whatever the filters or the cohort."""
     return (
-        "SELECT toString(`Application`) AS app_name, toString(sum(`Bytes`)) AS agg_bytes "
+        "SELECT toUnixTimestamp(max(`TimeReceived`)) AS source_seen "
+        f"FROM {{table}} WHERE {WINDOW} LIMIT 1 FORMAT JSON"
+    )
+
+
+def application_mix(where: str, columns: Collection[str]) -> str:
+    return (
+        "SELECT toString(`Application`) AS app_name, toString(sum(`Bytes`)) AS agg_bytes, "
+        f"toString({internal_endpoints(columns)}) AS agg_endpoints "
         f"FROM {{table}} WHERE {where} GROUP BY app_name WITH TOTALS "
         f"ORDER BY sum(`Bytes`) DESC LIMIT {MAX_MIX_GROUPS} FORMAT JSON"
     )
@@ -231,7 +280,8 @@ def _hostname(columns: Collection[str]) -> str:
 def destination_share(where: str, columns: Collection[str], limit: int) -> str:
     return (
         f"SELECT toString(`DstAddr`) AS address{_hostname(columns)}, "
-        "toString(sum(`Bytes`)) AS agg_bytes "
+        "toString(sum(`Bytes`)) AS agg_bytes, "
+        f"toString({internal_endpoints(columns)}) AS agg_endpoints "
         f"FROM {{table}} WHERE {where} GROUP BY address WITH TOTALS "
         f"ORDER BY sum(`Bytes`) DESC LIMIT {limit} FORMAT JSON"
     )
@@ -252,7 +302,7 @@ def applications(columns: Collection[str], limit: int, *, previous: bool) -> str
         select.append(
             "toString(sumIf(`Bytes`, `TimeReceived` < toDateTime({start:UInt32}))) AS prev_bytes"
         )
-    select.append(f"toString(uniqIf(`SrcAddr`, {current})) AS agg_endpoints")
+    select.append(f"toString({internal_endpoints(columns, current)}) AS agg_endpoints")
     select.append(f"toUnixTimestamp(maxIf(`TimeReceived`, {current})) AS agg_seen")
     lower = "{pstart:UInt32}" if previous else "{start:UInt32}"
     return (
@@ -274,7 +324,7 @@ def destinations(columns: Collection[str], limit: int) -> str:
     select.append("toString(sum(`Bytes`)) AS dest_bytes")
     if "Packets" in columns:
         select.append("toString(sum(`Packets`)) AS dest_packets")
-    select.append("toString(uniq(`SrcAddr`)) AS dest_endpoints")
+    select.append(f"toString({internal_endpoints(columns)}) AS dest_endpoints")
     select.append("toUnixTimestamp(max(`TimeReceived`)) AS last_seen")
     return (
         f"SELECT {', '.join(select)} FROM {{table}} WHERE {WINDOW} GROUP BY address WITH TOTALS "
@@ -323,10 +373,13 @@ def baseline_oldest() -> str:
     )
 
 
-def first_seen_asns() -> str:
+_OBSERVED_ROW = "`TimeReceived` >= toDateTime({obs_from:UInt32})"
+
+
+def first_seen_asns(columns: Collection[str]) -> str:
     return (
         "SELECT toString(`DstAS`) AS first_asn, toString(sum(`Bytes`)) AS agg_bytes, "
-        "toString(uniqIf(`SrcAddr`, `TimeReceived` >= toDateTime({obs_from:UInt32}))) "
+        f"toString({internal_endpoints(columns, _OBSERVED_ROW)}) "
         "AS agg_endpoints, toUnixTimestamp(min(`TimeReceived`)) AS first_seen "
         f"FROM {{table}} WHERE {_RANGE} AND `DstAS` != 0 GROUP BY first_asn "
         "HAVING min(`TimeReceived`) >= toDateTime({obs_from:UInt32}) "
@@ -338,11 +391,29 @@ def first_seen_destinations(columns: Collection[str]) -> str:
     return (
         f"SELECT toString(`DstAddr`) AS first_address{_hostname(columns)}, "
         "toString(sum(`Bytes`)) AS agg_bytes, "
-        "toString(uniqIf(`SrcAddr`, `TimeReceived` >= toDateTime({obs_from:UInt32}))) "
+        f"toString({internal_endpoints(columns, _OBSERVED_ROW)}) "
         "AS agg_endpoints, toUnixTimestamp(min(`TimeReceived`)) AS first_seen "
         f"FROM {{table}} WHERE {_RANGE} AND `DstAddr` IN (SELECT `DstAddr` FROM {{table}} "
         f"WHERE {_OBSERVED} GROUP BY `DstAddr` ORDER BY sum(`Bytes`) DESC "
         f"LIMIT {FIRST_SEEN_DESTINATION_POOL}) GROUP BY first_address "
         "HAVING min(`TimeReceived`) >= toDateTime({obs_from:UInt32}) "
         f"ORDER BY sum(`Bytes`) DESC LIMIT {FIRST_SEEN_DESTINATION_LIMIT} FORMAT JSON"
+    )
+
+
+def baseline_sources_total(columns: Collection[str]) -> str:
+    """Distinct internal endpoints behind the whole observed window (the total series' cohort)."""
+    return (
+        f"SELECT toString({internal_endpoints(columns)}) AS total_sources "
+        f"FROM {{table}} WHERE {_OBSERVED} LIMIT 1 FORMAT JSON"
+    )
+
+
+def baseline_sources_by_application(columns: Collection[str]) -> str:
+    """Distinct internal endpoints behind each of the applications that get an hourly series."""
+    return (
+        "SELECT toString(`Application`) AS app_name, "
+        f"toString({internal_endpoints(columns)}) AS app_sources "
+        f"FROM {{table}} WHERE {_OBSERVED} AND `Application` != '' GROUP BY app_name "
+        f"ORDER BY sum(`Bytes`) DESC LIMIT {MAX_BASELINE_APPLICATIONS} FORMAT JSON"
     )

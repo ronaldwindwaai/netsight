@@ -326,8 +326,6 @@ def test_get_requests_are_not_subject_to_body_cap(monkeypatch: pytest.MonkeyPatc
 
 _READ_PATHS = [
     "/api/v1/security/events",
-    "/api/v1/traffic/top-talkers",
-    "/api/v1/traffic/top-destinations",
     "/api/v1/incidents",
     "/api/v1/devices",
     "/api/v1/alerts",
@@ -366,4 +364,4 @@ def test_read_limit_is_independent_per_family(monkeypatch: pytest.MonkeyPatch) -
     client = TestClient(app)
     assert client.get("/api/v1/security/events").status_code == 200
     assert client.get("/api/v1/security/events").status_code == 429
-    assert client.get("/api/v1/traffic/top-destinations").status_code == 200
+    assert client.get("/api/v1/traffic/destinations").status_code == 200

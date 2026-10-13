@@ -325,7 +325,9 @@ def test_invalid_filters_and_bounds_are_a_422_that_echoes_nothing(name: str, val
     assert response.status_code == 422, response.text
     assert source.calls == []
     if len(value) > 3:
-        assert value not in response.text
+        # A random correlation id could contain a short value by chance; it is not an echo.
+        body = response.text.replace(response.json()["error"]["correlation_id"], "")
+        assert value not in body
 
 
 def test_a_parameter_outside_the_allow_list_is_refused_not_ignored() -> None:
@@ -466,8 +468,10 @@ def test_hostile_source_text_is_carried_as_data() -> None:
                 "address": "203.0.113.9",
                 "host": HOSTILE,
                 "scope": "external",
+                "visibility": "shown",
                 "bytes": 5,
                 "share": None,
+                "endpoints": 12,
             }
         ]
     )

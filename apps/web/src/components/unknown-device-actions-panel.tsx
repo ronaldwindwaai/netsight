@@ -45,7 +45,7 @@ export function UnknownDeviceActionsPanel({
   viewer,
   currentPath,
 }: {
-  finding: { id: string; state: FindingState; assignee_id: string | null };
+  finding: { id: string; state: FindingState; assignee_id: string | null; evidence_version: number };
   viewer: Viewer | null;
   currentPath: string;
 }) {
@@ -57,7 +57,11 @@ export function UnknownDeviceActionsPanel({
   const disabledActions = actions.filter((item) => !item.enabled);
 
   async function run(payload: FindingPayload, label: string) {
-    const accepted = await runner.submit({ ...payload, findingId: finding.id });
+    const accepted = await runner.submit({
+      ...payload,
+      findingId: finding.id,
+      expectedEvidenceVersion: finding.evidence_version,
+    });
     if (accepted) {
       setOpen(null);
       setNotice(`${label}: saved. The finding below has been refreshed.`);

@@ -504,9 +504,9 @@ export function historyNotice(status: FirstSeenStatus): string {
 export function cohortNotice(cohort: CohortStatus, noun: string): string {
   switch (cohort.state) {
     case 'sufficient':
-      return `These ${noun} describe at least ${cohort.minimum} source addresses. Smaller groups are never shown to your role.`;
+      return `These ${noun} describe at least ${cohort.minimum} internal endpoints. Smaller groups are never shown to your role.`;
     case 'too-few-sources':
-      return `Some ${noun} were withheld because fewer than ${cohort.minimum} source addresses were involved. Small groups are not shown to your role because they can point at one machine; the traffic:read-detail permission shows them.`;
+      return `Some ${noun} were withheld because fewer than ${cohort.minimum} internal endpoints were involved. Small groups are not shown to your role because they can point at one machine; the traffic:read-detail permission shows them.`;
     default:
       return '';
   }
@@ -517,6 +517,25 @@ export function withheldCountText(cohort: CohortStatus): string {
   return cohort.state === 'too-few-sources'
     ? `Withheld (fewer than ${cohort.minimum})`
     : NOT_REPORTED;
+}
+
+/**
+ * What a withheld row shows in place of a figure it may not give: its volume, share, trend, counts and
+ * dates are all null, which is different from "not reported" and must not look like zero.
+ */
+export function withheldRowText(cohort: CohortStatus): string {
+  return cohort.minimum === null ? 'Withheld' : `Withheld (fewer than ${cohort.minimum} endpoints)`;
+}
+
+/** The Explorer's own items carry no cohort object of their own; the word is enough. */
+export const WITHHELD_ITEM = 'Withheld (too few endpoints)';
+
+/** Series the aggregate tier is not shown because too few internal endpoints stood behind them. */
+export function seriesWithheldNotice(withheld: number, minimum: number | null): string {
+  if (withheld === 0) return '';
+  const noun = withheld === 1 ? 'series was' : 'series were';
+  const floor = minimum === null ? 'the minimum' : `${minimum}`;
+  return `${withheld} ${noun} left out because fewer than ${floor} internal endpoints stood behind ${withheld === 1 ? 'it' : 'them'}. The counts above cover only the series that were judged.`;
 }
 
 export function destinationScopeText(scope: DestinationScope): string {

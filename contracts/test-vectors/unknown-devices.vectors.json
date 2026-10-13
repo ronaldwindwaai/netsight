@@ -624,7 +624,8 @@
           "detail": null
         }
       ],
-      "checked_at": "2026-10-11T12:00:00Z"
+      "checked_at": "2026-10-11T12:00:00Z",
+      "reason": "no-match"
     },
     "cases": [
       {
@@ -781,6 +782,128 @@
           "checked_at"
         ],
         "jsonschema_rejects": true
+      },
+      {
+        "name": "name matches but the mac does not",
+        "valid": true,
+        "set": {
+          "checks": [
+            {
+              "field": "ip",
+              "result": "no-match",
+              "detail": null
+            },
+            {
+              "field": "mac",
+              "result": "no-match",
+              "detail": null
+            },
+            {
+              "field": "hostname",
+              "result": "match",
+              "detail": "NetBox has a device of this name"
+            }
+          ],
+          "reason": "name-matches-mac-does-not"
+        }
+      },
+      {
+        "name": "name match whose mac was never asked",
+        "valid": false,
+        "set": {
+          "checks": [
+            {
+              "field": "ip",
+              "result": "no-match",
+              "detail": null
+            },
+            {
+              "field": "mac",
+              "result": "not-checked",
+              "detail": "no MAC address was observed"
+            },
+            {
+              "field": "hostname",
+              "result": "match",
+              "detail": "NetBox has a device of this name"
+            }
+          ],
+          "reason": "name-matches-mac-does-not"
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "name match together with an address match",
+        "valid": false,
+        "set": {
+          "checks": [
+            {
+              "field": "ip",
+              "result": "match",
+              "detail": null
+            },
+            {
+              "field": "mac",
+              "result": "no-match",
+              "detail": null
+            },
+            {
+              "field": "hostname",
+              "result": "match",
+              "detail": "NetBox has a device of this name"
+            }
+          ],
+          "reason": "name-matches-mac-does-not"
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "a name match is not a finding unless it says so",
+        "valid": false,
+        "set": {
+          "checks": [
+            {
+              "field": "ip",
+              "result": "no-match",
+              "detail": null
+            },
+            {
+              "field": "mac",
+              "result": "no-match",
+              "detail": null
+            },
+            {
+              "field": "hostname",
+              "result": "match",
+              "detail": "NetBox has a device of this name"
+            }
+          ]
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "the name-matches reason without a name match",
+        "valid": false,
+        "set": {
+          "reason": "name-matches-mac-does-not"
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "unknown reason",
+        "valid": false,
+        "set": {
+          "reason": "looks-odd"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "missing reason",
+        "valid": false,
+        "delete": [
+          "reason"
+        ],
+        "jsonschema_rejects": true
       }
     ]
   },
@@ -854,6 +977,7 @@
       "state": "new",
       "severity": "medium",
       "severity_basis": "policy-default",
+      "evidence_version": 1,
       "assignee_id": null,
       "first_seen_at": "2026-10-11T12:00:00Z",
       "last_seen_at": "2026-10-11T12:00:00Z",
@@ -950,7 +1074,8 @@
             "detail": null
           }
         ],
-        "checked_at": "2026-10-11T12:00:00Z"
+        "checked_at": "2026-10-11T12:00:00Z",
+        "reason": "no-match"
       },
       "proposed_action": null
     },
@@ -1400,6 +1525,54 @@
           "owner": "x"
         },
         "jsonschema_rejects": true
+      },
+      {
+        "name": "a spoofed name",
+        "valid": true,
+        "set": {
+          "comparison.checks": [
+            {
+              "field": "ip",
+              "result": "no-match",
+              "detail": null
+            },
+            {
+              "field": "mac",
+              "result": "no-match",
+              "detail": null
+            },
+            {
+              "field": "hostname",
+              "result": "match",
+              "detail": "NetBox has a device of this name"
+            }
+          ],
+          "comparison.reason": "name-matches-mac-does-not"
+        }
+      },
+      {
+        "name": "evidence version zero",
+        "valid": false,
+        "set": {
+          "evidence_version": 0
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "missing evidence version",
+        "valid": false,
+        "delete": [
+          "evidence_version"
+        ],
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "evidence version past the cap",
+        "valid": false,
+        "set": {
+          "evidence_version": 1000001
+        },
+        "jsonschema_rejects": true
       }
     ]
   },
@@ -1740,6 +1913,23 @@
           "x": 1
         },
         "jsonschema_rejects": true
+      },
+      {
+        "name": "suppressed sighting",
+        "valid": true,
+        "set": {
+          "kind": "suppressed-sighting"
+        }
+      },
+      {
+        "name": "states on a suppressed sighting",
+        "valid": false,
+        "set": {
+          "kind": "suppressed-sighting",
+          "state_from": "new",
+          "state_to": "acknowledged"
+        },
+        "jsonschema_rejects": true
       }
     ]
   },
@@ -1756,6 +1946,7 @@
           "state": "new",
           "severity": "medium",
           "severity_basis": "policy-default",
+          "evidence_version": 1,
           "assignee_id": null,
           "first_seen_at": "2026-10-11T12:00:00Z",
           "last_seen_at": "2026-10-11T12:00:00Z",
@@ -1852,7 +2043,8 @@
                 "detail": null
               }
             ],
-            "checked_at": "2026-10-11T12:00:00Z"
+            "checked_at": "2026-10-11T12:00:00Z",
+            "reason": "no-match"
           },
           "proposed_action": null
         }
@@ -1935,6 +2127,7 @@
               "state": "new",
               "severity": "medium",
               "severity_basis": "policy-default",
+              "evidence_version": 1,
               "assignee_id": null,
               "first_seen_at": "2026-10-11T12:00:00Z",
               "last_seen_at": "2026-10-11T12:00:00Z",
@@ -2031,7 +2224,8 @@
                     "detail": null
                   }
                 ],
-                "checked_at": "2026-10-11T12:00:00Z"
+                "checked_at": "2026-10-11T12:00:00Z",
+                "reason": "no-match"
               },
               "proposed_action": null
             },
@@ -2040,6 +2234,7 @@
               "state": "new",
               "severity": "medium",
               "severity_basis": "policy-default",
+              "evidence_version": 1,
               "assignee_id": null,
               "first_seen_at": "2026-10-11T12:00:00Z",
               "last_seen_at": "2026-10-11T12:00:00Z",
@@ -2136,7 +2331,8 @@
                     "detail": null
                   }
                 ],
-                "checked_at": "2026-10-11T12:00:00Z"
+                "checked_at": "2026-10-11T12:00:00Z",
+                "reason": "no-match"
               },
               "proposed_action": null
             }
@@ -2163,6 +2359,7 @@
               "state": "new",
               "severity": "medium",
               "severity_basis": "policy-default",
+              "evidence_version": 1,
               "assignee_id": null,
               "first_seen_at": "2026-10-11T12:00:00Z",
               "last_seen_at": "2026-10-11T12:00:00Z",
@@ -2259,7 +2456,8 @@
                     "detail": null
                   }
                 ],
-                "checked_at": "2026-10-11T12:00:00Z"
+                "checked_at": "2026-10-11T12:00:00Z",
+                "reason": "no-match"
               },
               "proposed_action": null
             },
@@ -2268,6 +2466,7 @@
               "state": "new",
               "severity": "medium",
               "severity_basis": "policy-default",
+              "evidence_version": 1,
               "assignee_id": null,
               "first_seen_at": "2026-10-11T12:00:00Z",
               "last_seen_at": "2026-10-11T12:00:00Z",
@@ -2364,7 +2563,8 @@
                     "detail": null
                   }
                 ],
-                "checked_at": "2026-10-11T12:00:00Z"
+                "checked_at": "2026-10-11T12:00:00Z",
+                "reason": "no-match"
               },
               "proposed_action": null
             }
@@ -2391,6 +2591,7 @@
         "state": "new",
         "severity": "medium",
         "severity_basis": "policy-default",
+        "evidence_version": 1,
         "assignee_id": null,
         "first_seen_at": "2026-10-11T12:00:00Z",
         "last_seen_at": "2026-10-11T12:00:00Z",
@@ -2487,7 +2688,8 @@
               "detail": null
             }
           ],
-          "checked_at": "2026-10-11T12:00:00Z"
+          "checked_at": "2026-10-11T12:00:00Z",
+          "reason": "no-match"
         },
         "proposed_action": null
       }
@@ -5375,9 +5577,76 @@
       }
     ]
   },
+  "unknown_device_transition_request": {
+    "base": {
+      "expected_evidence_version": 1
+    },
+    "cases": [
+      {
+        "name": "the version the person saw",
+        "valid": true
+      },
+      {
+        "name": "a later version",
+        "valid": true,
+        "set": {
+          "expected_evidence_version": 7
+        }
+      },
+      {
+        "name": "version zero",
+        "valid": false,
+        "set": {
+          "expected_evidence_version": 0
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "version past the cap",
+        "valid": false,
+        "set": {
+          "expected_evidence_version": 1000001
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "a fraction",
+        "valid": false,
+        "set": {
+          "expected_evidence_version": 1.5
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "a string",
+        "valid": false,
+        "set": {
+          "expected_evidence_version": "1"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "missing",
+        "valid": false,
+        "delete": [
+          "expected_evidence_version"
+        ],
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "extra key",
+        "valid": false,
+        "set": {
+          "x": 1
+        },
+        "jsonschema_rejects": true
+      }
+    ]
+  },
   "unknown_device_assign_request": {
     "base": {
-      "assignee_id": "oidc:analyst-1"
+      "assignee_id": "oidc:analyst-1",
+      "expected_evidence_version": 1
     },
     "cases": [
       {
@@ -5420,6 +5689,22 @@
         "valid": false,
         "set": {
           "x": 1
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "missing evidence version",
+        "valid": false,
+        "delete": [
+          "expected_evidence_version"
+        ],
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "evidence version zero",
+        "valid": false,
+        "set": {
+          "expected_evidence_version": 0
         },
         "jsonschema_rejects": true
       }
@@ -5478,7 +5763,8 @@
   "unknown_device_resolve_request": {
     "base": {
       "outcome": "resolved",
-      "reason": "Added to NetBox as asset 4521"
+      "reason": "Added to NetBox as asset 4521",
+      "expected_evidence_version": 1
     },
     "cases": [
       {
@@ -5532,6 +5818,22 @@
           "x": 1
         },
         "jsonschema_rejects": true
+      },
+      {
+        "name": "missing evidence version",
+        "valid": false,
+        "delete": [
+          "expected_evidence_version"
+        ],
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "evidence version zero",
+        "valid": false,
+        "set": {
+          "expected_evidence_version": 0
+        },
+        "jsonschema_rejects": true
       }
     ]
   },
@@ -5560,7 +5862,8 @@
       "refreshed": 1,
       "suppressed": 0,
       "unverified": 3,
-      "truncated": false
+      "truncated": false,
+      "incomplete_sources": []
     },
     "cases": [
       {
@@ -5683,6 +5986,66 @@
         "valid": false,
         "set": {
           "x": 1
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "netbox answered with dropped rows",
+        "valid": true,
+        "set": {
+          "incomplete_sources": [
+            "netbox"
+          ]
+        }
+      },
+      {
+        "name": "duplicate incomplete source",
+        "valid": false,
+        "set": {
+          "incomplete_sources": [
+            "netbox",
+            "netbox"
+          ]
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "unknown incomplete source",
+        "valid": false,
+        "set": {
+          "incomplete_sources": [
+            "dhcp"
+          ]
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "missing incomplete sources",
+        "valid": false,
+        "delete": [
+          "incomplete_sources"
+        ],
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "a scan that could not compare reports incomplete data",
+        "valid": false,
+        "set": {
+          "state": "unknown",
+          "sources": [
+            {
+              "source": "netbox",
+              "state": "unknown",
+              "observed_at": null
+            }
+          ],
+          "created": 0,
+          "refreshed": 0,
+          "suppressed": 0,
+          "unverified": 0,
+          "incomplete_sources": [
+            "netbox"
+          ]
         },
         "jsonschema_rejects": true
       }

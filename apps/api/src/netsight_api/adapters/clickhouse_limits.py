@@ -15,11 +15,26 @@ attempt with a refusal. That is learned once per (endpoint, user) and remembered
 process, so it costs one failed round trip, not one per request. In that case nothing here can bound a
 query: the limits MUST then be enforced by the ClickHouse user profile (see the recommended profile in
 docs/04-integrations/AKVORADO-CLICKHOUSE.md), and one warning says so.
+
+**Only the server's own exception code decides.** ClickHouse puts the code of a failed query in the
+``X-ClickHouse-Exception-Code`` response header. The error *text* can carry caller-controlled
+material (an ``Enum`` error echoes the offending filter value), so nothing is ever matched against the
+body: a caller who could write "Code: 164. Cannot modify" into the text could otherwise flip the whole
+process into the profile-only mode for every user. The header is read strictly (decimal digits, one
+value) and only the two codes below mean "the limits were refused":
+
+* ``164`` (``READONLY``): the identity may not change settings at all;
+* ``452`` (``SETTING_CONSTRAINT_VIOLATION``): the profile pins or bounds a setting we sent.
+
+Either way the read is repeated without the settings, and the profile is relied on. If a ``452`` still
+fails the read *without* our settings, the profile itself rejects the query: that is a distinct
+warning, because no retry can help.
 """
 
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 from typing import Final, Literal
 
 _LOGGER = logging.getLogger("netsight_api")
@@ -30,6 +45,11 @@ MAX_ROWS_TO_READ: Final = 5_000_000_000
 MAX_BYTES_TO_READ: Final = 500 * GIB
 MAX_RESULT_ROWS: Final = 10_000  # the widest legitimate result is the 8,401-row baseline series
 MAX_RESULT_BYTES: Final = 64 * 1024 * 1024
+
+REFUSAL_CODES: Final = frozenset({164, 452})
+CONSTRAINT_CODE: Final = 452
+EXCEPTION_CODE_HEADER: Final = "X-ClickHouse-Exception-Code"
+_MAX_CODE_DIGITS: Final = 5
 
 Capability = Literal["enforced", "profile-only", "unverified"]
 CapabilityKey = tuple[str, str]  # (base URL without credentials, user name)
@@ -54,11 +74,17 @@ def limit_settings(timeout_seconds: float) -> dict[str, str]:
     }
 
 
-def settings_refused(body: str) -> bool:
-    """True when a ClickHouse error says the identity may not set (or pins) a setting."""
-    if "Code: 164." in body or "Cannot modify" in body:
-        return True
-    return "Code: 452." in body and "should not be changed" in body
+def exception_code(headers: Mapping[str, str]) -> int | None:
+    """The server's exception code from the response header; ``None`` when absent or malformed."""
+    raw = headers.get(EXCEPTION_CODE_HEADER, "").strip()
+    if not raw.isascii() or not raw.isdecimal() or len(raw) > _MAX_CODE_DIGITS:
+        return None
+    return int(raw)
+
+
+def settings_refused(headers: Mapping[str, str]) -> bool:
+    """True when the server says (by its exception code) that it refused a per-query setting."""
+    return exception_code(headers) in REFUSAL_CODES
 
 
 def capability_for(key: CapabilityKey) -> Capability:
@@ -73,19 +99,45 @@ def mark_enforced(key: CapabilityKey) -> None:
     _known[key] = "enforced"
 
 
-def mark_profile_only(key: CapabilityKey) -> None:
+def mark_profile_only(key: CapabilityKey, *, code: int | None = None) -> None:
     """Remember that this identity can not set limits; say so once."""
     if _known.get(key) == "profile-only":
         return
     _known[key] = "profile-only"
+    if code == CONSTRAINT_CODE:
+        _LOGGER.warning(
+            "a clickhouse profile constraint rejected the per-query limits (Code 452); reads go "
+            "on without them, so resource limits can not be verified here and MUST be enforced by "
+            "the ClickHouse user profile (docs/04-integrations/AKVORADO-CLICKHOUSE.md)",
+            extra={"source": "clickhouse", "limits": "profile-only", "code": code},
+        )
+        return
     _LOGGER.warning(
         "clickhouse identity may not set per-query limits; resource limits can not be verified "
         "here and MUST be enforced by the ClickHouse user profile "
         "(docs/04-integrations/AKVORADO-CLICKHOUSE.md)",
-        extra={"source": "clickhouse", "limits": "profile-only"},
+        extra={"source": "clickhouse", "limits": "profile-only", "code": code},
+    )
+
+
+_constraint_failure_logged = False
+
+
+def report_failed_by_constraint(headers: Mapping[str, str]) -> None:
+    """A read failed with a settings-constraint code although no per-query setting was sent."""
+    global _constraint_failure_logged
+    if exception_code(headers) != CONSTRAINT_CODE or _constraint_failure_logged:
+        return
+    _constraint_failure_logged = True
+    _LOGGER.warning(
+        "a clickhouse profile constraint (Code 452) makes flow reads fail even without per-query "
+        "limits; the user profile must be corrected (docs/04-integrations/AKVORADO-CLICKHOUSE.md)",
+        extra={"source": "clickhouse", "code": CONSTRAINT_CODE},
     )
 
 
 def reset_for_tests() -> None:
     """Forget what was learned (the tests' autouse fixture calls this)."""
+    global _constraint_failure_logged
+    _constraint_failure_logged = False
     _known.clear()

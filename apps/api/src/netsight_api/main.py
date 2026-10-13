@@ -23,7 +23,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.base import RequestResponseEndpoint
 from starlette.responses import Response
 
-from netsight_api.adapters.clickhouse_explorer import ExplorerClickhouse
+from netsight_api.adapters.clickhouse_shared import shared_client
 from netsight_api.adapters.librenms import (
     AdapterError,
     AdapterStatus,
@@ -47,7 +47,7 @@ from netsight_api.adapters.netbox import (
     canonical_device_id as netbox_canonical_device_id,
 )
 from netsight_api.alert_rule_routes import router as alert_rule_router
-from netsight_api.audit import configure_audit_logging, record_audit
+from netsight_api.audit import configure_audit_logging
 from netsight_api.auth.deps import get_current_identity
 from netsight_api.auth.oidc import aclose as oidc_aclose
 from netsight_api.auth.routes import router as auth_router
@@ -93,13 +93,8 @@ from netsight_api.schemas import (
     TopologyResponse,
     TrafficDimension,
     TrafficItem,
-    TrafficPreset,
-    TrafficTimeRange,
-    TrafficTopResponse,
 )
 from netsight_api.security_routes import router as security_router
-from netsight_api.timewindow import resolve_window
-from netsight_api.traffic.responses import freshness_for
 from netsight_api.traffic_routes import router as traffic_router
 from netsight_api.unknown_device_routes import router as unknown_device_router
 from netsight_api.unknown_devices.wiring import build_scan_service, start_scan
@@ -359,10 +354,16 @@ OptionalLibrenmsDependency = Annotated[LibrenmsClient | None, Depends(get_option
 
 
 class TrafficSource(Protocol):
-    """Read-only, bounded flow-aggregate source (implemented by S4-2).
+    """Read-only, bounded flow source (the ClickHouse client).
 
     Implementations must run parameterised queries with explicit time
     bounds and a row limit; they never receive unbounded requests.
+
+    ``top`` ranks raw addresses and is NOT reachable from any route of the
+    aggregate tier: the legacy ``/traffic/top-*`` routes were retired because
+    they bypassed the small-cohort rule. Its one remaining caller is the
+    identity service (per-person traffic), which is handed the source only for
+    a caller holding ``traffic:read-detail`` (see ``identity_routes``).
     """
 
     async def top(
@@ -386,20 +387,10 @@ def get_optional_traffic_source() -> TrafficSource | None:
 
     A configured-but-invalid DSN still yields a client: its queries then
     fail and the endpoints degrade to explicit ``unknown`` — configured
-    does not imply connected (same rule as the S3 NetBox decision).
+    does not imply connected (same rule as the S3 NetBox decision). The client
+    is shared for the life of the process while the configuration is unchanged.
     """
-    dsn = os.environ.get("CLICKHOUSE_DSN", "").strip()
-    if not dsn:
-        return None
-    return ExplorerClickhouse(
-        dsn=dsn,
-        user=os.environ.get("CLICKHOUSE_USER", "").strip(),
-        password=os.environ.get("CLICKHOUSE_PASSWORD", ""),
-        flows_table=os.environ.get("CLICKHOUSE_FLOWS_TABLE", "").strip() or "flows",
-    )
-
-
-OptionalTrafficDependency = Annotated[TrafficSource | None, Depends(get_optional_traffic_source)]
+    return shared_client()
 
 
 async def _capture[T](operation: Awaitable[T]) -> T | Exception:
@@ -434,32 +425,8 @@ def require_alert_reader(identity: CurrentIdentity) -> Identity:
     return identity
 
 
-def require_traffic_reader(identity: CurrentIdentity) -> Identity:
-    if not is_allowed(identity, Permission.TRAFFIC_READ.value):
-        raise ApiError(403, "FORBIDDEN", "Permission is required")
-    enforce_read_limit(identity, "traffic")
-    return identity
-
-
-def require_traffic_detail_reader(request: Request, identity: CurrentIdentity) -> Identity:
-    """Endpoint-level traffic (source addresses): needs ``traffic:read-detail``; denials are audited."""
-    if not is_allowed(identity, Permission.TRAFFIC_READ_DETAIL.value):
-        record_audit(
-            "traffic.top-talkers.read",
-            outcome="denied",
-            actor_id=identity.id,
-            correlation_id=_request_correlation_id(request),
-            reason="permission",
-        )
-        raise ApiError(403, "FORBIDDEN", "Permission is required")
-    enforce_read_limit(identity, "traffic")
-    return identity
-
-
 DeviceReader = Annotated[Identity, Depends(require_device_reader)]
 AlertReader = Annotated[Identity, Depends(require_alert_reader)]
-TrafficReader = Annotated[Identity, Depends(require_traffic_reader)]
-TrafficDetailReader = Annotated[Identity, Depends(require_traffic_detail_reader)]
 
 _STANDARD_ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {
     401: {"model": ErrorEnvelope, "description": "Authentication required"},
@@ -468,16 +435,6 @@ _STANDARD_ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {
     502: {"model": ErrorEnvelope, "description": "Invalid source response"},
     503: {"model": ErrorEnvelope, "description": "Source unavailable"},
 }
-
-# Traffic reads never 5xx: a source failure degrades to an explicit 200
-# `unknown`. Documenting 502/503 (and their LibreNMS/NetBox wording) would be
-# inaccurate, so traffic routes advertise only the generation errors.
-_TRAFFIC_ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {
-    401: {"model": ErrorEnvelope, "description": "Authentication required"},
-    403: {"model": ErrorEnvelope, "description": "Permission denied"},
-    422: {"model": ErrorEnvelope, "description": "Invalid request"},
-}
-
 
 def _raise_adapter_error(exc: AdapterError) -> NoReturn:
     if exc.status is AdapterStatus.UNAVAILABLE:
@@ -853,142 +810,6 @@ async def topology(
             freshness=Freshness(state="unknown", observed_at=None, source="netbox"),
         )
     return response
-
-
-def _validate_top(body: TrafficTopResponse) -> TrafficTopResponse:
-    """Canonical boundary validation applied on every return path.
-
-    Non-ok bodies are static, but validating them too keeps the contract
-    enforced uniformly rather than only on the source-backed branch.
-    """
-    validate("traffic_top", body.model_dump(mode="json", by_alias=True))
-    return body
-
-
-async def _traffic_top(
-    request: Request,
-    source: TrafficSource | None,
-    dimension: TrafficDimension,
-    preset: TrafficPreset,
-    start: datetime | None,
-    end: datetime | None,
-    limit: int,
-) -> TrafficTopResponse:
-    """Explicit traffic state: not-connected / unknown / source-reported ok."""
-    window_start, window_end, resolved_preset = resolve_window(preset, start, end)
-    time_range = TrafficTimeRange.model_validate(
-        {"from": window_start, "to": window_end, "preset": resolved_preset}
-    )
-    correlation_id = _request_correlation_id(request)
-
-    def _degraded() -> TrafficTopResponse:
-        return _validate_top(
-            TrafficTopResponse(
-                state="unknown",
-                dimension=dimension,
-                time_range=time_range,
-                items=[],
-                freshness=Freshness(state="unknown", observed_at=None, source="clickhouse"),
-            )
-        )
-
-    if source is None:
-        return _validate_top(
-            TrafficTopResponse(
-                state="not-connected",
-                dimension=dimension,
-                time_range=time_range,
-                items=[],
-                freshness=Freshness(state="unknown", observed_at=None, source=None),
-            )
-        )
-    result = await _capture(
-        source.top(dimension=dimension, start=window_start, end=window_end, limit=limit)
-    )
-    if isinstance(result, Exception):
-        # Source configured but not confirmable: unknown, never guess.
-        _LOGGER.warning(
-            "traffic source read failed",
-            extra={
-                "correlation_id": correlation_id,
-                "source": "clickhouse",
-                "error_type": type(result).__name__,
-            },
-        )
-        return _degraded()
-    items, observed_at = result
-    try:
-        response = TrafficTopResponse(
-            state="ok",
-            dimension=dimension,
-            time_range=time_range,
-            items=items,
-            freshness=freshness_for(window_end, observed_at),
-        )
-        # Canonical contract enforced at the boundary, like every other endpoint.
-        _validate_top(response)
-    except (ValidationError, ContractViolation) as exc:
-        _LOGGER.warning(
-            "traffic response rejected by canonical contract",
-            extra={
-                "correlation_id": correlation_id,
-                "source": "clickhouse",
-                "error_type": type(exc).__name__,
-            },
-        )
-        return _degraded()
-    return response
-
-
-@api.get(
-    "/traffic/top-talkers",
-    response_model=TrafficTopResponse,
-    responses=_TRAFFIC_ERROR_RESPONSES,
-    tags=["traffic"],
-)
-async def traffic_top_talkers(
-    request: Request,
-    identity: TrafficDetailReader,
-    source: OptionalTrafficDependency,
-    preset: Annotated[TrafficPreset, Query()] = "24h",
-    start: Annotated[datetime | None, Query(alias="from")] = None,
-    end: Annotated[datetime | None, Query(alias="to")] = None,
-    limit: Annotated[int, Query(ge=1, le=100)] = 10,
-) -> TrafficTopResponse:
-    """Top talkers for a bounded window.
-
-    States are explicit: not-connected without a source, unknown when the
-    source read fails, ok only with source-reported aggregates.
-    """
-    body = await _traffic_top(request, source, "talkers", preset, start, end, limit)
-    record_audit(
-        "traffic.top-talkers.read",
-        outcome="failure" if body.state == "unknown" else "success",
-        actor_id=identity.id,
-        correlation_id=_request_correlation_id(request),
-        state=body.state,
-        row_count=len(body.items),
-    )
-    return body
-
-
-@api.get(
-    "/traffic/top-destinations",
-    response_model=TrafficTopResponse,
-    responses=_TRAFFIC_ERROR_RESPONSES,
-    tags=["traffic"],
-)
-async def traffic_top_destinations(
-    request: Request,
-    _identity: TrafficReader,
-    source: OptionalTrafficDependency,
-    preset: Annotated[TrafficPreset, Query()] = "24h",
-    start: Annotated[datetime | None, Query(alias="from")] = None,
-    end: Annotated[datetime | None, Query(alias="to")] = None,
-    limit: Annotated[int, Query(ge=1, le=100)] = 10,
-) -> TrafficTopResponse:
-    """Top destinations for a bounded window (same explicit states)."""
-    return await _traffic_top(request, source, "destinations", preset, start, end, limit)
 
 
 @api.get(

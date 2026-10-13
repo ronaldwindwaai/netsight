@@ -93,7 +93,9 @@ function EventLine({ event }: { event: UnknownDeviceEvent }) {
               ? 'Quarantine proposed (not executed)'
               : event.kind === 'evidence-updated'
                 ? 'Evidence updated'
-                : 'Detected';
+                : event.kind === 'suppressed-sighting'
+                  ? 'Seen again while dismissed (not reopened)'
+                  : 'Detected';
   return (
     <li className="list-group-item">
       <div className="d-flex flex-wrap justify-content-between gap-2">
@@ -215,6 +217,12 @@ function FindingBody({
                 );
               })}
             </ul>
+            {item.comparison.reason === 'name-matches-mac-does-not' ? (
+              <p className="small mb-1">
+                The name matched a NetBox device but the MAC address did not. A name alone never clears an
+                endpoint.
+              </p>
+            ) : null}
             <p className="small text-body-secondary mb-0">
               Checked {formatUtcTimestamp(item.comparison.checked_at)}. NetBox is read, never written.
             </p>

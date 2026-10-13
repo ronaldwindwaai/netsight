@@ -43,8 +43,60 @@ def london_hours() -> dict[str, Any]:
 
 def test_labels_compare_by_casefold_only(tmp_path: Path) -> None:
     policy = policy_of(tmp_path, {"version": 1, "applications": {"approved": ["Straße", "Zoom"]}})
-    assert policy.application_approval("STRASSE") == "approved"  # casefold: ß folds to ss
+    assert policy.application_approval("STRAẞE") == "approved"  # the ß / ẞ case pair is one letter
     assert policy.application_approval("zoom") == "approved"
+    assert policy.application_approval("ZOOM") == "approved"
+
+
+def test_sharp_s_never_matches_ss_in_either_direction(tmp_path: Path) -> None:
+    # Full case folding turns ß into "ss"; a label must not borrow the approval or risk of the ASCII
+    # name it folds onto (ASCII-equality semantics), nor may an ASCII label reach a ß entry.
+    document = {
+        "version": 1,
+        "applications": {
+            "approved": ["strasse", "Maße"],
+            "risk": {"strasse": "high", "Maße": "low"},
+        },
+    }
+    policy = policy_of(tmp_path, document)
+    for label in ("Straße", "STRAẞE", "straße"):
+        assert policy.application_approval(label) == "unknown", label
+        assert policy.application_risk(label) == "unknown", label
+    assert policy.application_approval("STRASSE") == "approved"
+    assert policy.application_approval("MASSE") == "unknown"
+    assert policy.application_approval("MAẞE") == "approved"
+    assert policy.application_risk("maße") == "low"
+
+
+@pytest.mark.parametrize("level", [["low"], {"x": "low"}, 3, None, True, ""])
+def test_a_risk_value_that_is_not_a_level_invalidates_the_file_without_raising(
+    tmp_path: Path, level: Any
+) -> None:
+    policy = policy_of(tmp_path, {"version": 1, "applications": {"risk": {"Zoom": level}}})
+    assert policy.state == "invalid"
+    assert policy.application_risk("Zoom") == "unknown"
+
+
+def test_risk_names_that_collide_after_folding_invalidate_the_file(tmp_path: Path) -> None:
+    document = {"version": 1, "applications": {"risk": {"Zoom": "low", "ZOOM": "high"}}}
+    assert policy_of(tmp_path, document).state == "invalid"
+    sharp = {"version": 1, "applications": {"risk": {"Maße": "low", "MAẞE": "high"}}}
+    assert policy_of(tmp_path, sharp).state == "invalid"
+    distinct = {"version": 1, "applications": {"risk": {"strasse": "low", "Straße": "high"}}}
+    assert policy_of(tmp_path, distinct).state == "configured"
+
+
+@pytest.mark.parametrize("entry", ["2000::/16", "2001::/31", "2a00::/20"])
+def test_an_ipv6_allow_range_shorter_than_a_32_refuses_the_whole_file(
+    tmp_path: Path, entry: str
+) -> None:
+    policy = policy_of(tmp_path, {"version": 1, "destinations": {"allow": [entry]}})
+    assert policy.state == "invalid"
+
+
+def test_an_ipv6_allow_range_of_a_32_or_longer_is_accepted(tmp_path: Path) -> None:
+    policy = policy_of(tmp_path, {"version": 1, "destinations": {"allow": ["2001:db8::/32"]}})
+    assert policy.state == "configured"
 
 
 @pytest.mark.parametrize("label", ["Ｚoom", "Zo₀m", "ﬁle-share", "Zoom x"])
@@ -88,7 +140,8 @@ def test_an_entry_that_changes_under_nfkc_invalidates_the_file(
 
 
 @pytest.mark.parametrize(
-    "entry", ["0.0.0.0/0", "128.0.0.0/1", "10.0.0.0/7", "::/0", "2000::/3", "2001::/15"]
+    "entry",
+    ["0.0.0.0/0", "128.0.0.0/1", "10.0.0.0/7", "::/0", "2000::/3", "2001::/15", "2001:db8::/16"],
 )
 def test_an_overly_broad_allow_range_invalidates_the_whole_file(tmp_path: Path, entry: str) -> None:
     document = {
@@ -102,7 +155,7 @@ def test_an_overly_broad_allow_range_invalidates_the_whole_file(tmp_path: Path, 
 
 
 @pytest.mark.parametrize(
-    "entry", ["10.0.0.0/8", "192.168.0.0/16", "2001:db8::/16", "2001:db8::/32"]
+    "entry", ["10.0.0.0/8", "192.168.0.0/16", "2001:db8::/32", "2001:db8::/48"]
 )
 def test_the_narrowest_broad_boundaries_are_accepted(tmp_path: Path, entry: str) -> None:
     assert policy_of(tmp_path, {"version": 1, "destinations": {"allow": [entry]}}).state == (

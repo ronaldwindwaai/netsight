@@ -265,6 +265,7 @@ async def test_readonly_settings_error_retries_without_setting() -> None:
         if len(calls) == 1:
             return httpx.Response(
                 500,
+                headers={"X-ClickHouse-Exception-Code": "164"},
                 text=(
                     "Code: 164. DB::Exception: Cannot modify 'max_execution_time' "
                     "setting in readonly mode. (READONLY)"

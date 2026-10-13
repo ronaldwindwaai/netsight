@@ -47,6 +47,7 @@ export const ATTRIBUTION_STATES = [
   'not-evaluated',
 ] as const;
 export const COHORT_STATES = ['not-applied', 'sufficient', 'too-few-sources'] as const;
+export const ROW_VISIBILITIES = ['shown', 'withheld'] as const;
 export const COHORT_MIN = 2;
 export const COHORT_MAX = 1000;
 export const DESTINATION_SCOPES = ['external', 'internal'] as const;
@@ -82,6 +83,7 @@ export type IdentityBasis = (typeof IDENTITY_BASES)[number];
 export type AttributionLevel = (typeof ATTRIBUTION_LEVELS)[number];
 export type AttributionState = (typeof ATTRIBUTION_STATES)[number];
 export type CohortState = (typeof COHORT_STATES)[number];
+export type RowVisibility = (typeof ROW_VISIBILITIES)[number];
 export type DestinationScope = (typeof DESTINATION_SCOPES)[number];
 export type DaylightSaving = (typeof DAYLIGHT_SAVING)[number];
 export type PolicyState = (typeof POLICY_STATES)[number];

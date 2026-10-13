@@ -205,96 +205,6 @@ paths:
           $ref: '#/components/responses/InvalidSourceData'
         '503':
           $ref: '#/components/responses/SourceUnavailable'
-  /traffic/top-talkers:
-    get:
-      summary: Top traffic talkers (source addresses) for a bounded time window (explicit source state; needs traffic:read-detail)
-      operationId: getTrafficTopTalkers
-      parameters:
-        - in: query
-          name: preset
-          schema:
-            enum: [1h, 6h, 24h, 7d]
-            default: 24h
-        - in: query
-          name: from
-          schema:
-            type: string
-            format: date-time
-        - in: query
-          name: to
-          schema:
-            type: string
-            format: date-time
-        - in: query
-          name: limit
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 100
-            default: 10
-      responses:
-        '200':
-          description: Top talkers, or an explicit not-connected/unknown state without items
-          headers:
-            X-Correlation-ID:
-              $ref: '#/components/headers/CorrelationId'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/TrafficTopResponse'
-        '401':
-          $ref: '#/components/responses/AuthenticationRequired'
-        '403':
-          $ref: '#/components/responses/PermissionDenied'
-        '422':
-          $ref: '#/components/responses/ValidationError'
-        '429':
-          $ref: '#/components/responses/RateLimited'
-  /traffic/top-destinations:
-    get:
-      summary: Top traffic destinations for a bounded time window (explicit source state; needs traffic:read)
-      operationId: getTrafficTopDestinations
-      parameters:
-        - in: query
-          name: preset
-          schema:
-            enum: [1h, 6h, 24h, 7d]
-            default: 24h
-        - in: query
-          name: from
-          schema:
-            type: string
-            format: date-time
-        - in: query
-          name: to
-          schema:
-            type: string
-            format: date-time
-        - in: query
-          name: limit
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 100
-            default: 10
-      responses:
-        '200':
-          description: Top destinations, or an explicit not-connected/unknown state without items
-          headers:
-            X-Correlation-ID:
-              $ref: '#/components/headers/CorrelationId'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/TrafficTopResponse'
-        '401':
-          $ref: '#/components/responses/AuthenticationRequired'
-        '403':
-          $ref: '#/components/responses/PermissionDenied'
-        '422':
-          $ref: '#/components/responses/ValidationError'
-        '429':
-          $ref: '#/components/responses/RateLimited'
   /traffic/flows:
     get:
       summary: "Flow Explorer: filtered flows with bounded aggregations and attribution by basis (explicit source state)"
@@ -2464,7 +2374,7 @@ paths:
           $ref: '#/components/responses/RateLimited'
   /unknown-devices/scan:
     post:
-      summary: Compare discovered telemetry with NetBox now and record unknown devices (never writes to NetBox)
+      summary: Compare discovered telemetry with NetBox now and record unknown devices (never writes to NetBox; one scan at a time, at most one a minute)
       operationId: scanUnknownDevices
       parameters:
       - in: header
@@ -2488,7 +2398,7 @@ paths:
         '403':
           $ref: '#/components/responses/PermissionDenied'
         '429':
-          $ref: '#/components/responses/RateLimited'
+          $ref: '#/components/responses/ScanBusy'
         '503':
           $ref: '#/components/responses/FindingStoreUnavailable'
   /unknown-devices/{finding_id}:
@@ -2587,6 +2497,12 @@ paths:
         description: Session CSRF token from GET /auth/csrf. Required for cookie-authenticated writes.
         schema:
           type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UnknownDeviceTransitionRequest'
       responses:
         '200':
           description: OK
@@ -2630,6 +2546,12 @@ paths:
         description: Session CSRF token from GET /auth/csrf. Required for cookie-authenticated writes.
         schema:
           type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UnknownDeviceTransitionRequest'
       responses:
         '200':
           description: OK
@@ -2967,53 +2889,6 @@ components:
         preset:
           type: [string, 'null']
           enum: [1h, 6h, 24h, 7d, null]
-    TrafficItem:
-      type: object
-      additionalProperties: false
-      required: [rank, subject_kind, subject_id, label, bytes, packets, share]
-      properties:
-        rank:
-          type: integer
-          minimum: 1
-          maximum: 1000
-        subject_kind:
-          enum: [device, ip, user, application, domain, asn, interface]
-        subject_id:
-          type: [string, 'null']
-          minLength: 1
-          maxLength: 128
-        label:
-          type: string
-          minLength: 1
-          maxLength: 255
-        bytes:
-          type: integer
-          minimum: 0
-        packets:
-          type: [integer, 'null']
-          minimum: 0
-        share:
-          type: [number, 'null']
-          minimum: 0
-          maximum: 1
-    TrafficTopResponse:
-      type: object
-      additionalProperties: false
-      required: [state, dimension, time_range, items, freshness]
-      properties:
-        state:
-          enum: [not-connected, ok, unknown]
-        dimension:
-          enum: [talkers, destinations]
-        time_range:
-          $ref: '#/components/schemas/TrafficTimeRange'
-        items:
-          type: array
-          maxItems: 1000
-          items:
-            $ref: '#/components/schemas/TrafficItem'
-        freshness:
-          $ref: '#/components/schemas/Freshness'
     TrafficFlowFilters:
       description: The filters that were applied, echoed from the request (allow-listed fields only).
       type: object
@@ -3428,6 +3303,7 @@ components:
       - flows
       - source_addresses
       - destination_addresses
+      - internal_endpoints
       properties:
         bytes:
           type: integer
@@ -3443,16 +3319,25 @@ components:
         source_addresses:
           type: integer
           minimum: 0
+          description: Distinct source addresses of any kind (not the cohort count).
         destination_addresses:
           type: integer
           minimum: 0
+        internal_endpoints:
+          type:
+          - integer
+          - 'null'
+          minimum: 0
+          description: 'Distinct endpoints inside the organisation (the internal side of each flow, by direction, under the shared internal-address classification). The small-cohort rule counts these, not every source address. Null: the source could not tell.'
     TrafficApplicationMixItem:
       type: object
       additionalProperties: false
       required:
       - application
+      - visibility
       - bytes
       - share
+      - endpoints
       properties:
         application:
           type:
@@ -3460,8 +3345,15 @@ components:
           - 'null'
           minLength: 1
           maxLength: 255
+        visibility:
+          enum:
+          - shown
+          - withheld
+          description: 'withheld: fewer than the cohort minimum of internal endpoints stood behind the row, so its volume, share, trend, counts and dates are null. Only the aggregate tier ever sees withheld rows; the detail tier sees every row shown.'
         bytes:
-          type: integer
+          type:
+          - integer
+          - 'null'
           minimum: 0
         share:
           type:
@@ -3469,6 +3361,31 @@ components:
           - 'null'
           minimum: 0
           maximum: 1
+        endpoints:
+          type:
+          - integer
+          - 'null'
+          minimum: 0
+          description: Distinct internal endpoints behind the application.
+      allOf:
+      - if:
+          properties:
+            visibility:
+              const: withheld
+          required:
+          - visibility
+        then:
+          properties:
+            bytes:
+              type: 'null'
+            share:
+              type: 'null'
+            endpoints:
+              type: 'null'
+        else:
+          properties:
+            bytes:
+              type: integer
     TrafficApplicationMix:
       description: Top applications by bytes; a null application is traffic the source labelled with none.
       type: object
@@ -3496,8 +3413,10 @@ components:
       - address
       - host
       - scope
+      - visibility
       - bytes
       - share
+      - endpoints
       properties:
         address:
           type: string
@@ -3514,8 +3433,15 @@ components:
           - external
           - internal
           description: 'internal: a private, loopback, link-local, shared or multicast address. The aggregate tier is never told about internal destinations.'
+        visibility:
+          enum:
+          - shown
+          - withheld
+          description: 'withheld: fewer than the cohort minimum of internal endpoints stood behind the row, so its volume, share, trend, counts and dates are null. Only the aggregate tier ever sees withheld rows; the detail tier sees every row shown.'
         bytes:
-          type: integer
+          type:
+          - integer
+          - 'null'
           minimum: 0
         share:
           type:
@@ -3523,6 +3449,33 @@ components:
           - 'null'
           minimum: 0
           maximum: 1
+        endpoints:
+          type:
+          - integer
+          - 'null'
+          minimum: 0
+          description: Distinct internal endpoints that sent to the destination.
+      allOf:
+      - if:
+          properties:
+            visibility:
+              const: withheld
+          required:
+          - visibility
+        then:
+          properties:
+            bytes:
+              type: 'null'
+            share:
+              type: 'null'
+            endpoints:
+              type: 'null'
+            host:
+              type: 'null'
+        else:
+          properties:
+            bytes:
+              type: integer
     TrafficAggregations:
       description: Bounded aggregations over the whole filtered window (not over the listed rows).
       type: object
@@ -3555,7 +3508,7 @@ components:
           items:
             $ref: '#/components/schemas/TrafficDestinationShare'
     TrafficCohort:
-      description: 'The small-cohort rule as applied to this answer. not-applied: the caller holds the detail tier (or nothing was read). sufficient: the aggregate tier, and the figures describe at least minimum source addresses. too-few-sources: the aggregate tier, and something was withheld because fewer than minimum source addresses stood behind it.'
+      description: 'The small-cohort rule as applied to this answer. not-applied: the caller holds the detail tier (or nothing was read). sufficient: the aggregate tier, and every figure describes at least minimum internal endpoints. too-few-sources: the aggregate tier, and something was withheld because fewer than minimum internal endpoints stood behind it (a whole answer, a row, a series, a first-seen destination).'
       type: object
       additionalProperties: false
       required:
@@ -3693,26 +3646,12 @@ components:
               - unknown
           required:
           - state
-        then: &id001
+        then:
           properties:
             cohort:
               properties:
                 state:
                   const: not-applied
-      - if:
-          properties:
-            cohort:
-              properties:
-                state:
-                  const: too-few-sources
-          required:
-          - cohort
-        then:
-          properties:
-            flows:
-              maxItems: 0
-            aggregations:
-              type: 'null'
       - if:
           properties:
             state:
@@ -3722,7 +3661,12 @@ components:
           required:
           - state
           - flows_restricted
-        then: *id001
+        then:
+          properties:
+            cohort:
+              properties:
+                state:
+                  const: not-applied
       - if:
           properties:
             state:
@@ -3749,6 +3693,112 @@ components:
                       properties:
                         scope:
                           const: external
+      - if:
+          properties:
+            cohort:
+              properties:
+                state:
+                  const: too-few-sources
+          required:
+          - cohort
+        then:
+          properties:
+            flows:
+              maxItems: 0
+            aggregations:
+              anyOf:
+              - type: 'null'
+              - type: object
+                anyOf:
+                - type: object
+                  required:
+                  - application_mix
+                  properties:
+                    application_mix:
+                      type: object
+                      required:
+                      - items
+                      properties:
+                        items:
+                          contains:
+                            properties:
+                              visibility:
+                                const: withheld
+                            required:
+                            - visibility
+                - type: object
+                  required:
+                  - destinations
+                  properties:
+                    destinations:
+                      contains:
+                        properties:
+                          visibility:
+                            const: withheld
+                        required:
+                        - visibility
+      - if:
+          properties:
+            cohort:
+              properties:
+                state:
+                  const: sufficient
+          required:
+          - cohort
+        then:
+          properties:
+            aggregations:
+              type: object
+              properties:
+                application_mix:
+                  anyOf:
+                  - type: 'null'
+                  - type: object
+                    properties:
+                      items:
+                        items:
+                          properties:
+                            visibility:
+                              const: shown
+                            endpoints:
+                              type: integer
+                destinations:
+                  items:
+                    properties:
+                      visibility:
+                        const: shown
+                      endpoints:
+                        type: integer
+      - if:
+          properties:
+            cohort:
+              properties:
+                state:
+                  const: not-applied
+          required:
+          - cohort
+        then:
+          properties:
+            aggregations:
+              anyOf:
+              - type: 'null'
+              - type: object
+                properties:
+                  application_mix:
+                    anyOf:
+                    - type: 'null'
+                    - type: object
+                      properties:
+                        items:
+                          items:
+                            properties:
+                              visibility:
+                                const: shown
+                  destinations:
+                    items:
+                      properties:
+                        visibility:
+                          const: shown
     TrafficPolicy:
       description: Whether an operator policy file classified approval, risk and reputation. Without one they are unknown.
       type: object
@@ -3867,6 +3917,7 @@ components:
       - rank
       - application
       - category
+      - visibility
       - bytes
       - packets
       - share
@@ -3890,8 +3941,15 @@ components:
           - 'null'
           minLength: 1
           maxLength: 128
+        visibility:
+          enum:
+          - shown
+          - withheld
+          description: 'withheld: fewer than the cohort minimum of internal endpoints stood behind the row, so its volume, share, trend, counts and dates are null. Only the aggregate tier ever sees withheld rows; the detail tier sees every row shown.'
         bytes:
-          type: integer
+          type:
+          - integer
+          - 'null'
           minimum: 0
         packets:
           type:
@@ -3909,7 +3967,7 @@ components:
           - integer
           - 'null'
           minimum: 0
-          description: Distinct source addresses seen using the application (not people, not inventory devices).
+          description: Distinct internal endpoints (the internal side of each flow) seen using the application; not people, not inventory devices.
         users:
           type:
           - integer
@@ -3929,6 +3987,33 @@ components:
           - approved
           - unapproved
           - unknown
+      allOf:
+      - if:
+          properties:
+            visibility:
+              const: withheld
+          required:
+          - visibility
+        then:
+          properties:
+            bytes:
+              type: 'null'
+            packets:
+              type: 'null'
+            share:
+              type: 'null'
+            endpoints:
+              type: 'null'
+            users:
+              type: 'null'
+            trend:
+              properties:
+                state:
+                  const: unknown
+        else:
+          properties:
+            bytes:
+              type: integer
     TrafficApplicationsResponse:
       type: object
       required:
@@ -4023,6 +4108,38 @@ components:
             cohort:
               properties:
                 state:
+                  const: not-applied
+          required:
+          - cohort
+        then:
+          properties:
+            items:
+              items:
+                properties:
+                  visibility:
+                    const: shown
+      - if:
+          properties:
+            cohort:
+              properties:
+                state:
+                  const: sufficient
+          required:
+          - cohort
+        then:
+          properties:
+            items:
+              items:
+                properties:
+                  visibility:
+                    const: shown
+                  endpoints:
+                    type: integer
+      - if:
+          properties:
+            cohort:
+              properties:
+                state:
                   const: too-few-sources
           required:
           - cohort
@@ -4031,10 +4148,10 @@ components:
             items:
               contains:
                 properties:
-                  endpoints:
-                    type: 'null'
+                  visibility:
+                    const: withheld
                 required:
-                - endpoints
+                - visibility
     TrafficDestination:
       description: Domain, ASN and country are source-reported; reputation comes only from the operator allow/deny list.
       type: object
@@ -4043,6 +4160,7 @@ components:
       - rank
       - address
       - scope
+      - visibility
       - domain
       - asn
       - country
@@ -4068,6 +4186,11 @@ components:
           - external
           - internal
           description: 'internal: a private, loopback, link-local, shared or multicast address. The aggregate tier is never told about internal destinations.'
+        visibility:
+          enum:
+          - shown
+          - withheld
+          description: 'withheld: fewer than the cohort minimum of internal endpoints stood behind the row, so its volume, share, trend, counts and dates are null. Only the aggregate tier ever sees withheld rows; the detail tier sees every row shown.'
         domain:
           type:
           - string
@@ -4094,10 +4217,14 @@ components:
           format: date-time
           description: Earliest time seen within the look-back (first_seen_since); null when not determined.
         last_seen:
-          type: string
+          type:
+          - string
+          - 'null'
           format: date-time
         bytes:
-          type: integer
+          type:
+          - integer
+          - 'null'
           minimum: 0
         packets:
           type:
@@ -4115,7 +4242,7 @@ components:
           - integer
           - 'null'
           minimum: 0
-          description: Distinct source addresses that sent to the destination.
+          description: Distinct internal endpoints that sent to the destination.
         users:
           type:
           - integer
@@ -4127,6 +4254,41 @@ components:
           - allow-listed
           - deny-listed
           - unknown
+      allOf:
+      - if:
+          properties:
+            visibility:
+              const: withheld
+          required:
+          - visibility
+        then:
+          properties:
+            bytes:
+              type: 'null'
+            packets:
+              type: 'null'
+            share:
+              type: 'null'
+            endpoints:
+              type: 'null'
+            users:
+              type: 'null'
+            domain:
+              type: 'null'
+            asn:
+              type: 'null'
+            country:
+              type: 'null'
+            first_seen:
+              type: 'null'
+            last_seen:
+              type: 'null'
+        else:
+          properties:
+            bytes:
+              type: integer
+            last_seen:
+              type: string
     TrafficDestinationsResponse:
       type: object
       required:
@@ -4204,23 +4366,6 @@ components:
             cohort:
               properties:
                 state:
-                  const: too-few-sources
-          required:
-          - cohort
-        then:
-          properties:
-            items:
-              contains:
-                properties:
-                  endpoints:
-                    type: 'null'
-                required:
-                - endpoints
-      - if:
-          properties:
-            cohort:
-              properties:
-                state:
                   enum:
                   - sufficient
                   - too-few-sources
@@ -4233,6 +4378,55 @@ components:
                 properties:
                   scope:
                     const: external
+      - if:
+          properties:
+            cohort:
+              properties:
+                state:
+                  const: not-applied
+          required:
+          - cohort
+        then:
+          properties:
+            items:
+              items:
+                properties:
+                  visibility:
+                    const: shown
+      - if:
+          properties:
+            cohort:
+              properties:
+                state:
+                  const: sufficient
+          required:
+          - cohort
+        then:
+          properties:
+            items:
+              items:
+                properties:
+                  visibility:
+                    const: shown
+                  endpoints:
+                    type: integer
+      - if:
+          properties:
+            cohort:
+              properties:
+                state:
+                  const: too-few-sources
+          required:
+          - cohort
+        then:
+          properties:
+            items:
+              contains:
+                properties:
+                  visibility:
+                    const: withheld
+                required:
+                - visibility
     TrafficBaselineMethod:
       description: The deterministic comparison; see docs/12-implementation/TRAFFIC-BASELINES.md.
       type: object
@@ -4309,6 +4503,7 @@ components:
       required:
       - status
       - series
+      - series_withheld
       - buckets
       - evaluated
       - insufficient_baseline
@@ -4326,6 +4521,10 @@ components:
         series:
           type: integer
           minimum: 0
+        series_withheld:
+          type: integer
+          minimum: 0
+          description: Series left out because fewer than the cohort minimum of internal endpoints stood behind them (aggregate tier only; the other counts cover the remaining series).
         buckets:
           type: integer
           minimum: 0
@@ -4688,6 +4887,34 @@ components:
               properties:
                 state:
                   const: not-applied
+      - if:
+          properties:
+            cohort:
+              properties:
+                state:
+                  const: not-applied
+          required:
+          - cohort
+        then:
+          properties:
+            evaluation:
+              properties:
+                series_withheld:
+                  const: 0
+      - if:
+          properties:
+            cohort:
+              properties:
+                state:
+                  const: sufficient
+          required:
+          - cohort
+        then:
+          properties:
+            evaluation:
+              properties:
+                series_withheld:
+                  const: 0
     SecurityEvent:
       type: object
       additionalProperties: false
@@ -10615,6 +10842,7 @@ components:
       required:
       - checks
       - checked_at
+      - reason
       properties:
         checks:
           type: array
@@ -10625,7 +10853,11 @@ components:
         checked_at:
           type: string
           format: date-time
-      description: The comparison against NetBox, one check per field in the order ip, mac, hostname. A finding exists only when no check matched.
+        reason:
+          enum:
+          - no-match
+          - name-matches-mac-does-not
+      description: 'The comparison against NetBox, one check per field in the order ip, mac, hostname. A finding exists only when nothing cleared the endpoint. reason no-match: no check matched. reason name-matches-mac-does-not: the device name matched a NetBox device but the MAC was asked and did not (the spoofing pattern): the only comparison that carries a match, because a name is corroboration only and never clears an endpoint (cross-field, checked by pydantic and the TS parser).'
     UnknownDeviceProposedAction:
       type: object
       additionalProperties: false
@@ -10660,6 +10892,7 @@ components:
       - state
       - severity
       - severity_basis
+      - evidence_version
       - assignee_id
       - first_seen_at
       - last_seen_at
@@ -10694,6 +10927,10 @@ components:
           - policy-rule
           - policy-default
           - no-policy
+        evidence_version:
+          minimum: 1
+          maximum: 1000000
+          type: integer
         assignee_id:
           minLength: 1
           maxLength: 255
@@ -10884,6 +11121,7 @@ components:
           - state-changed
           - assignee-changed
           - comment
+          - suppressed-sighting
         state_from:
           oneOf:
           - type: 'null'
@@ -10941,6 +11179,7 @@ components:
               - action-proposed
               - assignee-changed
               - comment
+              - suppressed-sighting
         then:
           properties:
             state_from:
@@ -11072,11 +11311,23 @@ components:
               maxItems: 0
             next_after_seq:
               type: 'null'
+    UnknownDeviceTransitionRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - expected_evidence_version
+      properties:
+        expected_evidence_version:
+          minimum: 1
+          maximum: 1000000
+          type: integer
+      description: POST /unknown-devices/{id}/acknowledge and /investigate. The evidence version the person was looking at; 409 STALE_EVIDENCE if it changed.
     UnknownDeviceAssignRequest:
       type: object
       additionalProperties: false
       required:
       - assignee_id
+      - expected_evidence_version
       properties:
         assignee_id:
           minLength: 1
@@ -11084,7 +11335,11 @@ components:
           type:
           - string
           - 'null'
-      description: POST /unknown-devices/{id}/assign. null unassigns.
+        expected_evidence_version:
+          minimum: 1
+          maximum: 1000000
+          type: integer
+      description: POST /unknown-devices/{id}/assign. null unassigns. expected_evidence_version is the evidence version the person was shown.
     UnknownDeviceCommentRequest:
       type: object
       additionalProperties: false
@@ -11103,6 +11358,7 @@ components:
       required:
       - outcome
       - reason
+      - expected_evidence_version
       properties:
         outcome:
           enum:
@@ -11113,7 +11369,11 @@ components:
           maxLength: 1000
           pattern: \S
           type: string
-      description: POST /unknown-devices/{id}/resolve. A false-positive suppresses later detections of the same endpoint, so the reason is mandatory.
+        expected_evidence_version:
+          minimum: 1
+          maximum: 1000000
+          type: integer
+      description: POST /unknown-devices/{id}/resolve (expected_evidence_version is the evidence version the person was shown). A false-positive suppresses later detections of the same endpoint, so the reason is mandatory.
     UnknownDeviceScanResponse:
       type: object
       additionalProperties: false
@@ -11126,6 +11386,7 @@ components:
       - suppressed
       - unverified
       - truncated
+      - incomplete_sources
       properties:
         state:
           enum:
@@ -11158,7 +11419,16 @@ components:
           type: integer
         truncated:
           type: boolean
-      description: 'POST /api/v1/unknown-devices/scan: what one comparison of telemetry with NetBox did. unverified: endpoints skipped because NetBox could not be asked about them. A non-ok state changed nothing.'
+        incomplete_sources:
+          type: array
+          maxItems: 3
+          uniqueItems: true
+          items:
+            enum:
+            - netbox
+            - librenms
+            - wazuh
+      description: 'POST /api/v1/unknown-devices/scan: what one comparison of telemetry with NetBox did. unverified: endpoints skipped because NetBox could not be asked about them. incomplete_sources: sources that answered with rows dropped as malformed; the comparison they feed was left unverified. A non-ok state changed nothing.'
       allOf:
       - if:
           properties:
@@ -11176,6 +11446,8 @@ components:
               const: 0
             unverified:
               const: 0
+            incomplete_sources:
+              maxItems: 0
     # <<< step8:c-unknown
   responses:
     AuthenticationRequired:
@@ -11308,6 +11580,21 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorEnvelope'
+    ScanBusy:
+      description: Write rate limit exceeded, or another scan is running (Retry-After says when to try again)
+      headers:
+        X-Correlation-ID:
+          $ref: '#/components/headers/CorrelationId'
+        Retry-After:
+          description: Seconds until a scan may be started
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 3600
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
     # >>> step8:r-inventory
     AssetNotFound:
       description: Asset not found
@@ -11330,7 +11617,7 @@ components:
           schema:
             $ref: '#/components/schemas/ErrorEnvelope'
     FindingConflict:
-      description: Illegal transition or concurrent change
+      description: Illegal transition, concurrent change, or the evidence changed since the person saw it (error code ILLEGAL_TRANSITION, CONFLICT or STALE_EVIDENCE)
       headers:
         X-Correlation-ID:
           $ref: '#/components/headers/CorrelationId'

@@ -20,7 +20,7 @@ from alerting_support import Caller, audit_records
 from fastapi.testclient import TestClient
 from unknown_support import detection
 
-from netsight_api import read_limit, unknown_device_routes
+from netsight_api import read_limit, unknown_device_routes, unknown_device_support
 from netsight_api.auth.deps import get_current_identity
 from netsight_api.auth.rate_limit import RateLimiter
 from netsight_api.auth.session import session_manager
@@ -31,7 +31,7 @@ from netsight_api.rbac import Identity, PrincipalKind
 from netsight_api.schemas_sources import SourceStatus
 from netsight_api.storage import StorageUnavailableError
 from netsight_api.storage.unknown_devices import InMemoryUnknownDeviceRepository
-from netsight_api.unknown_devices.scanner import ScanResult
+from netsight_api.unknown_devices.scanner import ScanBusy, ScanResult
 
 BASE = "/api/v1/unknown-devices"
 NOW = datetime(2026, 10, 11, 12, 0, tzinfo=UTC)
@@ -49,6 +49,7 @@ NON_WRITERS = ["auditor", "technician", "management"]
 HOSTILE = "<script>alert('x')</script> \"; DROP TABLE findings; -- {{7*7}}"
 MISSING = "unknown-device-00000000-0000-4000-8000-000000000000"
 SECRET = "postgresql://netsight:hunter2@db.internal/netsight"
+V = {"expected_evidence_version": 1}  # the evidence version of a freshly seeded finding
 
 
 class Operator(Caller):
@@ -60,6 +61,12 @@ class Operator(Caller):
         super().__init__(role, subject)
         manager = session_manager()
         self.session.mfa_verified_at = None if mfa_age is None else manager.store.now() - mfa_age
+
+    def post(self, path: str, body: Any = None, **kwargs: Any) -> Any:
+        """Acknowledge and investigate quote the evidence version, so a bare call quotes version 1."""
+        if body is None and path.endswith(("/acknowledge", "/investigate")):
+            body = V
+        return super().post(path, body, **kwargs)
 
 
 class StubScanner:
@@ -127,8 +134,8 @@ def _wiring(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     app.dependency_overrides.clear()
     session_policy.cache_clear()
     monkeypatch.setattr(read_limit, "_read_limiter", RateLimiter())
-    monkeypatch.setattr(unknown_device_routes, "_write_limiter", RateLimiter())
-    monkeypatch.setattr(unknown_device_routes, "_scan_limiter", RateLimiter())
+    monkeypatch.setattr(unknown_device_support, "_write_limiter", RateLimiter())
+    monkeypatch.setattr(unknown_device_support, "_scan_limiter", RateLimiter())
     yield
     app.dependency_overrides.clear()
     session_policy.cache_clear()
@@ -237,10 +244,14 @@ def test_filters_and_paging_are_applied_on_the_server(
 ) -> None:
     a = seed(store, severity="high", basis="policy-rule")
     b = seed(store, mac="aa:bb:cc:00:11:33", ip="10.0.5.10", severity="low", basis="policy-rule")
-    store.transition_state(b, to_state="acknowledged", actor_id="u")
-    store.set_assignee(b, assignee_id="u", actor_id="u")
+    store.transition_state(
+        b, to_state="acknowledged", actor_id="u", expected_evidence_version=1
+    )
+    store.set_assignee(b, assignee_id="u", actor_id="u", expected_evidence_version=1)
     c = seed(store, mac="aa:bb:cc:00:11:44", ip="10.0.5.11")
-    store.transition_state(c, to_state="resolved", actor_id="u", reason="done")
+    store.transition_state(
+        c, to_state="resolved", actor_id="u", reason="done", expected_evidence_version=1
+    )
     caller = Caller("network_engineer")
     ids = lambda **q: {i["id"] for i in caller.get(BASE, **q).json()["items"]}
     assert ids(state="open") == {a, b}
@@ -353,11 +364,11 @@ def test_roles_without_the_permission_cannot_change_a_finding(
     fid = seed(store)
     caller = Operator(role)
     for suffix, body in (
-        ("/acknowledge", None),
-        ("/investigate", None),
-        ("/assign", {"assignee_id": "u"}),
+        ("/acknowledge", V),
+        ("/investigate", V),
+        ("/assign", {**V, "assignee_id": "u"}),
         ("/comment", {"message": "x"}),
-        ("/resolve", {"outcome": "resolved", "reason": "x"}),
+        ("/resolve", {**V, "outcome": "resolved", "reason": "x"}),
     ):
         assert caller.post(finding_url(fid, suffix), body).status_code == 403
     assert store.get_finding(fid).state == "new"  # type: ignore[union-attr]
@@ -373,10 +384,10 @@ def test_no_service_or_ai_principal_can_change_a_finding_whatever_its_role(
     )
     client = TestClient(app, raise_server_exceptions=False)
     for suffix, body in (
-        ("/acknowledge", None),
-        ("/assign", {"assignee_id": "u"}),
+        ("/acknowledge", V),
+        ("/assign", {**V, "assignee_id": "u"}),
         ("/comment", {"message": "x"}),
-        ("/resolve", {"outcome": "resolved", "reason": "x"}),
+        ("/resolve", {**V, "outcome": "resolved", "reason": "x"}),
     ):
         assert client.post(finding_url(fid, suffix), json=body).status_code == 403
     assert client.post(f"{BASE}/scan").status_code == 403
@@ -435,7 +446,7 @@ def test_the_operating_roles_walk_a_finding_through_its_lifecycle(
     inv = operator.post(finding_url(fid, "/investigate"))
     assert inv.json()["state"] == "investigating"
     done = operator.post(
-        finding_url(fid, "/resolve"), {"outcome": "resolved", "reason": "Added to NetBox"}
+        finding_url(fid, "/resolve"), {**V, "outcome": "resolved", "reason": "Added to NetBox"}
     )
     assert done.status_code == 200 and done.json()["state"] == "resolved"
     events = store.list_timeline(fid)
@@ -463,7 +474,7 @@ def test_resolving_needs_a_recent_second_factor_and_changes_nothing_without_it(
     store: InMemoryUnknownDeviceRepository,
 ) -> None:
     fid = seed(store)
-    body = {"outcome": "false-positive", "reason": "Lab device"}
+    body = {**V, "outcome": "false-positive", "reason": "Lab device"}
     for age in (None, 1000.0):
         response = Operator(mfa_age=age).post(finding_url(fid, "/resolve"), body)
         assert (
@@ -478,7 +489,7 @@ def test_the_other_writes_need_no_second_factor(store: InMemoryUnknownDeviceRepo
     fid = seed(store)
     operator = Operator(mfa_age=None)
     assert operator.post(finding_url(fid, "/acknowledge")).status_code == 200
-    assert operator.post(finding_url(fid, "/assign"), {"assignee_id": "u"}).status_code == 200
+    assert operator.post(finding_url(fid, "/assign"), {**V, "assignee_id": "u"}).status_code == 200
     assert operator.post(finding_url(fid, "/comment"), {"message": "note"}).status_code == 201
 
 
@@ -487,13 +498,13 @@ def test_the_other_writes_need_no_second_factor(store: InMemoryUnknownDeviceRepo
     [
         None,
         {},
-        {"outcome": "resolved"},
+        {**V, "outcome": "resolved"},
         {"reason": "x"},
-        {"outcome": "resolved", "reason": ""},
-        {"outcome": "resolved", "reason": "   "},
-        {"outcome": "resolved", "reason": "x" * 1001},
-        {"outcome": "acknowledged", "reason": "x"},
-        {"outcome": "resolved", "reason": "x", "extra": 1},
+        {**V, "outcome": "resolved", "reason": ""},
+        {**V, "outcome": "resolved", "reason": "   "},
+        {**V, "outcome": "resolved", "reason": "x" * 1001},
+        {**V, "outcome": "acknowledged", "reason": "x"},
+        {**V, "outcome": "resolved", "reason": "x", "extra": 1},
     ],
 )
 def test_a_resolution_must_be_well_formed(
@@ -507,16 +518,16 @@ def test_a_resolution_must_be_well_formed(
 def test_assigning_and_unassigning(store: InMemoryUnknownDeviceRepository) -> None:
     fid = seed(store)
     operator = Operator()
-    assigned = operator.post(finding_url(fid, "/assign"), {"assignee_id": "oidc:tech-9"})
+    assigned = operator.post(finding_url(fid, "/assign"), {**V, "assignee_id": "oidc:tech-9"})
     assert assigned.json()["assignee_id"] == "oidc:tech-9"
-    cleared = operator.post(finding_url(fid, "/assign"), {"assignee_id": None})
+    cleared = operator.post(finding_url(fid, "/assign"), {**V, "assignee_id": None})
     assert cleared.json()["assignee_id"] is None
     for bad in (
         None,
         {},
-        {"assignee_id": ""},
-        {"assignee_id": "x" * 256},
-        {"assignee_id": "u", "x": 1},
+        {**V, "assignee_id": ""},
+        {**V, "assignee_id": "x" * 256},
+        {**V, "assignee_id": "u", "x": 1},
     ):
         assert operator.post(finding_url(fid, "/assign"), bad).status_code == 422
 
@@ -525,9 +536,9 @@ def test_a_finished_finding_cannot_be_reassigned_but_can_be_commented(
     store: InMemoryUnknownDeviceRepository,
 ) -> None:
     fid = seed(store)
-    Operator().post(finding_url(fid, "/resolve"), {"outcome": "resolved", "reason": "done"})
+    Operator().post(finding_url(fid, "/resolve"), {**V, "outcome": "resolved", "reason": "done"})
     operator = Operator()
-    assert operator.post(finding_url(fid, "/assign"), {"assignee_id": "u"}).status_code == 409
+    assert operator.post(finding_url(fid, "/assign"), {**V, "assignee_id": "u"}).status_code == 409
     assert (
         operator.post(finding_url(fid, "/comment"), {"message": "post-mortem note"}).status_code
         == 201
@@ -556,11 +567,11 @@ def test_a_comment_is_stored_verbatim_and_answered_as_the_event(
 def test_writes_to_unknown_or_malformed_ids(store: InMemoryUnknownDeviceRepository) -> None:
     operator = Operator()
     for suffix, body in (
-        ("/acknowledge", None),
-        ("/investigate", None),
-        ("/assign", {"assignee_id": "u"}),
+        ("/acknowledge", V),
+        ("/investigate", V),
+        ("/assign", {**V, "assignee_id": "u"}),
         ("/comment", {"message": "x"}),
-        ("/resolve", {"outcome": "resolved", "reason": "x"}),
+        ("/resolve", {**V, "outcome": "resolved", "reason": "x"}),
     ):
         assert operator.post(finding_url(MISSING, suffix), body).status_code == 404
         assert operator.post(finding_url("unknown-device-1", suffix), body).status_code == 422
@@ -577,6 +588,7 @@ def test_concurrent_acknowledgements_have_exactly_one_winner(
             TestClient(app, raise_server_exceptions=False, cookies=operator.http.cookies)
             .post(
                 finding_url(fid, "/acknowledge"),
+                json=V,
                 headers={"X-CSRF-Token": operator.session.csrf_token},
             )
             .status_code
@@ -612,7 +624,7 @@ def test_a_failing_store_is_a_503_that_never_leaks() -> None:
 def test_writes_are_rate_limited_per_identity(
     store: InMemoryUnknownDeviceRepository, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(unknown_device_routes, "WRITE_LIMIT_PER_MINUTE", 3)
+    monkeypatch.setattr(unknown_device_support, "WRITE_LIMIT_PER_MINUTE", 3)
     fid = seed(store)
     operator = Operator()
     codes = [
@@ -629,13 +641,13 @@ def test_writes_are_rate_limited_per_identity(
 def test_a_refused_step_up_does_not_spend_the_write_budget(
     store: InMemoryUnknownDeviceRepository, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(unknown_device_routes, "WRITE_LIMIT_PER_MINUTE", 2)
+    monkeypatch.setattr(unknown_device_support, "WRITE_LIMIT_PER_MINUTE", 2)
     fid = seed(store)
     stale = Operator(mfa_age=None)
     for _ in range(5):
         assert (
             stale.post(
-                finding_url(fid, "/resolve"), {"outcome": "resolved", "reason": "x"}
+                finding_url(fid, "/resolve"), {**V, "outcome": "resolved", "reason": "x"}
             ).status_code
             == 403
         )
@@ -652,11 +664,11 @@ def test_writes_are_audited_without_free_text(
     fid = seed(store)
     operator = Operator()
     operator.post(finding_url(fid, "/acknowledge"))
-    operator.post(finding_url(fid, "/assign"), {"assignee_id": "oidc:tech-secret-name"})
+    operator.post(finding_url(fid, "/assign"), {**V, "assignee_id": "oidc:tech-secret-name"})
     operator.post(finding_url(fid, "/comment"), {"message": "very secret comment text"})
     operator.post(
         finding_url(fid, "/resolve"),
-        {"outcome": "false-positive", "reason": "very secret reason text"},
+        {**V, "outcome": "false-positive", "reason": "very secret reason text"},
     )
     text = json.dumps(audit_records(caplog))
     for secret in ("very secret comment text", "very secret reason text", "tech-secret-name"):
@@ -667,7 +679,7 @@ def test_writes_are_audited_without_free_text(
     assert by_action["unknown-device.acknowledge"]["actor_id"] == operator.identity_id
     assert by_action["unknown-device.comment"]["comment_length"] == len("very secret comment text")
     assert by_action["unknown-device.resolve"]["outcome_state"] == "false-positive"
-    assert "assignee_hash" in by_action["unknown-device.assign"]
+    assert "assignee_hash" not in by_action["unknown-device.assign"]  # keyed, or omitted
 
 
 def test_refusals_and_failures_are_audited_too(
@@ -678,7 +690,7 @@ def test_refusals_and_failures_are_audited_too(
     Operator("auditor").post(finding_url(fid, "/acknowledge"))
     Operator().post(finding_url(fid, "/acknowledge"), csrf="bad")
     Operator(mfa_age=None).post(
-        finding_url(fid, "/resolve"), {"outcome": "resolved", "reason": "x"}
+        finding_url(fid, "/resolve"), {**V, "outcome": "resolved", "reason": "x"}
     )
     Operator().post(finding_url(fid, "/investigate"))
     reasons = {r.get("reason") for r in audit_records(caplog)}
@@ -760,7 +772,7 @@ def test_scans_are_rate_limited_and_audited(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     caplog.set_level(logging.INFO, logger="netsight_api.audit")
-    monkeypatch.setattr(unknown_device_routes, "SCAN_LIMIT_PER_MINUTE", 2)
+    monkeypatch.setattr(unknown_device_support, "SCAN_LIMIT_PER_MINUTE", 2)
     operator = Operator()
     assert [operator.post(f"{BASE}/scan").status_code for _ in range(3)] == [200, 200, 429]
     scans = [r for r in audit_records(caplog) if r["action"] == "unknown-device.scan"]
@@ -794,3 +806,176 @@ def test_a_proposed_quarantine_is_always_inert_over_the_wire(
         False,
         "action-engine",
     )
+
+
+# --- evidence versions: a decision quotes what the person saw (database review H2) ---------------------------------------------
+
+
+def test_the_finding_carries_its_evidence_version(store: InMemoryUnknownDeviceRepository) -> None:
+    fid = seed(store)
+    body = Caller("security_analyst").get(finding_url(fid)).json()
+    assert body["item"]["evidence_version"] == 1
+    validate("unknown_device_detail", body)
+
+
+@pytest.mark.parametrize(
+    "suffix", ["/acknowledge", "/investigate", "/assign", "/resolve"]
+)
+def test_a_decision_without_the_evidence_version_is_a_422_and_changes_nothing(
+    suffix: str, store: InMemoryUnknownDeviceRepository
+) -> None:
+    fid = seed(store)
+    bodies = {
+        "/assign": {"assignee_id": "u"},
+        "/resolve": {"outcome": "resolved", "reason": "x"},
+    }
+    operator = Operator()
+    for bad in (bodies.get(suffix, {}), None, {**V, "expected_evidence_version": 0}, {"expected_evidence_version": "1"}):
+        response = operator.http.post(
+            finding_url(fid, suffix),
+            json=bad,
+            headers={"X-CSRF-Token": operator.session.csrf_token},
+        )
+        assert response.status_code == 422, (suffix, bad)
+    assert store.get_finding(fid).state == "new"  # type: ignore[union-attr]
+    assert store.get_finding(fid).assignee_id is None  # type: ignore[union-attr]
+
+
+def test_a_decision_on_evidence_that_has_changed_is_a_409_stale_evidence(
+    store: InMemoryUnknownDeviceRepository, caplog: pytest.LogCaptureFixture
+) -> None:
+    caplog.set_level(logging.INFO, logger="netsight_api.audit")
+    fid = seed(store)
+    store.observe(detection(port=True))  # the evidence moved on while the page was open
+    operator = Operator()
+    for suffix, body in (
+        ("/acknowledge", V),
+        ("/assign", {**V, "assignee_id": "u"}),
+        ("/resolve", {**V, "outcome": "false-positive", "reason": "lab"}),
+    ):
+        response = operator.post(finding_url(fid, suffix), body)
+        assert response.status_code == 409, suffix
+        assert response.json()["error"]["code"] == "STALE_EVIDENCE"
+    current = store.get_finding(fid)
+    assert current is not None and (current.state, current.assignee_id) == ("new", None)
+    assert "STALE_EVIDENCE" in {r.get("reason") for r in audit_records(caplog)}
+    fresh = operator.post(finding_url(fid, "/acknowledge"), {"expected_evidence_version": 2})
+    assert fresh.status_code == 200 and fresh.json()["evidence_version"] == 2
+
+
+def test_a_comment_needs_no_evidence_version(store: InMemoryUnknownDeviceRepository) -> None:
+    fid = seed(store)
+    store.observe(detection(port=True))
+    response = Operator().post(finding_url(fid, "/comment"), {"message": "note"})
+    assert response.status_code == 201
+
+
+# --- audit: a keyed fingerprint of the assignee, or none (security low) ------------------------------------------------------
+
+
+def assign_audit(caplog: pytest.LogCaptureFixture, store: InMemoryUnknownDeviceRepository) -> dict[str, Any]:
+    caplog.set_level(logging.INFO, logger="netsight_api.audit")
+    fid = seed(store)
+    Operator().post(finding_url(fid, "/assign"), {**V, "assignee_id": "oidc:tech-secret-name"})
+    return {r["action"]: r for r in audit_records(caplog)}["unknown-device.assign"]
+
+
+def test_the_assignee_is_fingerprinted_with_the_audit_key_not_a_plain_hash(
+    store: InMemoryUnknownDeviceRepository,
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import hashlib
+
+    monkeypatch.setenv("NETSIGHT_AUDIT_FILTER_KEY", "k" * 40)
+    record = assign_audit(caplog, store)
+    plain = hashlib.sha256(b"oidc:tech-secret-name").hexdigest()[:16]
+    assert len(record["assignee_fp"]) == 16 and record["assignee_fp"] != plain
+    assert "assignee_hash" not in record and record["assignee_length"] == len("oidc:tech-secret-name")
+    assert "tech-secret-name" not in json.dumps(record)
+
+
+def test_a_different_key_gives_a_different_fingerprint(
+    store: InMemoryUnknownDeviceRepository,
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("NETSIGHT_AUDIT_FILTER_KEY", "a" * 40)
+    first = assign_audit(caplog, store)["assignee_fp"]
+    caplog.clear()
+    monkeypatch.setenv("NETSIGHT_AUDIT_FILTER_KEY", "b" * 40)
+    other = InMemoryUnknownDeviceRepository(clock=lambda: NOW)
+    app.dependency_overrides[unknown_device_routes.get_unknown_device_store] = lambda: other
+    assert assign_audit(caplog, other)["assignee_fp"] != first
+
+
+@pytest.mark.parametrize("short_or_missing", ["", "too-short"])
+def test_without_a_usable_audit_key_the_fingerprint_is_omitted(
+    short_or_missing: str,
+    store: InMemoryUnknownDeviceRepository,
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("NETSIGHT_IDENTITY_ID_KEY", raising=False)
+    monkeypatch.setenv("NETSIGHT_AUDIT_FILTER_KEY", short_or_missing)
+    record = assign_audit(caplog, store)
+    assert "assignee_fp" not in record and "assignee_hash" not in record
+    assert record["assignee_length"] == len("oidc:tech-secret-name")
+
+
+# --- scan: one at a time, visible when incomplete (security M5, M1; code M3) --------------------------------------------------
+
+
+def test_a_scan_that_is_already_running_is_a_429_with_retry_after(
+    store: InMemoryUnknownDeviceRepository, caplog: pytest.LogCaptureFixture
+) -> None:
+    caplog.set_level(logging.INFO, logger="netsight_api.audit")
+    app.dependency_overrides[unknown_device_routes.get_unknown_device_scanner] = lambda: (
+        StubScanner(ScanBusy(17))
+    )
+    response = Operator().post(f"{BASE}/scan")
+    assert response.status_code == 429
+    assert response.headers["retry-after"] == "17"
+    assert response.json()["error"]["code"] == "SCAN_BUSY"
+    last = audit_records(caplog)[-1]
+    assert (last["action"], last["outcome"], last["reason"]) == (
+        "unknown-device.scan",
+        "failure",
+        "SCAN_BUSY",
+    )
+
+
+def test_a_scan_reports_the_sources_that_came_back_incomplete(
+    store: InMemoryUnknownDeviceRepository, caplog: pytest.LogCaptureFixture
+) -> None:
+    caplog.set_level(logging.INFO, logger="netsight_api.audit")
+    result = ScanResult(
+        "ok",
+        NOW,
+        (
+            SourceStatus(source="netbox", state="ok", observed_at=NOW),
+            SourceStatus(source="librenms", state="not-connected", observed_at=None),
+        ),
+        unverified=4,
+        incomplete_sources=("netbox",),
+    )
+    app.dependency_overrides[unknown_device_routes.get_unknown_device_scanner] = lambda: (
+        StubScanner(result)
+    )
+    body = Operator().post(f"{BASE}/scan").json()
+    validate("unknown_device_scan", body)
+    assert body["incomplete_sources"] == ["netbox"] and body["unverified"] == 4
+    scans = [r for r in audit_records(caplog) if r["action"] == "unknown-device.scan"]
+    assert scans[-1]["incomplete"] == "netbox"
+
+
+# --- paging is bounded (database review M3) -------------------------------------------------------------------------------------
+
+
+def test_the_last_reachable_page_is_served_and_a_deeper_one_is_a_422(
+    store: InMemoryUnknownDeviceRepository,
+) -> None:
+    caller = Caller("network_engineer")
+    assert caller.get(BASE, page=201, page_size=50).status_code == 200  # offset 10,000
+    assert caller.get(BASE, page=202, page_size=50).status_code == 422  # offset 10,050
+    assert caller.get(BASE, page=100_000, page_size=1).status_code == 422

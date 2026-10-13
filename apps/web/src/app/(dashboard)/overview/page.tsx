@@ -3,17 +3,16 @@ import { AppContent, Card, InfoBox } from '@adminlte/react';
 
 import { DataFailure, FreshnessNotice } from '@/components/data-state';
 import { OverviewInternetKpi } from '@/components/overview-internet-kpi';
-import { OverviewApplicationMix, OverviewTopTalkers } from '@/components/overview-traffic-cards';
+import { OverviewApplicationMix, OverviewTopDestinations } from '@/components/overview-traffic-cards';
 import { apiGet } from '@/lib/api';
-import {
-  parseOverviewResponse,
-  parseSessionInfo,
-  parseTrafficTopResponse,
-} from '@/lib/api-contracts';
+import { parseOverviewResponse, parseSessionInfo } from '@/lib/api-contracts';
 import { parseInternetResponse } from '@/lib/api-contracts-internet';
-import { parseTrafficApplicationsResponse } from '@/lib/api-contracts-traffic-explorer';
+import {
+  parseTrafficApplicationsResponse,
+  parseTrafficDestinationsResponse,
+} from '@/lib/api-contracts-traffic-explorer';
 import { deviceHealthSummary, sourceProvenance } from '@/lib/overview-summary';
-import { canReadTraffic, canReadTrafficDetail, viewerFromSession } from '@/lib/viewer';
+import { canReadTraffic, viewerFromSession } from '@/lib/viewer';
 
 function UnavailableSurface({
   icon,
@@ -48,9 +47,9 @@ export default async function OverviewPage() {
   // refusal also renders as Restricted). The API enforces the same rules on its own.
   const viewer = viewerFromSession(session.kind === 'ok' ? session.data : null);
   const sessionUnread = session.kind !== 'ok';
-  const [talkers, applications] = await Promise.all([
-    sessionUnread || canReadTrafficDetail(viewer)
-      ? apiGet('/api/v1/traffic/top-talkers?preset=24h&limit=5', parseTrafficTopResponse)
+  const [destinations, applications] = await Promise.all([
+    sessionUnread || canReadTraffic(viewer)
+      ? apiGet('/api/v1/traffic/destinations?preset=24h&limit=5', parseTrafficDestinationsResponse)
       : null,
     sessionUnread || canReadTraffic(viewer)
       ? apiGet('/api/v1/traffic/applications?preset=24h&limit=6', parseTrafficApplicationsResponse)
@@ -163,7 +162,7 @@ export default async function OverviewPage() {
 
       <div className="row g-3">
         <div className="col-xl-6">
-          <OverviewTopTalkers state={talkers} />
+          <OverviewTopDestinations state={destinations} />
         </div>
         <div className="col-xl-6">
           <OverviewApplicationMix state={applications} />

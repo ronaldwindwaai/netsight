@@ -183,7 +183,10 @@ class FakeNetbox:
         agent_keys: dict[str, str] | Exception | None = None,
         ip_assignments: dict[str, str] | Exception | None = None,
         macs: dict[str, list[MacMatch]] | Exception | None = None,
+        skipped: int = 0,
     ) -> None:
+        self.skipped = skipped  # malformed rows the adapter dropped, on every collection it returns
+        self.lookups: list[str] = []
         self._assets = assets if assets is not None else []
         self._prefixes = prefixes if prefixes is not None else []
         self._vlans = vlans if vlans is not None else []
@@ -201,7 +204,7 @@ class FakeNetbox:
         return value
 
     async def inventory_assets(self) -> RowCollection[NetboxAsset]:
-        return rows(self._read("inventory_assets", self._assets))
+        return rows(self._read("inventory_assets", self._assets), skipped=self.skipped)
 
     async def prefixes(self) -> RowCollection[NetboxPrefix]:
         return rows(self._read("prefixes", self._prefixes))
@@ -218,7 +221,9 @@ class FakeNetbox:
     async def device_agent_keys(self, field_name: str) -> Any:
         keys = self._read("device_agent_keys", self._agent_keys)
         return netbox_adapter.DeviceAgentKeyCollection(
-            tuple(netbox_adapter.DeviceAgentKey(n, k) for n, k in keys.items()), NOW
+            tuple(netbox_adapter.DeviceAgentKey(n, k) for n, k in keys.items()),
+            NOW,
+            self.skipped,
         )
 
     async def ip_assignments(self) -> Any:
@@ -229,10 +234,12 @@ class FakeNetbox:
                 for ip, native in mapping.items()
             ),
             NOW,
+            self.skipped,
         )
 
     async def interfaces_by_mac(self, mac: str) -> MacLookup:
         table = self._read("interfaces_by_mac", self._macs)
+        self.lookups.append(mac)
         return MacLookup(mac, tuple(table.get(mac, [])), NOW)
 
 
@@ -249,13 +256,16 @@ class FakeLibrenms:
 
 
 class FakeWazuh:
-    def __init__(self, agents: list[WazuhAgent] | Exception, *, truncated: bool = False) -> None:
+    def __init__(
+        self, agents: list[WazuhAgent] | Exception, *, truncated: bool = False, skipped: int = 0
+    ) -> None:
         self._agents = agents
         self._truncated = truncated
+        self._skipped = skipped
         self.calls: list[tuple[datetime, datetime, int]] = []
 
     async def agents(self, *, start: datetime, end: datetime, limit: int) -> AgentInventory:
         self.calls.append((start, end, limit))
         if isinstance(self._agents, Exception):
             raise self._agents
-        return AgentInventory(tuple(self._agents), self._truncated, 0)
+        return AgentInventory(tuple(self._agents), self._truncated, self._skipped)

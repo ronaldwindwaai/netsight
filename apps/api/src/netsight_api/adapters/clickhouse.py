@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import json
 import re
+import time
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -35,6 +36,7 @@ from pydantic import ValidationError
 from netsight_api.adapters import clickhouse_limits as limits
 from netsight_api.schemas import TrafficDimension, TrafficItem
 
+SCHEMA_TTL_SECONDS = 300.0  # how long a discovered column list is trusted
 ADAPTER_VERSION = "clickhouse/1"
 SOURCE_NAME = "clickhouse"
 
@@ -70,7 +72,11 @@ class AdapterError(Exception):
 
 
 class _SettingsForbidden(Exception):
-    """Internal signal: the identity may not modify settings (readonly)."""
+    """Internal signal: the server refused the per-query settings (carries its exception code)."""
+
+    def __init__(self, code: int | None = None) -> None:
+        super().__init__("settings refused")
+        self.code = code
 
 
 def _parse_counter(value: Any, field_name: str) -> int:
@@ -196,9 +202,36 @@ def _raise_for_status(response: httpx.Response, *, with_limits: bool) -> None:
             AdapterStatus.FORBIDDEN, "clickhouse rejected the configured credentials"
         )
     if response.status_code >= 400:
-        if with_limits and limits.settings_refused(response.text):
-            raise _SettingsForbidden()
+        # Only the server's exception-code header decides; the text may echo caller-controlled input.
+        if with_limits and limits.settings_refused(response.headers):
+            raise _SettingsForbidden(limits.exception_code(response.headers))
+        if not with_limits:
+            limits.report_failed_by_constraint(response.headers)
         raise AdapterError(AdapterStatus.UNAVAILABLE, "clickhouse query failed")
+
+
+def _top_item(
+    rank: int, row: dict[str, Any], total_bytes: int | None, include_packets: bool
+) -> TrafficItem:
+    """One validated ranked row of ``top`` (source text is parsed, never trusted)."""
+    byte_count = _parse_counter(row.get("agg_bytes"), "bytes")
+    packets = (
+        _parse_optional_counter(row.get("agg_packets"), "packets") if include_packets else None
+    )
+    try:
+        return TrafficItem(
+            rank=rank,
+            subject_kind="ip",
+            subject_id=None,
+            label=_parse_address(row.get("label"), "label"),
+            bytes=byte_count,
+            packets=packets,
+            share=(byte_count / total_bytes) if total_bytes else None,
+        )
+    except ValidationError as exc:
+        raise AdapterError(
+            AdapterStatus.INVALID_SOURCE_DATA, "invalid traffic aggregate row"
+        ) from exc
 
 
 @dataclass
@@ -217,6 +250,7 @@ class ClickhouseClient:
     timeout_seconds: float = 10.0
     _transport: httpx.AsyncBaseTransport | None = field(default=None, repr=False)
     _columns: frozenset[str] | None = field(default=None, init=False, repr=False)
+    _columns_at: float = field(default=0.0, init=False, repr=False)
     _types: dict[str, str] = field(default_factory=dict, init=False, repr=False)
 
     async def top(
@@ -229,64 +263,49 @@ class ClickhouseClient:
     ) -> tuple[list[TrafficItem], datetime | None]:
         """Ranked source/destination aggregates for a bounded window.
 
-        Returns the rows and the newest flow timestamp among them, or None
-        when the window carried no rows at all.
+        Returns the rows and the newest flow timestamp among them, or None when the window carried no
+        rows at all. This ranks raw addresses and is subject to no cohort rule: no route of the
+        aggregate tier may reach it (the identity service's per-person traffic, gated on
+        ``traffic:read-detail``, is its one caller; see ``main.TrafficSource``).
         """
         params = _window_params(start, end)
         address_column = "SrcAddr" if dimension == "talkers" else "DstAddr"
         columns = await self._ensure_columns()
         self._require(columns, "TimeReceived", "Bytes", address_column)
-        bounded = max(1, min(int(limit), _MAX_TOP_LIMIT))
         include_packets = "Packets" in columns
+        sql = self._top_sql(address_column, include_packets, limit)
+        payload = await self._query(sql, params=params)
+        total_bytes = _optional_total(payload, "agg_bytes")
+        rows = _data_rows(payload)
+        items = [
+            _top_item(rank, row, total_bytes, include_packets) for rank, row in enumerate(rows, 1)
+        ]
+        seen = [_parse_epoch(row.get("agg_seen")) for row in rows]
+        return items, max(seen, default=None)
+
+    def _top_sql(self, address_column: str, include_packets: bool, limit: int) -> str:
+        bounded = max(1, min(int(limit), _MAX_TOP_LIMIT))
         select = [
             f"toString(`{address_column}`) AS label",
             "toString(sum(`Bytes`)) AS agg_bytes",
             *(["toString(sum(`Packets`)) AS agg_packets"] if include_packets else []),
             "toUnixTimestamp(max(`TimeReceived`)) AS agg_seen",
         ]
-        sql = (
+        return (
             f"SELECT {', '.join(select)} FROM {self._qualified_table()} "
             "WHERE `TimeReceived` >= toDateTime({start:UInt32}) "
             "AND `TimeReceived` < toDateTime({end:UInt32}) "
             "GROUP BY label WITH TOTALS ORDER BY sum(`Bytes`) DESC "
             f"LIMIT {bounded} FORMAT JSON"
         )
-        payload = await self._query(sql, params=params)
-        total_bytes = _optional_total(payload, "agg_bytes")
-
-        items: list[TrafficItem] = []
-        observed_at: datetime | None = None
-        for rank, row in enumerate(_data_rows(payload), start=1):
-            byte_count = _parse_counter(row.get("agg_bytes"), "bytes")
-            packets = (
-                _parse_optional_counter(row.get("agg_packets"), "packets")
-                if include_packets
-                else None
-            )
-            seen = _parse_epoch(row.get("agg_seen"))
-            observed_at = seen if observed_at is None or seen > observed_at else observed_at
-            share = (byte_count / total_bytes) if total_bytes else None
-            try:
-                items.append(
-                    TrafficItem(
-                        rank=rank,
-                        subject_kind="ip",
-                        subject_id=None,
-                        label=_parse_address(row.get("label"), "label"),
-                        bytes=byte_count,
-                        packets=packets,
-                        share=share,
-                    )
-                )
-            except ValidationError as exc:
-                raise AdapterError(
-                    AdapterStatus.INVALID_SOURCE_DATA, "invalid traffic aggregate row"
-                ) from exc
-        return items, observed_at
 
     async def _ensure_columns(self) -> frozenset[str]:
-        """Discover the flows table's columns once per client instance."""
-        if self._columns is None:
+        """Discover the flows table's columns; the answer is trusted for ``SCHEMA_TTL_SECONDS``.
+
+        The client is shared for the life of the process, so the schema expires: a column added to
+        the table later is noticed without a restart.
+        """
+        if self._columns is None or time.monotonic() - self._columns_at >= SCHEMA_TTL_SECONDS:
             database, table = self._split_table()
             payload = await self._query(
                 "SELECT name, type FROM system.columns "
@@ -294,6 +313,7 @@ class ClickhouseClient:
                 params={"db": database, "table": table},
             )
             names: set[str] = set()
+            types: dict[str, str] = {}
             for row in _data_rows(payload):
                 name = row.get("name")
                 if not isinstance(name, str) or not name:
@@ -301,10 +321,12 @@ class ClickhouseClient:
                 names.add(name)
                 column_type = row.get("type")
                 if isinstance(column_type, str):
-                    self._types[name] = column_type
+                    types[name] = column_type
             if not names:
                 raise AdapterError(AdapterStatus.INVALID_SOURCE_DATA, "flows table not found")
+            self._types = types
             self._columns = frozenset(names)
+            self._columns_at = time.monotonic()
         return self._columns
 
     @staticmethod
@@ -366,8 +388,8 @@ class ClickhouseClient:
             return await self._post(sql, params, with_limits=False)
         try:
             payload = await self._post(sql, params, with_limits=True)
-        except _SettingsForbidden:
-            limits.mark_profile_only(key)
+        except _SettingsForbidden as refused:
+            limits.mark_profile_only(key, code=refused.code)
             return await self._post(sql, params, with_limits=False)
         limits.mark_enforced(key)
         return payload

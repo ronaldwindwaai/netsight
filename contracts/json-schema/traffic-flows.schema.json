@@ -179,32 +179,6 @@
     {
       "if": {
         "properties": {
-          "cohort": {
-            "properties": {
-              "state": {
-                "const": "too-few-sources"
-              }
-            }
-          }
-        },
-        "required": [
-          "cohort"
-        ]
-      },
-      "then": {
-        "properties": {
-          "flows": {
-            "maxItems": 0
-          },
-          "aggregations": {
-            "type": "null"
-          }
-        }
-      }
-    },
-    {
-      "if": {
-        "properties": {
           "state": {
             "const": "ok"
           },
@@ -268,6 +242,212 @@
                       "properties": {
                         "scope": {
                           "const": "external"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "cohort": {
+            "properties": {
+              "state": {
+                "const": "too-few-sources"
+              }
+            }
+          }
+        },
+        "required": [
+          "cohort"
+        ]
+      },
+      "then": {
+        "properties": {
+          "flows": {
+            "maxItems": 0
+          },
+          "aggregations": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "required": [
+                      "application_mix"
+                    ],
+                    "properties": {
+                      "application_mix": {
+                        "type": "object",
+                        "required": [
+                          "items"
+                        ],
+                        "properties": {
+                          "items": {
+                            "contains": {
+                              "properties": {
+                                "visibility": {
+                                  "const": "withheld"
+                                }
+                              },
+                              "required": [
+                                "visibility"
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "destinations"
+                    ],
+                    "properties": {
+                      "destinations": {
+                        "contains": {
+                          "properties": {
+                            "visibility": {
+                              "const": "withheld"
+                            }
+                          },
+                          "required": [
+                            "visibility"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "cohort": {
+            "properties": {
+              "state": {
+                "const": "sufficient"
+              }
+            }
+          }
+        },
+        "required": [
+          "cohort"
+        ]
+      },
+      "then": {
+        "properties": {
+          "aggregations": {
+            "type": "object",
+            "properties": {
+              "application_mix": {
+                "anyOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "items": {
+                        "items": {
+                          "properties": {
+                            "visibility": {
+                              "const": "shown"
+                            },
+                            "endpoints": {
+                              "type": "integer"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                ]
+              },
+              "destinations": {
+                "items": {
+                  "properties": {
+                    "visibility": {
+                      "const": "shown"
+                    },
+                    "endpoints": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "cohort": {
+            "properties": {
+              "state": {
+                "const": "not-applied"
+              }
+            }
+          }
+        },
+        "required": [
+          "cohort"
+        ]
+      },
+      "then": {
+        "properties": {
+          "aggregations": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "application_mix": {
+                    "anyOf": [
+                      {
+                        "type": "null"
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "items": {
+                            "items": {
+                              "properties": {
+                                "visibility": {
+                                  "const": "shown"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "destinations": {
+                    "items": {
+                      "properties": {
+                        "visibility": {
+                          "const": "shown"
                         }
                       }
                     }
@@ -872,7 +1052,8 @@
         "packets",
         "flows",
         "source_addresses",
-        "destination_addresses"
+        "destination_addresses",
+        "internal_endpoints"
       ],
       "properties": {
         "bytes": {
@@ -892,11 +1073,20 @@
         },
         "source_addresses": {
           "type": "integer",
-          "minimum": 0
+          "minimum": 0,
+          "description": "Distinct source addresses of any kind (not the cohort count)."
         },
         "destination_addresses": {
           "type": "integer",
           "minimum": 0
+        },
+        "internal_endpoints": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "description": "Distinct endpoints inside the organisation (the internal side of each flow, by direction, under the shared internal-address classification). The small-cohort rule counts these, not every source address. Null: the source could not tell."
         }
       }
     },
@@ -905,8 +1095,10 @@
       "additionalProperties": false,
       "required": [
         "application",
+        "visibility",
         "bytes",
-        "share"
+        "share",
+        "endpoints"
       ],
       "properties": {
         "application": {
@@ -917,8 +1109,18 @@
           "minLength": 1,
           "maxLength": 255
         },
+        "visibility": {
+          "enum": [
+            "shown",
+            "withheld"
+          ],
+          "description": "withheld: fewer than the cohort minimum of internal endpoints stood behind the row, so its volume, share, trend, counts and dates are null. Only the aggregate tier ever sees withheld rows; the detail tier sees every row shown."
+        },
         "bytes": {
-          "type": "integer",
+          "type": [
+            "integer",
+            "null"
+          ],
           "minimum": 0
         },
         "share": {
@@ -928,8 +1130,50 @@
           ],
           "minimum": 0,
           "maximum": 1
+        },
+        "endpoints": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "description": "Distinct internal endpoints behind the application."
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "visibility": {
+                "const": "withheld"
+              }
+            },
+            "required": [
+              "visibility"
+            ]
+          },
+          "then": {
+            "properties": {
+              "bytes": {
+                "type": "null"
+              },
+              "share": {
+                "type": "null"
+              },
+              "endpoints": {
+                "type": "null"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "bytes": {
+                "type": "integer"
+              }
+            }
+          }
+        }
+      ]
     },
     "applicationMix": {
       "description": "Top applications by bytes; a null application is traffic the source labelled with none.",
@@ -965,8 +1209,10 @@
         "address",
         "host",
         "scope",
+        "visibility",
         "bytes",
-        "share"
+        "share",
+        "endpoints"
       ],
       "properties": {
         "address": {
@@ -989,8 +1235,18 @@
           ],
           "description": "internal: a private, loopback, link-local, shared or multicast address. The aggregate tier is never told about internal destinations."
         },
+        "visibility": {
+          "enum": [
+            "shown",
+            "withheld"
+          ],
+          "description": "withheld: fewer than the cohort minimum of internal endpoints stood behind the row, so its volume, share, trend, counts and dates are null. Only the aggregate tier ever sees withheld rows; the detail tier sees every row shown."
+        },
         "bytes": {
-          "type": "integer",
+          "type": [
+            "integer",
+            "null"
+          ],
           "minimum": 0
         },
         "share": {
@@ -1000,8 +1256,53 @@
           ],
           "minimum": 0,
           "maximum": 1
+        },
+        "endpoints": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "description": "Distinct internal endpoints that sent to the destination."
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "visibility": {
+                "const": "withheld"
+              }
+            },
+            "required": [
+              "visibility"
+            ]
+          },
+          "then": {
+            "properties": {
+              "bytes": {
+                "type": "null"
+              },
+              "share": {
+                "type": "null"
+              },
+              "endpoints": {
+                "type": "null"
+              },
+              "host": {
+                "type": "null"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "bytes": {
+                "type": "integer"
+              }
+            }
+          }
+        }
+      ]
     },
     "aggregations": {
       "description": "Bounded aggregations over the whole filtered window (not over the listed rows).",

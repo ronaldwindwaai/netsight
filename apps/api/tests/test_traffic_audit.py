@@ -397,3 +397,66 @@ def test_fingerprints_are_computed_from_canonical_filters_only() -> None:
     filters = FlowFilterSet(source_ip="10.0.0.10", application="Zoom")
     assert set(audit_trail.filter_fingerprints(filters)) == {"fp_source_ip"}
     assert audit_trail.filter_fingerprints(FlowFilterSet()) == {}
+
+
+# --- a configured-but-short key is loud, never a silent fallback; denied lookups are fingerprinted --------------
+
+
+def test_a_short_dedicated_key_is_not_silently_replaced_by_the_identity_key(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    monkeypatch.setenv(audit_trail.FILTER_KEY_ENV, "too-short-secret")  # set, but under 32
+    with caplog.at_level(logging.WARNING, logger="netsight_api"):
+        record = lookup(caplog, source_ip="10.0.0.10")
+        lookup(caplog, source_ip="10.0.0.11")
+    assert not [key for key in record if key.startswith("fp_")]  # no fallback to the identity key
+    notes = [
+        r
+        for r in caplog.records
+        if r.name == "netsight_api" and audit_trail.FILTER_KEY_ENV in r.getMessage()
+    ]
+    assert len(notes) == 1  # said once, and says why
+    assert "32" in notes[0].getMessage()
+    assert "too-short-secret" not in notes[0].getMessage()
+
+
+def test_an_unset_dedicated_key_still_falls_back_to_the_identity_key(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    monkeypatch.setenv(audit_trail.FILTER_KEY_ENV, "   ")
+    assert "fp_source_ip" in lookup(caplog, source_ip="10.0.0.10")
+
+
+def denied_lookup(caplog: pytest.LogCaptureFixture, **params: str) -> dict[str, Any]:
+    with caplog.at_level(logging.INFO, logger="netsight_api.audit"):
+        assert Caller("management").get(FLOWS, **WINDOW, **params).status_code == 403
+    return records(caplog, ACTIONS[FLOWS])[-1]
+
+
+def test_a_denied_endpoint_filter_is_fingerprinted_when_a_key_is_configured(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    monkeypatch.setenv(audit_trail.FILTER_KEY_ENV, KEY)
+    record = denied_lookup(caplog, source_ip="10.0.0.10", protocol="tcp")
+    assert record["outcome"] == "denied"
+    assert record["reason"] == "filter-needs-detail"
+    assert record["fp_source_ip"] == expected("source_ip", "10.0.0.10")
+    assert "fp_protocol" not in record  # only endpoint-level values are fingerprinted
+    assert "10.0.0.10" not in json.dumps(record)
+
+
+def test_a_denied_endpoint_filter_carries_no_fingerprint_without_a_key(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    monkeypatch.delenv("NETSIGHT_IDENTITY_ID_KEY", raising=False)
+    record = denied_lookup(caplog, source_ip="10.0.0.10")
+    assert record["reason"] == "filter-needs-detail"
+    assert not [key for key in record if key.startswith("fp_")]
+
+
+def test_a_denied_fingerprint_honours_the_off_switch(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    monkeypatch.setenv(audit_trail.FILTER_KEY_ENV, KEY)
+    monkeypatch.setenv(audit_trail.FINGERPRINT_ENV, "off")
+    assert not [k for k in denied_lookup(caplog, device="edge-1") if k.startswith("fp_")]

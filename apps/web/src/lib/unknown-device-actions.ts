@@ -6,7 +6,7 @@
  * step-up on every request. There is no action here that executes, approves or creates an isolation:
  * a quarantine is a recommendation shown on the finding, and the action engine (Step 14) owns it.
  */
-import { FINDING_ID, type FindingState } from './api-contracts-unknown-devices.ts';
+import { FINDING_ID, isEvidenceVersion, type FindingState } from './api-contracts-unknown-devices.ts';
 import { codePointLength, isOneOf } from './contract-guards.ts';
 import type { Viewer } from './incident-actions.ts';
 
@@ -76,6 +76,7 @@ export type PlannedFindingRequest =
 const MAX_ASSIGNEE = 255;
 const MAX_COMMENT = 4000;
 const MAX_REASON = 1000;
+const DECISIONS = ['acknowledge', 'investigate', 'assign', 'resolve'] as const;
 
 function fail(message: string): PlannedFindingRequest {
   return { ok: false, message };
@@ -101,23 +102,30 @@ export function planFindingRequest(input: unknown): PlannedFindingRequest {
     return fail('The finding identifier was not valid.');
   }
   const base = `/api/v1/unknown-devices/${findingId}`;
+  if (action === 'comment') {
+    if (!nonBlank(input.message, MAX_COMMENT)) return fail('Enter a comment of at most 4000 characters.');
+    return { ok: true, path: `${base}/comment`, body: { message: input.message }, result: 'event' };
+  }
+  // Every other decision is made on the evidence the person was shown, and loses if it changed.
+  const expected = input.expectedEvidenceVersion;
+  if (isOneOf(action, DECISIONS) && !isEvidenceVersion(expected)) {
+    return fail('The evidence version this decision rests on is missing. Reload the finding and try again.');
+  }
+  const version = { expected_evidence_version: expected };
   switch (action) {
     case 'acknowledge':
     case 'investigate':
-      return { ok: true, path: `${base}/${action}`, body: {}, result: 'finding' };
+      return { ok: true, path: `${base}/${action}`, body: version, result: 'finding' };
     case 'assign': {
       if (input.assigneeId === null) {
-        return { ok: true, path: `${base}/assign`, body: { assignee_id: null }, result: 'finding' };
+        return { ok: true, path: `${base}/assign`, body: { assignee_id: null, ...version }, result: 'finding' };
       }
       const assignee = typeof input.assigneeId === 'string' ? input.assigneeId.trim() : '';
       if (assignee.length === 0 || codePointLength(assignee) > MAX_ASSIGNEE) {
         return fail('Enter an assignee identity of at most 255 characters, or choose "Unassign".');
       }
-      return { ok: true, path: `${base}/assign`, body: { assignee_id: assignee }, result: 'finding' };
+      return { ok: true, path: `${base}/assign`, body: { assignee_id: assignee, ...version }, result: 'finding' };
     }
-    case 'comment':
-      if (!nonBlank(input.message, MAX_COMMENT)) return fail('Enter a comment of at most 4000 characters.');
-      return { ok: true, path: `${base}/comment`, body: { message: input.message }, result: 'event' };
     case 'resolve':
       if (!isOneOf(input.outcome, ['resolved', 'false-positive'] as const)) {
         return fail('Choose resolved or false positive as the outcome.');
@@ -128,7 +136,7 @@ export function planFindingRequest(input: unknown): PlannedFindingRequest {
       return {
         ok: true,
         path: `${base}/resolve`,
-        body: { outcome: input.outcome, reason: input.reason },
+        body: { outcome: input.outcome, reason: input.reason, ...version },
         result: 'finding',
       };
     default:

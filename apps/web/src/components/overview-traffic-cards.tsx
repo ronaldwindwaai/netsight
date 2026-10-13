@@ -1,14 +1,17 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 
+import { CohortNotice } from '@/components/cohort-notice';
 import { DataFailure, FreshnessNotice } from '@/components/data-state';
 import { StateSurface } from '@/components/state-surface';
 import { TrafficBars } from '@/components/traffic-bars';
 import { TrafficPanel } from '@/components/traffic-panel';
-import type { TrafficTopResponse } from '@/lib/api-contracts';
-import type { TrafficApplicationsResponse } from '@/lib/api-contracts-traffic-explorer';
+import type {
+  TrafficApplicationsResponse,
+  TrafficDestinationsResponse,
+} from '@/lib/api-contracts-traffic-explorer';
 import type { FetchState } from '@/lib/api-response';
-import { resolveTrafficWindow, trafficHref } from '@/lib/traffic-view';
+import { resolveTrafficWindow, trafficHref, withheldRowText } from '@/lib/traffic-view';
 import type { TrafficWindow } from '@/lib/traffic-view';
 
 // The overview shows the last 24 hours; the links open the same window on the detail pages.
@@ -37,24 +40,24 @@ function Card({ title, icon, children }: { title: string; icon: string; children
 }
 
 /**
- * Top bandwidth users on the overview: real source addresses ranked by bytes, never people (naming
- * a person is the Flow Explorer's job, for roles that may see it). `null` means the viewer does not
- * hold traffic:read-detail, which is shown as Restricted rather than as an empty ranking.
+ * Top destinations on the overview, from `/traffic/destinations` (the one list route that applies the
+ * small-cohort rule). Destinations a small group reached are listed by address with their figures
+ * withheld, and destinations inside the organisation are not listed to the aggregate tier. `null` means
+ * the viewer does not hold traffic:read, which is shown as Restricted rather than as an empty ranking.
  */
-export function OverviewTopTalkers({
+export function OverviewTopDestinations({
   state,
   window = OVERVIEW_WINDOW,
 }: {
-  state: FetchState<TrafficTopResponse> | null;
+  state: FetchState<TrafficDestinationsResponse> | null;
   window?: TrafficWindow;
 }) {
-  const title = 'Top bandwidth users';
-  const icon = 'bi-bar-chart-line';
-  const restricted = <Restricted permission="traffic:read-detail" what="Ranking source addresses" />;
+  const title = 'Top destinations';
+  const icon = 'bi-globe2';
   if (state === null || state.kind === 'forbidden') {
     return (
       <Card title={title} icon={icon}>
-        {restricted}
+        <Restricted permission="traffic:read" what="Ranking destinations" />
       </Card>
     );
   }
@@ -72,7 +75,7 @@ export function OverviewTopTalkers({
         <StateSurface
           icon="bi bi-activity"
           title="Flow telemetry not connected"
-          detail="Bandwidth rankings will appear only after an approved flow source is available."
+          detail="Destination rankings will appear only after an approved flow source is available."
         />
       </Card>
     );
@@ -91,6 +94,7 @@ export function OverviewTopTalkers({
   return (
     <Card title={title} icon={icon}>
       <FreshnessNotice freshness={data.freshness} />
+      <CohortNotice cohort={data.cohort} noun="destinations" />
       {data.items.length === 0 ? (
         <StateSurface
           icon="bi bi-inboxes"
@@ -99,14 +103,22 @@ export function OverviewTopTalkers({
         />
       ) : (
         <>
-          <TrafficBars items={data.items} />
+          <TrafficBars
+            items={data.items.map((item) => ({
+              rank: item.rank,
+              label: item.address,
+              bytes: item.bytes,
+              share: item.share,
+            }))}
+            withheldText={withheldRowText(data.cohort)}
+          />
           <p className="small text-body-secondary mt-2 mb-1">
-            Addresses, not people. Source addresses ranked by bytes in {window.label.toLowerCase()}.
+            Destination addresses ranked by bytes in {window.label.toLowerCase()}.
           </p>
         </>
       )}
-      <Link className="small" href={trafficHref('flows', window)}>
-        Open the Flow Explorer
+      <Link className="small" href={trafficHref('destinations', window)}>
+        All destinations
       </Link>
     </Card>
   );
@@ -179,13 +191,11 @@ export function OverviewApplicationMix({
         <TrafficBars
           items={data.items.map((item) => ({
             rank: item.rank,
-            subject_kind: 'application' as const,
-            subject_id: null,
             label: item.application,
             bytes: item.bytes,
-            packets: item.packets,
             share: item.share,
           }))}
+          withheldText={withheldRowText(data.cohort)}
         />
         <p className="small text-body-secondary mt-2 mb-1">
           Each bar is the share of all bytes in {window.label.toLowerCase()}, as the flow source reports

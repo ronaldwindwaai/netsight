@@ -52,6 +52,14 @@ class StorageConflictError(StorageError):
     """
 
 
+class StaleEvidenceError(StorageConflictError):
+    """A decision was taken on evidence that has changed since the person was shown it.
+
+    The write quoted an ``expected_evidence_version`` that is no longer the finding's. Nothing was
+    written; the caller re-reads the finding and decides again (HTTP 409 ``STALE_EVIDENCE``).
+    """
+
+
 class StorageUnavailableError(StorageError):
     """The database could not serve the request in time: unreachable, lock or statement timeout.
 

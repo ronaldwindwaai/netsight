@@ -10,7 +10,12 @@ bounded, parameterised reads of Step 7. Contract for every method:
 * a value is source-reported or ``None``. A column the source lacks yields ``None`` (or an
   ``unsupported`` filter), never a default; a count that is negative, fractional or oversize fails
   the read instead of being clamped; a result that hit its row cap fails instead of being truncated;
-* a failure raises ``AdapterError``; this layer never turns one into an empty success.
+* a failure raises ``AdapterError``; this layer never turns one into an empty success;
+* every ``endpoints`` figure counts endpoints *inside the organisation* (see ``clickhouse_queries``),
+  the denominator of the small-cohort rule; a count the source does not give is ``None``, which the
+  rule treats as too few;
+* ``source_observed_at`` is the newest flow the source holds in the window whatever the filter (the
+  one freshness the aggregate tier is told); it is read without caller filters.
 """
 
 from __future__ import annotations
@@ -208,15 +213,23 @@ class ExplorerClickhouse(ClickhouseClient):
         if unsupported:
             return Exploration((), None, unsupported, None)
         base: Params = {**window, **bound}
+        counted: Params = {**base, **q.internal_params()}
         bucket = bucket_seconds(int((end - start).total_seconds()))
         plan: dict[str, tuple[str, Params]] = {}
         if include_rows:
             plan["rows"] = (q.flow_rows(where, columns, _clamp(limit, MAX_FLOW_ROWS)), base)
         plan["timeline"] = (q.timeline(where, columns), {**base, "bucket": bucket})
-        plan["volume"] = (q.volume(where, columns), base)
+        plan["volume"] = (q.volume(where, columns), counted)
         if "Application" in columns:
-            plan["mix"] = (q.application_mix(where), base)
-        plan["destinations"] = (q.destination_share(where, columns, MAX_DESTINATION_SHARES), base)
+            plan["mix"] = (q.application_mix(where, columns), counted)
+        plan["destinations"] = (
+            q.destination_share(where, columns, MAX_DESTINATION_SHARES),
+            counted,
+        )
+        if (
+            not include_rows
+        ):  # the aggregate tier is told the source's freshness, never this answer's
+            plan["source_seen"] = (q.source_seen(), dict(window))
         payloads = dict(zip(plan, await self._run(*plan.values()), strict=True))
         flows, observed_at = self._flows(payloads["rows"], columns) if include_rows else ([], None)
         volume_seen = self._newest(payloads["volume"])
@@ -232,12 +245,15 @@ class ExplorerClickhouse(ClickhouseClient):
             )
         except ValidationError as exc:
             raise _invalid("invalid traffic aggregate") from exc
-        return Exploration(tuple(flows), aggregations, (), observed_at)
+        source_seen = (
+            self._newest(payloads["source_seen"], "source_seen") if not include_rows else None
+        )
+        return Exploration(tuple(flows), aggregations, (), observed_at, source_seen)
 
     @staticmethod
-    def _newest(payload: dict[str, Any]) -> datetime | None:
+    def _newest(payload: dict[str, Any], key: str = "agg_seen") -> datetime | None:
         rows = _data_rows(payload)
-        seen = _parse_optional_counter(rows[0].get("agg_seen"), "timestamp") if rows else None
+        seen = _parse_optional_counter(rows[0].get(key), "timestamp") if rows else None
         return _epoch(seen) if seen else None
 
     @staticmethod
@@ -317,6 +333,9 @@ class ExplorerClickhouse(ClickhouseClient):
             flows=_parse_counter(row.get("agg_flows"), "flows"),
             source_addresses=_parse_counter(row.get("agg_sources"), "sources"),
             destination_addresses=_parse_counter(row.get("agg_destinations"), "destinations"),
+            internal_endpoints=_parse_optional_counter(
+                row.get("agg_internal"), "internal endpoints"
+            ),
         )
 
     @staticmethod
@@ -334,12 +353,14 @@ class ExplorerClickhouse(ClickhouseClient):
         items = [
             ApplicationMixItem(
                 application=_parse_optional_text(row.get("app_name"), "application"),
+                visibility="shown",
                 bytes=(count := _parse_counter(row.get("agg_bytes"), "bytes")),
                 share=_share(count, total),
+                endpoints=_parse_optional_counter(row.get("agg_endpoints"), "endpoints"),
             )
             for row in rows
         ]
-        listed = sum(item.bytes for item in items)
+        listed = sum(item.bytes or 0 for item in items)
         if listed > total:
             raise _invalid("application mix exceeds its total")
         return ApplicationMix(items=items, other_bytes=total - listed, total_bytes=total)
@@ -352,8 +373,10 @@ class ExplorerClickhouse(ClickhouseClient):
                 address=(address := _parse_address(row.get("address"), "address")),
                 host=_parse_optional_text(row.get("dest_host"), "host"),
                 scope=_scope(address),
+                visibility="shown",
                 bytes=(count := _parse_counter(row.get("agg_bytes"), "bytes")),
                 share=_share(count, total),
+                endpoints=_parse_optional_counter(row.get("agg_endpoints"), "endpoints"),
             )
             for row in rows
         ]
@@ -373,7 +396,7 @@ class ExplorerClickhouse(ClickhouseClient):
             return ApplicationsRead((), None, None, ("application",), None)
         length = end - start
         previous = length <= PREVIOUS_WINDOW_MAX
-        params: Params = dict(window)
+        params: Params = {**window, **q.internal_params()}
         previous_range: tuple[datetime, datetime] | None = None
         if previous:
             previous_start = start - length
@@ -407,7 +430,18 @@ class ExplorerClickhouse(ClickhouseClient):
             raise _invalid("invalid application row") from exc
         seen = [_parse_optional_counter(row.get("agg_seen"), "timestamp") for _, row in ranked]
         newest = max((_epoch(moment) for moment in seen if moment), default=None)
-        return ApplicationsRead(tuple(rows), total, previous_range, (), newest)
+        return ApplicationsRead(
+            tuple(rows), total, previous_range, (), newest, self._totals_seen(payload, "agg_seen")
+        )
+
+    @staticmethod
+    def _totals_seen(payload: dict[str, Any], key: str) -> datetime | None:
+        """The newest flow across every group (the ``WITH TOTALS`` row): source-level, not per row."""
+        totals = payload.get("totals")
+        if not isinstance(totals, dict):
+            return None
+        seen = _parse_optional_counter(totals.get(key), "timestamp")
+        return _epoch(seen) if seen else None
 
     @staticmethod
     def _application_row(
@@ -418,6 +452,7 @@ class ExplorerClickhouse(ClickhouseClient):
             rank=rank,
             application=str(_parse_optional_text(row.get("app_name"), "application")),
             category=_parse_optional_text(row.get("app_category"), "category"),
+            visibility="shown",
             bytes=count,
             packets=_parse_optional_counter(row.get("cur_packets"), "packets"),
             share=_share(count, total),
@@ -442,7 +477,7 @@ class ExplorerClickhouse(ClickhouseClient):
         bounded = _clamp(limit, MAX_LIST_ROWS)
         lookback = end - FIRST_SEEN_LOOKBACK
         main, first = await self._run(
-            (q.destinations(columns, bounded), dict(window)),
+            (q.destinations(columns, bounded), {**window, **q.internal_params()}),
             (q.destinations_first_seen(bounded), {**window, "lookback": int(lookback.timestamp())}),
         )
         rows = _data_rows(main)
@@ -465,6 +500,7 @@ class ExplorerClickhouse(ClickhouseClient):
                         rank=rank,
                         address=address,
                         scope=_scope(address),
+                        visibility="shown",
                         domain=_parse_optional_text(row.get("dest_host"), "domain"),
                         asn=_optional_asn(row.get("dest_asn")),
                         country=_optional_country(row.get("dest_country")),
@@ -482,7 +518,9 @@ class ExplorerClickhouse(ClickhouseClient):
                 )
         except ValidationError as exc:
             raise _invalid("invalid destination row") from exc
-        return DestinationsRead(tuple(result), total, lookback, newest)
+        return DestinationsRead(
+            tuple(result), total, lookback, newest, self._totals_seen(main, "last_seen")
+        )
 
     # --- baseline inputs -----------------------------------------------------------------------------
 
@@ -506,13 +544,17 @@ class ExplorerClickhouse(ClickhouseClient):
         }
         has_apps = "Application" in columns
         has_asn = "DstAS" in columns
+        counted: Params = {**params, **q.internal_params()}
         plan: list[tuple[str, str, Params]] = [("total", q.baseline_total_hours(), params)]
         if has_apps:
             plan.append(("apps", q.baseline_application_hours(), params))
         plan.append(("oldest", q.baseline_oldest(), params))
+        plan.append(("total_sources", q.baseline_sources_total(columns), counted))
+        if has_apps:
+            plan.append(("app_sources", q.baseline_sources_by_application(columns), counted))
         if has_asn:
-            plan.append(("asn", q.first_seen_asns(), params))
-        plan.append(("dest", q.first_seen_destinations(columns), params))
+            plan.append(("asn", q.first_seen_asns(columns), counted))
+        plan.append(("dest", q.first_seen_destinations(columns), counted))
         payloads = dict(
             zip(
                 (name for name, _, _ in plan),
@@ -535,7 +577,28 @@ class ExplorerClickhouse(ClickhouseClient):
             oldest=self._oldest(payloads["oldest"]),
             first_seen=tuple(first_seen),
             observed_at=datetime.fromtimestamp(newest, tz=UTC) if newest is not None else None,
+            sources_total=self._sources_total(payloads["total_sources"]),
+            sources_by_application=(
+                self._sources_by_application(payloads["app_sources"]) if has_apps else {}
+            ),
         )
+
+    @staticmethod
+    def _sources_total(payload: dict[str, Any]) -> int | None:
+        rows = _data_rows(payload)
+        if len(rows) != 1:
+            raise _invalid("endpoint count returned no row")
+        return _parse_optional_counter(rows[0].get("total_sources"), "endpoints")
+
+    @staticmethod
+    def _sources_by_application(payload: dict[str, Any]) -> dict[str, int]:
+        found: dict[str, int] = {}
+        for row in _data_rows(payload):
+            name = _parse_optional_text(row.get("app_name"), "application")
+            count = _parse_optional_counter(row.get("app_sources"), "endpoints")
+            if name is not None and count is not None:
+                found[name] = count
+        return found
 
     @staticmethod
     def _hour(value: Any) -> int:

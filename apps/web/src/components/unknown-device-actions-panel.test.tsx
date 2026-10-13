@@ -16,6 +16,7 @@ import { FAILURES, assertAbsent, deferred, failedWrite } from '@/test/helpers';
 import { FINDING_ID, HOSTILE, NOW, sources } from '@/test/step8-fixtures';
 import { findingHandlers } from '@/test/unknown-device-actions-stub';
 
+const VERSION = 4;
 const PATH = `/unknown-devices/${FINDING_ID}`;
 
 const ANALYST: Viewer = {
@@ -48,7 +49,7 @@ function install(handler: (input: unknown) => Promise<WriteActionResult>) {
 function renderPanel(viewer: Viewer | null, state: FindingState = 'new', assignee: string | null = null) {
   return render(
     <UnknownDeviceActionsPanel
-      finding={{ id: FINDING_ID, state, assignee_id: assignee }}
+      finding={{ id: FINDING_ID, state, assignee_id: assignee, evidence_version: VERSION }}
       viewer={viewer}
       currentPath={PATH}
     />,
@@ -115,7 +116,7 @@ describe('one-click actions', () => {
       fireEvent.click(acknowledge);
     });
     assert.equal(handler.mock.callCount(), 1);
-    assert.deepEqual(handler.mock.calls[0].arguments[0], { action: 'acknowledge', findingId: FINDING_ID });
+    assert.deepEqual(handler.mock.calls[0].arguments[0], { action: 'acknowledge', findingId: FINDING_ID, expectedEvidenceVersion: VERSION });
     await act(async () => gate.resolve({ ok: true }));
     assert.equal(routerSpy.refreshCount, 1);
     assert.match(screen.getByRole('status').textContent ?? '', /Acknowledge: saved/);
@@ -125,7 +126,7 @@ describe('one-click actions', () => {
     const handler = install(() => Promise.resolve({ ok: true }));
     renderPanel(ANALYST, 'acknowledged');
     await act(async () => fireEvent.click(button(/^Mark investigating/)));
-    assert.deepEqual(handler.mock.calls[0].arguments[0], { action: 'investigate', findingId: FINDING_ID });
+    assert.deepEqual(handler.mock.calls[0].arguments[0], { action: 'investigate', findingId: FINDING_ID, expectedEvidenceVersion: VERSION });
   });
 
   const cases: Array<[string, keyof typeof FAILURES, RegExp, 'link' | 'button' | 'none', string?]> = [
@@ -152,6 +153,20 @@ describe('one-click actions', () => {
     });
   }
 
+  it('a stale-evidence refusal says the evidence changed and offers a reload', async () => {
+    install(() =>
+      Promise.resolve(
+        failedWrite({ kind: 'error', code: 'STALE_EVIDENCE', status: 409, message: 'x', correlationId: 'corr-s' }),
+      ),
+    );
+    renderPanel(ANALYST);
+    await act(async () => fireEvent.click(button(/^Acknowledge/)));
+    const alert = screen.getByRole('alert');
+    assert.match(alert.textContent ?? '', /evidence for this finding changed/i);
+    assert.ok(within(alert).getByRole('button', { name: /Reload current state/ }));
+    assert.equal(routerSpy.refreshCount, 0);
+  });
+
   it('after an unconfirmed result nothing is sent again until the page is reloaded', async () => {
     const handler = install(() => Promise.resolve(failedWrite(FAILURES.unknownResult.failure)));
     renderPanel(ANALYST);
@@ -174,7 +189,7 @@ describe('dialogs', () => {
     const dialog = screen.getByRole('dialog', { name: 'Assign finding' });
     await user.type(within(dialog).getByLabelText('Assignee identity'), 'oidc:tech-9');
     await user.click(within(dialog).getByRole('button', { name: 'Assign' }));
-    assert.deepEqual(handler.mock.calls[0].arguments[0], { action: 'assign', assigneeId: 'oidc:tech-9', findingId: FINDING_ID });
+    assert.deepEqual(handler.mock.calls[0].arguments[0], { action: 'assign', assigneeId: 'oidc:tech-9', findingId: FINDING_ID, expectedEvidenceVersion: VERSION });
     assert.equal(screen.queryAllByRole('dialog').length, 0);
     assert.match(screen.getByRole('status').textContent ?? '', /Assign: saved/);
   });
@@ -185,7 +200,7 @@ describe('dialogs', () => {
     renderPanel(ANALYST, 'new', 'oidc:tech-9');
     await user.click(button(/^Assign/));
     await user.click(screen.getByRole('button', { name: 'Unassign' }));
-    assert.deepEqual(handler.mock.calls[0].arguments[0], { action: 'assign', assigneeId: null, findingId: FINDING_ID });
+    assert.deepEqual(handler.mock.calls[0].arguments[0], { action: 'assign', assigneeId: null, findingId: FINDING_ID, expectedEvidenceVersion: VERSION });
   });
 
   it('keeps a hostile comment as typed text and sends it unmodified', async () => {
@@ -197,7 +212,7 @@ describe('dialogs', () => {
     await user.click(within(dialog).getByLabelText('Comment'));
     await user.paste(HOSTILE);
     await user.click(within(dialog).getByRole('button', { name: 'Add comment' }));
-    assert.deepEqual(handler.mock.calls[0].arguments[0], { action: 'comment', message: HOSTILE, findingId: FINDING_ID });
+    assert.deepEqual(handler.mock.calls[0].arguments[0], { action: 'comment', message: HOSTILE, findingId: FINDING_ID, expectedEvidenceVersion: VERSION });
   });
 
   it('resolves with a chosen outcome and a reason, and defaults to resolved', async () => {
@@ -215,6 +230,7 @@ describe('dialogs', () => {
       outcome: 'false-positive',
       reason: 'It is the reception printer',
       findingId: FINDING_ID,
+      expectedEvidenceVersion: VERSION,
     });
   });
 
@@ -252,6 +268,7 @@ describe('scan panel', () => {
       suppressed: 3,
       unverified: 0,
       truncated: false,
+      incomplete_sources: [],
       ...over,
     });
     assert.ok(parsed, 'scan fixture');
@@ -282,6 +299,21 @@ describe('scan panel', () => {
     const text = document.body.textContent ?? '';
     assert.match(text, /could not be checked against NetBox are not reported/);
     assert.match(text, /reached its size limit/);
+  });
+
+  it('names the sources left unverified when a source answered incompletely', async () => {
+    findingHandlers.scan = (() =>
+      Promise.resolve({ ok: true, scan: scan({ incomplete_sources: ['librenms', 'wazuh'] }) })) as never;
+    render(<UnknownDeviceScanPanel />);
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: /Scan for unknown devices now/ })));
+    assert.match(document.body.textContent ?? '', /Comparison left unverified for incomplete sources: librenms, wazuh/);
+  });
+
+  it('says nothing about incomplete sources when every source answered fully', async () => {
+    findingHandlers.scan = (() => Promise.resolve({ ok: true, scan: scan() })) as never;
+    render(<UnknownDeviceScanPanel />);
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: /Scan for unknown devices now/ })));
+    assert.doesNotMatch(document.body.textContent ?? '', /incomplete sources/);
   });
 
   it('shows a refusal with its reference and does not refresh', async () => {

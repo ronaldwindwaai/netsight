@@ -208,41 +208,11 @@ export interface TopologyResponse {
 }
 
 export type TrafficState = 'not-connected' | 'ok' | 'unknown';
-export type TrafficDimension = 'talkers' | 'destinations';
 export type TrafficPreset = '1h' | '6h' | '24h' | '7d';
-export type TrafficSubjectKind =
-  | 'device'
-  | 'ip'
-  | 'user'
-  | 'application'
-  | 'domain'
-  | 'asn'
-  | 'interface';
-
 export interface TrafficTimeRange {
   from: string;
   to: string;
   preset: TrafficPreset | null;
-}
-
-export interface TrafficItem {
-  rank: number;
-  subject_kind: TrafficSubjectKind;
-  /** Canonical ID when the source resolves one; never inferred. */
-  subject_id: string | null;
-  /** Source-reported label; untrusted, render as data only. */
-  label: string;
-  bytes: number;
-  packets: number | null;
-  share: number | null;
-}
-
-export interface TrafficTopResponse {
-  state: TrafficState;
-  dimension: TrafficDimension;
-  time_range: TrafficTimeRange;
-  items: TrafficItem[];
-  freshness: Freshness;
 }
 
 type UnknownRecord = Record<string, unknown>;
@@ -965,36 +935,8 @@ export function parseTopologyResponse(value: unknown): TopologyResponse | null {
   return { state, nodes, edges, freshness };
 }
 
-const TRAFFIC_STATES = ['not-connected', 'ok', 'unknown'] as const;
-const TRAFFIC_DIMENSIONS = ['talkers', 'destinations'] as const;
 const TRAFFIC_PRESETS = ['1h', '6h', '24h', '7d'] as const;
-const TRAFFIC_SUBJECT_KINDS = [
-  'device',
-  'ip',
-  'user',
-  'application',
-  'domain',
-  'asn',
-  'interface',
-] as const;
-
-const TRAFFIC_TOP_RESPONSE_KEYS = [
-  'state',
-  'dimension',
-  'time_range',
-  'items',
-  'freshness',
-] as const;
 const TRAFFIC_TIME_RANGE_KEYS = ['from', 'to', 'preset'] as const;
-const TRAFFIC_ITEM_KEYS = [
-  'rank',
-  'subject_kind',
-  'subject_id',
-  'label',
-  'bytes',
-  'packets',
-  'share',
-] as const;
 export function parseTrafficTimeRange(value: unknown): TrafficTimeRange | null {
   if (!isRecord(value) || !hasContractKeys(value, TRAFFIC_TIME_RANGE_KEYS)) return null;
   if (typeof value.from !== 'string' || !isRfc3339(value.from)) return null;
@@ -1006,73 +948,6 @@ export function parseTrafficTimeRange(value: unknown): TrafficTimeRange | null {
     from: value.from,
     to: value.to,
     preset: value.preset as TrafficPreset | null,
-  };
-}
-
-function parseTrafficItem(value: unknown): TrafficItem | null {
-  if (!isRecord(value) || !hasContractKeys(value, TRAFFIC_ITEM_KEYS)) return null;
-  if (
-    !isBoundedInteger(value.rank, 1, 1000) ||
-    typeof value.subject_kind !== 'string' ||
-    !TRAFFIC_SUBJECT_KINDS.includes(value.subject_kind as TrafficSubjectKind) ||
-    !isNullableString(value.subject_id) ||
-    (value.subject_id !== null && !isBoundedString(value.subject_id, 1, 128)) ||
-    typeof value.label !== 'string' ||
-    !isBoundedString(value.label, 1, 255) ||
-    !isBoundedInteger(value.bytes, 0) ||
-    (value.packets !== null && !isBoundedInteger(value.packets, 0))
-  ) {
-    return null;
-  }
-  if (
-    value.share !== null &&
-    (typeof value.share !== 'number' ||
-      !Number.isFinite(value.share) ||
-      value.share < 0 ||
-      value.share > 1)
-  ) {
-    return null;
-  }
-  return {
-    rank: value.rank as number,
-    subject_kind: value.subject_kind as TrafficSubjectKind,
-    subject_id: value.subject_id,
-    label: value.label,
-    bytes: value.bytes as number,
-    packets: value.packets as number | null,
-    share: value.share as number | null,
-  };
-}
-
-export function parseTrafficTopResponse(value: unknown): TrafficTopResponse | null {
-  if (
-    !isRecord(value) ||
-    !hasContractKeys(value, TRAFFIC_TOP_RESPONSE_KEYS) ||
-    typeof value.state !== 'string' ||
-    !TRAFFIC_STATES.includes(value.state as TrafficState) ||
-    typeof value.dimension !== 'string' ||
-    !TRAFFIC_DIMENSIONS.includes(value.dimension as TrafficDimension) ||
-    !Array.isArray(value.items) ||
-    value.items.length > 1000
-  ) {
-    return null;
-  }
-
-  const timeRange = parseTrafficTimeRange(value.time_range);
-  const freshness = parseFreshness(value.freshness);
-  if (timeRange === null || freshness === null) return null;
-
-  const items = value.items.map(parseTrafficItem);
-  if (items.some((item) => item === null)) return null;
-  // Fail closed: a non-ok state must never carry source-derived rows.
-  if (value.state !== 'ok' && items.length > 0) return null;
-
-  return {
-    state: value.state as TrafficState,
-    dimension: value.dimension as TrafficDimension,
-    time_range: timeRange,
-    items: items as TrafficItem[],
-    freshness,
   };
 }
 

@@ -131,7 +131,13 @@ async def test_a_false_positive_stays_suppressed_across_scans() -> None:
     scanner, repo = make()
     await scanner.scan()
     finding = findings(repo)[0]
-    repo.transition_state(finding.id, to_state="false-positive", actor_id="u", reason="lab device")
+    repo.transition_state(
+        finding.id,
+        to_state="false-positive",
+        actor_id="u",
+        reason="lab device",
+        expected_evidence_version=finding.evidence_version,
+    )
     result = await scanner.scan()
     assert (result.created, result.refreshed, result.suppressed) == (0, 0, 1)
 
@@ -190,6 +196,8 @@ async def test_a_wazuh_agent_is_known_by_its_key_address_or_name() -> None:
     assert result.created == 1
     assert findings(repo)[0].endpoint.hostname == "stray"
     assert states(result)["wazuh"] == "ok"
+    # a name alone clears nothing: agent 003 only claims a NetBox device's name, so it is unverified
+    assert result.unverified == 1
 
 
 @pytest.mark.asyncio
@@ -331,6 +339,9 @@ async def test_a_source_that_hangs_is_unknown_after_its_budget(
 @pytest.mark.asyncio
 async def test_a_store_that_is_down_fails_the_scan_loudly_not_silently() -> None:
     class Down:
+        def known_subject_keys(self, keys: Any) -> set[str]:
+            return set()
+
         def observe(self, detection: Any) -> Any:
             raise StorageUnavailableError("down")
 

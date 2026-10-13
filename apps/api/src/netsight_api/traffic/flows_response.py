@@ -4,7 +4,9 @@ The route decides *who is asking* (``FlowsQuery``); this module turns one source
 response that caller may see:
 
 * the detail tier gets rows and aggregates as read; the aggregate tier gets aggregates only (its rows
-  were never read), held to the small-cohort rule and without destinations inside the organisation;
+  were never read), held to the small-cohort rule (a small answer is withheld whole, a small item is
+  withheld individually), without destinations inside the organisation, and told the source's own
+  freshness rather than the newest time of the filtered answer;
 * people are named only through the identity service, and only as far as the role's ``users:*``
   permission goes (see ``traffic.attribution``).
 """
@@ -23,7 +25,7 @@ from netsight_api.schemas_traffic import (
 from netsight_api.traffic import cohort
 from netsight_api.traffic.attribution import attribute_flows
 from netsight_api.traffic.filters import FlowFilterSet
-from netsight_api.traffic.responses import freshness_for
+from netsight_api.traffic.responses import freshness_for_tier
 from netsight_api.traffic.route_support import Window
 from netsight_api.traffic.source import Exploration
 
@@ -78,5 +80,10 @@ async def ok_response(
         flows=flows,
         aggregations=aggregations,
         cohort=cohort_status,
-        freshness=freshness_for(query.window.end, result.observed_at),
+        freshness=freshness_for_tier(
+            query.window.end,
+            result.observed_at,
+            result.source_observed_at,
+            aggregate=query.minimum is not None,
+        ),
     )

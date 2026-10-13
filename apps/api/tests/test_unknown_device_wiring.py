@@ -159,3 +159,49 @@ def test_the_application_starts_with_the_scan_disabled_and_exposes_no_task() -> 
         assert client.get("/api/v1/health").status_code == 200
         assert app.state.unknown_scan_task is None
     assert InMemoryUnknownDeviceRepository  # the in-memory store stays importable for tests only
+
+
+# --- the dismissal lifetime and the shared scan guard (security M3, M5) -----------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("raw", "days"), [("", 90), ("1", 1), ("90", 90), ("3650", 3650), (" 30 ", 30)]
+)
+def test_the_dismissal_lifetime_is_in_whole_days_and_defaults_to_ninety(raw: str, days: int) -> None:
+    from datetime import timedelta
+
+    from netsight_api.storage.unknown_devices import FP_TTL_ENV, fp_ttl_from_env
+
+    assert fp_ttl_from_env({FP_TTL_ENV: raw}) == timedelta(days=days)
+
+
+@pytest.mark.parametrize("raw", ["0", "-1", "3651", "ninety", "1.5", "１２", "1e2", "0x10"])
+def test_an_invalid_dismissal_lifetime_fails_start_up_even_with_the_scan_off(raw: str) -> None:
+    from netsight_api.storage.unknown_devices import FP_TTL_ENV
+
+    with pytest.raises(ValueError, match=FP_TTL_ENV):
+        wiring.build_scan_service({FP_TTL_ENV: raw})
+
+
+def test_an_invalid_lifetime_makes_the_request_time_store_unavailable_not_default(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from netsight_api.storage import StorageError
+    from netsight_api.storage.unknown_devices import FP_TTL_ENV
+
+    monkeypatch.setenv("DATABASE_URL", PG_URL)
+    monkeypatch.setenv(FP_TTL_ENV, "0")
+    store = wiring.get_optional_store()
+    assert store is not None
+    with pytest.raises(StorageError):
+        store.counts()
+
+
+def test_the_scheduled_and_the_on_demand_scanner_share_one_guard(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("netsight_api.main.get_optional_netbox_client", lambda: None)
+    monkeypatch.setattr("netsight_api.main.get_optional_librenms_client", lambda: None)
+    store = InMemoryUnknownDeviceRepository()
+    first, second = wiring.build_scanner(store), wiring.build_scanner(store)
+    assert first._guard is second._guard is wiring.SCAN_GUARD  # noqa: SLF001

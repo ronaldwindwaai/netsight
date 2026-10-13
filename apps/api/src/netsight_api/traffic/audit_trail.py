@@ -13,9 +13,14 @@ target, without the trail holding the address. It is keyed so it can not be reve
 IPv4 space, and it is omitted (never degraded to a plain hash) when no key is configured.
 
 * ``NETSIGHT_AUDIT_FILTER_FINGERPRINT``: ``on`` (default) or ``off``/``0``/``false``/``no``;
-* ``NETSIGHT_AUDIT_FILTER_KEY``: the HMAC key (at least 32 characters). When unset the identity
+* ``NETSIGHT_AUDIT_FILTER_KEY``: the HMAC key (at least 32 characters). When *unset* the identity
   evidence-id key (``NETSIGHT_IDENTITY_ID_KEY``) is used; when neither is usable the fingerprints are
-  omitted and that is logged once.
+  omitted and that is logged once. A key that is *set but shorter than 32 characters* is a
+  misconfiguration, not an absence: it is never replaced by the identity key, the fingerprints are
+  omitted and the warning names the variable (never its value).
+
+A denied attempt to filter by endpoint without the detail tier carries the same fingerprint (when a
+key is configured): a probe for an address is exactly what an auditor wants to be able to search for.
 
 See docs/08-operations/AUDIT-LOGGING.md.
 """
@@ -45,6 +50,7 @@ FINGERPRINT_LENGTH: Final = 16
 FINGERPRINT_CONTEXT: Final = b"netsight.audit.filter.v1"
 _OFF: Final = frozenset({"off", "0", "false", "no"})
 _unkeyed_logged = False
+_short_logged = False
 
 
 def reason_for(error: FilterError | ApiError) -> str:
@@ -68,8 +74,8 @@ def _write(
     )
 
 
-def denied(request: Request, actor_id: str, action: str, reason: str) -> None:
-    _write(request, actor_id, action, "denied", reason=reason)
+def denied(request: Request, actor_id: str, action: str, reason: str, **fields: Any) -> None:
+    _write(request, actor_id, action, "denied", reason=reason, **fields)
 
 
 def failed(request: Request, actor_id: str, action: str, reason: str) -> None:
@@ -87,11 +93,23 @@ def read(
 
 
 def _key() -> bytes | None:
-    global _unkeyed_logged
-    for name in (FILTER_KEY_ENV, ID_KEY_ENV):
-        configured = os.environ.get(name, "").strip()
-        if len(configured) >= MIN_KEY_LENGTH:
-            return configured.encode()
+    global _unkeyed_logged, _short_logged
+    dedicated = os.environ.get(FILTER_KEY_ENV, "").strip()
+    if dedicated:
+        if len(dedicated) >= MIN_KEY_LENGTH:
+            return dedicated.encode()
+        if not _short_logged:
+            _short_logged = True
+            _LOGGER.warning(
+                "%s is set but shorter than %d characters; audit filter fingerprints are omitted "
+                "(it is not replaced by another key)",
+                FILTER_KEY_ENV,
+                MIN_KEY_LENGTH,
+            )
+        return None
+    configured = os.environ.get(ID_KEY_ENV, "").strip()
+    if len(configured) >= MIN_KEY_LENGTH:
+        return configured.encode()
     if not _unkeyed_logged:
         _unkeyed_logged = True
         _LOGGER.warning(
@@ -122,5 +140,6 @@ def filter_fingerprints(filters: FlowFilterSet) -> dict[str, str]:
 
 
 def reset_for_tests() -> None:
-    global _unkeyed_logged
+    global _unkeyed_logged, _short_logged
     _unkeyed_logged = False
+    _short_logged = False

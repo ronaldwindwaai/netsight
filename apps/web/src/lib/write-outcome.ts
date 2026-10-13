@@ -33,6 +33,7 @@ export interface WriteFailure {
 }
 
 export const STEP_UP_CODE = 'STEP_UP_REQUIRED';
+export const STALE_EVIDENCE_CODE = 'STALE_EVIDENCE';
 const MAX_SERVER_MESSAGE = 500;
 const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f-\u009f]/g;
 
@@ -99,6 +100,15 @@ export function describeWriteFailure(failure: Failure): WriteFailure {
       'Too many changes',
       'Too many changes were made in a short time. Nothing was changed. Wait a minute and try again.',
       'retry-later',
+      failure,
+    );
+  }
+  if (failure.status === 409 && failure.code === STALE_EVIDENCE_CODE) {
+    return build(
+      'conflict',
+      'The evidence changed',
+      'The evidence for this finding changed after you opened it, so your decision was not applied. Nothing was changed. Reload to see the current evidence, then decide again.',
+      'reload',
       failure,
     );
   }

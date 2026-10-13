@@ -182,6 +182,60 @@
           }
         }
       }
+    },
+    {
+      "if": {
+        "properties": {
+          "cohort": {
+            "properties": {
+              "state": {
+                "const": "not-applied"
+              }
+            }
+          }
+        },
+        "required": [
+          "cohort"
+        ]
+      },
+      "then": {
+        "properties": {
+          "evaluation": {
+            "properties": {
+              "series_withheld": {
+                "const": 0
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "cohort": {
+            "properties": {
+              "state": {
+                "const": "sufficient"
+              }
+            }
+          }
+        },
+        "required": [
+          "cohort"
+        ]
+      },
+      "then": {
+        "properties": {
+          "evaluation": {
+            "properties": {
+              "series_withheld": {
+                "const": 0
+              }
+            }
+          }
+        }
+      }
     }
   ],
   "$defs": {
@@ -296,6 +350,7 @@
       "required": [
         "status",
         "series",
+        "series_withheld",
         "buckets",
         "evaluated",
         "insufficient_baseline",
@@ -316,6 +371,11 @@
         "series": {
           "type": "integer",
           "minimum": 0
+        },
+        "series_withheld": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Series left out because fewer than the cohort minimum of internal endpoints stood behind them (aggregate tier only; the other counts cover the remaining series)."
         },
         "buckets": {
           "type": "integer",

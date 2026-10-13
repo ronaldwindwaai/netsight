@@ -6,6 +6,7 @@ the one safe reader both documents share:
 
 * the document comes from exactly one place: a file (``<NAME>_FILE``) or inline JSON (``<NAME>``);
   naming both is ambiguous and invalid, naming neither is *not configured*;
+* nesting deep enough to exhaust the parser's recursion is invalid, not a crash;
 * a file is opened once and measured with ``fstat`` on that handle, so a swap between a size check
   and the read cannot slip past the limit; only a regular file is read;
 * duplicate keys are refused (a later key must not silently override an earlier one);
@@ -63,6 +64,8 @@ def _parse(raw: bytes, name: str) -> OperatorDocument:
         data = json.loads(raw.decode("utf-8"), object_pairs_hook=_reject_duplicates)
     except _DuplicateKeyError:
         return _invalid(name, "duplicate-key")
+    except RecursionError:  # 64 kB of "[" is under the size limit and over the parser's depth
+        return _invalid(name, "too-deep")
     except (UnicodeDecodeError, ValueError):
         return _invalid(name, "not-json")
     return OperatorDocument("configured", data)

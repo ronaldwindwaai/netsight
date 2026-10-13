@@ -15,10 +15,12 @@ Two deliberate asymmetries:
 * application names match **exactly** (``casefold`` only), never by prefix or substring, so a hostile
   label such as ``Zoom-malware`` can not borrow an approval. A label that changes under NFKC
   (full-width letters, ligatures, no-break spaces: a look-alike of an ASCII name) is *unknown*, never
-  folded onto the name it imitates; a policy entry like that is refused with the whole file.
+  folded onto the name it imitates; a policy entry like that is refused with the whole file. The
+  folding also never lets a non-ASCII letter collapse onto ASCII (``ß`` and ``ẞ`` are one letter, and
+  neither equals ``ss``); two risk names that fold to the same text refuse the file;
 
 A destination ``allow`` range is refused when it is wide enough to cover a large part of the Internet
-(IPv4 shorter than /8, IPv6 shorter than /16): one slip would make nearly everything "allow-listed".
+(IPv4 shorter than /8, IPv6 shorter than /32): one slip would make nearly everything "allow-listed".
 Deny ranges may be as broad as the operator likes (denying too much fails safe). The file is opened
 once and measured with ``fstat`` on that handle, so a swap between a size check and the read can not
 slip past the limit.
@@ -57,7 +59,7 @@ _CLOCK = re.compile(r"^([01]\d|2[0-3]):([0-5]\d)$")
 END_OF_DAY: Final = "24:00"
 MINUTES_PER_DAY: Final = 24 * 60
 MIN_ALLOW_PREFIX_V4: Final = 8
-MIN_ALLOW_PREFIX_V6: Final = 16
+MIN_ALLOW_PREFIX_V6: Final = 32
 _DST_PROBE: Final = timedelta(hours=6)
 _ZONE = re.compile(r"^[A-Za-z][A-Za-z0-9_+-]*(?:/[A-Za-z0-9_+-]+){0,2}$")
 _ASN = re.compile(r"^AS([1-9]\d{0,9})$")
@@ -96,9 +98,25 @@ def _stable(value: str) -> bool:
     return unicodedata.normalize("NFKC", value) == value
 
 
+def _fold_char(char: str) -> str:
+    """Case-fold one character, but never let a non-ASCII letter collapse onto ASCII.
+
+    Full case folding turns ``ß`` into ``ss`` (and ``ẞ``, the Kelvin sign, the long s ... into ASCII
+    too), which would let a look-alike borrow the approval or risk of the ASCII name. Such a character
+    is only lower-cased (``ẞ`` and ``ß`` stay one letter) and otherwise left alone.
+    """
+    if char.isascii():
+        return char.casefold()
+    folded = char.casefold()
+    if folded.isascii():
+        lowered = char.lower()
+        return char if lowered.isascii() else lowered
+    return folded
+
+
 def _fold(value: str) -> str:
-    """The comparison form of a label: stripped and case-folded, nothing else."""
-    return value.strip().casefold()
+    """The comparison form of a label: stripped, case-folded, with ASCII-equality semantics."""
+    return "".join(_fold_char(char) for char in value.strip())
 
 
 def _entry(value: str) -> str:
@@ -362,9 +380,12 @@ def _parse_risk(value: object) -> dict[str, Risk]:
         raise _PolicyError("risk must be a mapping of at most the entry limit")
     result: dict[str, Risk] = {}
     for name, level in value.items():
-        if level not in _RISKS:
+        if not isinstance(level, str) or level not in _RISKS:
             raise _PolicyError("risk is low, medium or high")
-        result[_entry(_text(name, "risk name"))] = level
+        key = _entry(_text(name, "risk name"))
+        if key in result:
+            raise _PolicyError("two risk names are the same after folding")
+        result[key] = level  # type: ignore[assignment]
     return result
 
 
@@ -401,7 +422,8 @@ def _invalid(error: BaseException) -> TrafficPolicy:
 def _from_handle(handle: Any) -> TrafficPolicy:
     try:
         return _parse_bytes(_read_document(handle))
-    except (_PolicyError, OSError, ValueError, RecursionError) as error:
+    except (_PolicyError, OSError, ValueError, TypeError, RecursionError) as error:
+        # TypeError: a value of the wrong JSON type that slipped a check is still just a bad file.
         return _invalid(error)
 
 

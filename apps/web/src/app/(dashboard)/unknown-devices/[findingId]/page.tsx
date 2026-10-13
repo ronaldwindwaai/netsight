@@ -55,7 +55,12 @@ export default async function UnknownDevicePage({ params }: { params: Promise<{ 
         actions={
           item === null ? null : (
             <UnknownDeviceActionsPanel
-              finding={{ id: item.id, state: item.state, assignee_id: item.assignee_id }}
+              finding={{
+                id: item.id,
+                state: item.state,
+                assignee_id: item.assignee_id,
+                evidence_version: item.evidence_version,
+              }}
               viewer={viewer}
               currentPath={`/unknown-devices/${findingId}`}
             />

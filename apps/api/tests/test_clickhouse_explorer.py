@@ -769,6 +769,13 @@ def baseline_answers(**overrides: Any) -> dict[str, Any]:
             ]
         },
         OLDEST: {"data": [{"oldest": hour(-24 * 20), "agg_rows": "9000"}]},
+        "AS total_sources": {"data": [{"total_sources": "40"}]},
+        "AS app_sources": {
+            "data": [
+                {"app_name": "Zoom", "app_sources": "30"},
+                {"app_name": "Teams", "app_sources": "2"},
+            ]
+        },
         FIRST_ASN: {"data": [{"first_asn": "64501", "agg_bytes": "800", "first_seen": hour(3)}]},
         FIRST_DEST: {
             "data": [
@@ -812,7 +819,7 @@ async def test_baseline_inputs_cover_the_lookback_and_the_window() -> None:
 async def test_every_baseline_query_is_bounded() -> None:
     script = Script(FULL, baseline_answers())
     await inputs(script)
-    assert 4 <= len(script.data_requests) <= 6
+    assert 4 <= len(script.data_requests) <= 8
     for request in script.data_requests:
         sql = request.content.decode()
         assert "FORMAT JSON" in sql and "LIMIT" in sql and "SELECT *" not in sql
@@ -824,7 +831,7 @@ async def test_every_baseline_query_is_bounded() -> None:
 async def test_without_applications_only_the_total_series_is_read() -> None:
     columns = [c for c in FULL if c != "Application"]
     answers_ = baseline_answers()
-    del answers_["AS app_hour"]
+    del answers_["AS app_hour"], answers_["AS app_sources"]
     script = Script(columns, answers_)
     result = await inputs(script)
     assert result.applications_reported is False and result.hourly_apps == {}
@@ -946,7 +953,7 @@ async def test_application_and_destination_endpoint_counts_use_uniq_too() -> Non
     )
     await client(script).applications(start=START, end=END, limit=5)
     sql = script.sql("AS app_name")
-    assert "uniqIf(`SrcAddr`" in sql and "uniqExact" not in sql
+    assert "uniqIf(" in sql and "uniqExact" not in sql
 
     script = Script(
         FULL,
@@ -957,7 +964,7 @@ async def test_application_and_destination_endpoint_counts_use_uniq_too() -> Non
     )
     await client(script).destinations(start=START, end=END, limit=5)
     sql = script.sql("AS dest_endpoints")
-    assert "uniq(`SrcAddr`)" in sql and "uniqExact" not in sql
+    assert "uniqIf(" in sql and "uniqExact" not in sql
 
 
 @pytest.mark.asyncio
@@ -1068,13 +1075,271 @@ async def test_first_seen_rows_carry_how_many_sources_reached_them() -> None:
         ("first-seen-destination", 9),
     ]
     for marker in (FIRST_ASN, FIRST_DEST):  # sources inside the window only, approximate counts
-        assert "uniqIf(`SrcAddr`, `TimeReceived` >= toDateTime({obs_from:UInt32}))" in script.sql(
-            marker
-        )
-        assert "uniqExact" not in script.sql(marker)
+        sql = script.sql(marker)
+        assert "AND `TimeReceived` >= toDateTime({obs_from:UInt32}))" in sql
+        assert "isIPAddressInRange" in sql and "uniqExact" not in sql
 
 
 @pytest.mark.asyncio
 async def test_a_first_seen_row_without_a_count_reports_none() -> None:
     result = await inputs(Script(FULL, baseline_answers()))
     assert all(f.endpoints is None for f in result.first_seen)
+
+
+# --- the cohort denominator is internal endpoints (second re-review, HIGH 3) -------------------------------
+
+BOUNDARY_SIDE = (
+    "if(`InIfBoundary` = 'external' AND `OutIfBoundary` = 'internal', `DstAddr`, `SrcAddr`)"
+)
+IN_ORGANISATION = "isIPAddressInRange(replaceRegexpOne(toString("
+PLAIN = [c for c in FULL if c not in {"InIfBoundary", "OutIfBoundary"}]
+
+
+def prefixes_of(params: dict[str, str]) -> list[str]:
+    raw = params["param_internal"]
+    assert raw.startswith("[") and raw.endswith("]")
+    return [item.strip("'") for item in raw[1:-1].split(",")]
+
+
+@pytest.mark.asyncio
+async def test_the_cohort_counts_the_internal_side_of_each_flow_by_direction() -> None:
+    script = Script(FULL, answers())
+    await explore(script)
+    volume = script.sql(VOLUME_MARK)
+    assert f"uniqIf({BOUNDARY_SIDE}," in volume  # inbound flows count the destination
+    assert IN_ORGANISATION in volume
+    assert "AS agg_internal" in volume
+    # The all-addresses figures are still reported, but they are not the cohort count.
+    assert "uniq(`SrcAddr`)" in volume and "AS agg_sources" in volume
+
+
+@pytest.mark.asyncio
+async def test_without_interface_boundaries_the_source_address_is_the_internal_side() -> None:
+    script = Script(PLAIN, answers())
+    await explore(script)
+    volume = script.sql(VOLUME_MARK)
+    assert "uniqIf(`SrcAddr`," in volume and "InIfBoundary" not in volume
+
+
+@pytest.mark.asyncio
+async def test_the_internal_prefixes_are_one_bound_parameter_never_sql_text() -> None:
+    script = Script(FULL, answers())
+    await explore(script)
+    volume = script.sql(VOLUME_MARK)
+    assert "{internal:Array(String)}" in volume
+    assert "10.0.0.0/8" not in volume and "fc00::/7" not in volume
+    prefixes = prefixes_of(script.params(VOLUME_MARK))
+    for expected in (
+        "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "100.64.0.0/10", "169.254.0.0/16",
+        "fc00::/7", "fe80::/10", "198.18.0.0/15", "192.0.0.0/24", "240.0.0.0/4", "0.0.0.0/8",
+    ):  # fmt: skip
+        assert expected in prefixes
+
+
+@pytest.mark.asyncio
+async def test_configured_internal_prefixes_reach_the_store(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("NETSIGHT_INTERNAL_PREFIXES", "203.0.113.0/24")
+    script = Script(FULL, answers())
+    await explore(script)
+    assert "203.0.113.0/24" in prefixes_of(script.params(VOLUME_MARK))
+
+
+@pytest.mark.asyncio
+async def test_mix_shares_and_the_summary_lists_all_count_the_internal_side() -> None:
+    script = Script(FULL, answers())
+    await explore(script)
+    for marker in ("GROUP BY app_name", DEST_MARK):
+        sql = script.sql(marker)
+        assert f"uniqIf({BOUNDARY_SIDE}," in sql and "AS agg_endpoints" in sql
+        assert "param_internal" in script.params(marker)
+
+    empty_apps = {"AS app_name": {"data": [], "totals": {"cur_bytes": "0", "prev_bytes": "0"}}}
+    script = Script(FULL, empty_apps)
+    await client(script).applications(start=START, end=END, limit=5)
+    assert f"uniqIf({BOUNDARY_SIDE}," in script.sql("AS app_name")
+    assert "param_internal" in script.params("AS app_name")
+
+    empty_dests = {
+        "AS dest_endpoints": {"data": [], "totals": {"dest_bytes": "0"}},
+        "AS first_seen": {"data": []},
+    }
+    script = Script(FULL, empty_dests)
+    await client(script).destinations(start=START, end=END, limit=5)
+    assert f"uniqIf({BOUNDARY_SIDE}," in script.sql("AS dest_endpoints")
+    assert "param_internal" in script.params("AS dest_endpoints")
+
+
+@pytest.mark.asyncio
+async def test_first_seen_counts_internal_endpoints_in_the_window_only() -> None:
+    script = Script(FULL, baseline_answers())
+    await inputs(script)
+    for marker in (FIRST_ASN, FIRST_DEST):
+        sql = script.sql(marker)
+        assert f"uniqIf({BOUNDARY_SIDE}," in sql and "param_internal" in script.params(marker)
+
+
+@pytest.mark.asyncio
+async def test_the_volume_reports_the_internal_endpoint_count() -> None:
+    payload = answers()
+    payload[VOLUME_MARK] = {
+        "data": [
+            {
+                "agg_bytes": "900", "agg_packets": "9", "agg_flows": "5", "agg_sources": "20",
+                "agg_destinations": "1", "agg_internal": "1",
+            }
+        ]
+    }  # fmt: skip
+    result = await explore(Script(FULL, payload))
+    assert result.aggregations is not None
+    volume = result.aggregations.volume
+    assert (volume.source_addresses, volume.internal_endpoints) == (20, 1)
+
+
+@pytest.mark.asyncio
+async def test_an_unreported_internal_endpoint_count_is_none_not_a_guess() -> None:
+    result = await explore(Script(FULL, answers()))  # the default payload carries no agg_internal
+    assert result.aggregations is not None
+    assert result.aggregations.volume.internal_endpoints is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("bad", ["-1", "1.5", "many", True])
+async def test_a_malformed_internal_endpoint_count_fails_the_read(bad: Any) -> None:
+    payload = answers()
+    payload[VOLUME_MARK]["data"][0]["agg_internal"] = bad
+    with pytest.raises(AdapterError):
+        await explore(Script(FULL, payload))
+
+
+@pytest.mark.asyncio
+async def test_mix_items_and_shares_carry_their_internal_endpoint_counts() -> None:
+    payload = answers()
+    payload[MIX_MARK]["data"][0]["agg_endpoints"] = "7"
+    payload[DEST_MARK]["data"][0]["agg_endpoints"] = "3"
+    result = await explore(Script(FULL, payload))
+    assert result.aggregations is not None
+    mix = result.aggregations.application_mix
+    assert mix is not None
+    assert [(i.visibility, i.endpoints) for i in mix.items] == [("shown", 7), ("shown", None)]
+    assert [(d.visibility, d.endpoints) for d in result.aggregations.destinations] == [
+        ("shown", 3),
+        ("shown", None),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_application_and_destination_rows_carry_internal_endpoint_counts() -> None:
+    rows = [app_row("Zoom", 700, 100, agg_endpoints="6")]
+    result = await applications(Script(FULL, app_answers(rows, 700, 100)))
+    assert result.rows[0].endpoints == 6 and result.rows[0].visibility == "shown"
+    destination = dest_row("198.51.100.7", 300, dest_endpoints="8")
+    found = await client(Script(FULL, dest_answers([destination], 300, []))).destinations(
+        start=START, end=END, limit=10
+    )
+    assert found.rows[0].endpoints == 8 and found.rows[0].visibility == "shown"
+
+
+# --- source-level freshness (second re-review, HIGH 4) --------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_the_aggregate_explorer_reads_the_source_level_newest_flow_without_rows() -> None:
+    payload = answers(**{"AS source_seen": {"data": [{"source_seen": SEEN + 600}]}})
+    del payload[ROW_MARK]
+    script = Script(FULL, payload)
+    result = await client(script).explore(
+        start=START, end=END, limit=10, filters=FlowFilterSet(application="x"), include_rows=False
+    )
+    assert result.source_observed_at == datetime.fromtimestamp(SEEN + 600, tz=UTC)
+    sql = script.sql("AS source_seen")
+    assert "WHERE `TimeReceived` >=" in sql and "ExporterName" not in sql and "{f_" not in sql
+    assert "LIMIT" in sql and "FORMAT JSON" in sql
+
+
+@pytest.mark.asyncio
+async def test_the_detail_explorer_does_not_pay_for_the_source_level_read() -> None:
+    script = Script(FULL, answers())
+    result = await explore(script)
+    assert result.source_observed_at is None
+    assert not [r for r in script.data_requests if "AS source_seen" in r.content.decode()]
+
+
+@pytest.mark.asyncio
+async def test_an_empty_window_has_no_source_level_time() -> None:
+    payload = answers(**{"AS source_seen": {"data": [{"source_seen": 0}]}})
+    del payload[ROW_MARK]
+    result = await client(Script(FULL, payload)).explore(
+        start=START, end=END, limit=10, filters=FlowFilterSet(), include_rows=False
+    )
+    assert result.source_observed_at is None
+
+
+@pytest.mark.asyncio
+async def test_applications_and_destinations_take_the_source_level_time_from_the_totals() -> None:
+    rows = [app_row("Zoom", 700, 100, agg_seen=SEEN - 3000)]
+    payload = app_answers(rows, 700, 100)
+    payload["cur_bytes"]["totals"]["agg_seen"] = SEEN
+    result = await applications(Script(FULL, payload))
+    assert result.observed_at == datetime.fromtimestamp(SEEN - 3000, tz=UTC)
+    assert result.source_observed_at == datetime.fromtimestamp(SEEN, tz=UTC)
+
+    answers_ = dest_answers([dest_row("198.51.100.7", 300, last_seen=SEEN - 3000)], 300, [])
+    answers_[DEST_COLS]["totals"]["last_seen"] = SEEN
+    found = await client(Script(FULL, answers_)).destinations(start=START, end=END, limit=10)
+    assert found.observed_at == datetime.fromtimestamp(SEEN - 3000, tz=UTC)
+    assert found.source_observed_at == datetime.fromtimestamp(SEEN, tz=UTC)
+
+
+@pytest.mark.asyncio
+async def test_without_totals_the_source_level_time_is_none() -> None:
+    result = await applications(Script(FULL, app_answers([app_row("Zoom", 700, 100)], 700, 100)))
+    assert result.source_observed_at is None
+
+
+# --- the hourly series' cohort inputs (second re-review, HIGH 5) -------------------------------------------------
+
+
+def with_sources(**overrides: Any) -> dict[str, Any]:
+    payload = baseline_answers()
+    payload.update(overrides)
+    return payload
+
+
+@pytest.mark.asyncio
+async def test_the_baseline_carries_internal_endpoint_counts_per_series() -> None:
+    script = Script(FULL, with_sources())
+    result = await inputs(script)
+    assert result.sources_total == 40
+    assert dict(result.sources_by_application) == {"Zoom": 30, "Teams": 2}
+    for marker in ("AS total_sources", "AS app_sources"):
+        sql = script.sql(marker)
+        assert f"uniqIf({BOUNDARY_SIDE}," in sql and "param_internal" in script.params(marker)
+        assert "LIMIT" in sql and "FORMAT JSON" in sql and "obs_from" in sql
+
+
+@pytest.mark.asyncio
+async def test_without_applications_only_the_total_count_is_read() -> None:
+    columns = [c for c in FULL if c != "Application"]
+    payload = with_sources()
+    del payload["AS app_hour"], payload["AS app_sources"]
+    result = await inputs(Script(columns, payload))
+    assert result.sources_total == 40 and dict(result.sources_by_application) == {}
+
+
+@pytest.mark.asyncio
+async def test_a_source_that_does_not_count_endpoints_yields_none() -> None:
+    payload = with_sources()
+    payload["AS total_sources"] = {"data": [{"total_sources": None}]}
+    result = await inputs(Script(FULL, payload))
+    assert result.sources_total is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("bad", ["-3", "x", 1.5])
+async def test_malformed_series_counts_fail_the_read(bad: Any) -> None:
+    payload = with_sources()
+    payload["AS app_sources"] = {"data": [{"app_name": "Zoom", "app_sources": bad}]}
+    with pytest.raises(AdapterError):
+        await inputs(Script(FULL, payload))

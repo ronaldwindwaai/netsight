@@ -116,38 +116,6 @@
           "cohort": {
             "properties": {
               "state": {
-                "const": "too-few-sources"
-              }
-            }
-          }
-        },
-        "required": [
-          "cohort"
-        ]
-      },
-      "then": {
-        "properties": {
-          "items": {
-            "contains": {
-              "properties": {
-                "endpoints": {
-                  "type": "null"
-                }
-              },
-              "required": [
-                "endpoints"
-              ]
-            }
-          }
-        }
-      }
-    },
-    {
-      "if": {
-        "properties": {
-          "cohort": {
-            "properties": {
-              "state": {
                 "enum": [
                   "sufficient",
                   "too-few-sources"
@@ -173,6 +141,99 @@
           }
         }
       }
+    },
+    {
+      "if": {
+        "properties": {
+          "cohort": {
+            "properties": {
+              "state": {
+                "const": "not-applied"
+              }
+            }
+          }
+        },
+        "required": [
+          "cohort"
+        ]
+      },
+      "then": {
+        "properties": {
+          "items": {
+            "items": {
+              "properties": {
+                "visibility": {
+                  "const": "shown"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "cohort": {
+            "properties": {
+              "state": {
+                "const": "sufficient"
+              }
+            }
+          }
+        },
+        "required": [
+          "cohort"
+        ]
+      },
+      "then": {
+        "properties": {
+          "items": {
+            "items": {
+              "properties": {
+                "visibility": {
+                  "const": "shown"
+                },
+                "endpoints": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "cohort": {
+            "properties": {
+              "state": {
+                "const": "too-few-sources"
+              }
+            }
+          }
+        },
+        "required": [
+          "cohort"
+        ]
+      },
+      "then": {
+        "properties": {
+          "items": {
+            "contains": {
+              "properties": {
+                "visibility": {
+                  "const": "withheld"
+                }
+              },
+              "required": [
+                "visibility"
+              ]
+            }
+          }
+        }
+      }
     }
   ],
   "$defs": {
@@ -184,6 +245,7 @@
         "rank",
         "address",
         "scope",
+        "visibility",
         "domain",
         "asn",
         "country",
@@ -213,6 +275,13 @@
             "internal"
           ],
           "description": "internal: a private, loopback, link-local, shared or multicast address. The aggregate tier is never told about internal destinations."
+        },
+        "visibility": {
+          "enum": [
+            "shown",
+            "withheld"
+          ],
+          "description": "withheld: fewer than the cohort minimum of internal endpoints stood behind the row, so its volume, share, trend, counts and dates are null. Only the aggregate tier ever sees withheld rows; the detail tier sees every row shown."
         },
         "domain": {
           "type": [
@@ -248,11 +317,17 @@
           "description": "Earliest time seen within the look-back (first_seen_since); null when not determined."
         },
         "last_seen": {
-          "type": "string",
+          "type": [
+            "string",
+            "null"
+          ],
           "format": "date-time"
         },
         "bytes": {
-          "type": "integer",
+          "type": [
+            "integer",
+            "null"
+          ],
           "minimum": 0
         },
         "packets": {
@@ -276,7 +351,7 @@
             "null"
           ],
           "minimum": 0,
-          "description": "Distinct source addresses that sent to the destination."
+          "description": "Distinct internal endpoints that sent to the destination."
         },
         "users": {
           "type": [
@@ -293,7 +368,65 @@
             "unknown"
           ]
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "visibility": {
+                "const": "withheld"
+              }
+            },
+            "required": [
+              "visibility"
+            ]
+          },
+          "then": {
+            "properties": {
+              "bytes": {
+                "type": "null"
+              },
+              "packets": {
+                "type": "null"
+              },
+              "share": {
+                "type": "null"
+              },
+              "endpoints": {
+                "type": "null"
+              },
+              "users": {
+                "type": "null"
+              },
+              "domain": {
+                "type": "null"
+              },
+              "asn": {
+                "type": "null"
+              },
+              "country": {
+                "type": "null"
+              },
+              "first_seen": {
+                "type": "null"
+              },
+              "last_seen": {
+                "type": "null"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "bytes": {
+                "type": "integer"
+              },
+              "last_seen": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      ]
     }
   }
 }

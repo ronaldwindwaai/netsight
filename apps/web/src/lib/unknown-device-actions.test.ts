@@ -9,6 +9,7 @@ import {
 import type { Viewer } from './incident-actions.ts';
 
 const ID = 'unknown-device-6f1c2a9e-0b1d-5c3e-8f4a-123456789abc';
+const V = 7;
 const ALL = [
   'unknown-devices:read',
   'unknown-devices:acknowledge',
@@ -89,16 +90,19 @@ const refused = (input: unknown) => {
   return (plan as Extract<typeof plan, { ok: false }>).message;
 };
 
-test('acknowledge and investigate need only a valid finding id', () => {
-  assert.deepEqual(ok({ findingId: ID, action: 'acknowledge' }), {
-    ok: true, path: `/api/v1/unknown-devices/${ID}/acknowledge`, body: {}, result: 'finding',
+test('acknowledge and investigate need a valid finding id and the evidence version shown', () => {
+  assert.deepEqual(ok({ findingId: ID, action: 'acknowledge', expectedEvidenceVersion: V }), {
+    ok: true,
+    path: `/api/v1/unknown-devices/${ID}/acknowledge`,
+    body: { expected_evidence_version: V },
+    result: 'finding',
   });
-  assert.equal(ok({ findingId: ID, action: 'investigate' }).path, `/api/v1/unknown-devices/${ID}/investigate`);
+  assert.equal(ok({ findingId: ID, action: 'investigate', expectedEvidenceVersion: V }).path, `/api/v1/unknown-devices/${ID}/investigate`);
 });
 
 test('a malformed or hostile finding id never reaches a path', () => {
   for (const bad of ['', 'x', 'unknown-device-1', `${ID}/../resolve`, `${ID}?x=1`, '../etc', 5, null, undefined]) {
-    assert.match(refused({ findingId: bad, action: 'acknowledge' }), /identifier/);
+    assert.match(refused({ findingId: bad, action: 'acknowledge', expectedEvidenceVersion: V }), /identifier/);
   }
 });
 
@@ -109,12 +113,37 @@ test('an unknown action or a non-object is refused', () => {
   for (const bad of [null, undefined, 'x', 5, [], true]) assert.match(refused(bad), /not well formed/);
 });
 
+test('every decision quotes the evidence version the page displayed, within the contract bounds', () => {
+  const decisions = [
+    { action: 'acknowledge' },
+    { action: 'investigate' },
+    { action: 'assign', assigneeId: 'oidc:a' },
+    { action: 'resolve', expectedEvidenceVersion: V, outcome: 'resolved', reason: 'ok' },
+  ];
+  for (const decision of decisions) {
+    for (const bad of [undefined, null, 0, -1, 1.5, 1_000_001, '7', Number.NaN, Number.POSITIVE_INFINITY]) {
+      assert.match(refused({ findingId: ID, ...decision, expectedEvidenceVersion: bad }), /evidence/i);
+    }
+    assert.equal(ok({ findingId: ID, ...decision, expectedEvidenceVersion: 1 }).ok, true);
+    assert.equal(ok({ findingId: ID, ...decision, expectedEvidenceVersion: 1_000_000 }).ok, true);
+  }
+});
+
+test('a comment does not depend on the evidence and sends no version', () => {
+  assert.deepEqual(ok({ findingId: ID, action: 'comment', message: 'hi', expectedEvidenceVersion: V }).body, {
+    message: 'hi',
+  });
+});
+
 test('assign rebuilds the body and unassign is explicit', () => {
-  const plan = ok({ findingId: ID, action: 'assign', assigneeId: '  oidc:tech-9  ', extra: 'ignored' });
-  assert.deepEqual(plan.body, { assignee_id: 'oidc:tech-9' });
-  assert.deepEqual(ok({ findingId: ID, action: 'assign', assigneeId: null }).body, { assignee_id: null });
+  const plan = ok({ findingId: ID, action: 'assign', expectedEvidenceVersion: V, assigneeId: '  oidc:tech-9  ', extra: 'ignored' });
+  assert.deepEqual(plan.body, { assignee_id: 'oidc:tech-9', expected_evidence_version: V });
+  assert.deepEqual(ok({ findingId: ID, action: 'assign', expectedEvidenceVersion: V, assigneeId: null }).body, {
+    assignee_id: null,
+    expected_evidence_version: V,
+  });
   for (const bad of ['', '   ', 'x'.repeat(256), 5, undefined]) {
-    assert.match(refused({ findingId: ID, action: 'assign', assigneeId: bad }), /assignee/i);
+    assert.match(refused({ findingId: ID, action: 'assign', expectedEvidenceVersion: V, assigneeId: bad }), /assignee/i);
   }
 });
 
@@ -131,14 +160,14 @@ test('a comment is bounded and its text is carried verbatim', () => {
 });
 
 test('resolving needs an outcome and a reason, within the contract bounds', () => {
-  assert.deepEqual(ok({ findingId: ID, action: 'resolve', outcome: 'false-positive', reason: 'Lab device' }).body, {
-    outcome: 'false-positive', reason: 'Lab device',
+  assert.deepEqual(ok({ findingId: ID, action: 'resolve', expectedEvidenceVersion: V, outcome: 'false-positive', reason: 'Lab device' }).body, {
+    outcome: 'false-positive', reason: 'Lab device', expected_evidence_version: V,
   });
-  assert.equal(ok({ findingId: ID, action: 'resolve', outcome: 'resolved', reason: 'x'.repeat(1000) }).ok, true);
-  assert.match(refused({ findingId: ID, action: 'resolve', outcome: 'acknowledged', reason: 'x' }), /outcome/i);
-  assert.match(refused({ findingId: ID, action: 'resolve', outcome: 'resolved' }), /reason/i);
-  assert.match(refused({ findingId: ID, action: 'resolve', outcome: 'resolved', reason: '   ' }), /reason/i);
-  assert.match(refused({ findingId: ID, action: 'resolve', outcome: 'resolved', reason: 'x'.repeat(1001) }), /reason/i);
+  assert.equal(ok({ findingId: ID, action: 'resolve', expectedEvidenceVersion: V, outcome: 'resolved', reason: 'x'.repeat(1000) }).ok, true);
+  assert.match(refused({ findingId: ID, action: 'resolve', expectedEvidenceVersion: V, outcome: 'acknowledged', reason: 'x' }), /outcome/i);
+  assert.match(refused({ findingId: ID, action: 'resolve', expectedEvidenceVersion: V, outcome: 'resolved' }), /reason/i);
+  assert.match(refused({ findingId: ID, action: 'resolve', expectedEvidenceVersion: V, outcome: 'resolved', reason: '   ' }), /reason/i);
+  assert.match(refused({ findingId: ID, action: 'resolve', expectedEvidenceVersion: V, outcome: 'resolved', reason: 'x'.repeat(1001) }), /reason/i);
 });
 
 test('counting is by code point, matching the contract', () => {

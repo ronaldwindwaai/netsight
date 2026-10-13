@@ -6,4 +6,9 @@
 
 DROP TABLE IF EXISTS unknown_device_events;
 DROP TABLE IF EXISTS unknown_device_findings;
+DROP FUNCTION IF EXISTS netsight_unknown_device_event_logged();
+DROP FUNCTION IF EXISTS netsight_unknown_device_finding_logged();
+DROP FUNCTION IF EXISTS netsight_check_unknown_device_log(uuid);
 DROP FUNCTION IF EXISTS netsight_guard_unknown_device_update();
+DROP FUNCTION IF EXISTS netsight_guard_unknown_device_insert();
+DROP FUNCTION IF EXISTS netsight_udf_evidence(jsonb, jsonb, jsonb, text, text, jsonb);

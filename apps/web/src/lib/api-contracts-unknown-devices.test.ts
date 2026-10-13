@@ -27,6 +27,7 @@ import { buildInstance, loadVectorFile } from './contract-vectors.ts';
 const VECTORS = loadVectorFile('unknown-devices.vectors.json');
 const REQUEST_ENTITIES = [
   'unknown_device_assign_request',
+  'unknown_device_transition_request',
   'unknown_device_comment_request',
   'unknown_device_resolve_request',
 ];

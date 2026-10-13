@@ -224,7 +224,8 @@ def test_management_may_not_narrow_to_a_device_or_vlan(name: str, value: str) ->
     use(source)
     response = Caller("management").get(FLOWS, **WINDOW, **{name: value})
     assert response.status_code == 403
-    assert source.calls == [] and value not in response.text
+    # The refusal echoes nothing (compare the message: a random correlation id may contain "20").
+    assert source.calls == [] and value not in response.json()["error"]["message"]
 
 
 @pytest.mark.parametrize(("name", "value"), [("device", "edge-rtr-1"), ("vlan", "20")])
@@ -252,8 +253,10 @@ def internal_share(**overrides: Any) -> dict[str, Any]:
         "address": "192.168.1.20",
         "host": "nas.corp.example",
         "scope": "internal",
+        "visibility": "shown",
         "bytes": 50_000_000,
         "share": 0.04,
+        "endpoints": 11,
         **overrides,
     }
 
@@ -319,12 +322,27 @@ def test_destinations_keep_internal_rows_labelled_for_the_detail_tier(role: str)
 # --- endpoint counts ------------------------------------------------------------------------------------------------------
 
 
-def test_destination_endpoint_counts_below_the_minimum_are_withheld() -> None:
+def test_a_destination_below_the_minimum_is_withheld_whole() -> None:
     use(FakeSource(destinations=destinations_read(destination_rows())))
     body = ok(DESTS)
-    assert [i["endpoints"] for i in body["items"]] == [40, None]
+    shown, withheld = body["items"]
+    assert shown["visibility"] == "shown" and shown["endpoints"] == 40
+    assert withheld["visibility"] == "withheld" and withheld["address"] == "198.51.100.7"
+    for field in (
+        "bytes",
+        "packets",
+        "share",
+        "endpoints",
+        "users",
+        "domain",
+        "asn",
+        "country",
+        "first_seen",
+        "last_seen",
+    ):
+        assert withheld[field] is None, field
     assert body["cohort"] == {"state": "too-few-sources", "minimum": 5}
-    assert 2 not in [i["endpoints"] for i in body["items"]]
+    assert '"bytes": 60000000' not in json.dumps(body)
 
 
 def test_destination_counts_at_the_minimum_are_listed() -> None:
@@ -352,14 +370,21 @@ def application_rows() -> list[Any]:
     ]
 
 
-def test_application_endpoint_counts_below_the_minimum_are_withheld() -> None:
+def test_an_application_below_the_minimum_is_withheld_whole() -> None:
     use(FakeSource(applications=applications_read(application_rows())))
     body = ok(APPS)
-    assert [(i["application"], i["endpoints"]) for i in body["items"]] == [
-        ("Microsoft 365", 25),
-        ("BitTorrent", None),
-    ]
+    shown, withheld = body["items"]
+    assert (shown["application"], shown["visibility"], shown["endpoints"]) == (
+        "Microsoft 365",
+        "shown",
+        25,
+    )
+    assert (withheld["application"], withheld["visibility"]) == ("BitTorrent", "withheld")
+    for field in ("bytes", "packets", "share", "endpoints", "users"):
+        assert withheld[field] is None, field
+    assert withheld["trend"] == NO_TREND
     assert body["cohort"]["state"] == "too-few-sources"
+    assert '"bytes": 40000000' not in json.dumps(body)
 
 
 def test_application_counts_for_the_detail_tier_are_never_withheld() -> None:
@@ -380,6 +405,7 @@ def test_a_lower_configured_minimum_lists_more(monkeypatch: pytest.MonkeyPatch) 
     use(FakeSource(applications=applications_read(application_rows())))
     body = ok(APPS)
     assert [i["endpoints"] for i in body["items"]] == [25, None]  # 1 is still below 2
+    assert [i["visibility"] for i in body["items"]] == ["shown", "withheld"]
 
 
 # --- first-seen destinations -----------------------------------------------------------------------------------------------

@@ -51,7 +51,7 @@ test('every traffic vector entity has a parser', () => {
 
 test('the shared vectors are large enough to matter', () => {
   const cases = Object.values(VECTORS).reduce((sum, block) => sum + block.cases.length, 0);
-  assert.ok(cases >= 320, `expected at least 320 cases, saw ${cases}`);
+  assert.ok(cases >= 400, `expected at least 400 cases, saw ${cases}`);
 });
 
 for (const [entity, parse] of Object.entries(PARSERS)) {

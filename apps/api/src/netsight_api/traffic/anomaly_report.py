@@ -12,8 +12,10 @@ the source reported:
 * **Bounded.** At most 50 anomalies and 20 first-seen rows are listed (the full anomaly count is
   reported), and the evaluation is bounded to a week of hours and eleven series.
 * **Small cohorts.** The aggregate tier is not shown a first-seen ASN or destination that fewer than
-  the cohort minimum of source addresses reached (``traffic.cohort``); the response says when rows
-  were withheld.
+  the cohort minimum of internal endpoints reached, and an hourly series (the total, or one
+  application) that fewer than that many contributed to is neither evaluated nor reported: the
+  evaluation counts only the series that pass, ``series_withheld`` says how many did not, and the
+  response says when anything was withheld (``traffic.cohort``).
 * **Daylight saving.** The weeks compared are fixed 168-hour UTC weeks, so when the policy time zone
   changes its offset between the first baseline week and the end of the range, the local hour of the
   earlier weeks is shifted by one. The response flags that (``evaluation.daylight_saving``).
@@ -170,10 +172,12 @@ def _evaluation(
     policy: TrafficPolicy,
     first_hour: datetime,
     last_hour: datetime,
+    series_withheld: int,
 ) -> Evaluation:
     return Evaluation(
         status=evaluation_status(outcome.evaluated, outcome.insufficient),  # type: ignore[arg-type]
         series=outcome.series,
+        series_withheld=series_withheld,
         buckets=outcome.buckets,
         evaluated=outcome.evaluated,
         insufficient_baseline=outcome.insufficient,
@@ -182,6 +186,16 @@ def _evaluation(
         application_series="evaluated" if inputs.applications_reported else "not-reported",
         daylight_saving=_daylight_saving(policy, first_hour, last_hour),
     )
+
+
+def _series(inputs: AnomalyInputs, minimum: int | None) -> tuple[list[alg.SeriesData], int]:
+    """The series the caller's tier may be judged on, and how many were left out."""
+    candidates = [(alg.SeriesData("total", None, inputs.hourly_total), inputs.sources_total)] + [
+        (alg.SeriesData("application", name, hours), inputs.sources_by_application.get(name))
+        for name, hours in inputs.hourly_apps.items()
+    ]
+    passing = [data for data, sources in candidates if cohort.series_passes(sources, minimum)]
+    return passing, len(candidates) - len(passing)
 
 
 def build_anomalies(
@@ -197,9 +211,7 @@ def build_anomalies(
 
     ``minimum`` is the cohort minimum for the aggregate tier (``None``: the detail tier).
     """
-    series = [alg.SeriesData("total", None, inputs.hourly_total)] + [
-        alg.SeriesData("application", name, hours) for name, hours in inputs.hourly_apps.items()
-    ]
+    series, withheld = _series(inputs, minimum)
     outcome = alg.evaluate_series(
         series,
         frozenset(inputs.hourly_total),
@@ -207,7 +219,7 @@ def build_anomalies(
         int(last_hour.timestamp()),
     )
     history = _history(inputs, first_hour)
-    first_seen, cohort_status = (
+    first_seen, first_seen_status = (
         _first_seen_rows(inputs.first_seen, policy, minimum)
         if history.state == "sufficient"
         else ([], cohort.first_seen_view((), minimum)[1])
@@ -220,11 +232,11 @@ def build_anomalies(
         ),
         method=METHOD,
         working_hours=WorkingHours(state=policy.working_hours_state, timezone=policy.timezone_name),
-        evaluation=_evaluation(outcome, inputs, policy, first_hour, last_hour),
+        evaluation=_evaluation(outcome, inputs, policy, first_hour, last_hour, withheld),
         first_seen_status=history,
         anomalies=[_anomaly(found, policy) for found in outcome.anomalies[:MAX_ANOMALIES]],
         first_seen=first_seen,
-        cohort=cohort_status,
+        cohort=cohort.anomalies_status(first_seen_status, withheld, minimum),
         freshness=freshness_for(last_hour, inputs.observed_at),
     )
 
@@ -245,6 +257,7 @@ def static_fields(time_range: TrafficTimeRange, policy: TrafficPolicy) -> dict[s
         "evaluation": Evaluation(
             status="no-data",
             series=0,
+            series_withheld=0,
             buckets=0,
             evaluated=0,
             insufficient_baseline=0,

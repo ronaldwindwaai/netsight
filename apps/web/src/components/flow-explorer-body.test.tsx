@@ -204,7 +204,17 @@ describe('the rows', () => {
       attribution: attributionFixture({ person: { id: attributionFixture().person?.id ?? '', label: HOSTILE } }),
     });
     const aggregations = aggregationsFixture({
-      destinations: [{ address: '203.0.113.9', host: HOSTILE, scope: 'external', bytes: 5, share: null }],
+      destinations: [
+        {
+          address: '203.0.113.9',
+          host: HOSTILE,
+          scope: 'external',
+          visibility: 'shown',
+          bytes: 5,
+          share: null,
+          endpoints: 9,
+        },
+      ],
     });
     show(okState(flowsFixture({ flows: [flow], aggregations })));
     assert.equal(document.querySelectorAll('img, script, iframe').length, 0);
@@ -264,7 +274,7 @@ describe('the aggregations', () => {
   });
 
   it('an empty window still reports honest zero totals as source-reported', () => {
-    show(okState(flowsFixture({ flows: [], attribution: { level: 'person', state: 'not-evaluated', as_of: null }, aggregations: aggregationsFixture({ timeline: [], destinations: [], application_mix: null, volume: { bytes: 0, packets: null, flows: 0, source_addresses: 0, destination_addresses: 0 } }) })));
+    show(okState(flowsFixture({ flows: [], attribution: { level: 'person', state: 'not-evaluated', as_of: null }, aggregations: aggregationsFixture({ timeline: [], destinations: [], application_mix: null, volume: { bytes: 0, packets: null, flows: 0, source_addresses: 0, destination_addresses: 0, internal_endpoints: 0 } }) })));
     assert.match(text(), /No traffic in the timeline/);
   });
 });

@@ -19,13 +19,13 @@ test('the detail tier is told nothing about a cohort rule', () => {
 
 test('a sufficient cohort says how many sources stand behind the figures', () => {
   const notice = cohortNotice(COHORT_SUFFICIENT, 'figures');
-  assert.match(notice, /at least 5 source addresses/);
+  assert.match(notice, /at least 5 internal endpoints/);
   assert.match(notice, /Smaller groups are never shown/);
 });
 
 test('too few sources is explained, not shown as an empty result', () => {
   const notice = cohortNotice(COHORT_TOO_FEW, 'figures');
-  assert.match(notice, /fewer than 5 source addresses/);
+  assert.match(notice, /fewer than 5 internal endpoints/);
   assert.match(notice, /withheld/);
   assert.match(notice, /traffic:read-detail/);
   assert.doesNotMatch(notice, /No /);

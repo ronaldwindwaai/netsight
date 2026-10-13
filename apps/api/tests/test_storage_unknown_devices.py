@@ -31,6 +31,8 @@ from netsight_api.storage import (
     IllegalTransitionError,
     InvalidOperationError,
     NotFoundError,
+    StaleEvidenceError,
+    StorageConflictError,
 )
 from netsight_api.storage.unknown_devices import (
     InMemoryUnknownDeviceRepository,
@@ -55,17 +57,19 @@ class FakeClock:
         return self.current
 
 
-@pytest.fixture(
-    params=[
-        "memory",
-        pytest.param("postgres", marks=requires_pg),
-        pytest.param("postgres-app-role", marks=requires_pg),
-    ]
-)
-def store(request: pytest.FixtureRequest) -> Iterator[UnknownDeviceRepository]:
-    clock = FakeClock()
-    if request.param == "memory":
-        yield InMemoryUnknownDeviceRepository(clock=clock)
+BACKENDS = [
+    "memory",
+    pytest.param("postgres", marks=requires_pg),
+    pytest.param("postgres-app-role", marks=requires_pg),
+]
+
+
+def open_store(
+    backend: str, clock: FakeClock, fp_ttl: timedelta | None = None
+) -> Iterator[UnknownDeviceRepository]:
+    options: dict[str, Any] = {} if fp_ttl is None else {"fp_ttl": fp_ttl}
+    if backend == "memory":
+        yield InMemoryUnknownDeviceRepository(clock=clock, **options)
         return
     from pg_support import PG_DSN
 
@@ -79,14 +83,27 @@ def store(request: pytest.FixtureRequest) -> Iterator[UnknownDeviceRepository]:
         owner = PostgresSettings(dsn=PG_DSN, schema=schema)
         with owner.connect() as conn:
             apply_up(conn)
-            if request.param == "postgres-app-role":
+            if backend == "postgres-app-role":
                 role, role_dsn = stack.enter_context(app_role())
                 apply_grants(conn, role)
                 yield PostgresUnknownDeviceRepository(
-                    PostgresSettings(dsn=role_dsn, schema=schema), clock=clock
+                    PostgresSettings(dsn=role_dsn, schema=schema), clock=clock, **options
                 )
                 return
-        yield PostgresUnknownDeviceRepository(owner, clock=clock)
+        yield PostgresUnknownDeviceRepository(owner, clock=clock, **options)
+
+
+@pytest.fixture(params=BACKENDS)
+def store(request: pytest.FixtureRequest) -> Iterator[UnknownDeviceRepository]:
+    yield from open_store(request.param, FakeClock())
+
+
+@pytest.fixture(params=BACKENDS)
+def timed(request: pytest.FixtureRequest) -> Iterator[tuple[UnknownDeviceRepository, FakeClock]]:
+    """A store whose dismissals expire after ten days, and the clock to move past that."""
+    clock = FakeClock()
+    for repository in open_store(request.param, clock, fp_ttl=timedelta(days=10)):
+        yield repository, clock
 
 
 def created(store: UnknownDeviceRepository, **kwargs: Any) -> UnknownDeviceFinding:
@@ -95,6 +112,13 @@ def created(store: UnknownDeviceRepository, **kwargs: Any) -> UnknownDeviceFindi
     finding = store.get_finding(outcome.finding_id)
     assert finding is not None
     return finding
+
+
+def ver(store: UnknownDeviceRepository, finding_id: str) -> int:
+    """The evidence version a person looking at the finding now would be quoting."""
+    finding = store.get_finding(finding_id)
+    assert finding is not None
+    return finding.evidence_version
 
 
 def kinds(store: UnknownDeviceRepository, finding_id: str) -> list[str]:
@@ -168,8 +192,8 @@ def test_a_known_endpoint_keeps_its_state_and_assignee_when_it_is_seen_again(
     store: UnknownDeviceRepository,
 ) -> None:
     first = created(store)
-    store.transition_state(first.id, to_state="acknowledged", actor_id=ACTOR)
-    store.set_assignee(first.id, assignee_id=ACTOR, actor_id=ACTOR)
+    store.transition_state(first.id, expected_evidence_version=ver(store, first.id), to_state="acknowledged", actor_id=ACTOR)
+    store.set_assignee(first.id, expected_evidence_version=ver(store, first.id), assignee_id=ACTOR, actor_id=ACTOR)
     store.observe(detection(port=True))
     now = store.get_finding(first.id)
     assert now is not None and now.state == "acknowledged" and now.assignee_id == ACTOR
@@ -198,9 +222,9 @@ def test_a_false_positive_suppresses_the_endpoint_and_writes_nothing(
     store: UnknownDeviceRepository,
 ) -> None:
     first = created(store)
-    store.transition_state(first.id, to_state="false-positive", actor_id=ACTOR, reason="Lab device")
+    store.transition_state(first.id, expected_evidence_version=ver(store, first.id), to_state="false-positive", actor_id=ACTOR, reason="Lab device")
     before = store.get_finding(first.id)
-    outcome = store.observe(detection(port=True))
+    outcome = store.observe(detection())
     assert outcome.outcome == "suppressed" and outcome.finding_id == first.id
     assert store.get_finding(first.id) == before
     assert len(store.list_findings()[0]) == 1
@@ -211,7 +235,7 @@ def test_after_a_resolution_a_new_sighting_is_a_new_finding_that_remembers_the_o
     store: UnknownDeviceRepository,
 ) -> None:
     first = created(store)
-    store.transition_state(first.id, to_state="resolved", actor_id=ACTOR, reason="Added to NetBox")
+    store.transition_state(first.id, expected_evidence_version=ver(store, first.id), to_state="resolved", actor_id=ACTOR, reason="Added to NetBox")
     outcome = store.observe(detection())
     assert outcome.outcome == "created" and outcome.finding_id != first.id
     second = store.get_finding(outcome.finding_id)
@@ -248,16 +272,16 @@ def test_the_lifecycle_is_exactly_the_documented_table(
         "false-positive": ["false-positive"],
     }[start]
     for step in path:
-        store.transition_state(finding.id, to_state=step, actor_id=ACTOR, reason="because")  # type: ignore[arg-type]
+        store.transition_state(finding.id, expected_evidence_version=ver(store, finding.id), to_state=step, actor_id=ACTOR, reason="because")  # type: ignore[arg-type]
     allowed = target in ALLOWED_TRANSITIONS[start]  # type: ignore[index]
     if allowed:
         moved = store.transition_state(
-            finding.id, to_state=target, actor_id=ACTOR, reason="because"
+            finding.id, expected_evidence_version=ver(store, finding.id), to_state=target, actor_id=ACTOR, reason="because"
         )  # type: ignore[arg-type]
         assert moved.state == target
     else:
         with pytest.raises(IllegalTransitionError):
-            store.transition_state(finding.id, to_state=target, actor_id=ACTOR, reason="because")  # type: ignore[arg-type]
+            store.transition_state(finding.id, expected_evidence_version=ver(store, finding.id), to_state=target, actor_id=ACTOR, reason="because")  # type: ignore[arg-type]
         current = store.get_finding(finding.id)
         assert current is not None and current.state == start
 
@@ -266,7 +290,7 @@ def test_a_transition_leaves_an_event_with_both_states_and_the_actor(
     store: UnknownDeviceRepository,
 ) -> None:
     finding = created(store)
-    store.transition_state(finding.id, to_state="acknowledged", actor_id=ACTOR)
+    store.transition_state(finding.id, expected_evidence_version=ver(store, finding.id), to_state="acknowledged", actor_id=ACTOR)
     events = store.list_timeline(finding.id)
     last = events[-1]
     assert (last.kind, last.state_from, last.state_to, last.actor_id) == (
@@ -285,14 +309,14 @@ def test_a_resolution_or_dismissal_needs_a_real_reason(
 ) -> None:
     finding = created(store)
     with pytest.raises(InvalidOperationError):
-        store.transition_state(finding.id, to_state=outcome, actor_id=ACTOR, reason=reason)  # type: ignore[arg-type]
+        store.transition_state(finding.id, expected_evidence_version=ver(store, finding.id), to_state=outcome, actor_id=ACTOR, reason=reason)  # type: ignore[arg-type]
     current = store.get_finding(finding.id)
     assert current is not None and current.state == "new"
 
 
 def test_the_reason_is_stored_verbatim_as_data(store: UnknownDeviceRepository) -> None:
     finding = created(store)
-    store.transition_state(finding.id, to_state="resolved", actor_id=ACTOR, reason=HOSTILE)
+    store.transition_state(finding.id, expected_evidence_version=ver(store, finding.id), to_state="resolved", actor_id=ACTOR, reason=HOSTILE)
     assert store.list_timeline(finding.id)[-1].reason == HOSTILE
 
 
@@ -300,9 +324,11 @@ def test_unknown_and_malformed_ids_are_not_found(store: UnknownDeviceRepository)
     for bad in ("unknown-device-00000000-0000-4000-8000-000000000000", "x", "", "../etc"):
         assert store.get_finding(bad) is None
         with pytest.raises(NotFoundError):
-            store.transition_state(bad, to_state="acknowledged", actor_id=ACTOR)
+            store.transition_state(
+                bad, to_state="acknowledged", actor_id=ACTOR, expected_evidence_version=1
+            )
         with pytest.raises(NotFoundError):
-            store.set_assignee(bad, assignee_id=ACTOR, actor_id=ACTOR)
+            store.set_assignee(bad, assignee_id=ACTOR, actor_id=ACTOR, expected_evidence_version=1)
         with pytest.raises(NotFoundError):
             store.add_comment(bad, actor_id=ACTOR, message="x")
         with pytest.raises(NotFoundError):
@@ -316,7 +342,7 @@ def test_concurrent_acknowledgements_have_exactly_one_winner(
 
     def attempt(_: int) -> str:
         try:
-            store.transition_state(finding.id, to_state="acknowledged", actor_id=ACTOR)
+            store.transition_state(finding.id, expected_evidence_version=ver(store, finding.id), to_state="acknowledged", actor_id=ACTOR)
         except IllegalTransitionError:
             return "lost"
         return "won"
@@ -334,19 +360,19 @@ def test_assigning_records_the_assignee_and_unassigning_clears_it(
     store: UnknownDeviceRepository,
 ) -> None:
     finding = created(store)
-    assigned = store.set_assignee(finding.id, assignee_id="oidc:tech-9", actor_id=ACTOR)
+    assigned = store.set_assignee(finding.id, expected_evidence_version=ver(store, finding.id), assignee_id="oidc:tech-9", actor_id=ACTOR)
     assert assigned.assignee_id == "oidc:tech-9"
     last = store.list_timeline(finding.id)[-1]
     assert (last.kind, last.subject_id, last.actor_id) == ("assignee-changed", "oidc:tech-9", ACTOR)
-    cleared = store.set_assignee(finding.id, assignee_id=None, actor_id=ACTOR)
+    cleared = store.set_assignee(finding.id, expected_evidence_version=ver(store, finding.id), assignee_id=None, actor_id=ACTOR)
     assert cleared.assignee_id is None
     assert kinds(store, finding.id).count("assignee-changed") == 2
 
 
 def test_assigning_the_same_person_again_changes_nothing(store: UnknownDeviceRepository) -> None:
     finding = created(store)
-    store.set_assignee(finding.id, assignee_id=ACTOR, actor_id=ACTOR)
-    store.set_assignee(finding.id, assignee_id=ACTOR, actor_id=ACTOR)
+    store.set_assignee(finding.id, expected_evidence_version=ver(store, finding.id), assignee_id=ACTOR, actor_id=ACTOR)
+    store.set_assignee(finding.id, expected_evidence_version=ver(store, finding.id), assignee_id=ACTOR, actor_id=ACTOR)
     assert kinds(store, finding.id).count("assignee-changed") == 1
 
 
@@ -354,7 +380,7 @@ def test_assigning_the_same_person_again_changes_nothing(store: UnknownDeviceRep
 def test_an_unusable_assignee_is_refused(store: UnknownDeviceRepository, bad: str) -> None:
     finding = created(store)
     with pytest.raises((InvalidOperationError, ValueError)):
-        store.set_assignee(finding.id, assignee_id=bad, actor_id=ACTOR)
+        store.set_assignee(finding.id, expected_evidence_version=ver(store, finding.id), assignee_id=bad, actor_id=ACTOR)
 
 
 @pytest.mark.parametrize("outcome", ["resolved", "false-positive"])
@@ -362,16 +388,16 @@ def test_a_finished_finding_cannot_be_reassigned(
     store: UnknownDeviceRepository, outcome: str
 ) -> None:
     finding = created(store)
-    store.transition_state(finding.id, to_state=outcome, actor_id=ACTOR, reason="done")  # type: ignore[arg-type]
+    store.transition_state(finding.id, expected_evidence_version=ver(store, finding.id), to_state=outcome, actor_id=ACTOR, reason="done")  # type: ignore[arg-type]
     with pytest.raises(IllegalTransitionError):
-        store.set_assignee(finding.id, assignee_id=ACTOR, actor_id=ACTOR)
+        store.set_assignee(finding.id, expected_evidence_version=ver(store, finding.id), assignee_id=ACTOR, actor_id=ACTOR)
 
 
 def test_a_comment_is_stored_verbatim_and_allowed_even_after_the_finding_is_finished(
     store: UnknownDeviceRepository,
 ) -> None:
     finding = created(store)
-    store.transition_state(finding.id, to_state="resolved", actor_id=ACTOR, reason="done")
+    store.transition_state(finding.id, expected_evidence_version=ver(store, finding.id), to_state="resolved", actor_id=ACTOR, reason="done")
     event = store.add_comment(finding.id, actor_id=ACTOR, message=HOSTILE)
     assert (event.kind, event.message, event.actor_id) == ("comment", HOSTILE, ACTOR)
     assert store.list_timeline(finding.id)[-1] == event
@@ -413,9 +439,9 @@ def test_the_list_filters_orders_and_counts(store: UnknownDeviceRepository) -> N
     c = created(
         store, mac="aa:bb:cc:00:11:44", ip="10.0.5.11", severity="unknown", basis="no-policy"
     )
-    store.transition_state(b.id, to_state="acknowledged", actor_id=ACTOR)
-    store.set_assignee(b.id, assignee_id=ACTOR, actor_id=ACTOR)
-    store.transition_state(c.id, to_state="false-positive", actor_id=ACTOR, reason="lab")
+    store.transition_state(b.id, expected_evidence_version=ver(store, b.id), to_state="acknowledged", actor_id=ACTOR)
+    store.set_assignee(b.id, expected_evidence_version=ver(store, b.id), assignee_id=ACTOR, actor_id=ACTOR)
+    store.transition_state(c.id, expected_evidence_version=ver(store, c.id), to_state="false-positive", actor_id=ACTOR, reason="lab")
 
     rows, total = store.list_findings()
     assert total == 3
@@ -447,8 +473,8 @@ def test_counts_cover_state_severity_and_open(store: UnknownDeviceRepository) ->
     c = created(
         store, mac="aa:bb:cc:00:11:44", ip="10.0.5.11", severity="unknown", basis="no-policy"
     )
-    store.transition_state(a.id, to_state="acknowledged", actor_id=ACTOR)
-    store.transition_state(c.id, to_state="resolved", actor_id=ACTOR, reason="done")
+    store.transition_state(a.id, expected_evidence_version=ver(store, a.id), to_state="acknowledged", actor_id=ACTOR)
+    store.transition_state(c.id, expected_evidence_version=ver(store, c.id), to_state="resolved", actor_id=ACTOR, reason="done")
     counts = store.counts()
     assert counts.open == 2
     assert {r.state: r.count for r in counts.by_state} == {
@@ -509,3 +535,289 @@ def test_an_observation_with_a_chain_the_contract_refuses_cannot_be_built() -> N
             severity="low",
             severity_basis="policy-default",
         )
+
+
+# --- evidence versions (database review H2) -----------------------------------------------------------------------
+
+
+def test_a_new_finding_starts_at_evidence_version_one(store: UnknownDeviceRepository) -> None:
+    assert created(store).evidence_version == 1
+
+
+def test_a_sighting_that_changes_nothing_does_not_move_the_evidence_version(
+    store: UnknownDeviceRepository,
+) -> None:
+    first = created(store)
+    for _ in range(3):
+        store.observe(detection())
+    assert ver(store, first.id) == 1
+
+
+def test_changed_evidence_moves_the_evidence_version_by_one(store: UnknownDeviceRepository) -> None:
+    first = created(store)
+    store.observe(detection(port=True))
+    assert ver(store, first.id) == 2
+
+
+def test_assigning_acknowledging_and_commenting_do_not_move_the_evidence_version(
+    store: UnknownDeviceRepository,
+) -> None:
+    first = created(store)
+    store.set_assignee(first.id, assignee_id=ACTOR, actor_id=ACTOR, expected_evidence_version=1)
+    store.transition_state(
+        first.id, to_state="acknowledged", actor_id=ACTOR, expected_evidence_version=1
+    )
+    store.add_comment(first.id, actor_id=ACTOR, message="looking")
+    assert ver(store, first.id) == 1
+
+
+def test_a_decision_taken_on_stale_evidence_loses_with_stale_evidence(
+    store: UnknownDeviceRepository,
+) -> None:
+    first = created(store)
+    store.observe(detection(port=True))  # the evidence moved on while the person was reading
+    with pytest.raises(StaleEvidenceError):
+        store.transition_state(
+            first.id,
+            to_state="false-positive",
+            actor_id=ACTOR,
+            reason="lab",
+            expected_evidence_version=1,
+        )
+    with pytest.raises(StaleEvidenceError):
+        store.set_assignee(first.id, assignee_id=ACTOR, actor_id=ACTOR, expected_evidence_version=1)
+    current = store.get_finding(first.id)
+    assert current is not None and current.state == "new" and current.assignee_id is None
+    assert kinds(store, first.id) == ["detected", "evidence-updated"]
+    moved = store.transition_state(
+        first.id,
+        to_state="false-positive",
+        actor_id=ACTOR,
+        reason="lab",
+        expected_evidence_version=2,
+    )
+    assert moved.state == "false-positive"
+
+
+def test_stale_evidence_is_a_kind_of_conflict_the_routes_already_map_to_409() -> None:
+    assert issubclass(StaleEvidenceError, StorageConflictError)
+
+
+def test_a_future_version_is_not_accepted_either(store: UnknownDeviceRepository) -> None:
+    first = created(store)
+    with pytest.raises(StaleEvidenceError):
+        store.transition_state(
+            first.id, to_state="acknowledged", actor_id=ACTOR, expected_evidence_version=9
+        )
+
+
+# --- identity: the MAC is authoritative, every key of one endpoint counts (database review M1) -------------------------
+
+
+def dismiss(store: UnknownDeviceRepository, finding_id: str) -> None:
+    store.transition_state(
+        finding_id,
+        to_state="false-positive",
+        actor_id=ACTOR,
+        reason="lab",
+        expected_evidence_version=ver(store, finding_id),
+    )
+
+
+def test_a_dismissal_on_a_mac_also_suppresses_the_same_endpoint_seen_by_address_only(
+    store: UnknownDeviceRepository,
+) -> None:
+    first = created(store)
+    dismiss(store, first.id)
+    outcome = store.observe(detection(mac=None))  # same address, MAC not resolved this time
+    assert (outcome.outcome, outcome.finding_id) == ("suppressed", first.id)
+    assert store.list_findings()[1] == 1
+
+
+def test_a_dismissal_on_an_address_also_suppresses_it_once_its_mac_is_known(
+    store: UnknownDeviceRepository,
+) -> None:
+    first = created(store, mac=None)
+    dismiss(store, first.id)
+    outcome = store.observe(detection())
+    assert (outcome.outcome, outcome.finding_id) == ("suppressed", first.id)
+
+
+def test_an_open_finding_opened_by_address_is_found_again_when_the_mac_appears(
+    store: UnknownDeviceRepository,
+) -> None:
+    first = created(store, mac=None)
+    outcome = store.observe(detection())
+    assert (outcome.outcome, outcome.finding_id) == ("refreshed", first.id)
+    updated = store.get_finding(first.id)
+    assert updated is not None and updated.endpoint.mac == MAC
+    assert store.list_findings()[1] == 1
+
+
+def test_a_different_mac_at_the_same_address_is_a_different_endpoint(
+    store: UnknownDeviceRepository,
+) -> None:
+    first = created(store)
+    other = store.observe(detection(mac="aa:bb:cc:00:11:99"))
+    assert other.outcome == "created" and other.finding_id != first.id
+
+
+def test_a_dismissed_mac_does_not_suppress_a_different_mac_that_took_its_address(
+    store: UnknownDeviceRepository,
+) -> None:
+    first = created(store)
+    dismiss(store, first.id)
+    assert store.observe(detection(mac="aa:bb:cc:00:11:99")).outcome == "created"
+
+
+def test_known_subject_keys_names_the_keys_that_have_a_finding(
+    store: UnknownDeviceRepository,
+) -> None:
+    created(store)
+    asked = [f"mac:{MAC}", "mac:aa:bb:cc:00:00:00", f"ip:{IP}"]
+    assert store.known_subject_keys(asked) == {f"mac:{MAC}"}
+    assert store.known_subject_keys([]) == set()
+
+
+# --- dismissals expire and a changed dismissed endpoint is noticed (security M3) ---------------------------------------------
+
+
+def test_a_dismissal_expires_and_the_next_sighting_is_a_new_finding_for_review(
+    timed: tuple[UnknownDeviceRepository, FakeClock],
+) -> None:
+    store, clock = timed
+    first = created(store)
+    dismiss(store, first.id)
+    assert store.observe(detection()).outcome == "suppressed"
+    clock.current += timedelta(days=11)
+    outcome = store.observe(detection())
+    assert outcome.outcome == "created" and outcome.finding_id != first.id
+    again = store.get_finding(outcome.finding_id)
+    assert again is not None and again.recurrence_of == first.id and again.state == "new"
+
+
+def test_a_dismissal_that_has_not_expired_keeps_suppressing(
+    timed: tuple[UnknownDeviceRepository, FakeClock],
+) -> None:
+    store, clock = timed
+    first = created(store)
+    dismiss(store, first.id)
+    clock.current += timedelta(days=9)
+    assert store.observe(detection()).outcome == "suppressed"
+
+
+def test_a_dismissed_endpoint_seen_with_different_evidence_leaves_a_suppressed_sighting(
+    timed: tuple[UnknownDeviceRepository, FakeClock],
+) -> None:
+    store, clock = timed
+    first = created(store)
+    dismiss(store, first.id)
+    assert store.observe(detection(port=True)).outcome == "suppressed"
+    assert kinds(store, first.id) == ["detected", "state-changed", "suppressed-sighting"]
+    # at most one a day, however often it is seen
+    store.observe(detection(port=True))
+    clock.current += timedelta(hours=3)
+    store.observe(detection(port=True))
+    assert kinds(store, first.id).count("suppressed-sighting") == 1
+    clock.current += timedelta(hours=22)
+    store.observe(detection(port=True))
+    assert kinds(store, first.id).count("suppressed-sighting") == 2
+    last = store.list_timeline(first.id)[-1]
+    assert (last.kind, last.actor_id, last.state_from) == ("suppressed-sighting", SYSTEM_ACTOR, None)
+    finding = store.get_finding(first.id)
+    assert finding is not None and finding.state == "false-positive"  # the dismissal is untouched
+
+
+def test_a_dismissed_endpoint_seen_unchanged_writes_nothing_at_all(
+    store: UnknownDeviceRepository,
+) -> None:
+    first = created(store)
+    dismiss(store, first.id)
+    for _ in range(3):
+        store.observe(detection())
+    assert kinds(store, first.id) == ["detected", "state-changed"]
+
+
+# --- evidence snapshots are rate limited (database review M5) ---------------------------------------------------------------
+
+
+def test_a_second_evidence_change_within_the_hour_is_not_snapshotted_again(
+    timed: tuple[UnknownDeviceRepository, FakeClock],
+) -> None:
+    store, clock = timed
+    first = created(store)
+    store.observe(detection(port=True))  # recorded: the first change
+    assert (ver(store, first.id), kinds(store, first.id)) == (2, ["detected", "evidence-updated"])
+    clock.current += timedelta(minutes=10)
+    outcome = store.observe(detection(ip="10.0.5.77", port=True))  # churn: a new DHCP address
+    assert outcome.outcome == "refreshed"
+    held = store.get_finding(first.id)
+    assert held is not None and held.endpoint.ip == IP  # not yet applied
+    assert held.seen_count == 3 and ver(store, first.id) == 2
+    assert kinds(store, first.id) == ["detected", "evidence-updated"]
+    clock.current += timedelta(hours=1)
+    store.observe(detection(ip="10.0.5.77", port=True))
+    moved = store.get_finding(first.id)
+    assert moved is not None and moved.endpoint.ip == "10.0.5.77" and ver(store, first.id) == 3
+    assert kinds(store, first.id).count("evidence-updated") == 2
+
+
+def test_a_severity_change_is_recorded_at_once_whatever_the_rate_limit(
+    store: UnknownDeviceRepository,
+) -> None:
+    first = created(store)
+    store.observe(detection(port=True))
+    store.observe(detection(port=True, severity="critical", basis="policy-rule", with_action=True))
+    updated = store.get_finding(first.id)
+    assert updated is not None and updated.severity == "critical" and updated.evidence_version == 3
+    assert kinds(store, first.id) == [
+        "detected",
+        "evidence-updated",
+        "evidence-updated",
+        "action-proposed",
+    ]
+
+
+def test_a_changed_netbox_verdict_is_recorded_at_once(store: UnknownDeviceRepository) -> None:
+    first = created(store)
+    store.observe(detection(port=True))
+    store.observe(
+        detection(
+            port=True,
+            reason="name-matches-mac-does-not",
+            results={"hostname": "match"},
+            severity="low",
+        )
+    )
+    assert ver(store, first.id) == 3
+
+
+# --- times only move forward (database review M2) -----------------------------------------------------------------------------
+
+
+def test_a_clock_that_steps_back_never_rewinds_a_finding(
+    timed: tuple[UnknownDeviceRepository, FakeClock],
+) -> None:
+    store, clock = timed
+    first = created(store)
+    before = store.get_finding(first.id)
+    assert before is not None
+    clock.current -= timedelta(hours=1)  # a worker with a slow clock sees the same endpoint
+    store.observe(detection())
+    after = store.get_finding(first.id)
+    assert after is not None and after.seen_count == 2
+    assert after.last_seen_at >= before.last_seen_at
+
+
+# --- paging is bounded (database review M3) -----------------------------------------------------------------------------------
+
+
+def test_a_page_beyond_the_offset_cap_is_refused(store: UnknownDeviceRepository) -> None:
+    store.list_findings(limit=50, offset=10_000)
+    with pytest.raises(ValueError):
+        store.list_findings(limit=50, offset=10_001)
+
+
+def test_a_state_filter_outside_the_closed_set_is_refused(store: UnknownDeviceRepository) -> None:
+    with pytest.raises(ValueError):
+        store.list_findings(states=["new' OR '1'='1"])  # type: ignore[list-item]

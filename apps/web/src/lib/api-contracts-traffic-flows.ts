@@ -13,7 +13,9 @@ import {
 } from './api-contracts-traffic-guards.ts';
 import {
   cohortMatchesState,
+  figuresFollowVisibility,
   parseCohort,
+  withheldLast,
   type CohortStatus,
 } from './api-contracts-traffic-cohort.ts';
 import {
@@ -27,12 +29,14 @@ import { isIntegerInRange, isOneOf, isText, parseArray } from './contract-guards
 import {
   ATTRIBUTION_LEVELS,
   ATTRIBUTION_STATES,
+  COHORT_MIN,
   DESTINATION_SCOPES,
   FILTER_NAMES,
   FLOW_DIRECTIONS,
   FLOW_PROTOCOLS,
   IDENTITY_BASES,
   INFERRED_REASONS,
+  ROW_VISIBILITIES,
   UNKNOWN_REASONS,
   type AttributionLevel,
   type AttributionState,
@@ -41,6 +45,7 @@ import {
   type FlowDirection,
   type FlowProtocol,
   type IdentityBasis,
+  type RowVisibility,
 } from './api-contracts-traffic-shared.ts';
 
 /** Flow Explorer contract (traffic-flows.schema.json): filters, attribution, rows, aggregations. */
@@ -265,14 +270,20 @@ export interface Volume {
   bytes: number;
   packets: number | null;
   flows: number;
+  /** Distinct source addresses of any kind: not the cohort count. */
   source_addresses: number;
   destination_addresses: number;
+  /** Distinct endpoints inside the organisation: the cohort count. Null: the source could not tell. */
+  internal_endpoints: number | null;
 }
 
 export interface ApplicationMixItem {
   application: string | null;
-  bytes: number;
+  /** `withheld`: fewer than the cohort minimum of internal endpoints stood behind the item. */
+  visibility: RowVisibility;
+  bytes: number | null;
   share: number | null;
+  endpoints: number | null;
 }
 
 export interface ApplicationMix {
@@ -286,8 +297,10 @@ export interface DestinationShare {
   host: string | null;
   /** `internal`: a private or otherwise non-routable address; only the detail tier is told. */
   scope: DestinationScope;
-  bytes: number;
+  visibility: RowVisibility;
+  bytes: number | null;
   share: number | null;
+  endpoints: number | null;
 }
 
 export interface FlowAggregations {
@@ -307,13 +320,25 @@ function parseBucket(value: unknown): TimelineBucket | null {
 }
 
 function parseVolume(value: unknown): Volume | null {
-  if (!exact(value, ['bytes', 'packets', 'flows', 'source_addresses', 'destination_addresses'])) return null;
+  if (
+    !exact(value, [
+      'bytes',
+      'packets',
+      'flows',
+      'source_addresses',
+      'destination_addresses',
+      'internal_endpoints',
+    ])
+  ) {
+    return null;
+  }
   if (
     !count(value.bytes) ||
     !nullableCount(value.packets) ||
     !count(value.flows) ||
     !count(value.source_addresses) ||
-    !count(value.destination_addresses)
+    !count(value.destination_addresses) ||
+    !nullableCount(value.internal_endpoints)
   ) {
     return null;
   }
@@ -323,42 +348,67 @@ function parseVolume(value: unknown): Volume | null {
     flows: value.flows,
     source_addresses: value.source_addresses,
     destination_addresses: value.destination_addresses,
+    internal_endpoints: value.internal_endpoints,
   };
 }
 
 function parseMixItem(value: unknown): ApplicationMixItem | null {
-  if (!exact(value, ['application', 'bytes', 'share'])) return null;
-  if (!nullableText(value.application, 255) || !count(value.bytes) || !share(value.share)) return null;
-  return { application: value.application, bytes: value.bytes, share: value.share };
+  if (!exact(value, ['application', 'visibility', 'bytes', 'share', 'endpoints'])) return null;
+  if (
+    !nullableText(value.application, 255) ||
+    !isOneOf(value.visibility, ROW_VISIBILITIES) ||
+    !nullableCount(value.bytes) ||
+    !share(value.share) ||
+    !nullableCount(value.endpoints)
+  ) {
+    return null;
+  }
+  const figures = [value.bytes, value.share, value.endpoints];
+  if (!figuresFollowVisibility(value.visibility, figures, [value.bytes])) return null;
+  return {
+    application: value.application,
+    visibility: value.visibility,
+    bytes: value.bytes,
+    share: value.share,
+    endpoints: value.endpoints,
+  };
 }
 
 function parseMix(value: unknown): ApplicationMix | null {
   if (!exact(value, ['items', 'other_bytes', 'total_bytes'])) return null;
   const items = parseArray(value.items, 0, 11, parseMixItem);
   if (items === null || !count(value.other_bytes) || !count(value.total_bytes)) return null;
-  if (items.reduce((sum, item) => sum + item.bytes, 0) + value.other_bytes !== value.total_bytes) {
-    return null;
-  }
+  // Withheld bytes are merged into "other", so what is shown plus "other" is still the total.
+  const shown = items.reduce((sum, item) => sum + (item.bytes ?? 0), 0);
+  if (shown + value.other_bytes !== value.total_bytes) return null;
   return { items, other_bytes: value.other_bytes, total_bytes: value.total_bytes };
 }
 
 function parseDestinationShare(value: unknown): DestinationShare | null {
-  if (!exact(value, ['address', 'host', 'scope', 'bytes', 'share'])) return null;
+  if (!exact(value, ['address', 'host', 'scope', 'visibility', 'bytes', 'share', 'endpoints'])) {
+    return null;
+  }
   if (
     !isText(value.address, 1, 45) ||
     !nullableText(value.host, 255) ||
     !isOneOf(value.scope, DESTINATION_SCOPES) ||
-    !count(value.bytes) ||
-    !share(value.share)
+    !isOneOf(value.visibility, ROW_VISIBILITIES) ||
+    !nullableCount(value.bytes) ||
+    !share(value.share) ||
+    !nullableCount(value.endpoints)
   ) {
     return null;
   }
+  const figures = [value.bytes, value.share, value.endpoints, value.host];
+  if (!figuresFollowVisibility(value.visibility, figures, [value.bytes])) return null;
   return {
     address: value.address,
     host: value.host,
     scope: value.scope,
+    visibility: value.visibility,
     bytes: value.bytes,
     share: value.share,
+    endpoints: value.endpoints,
   };
 }
 
@@ -399,7 +449,10 @@ export interface TrafficFlowsResponse {
   attribution: AttributionStatus;
   flows: TrafficFlow[];
   aggregations: FlowAggregations | null;
-  /** The small-cohort rule: too few sources withholds the aggregates (they are null, not thinned). */
+  /**
+   * The small-cohort rule: too few internal endpoints withholds the aggregates whole (null), and a
+   * small item inside them is withheld individually (its `visibility` says so).
+   */
   cohort: CohortStatus;
   freshness: Freshness;
 }
@@ -422,6 +475,29 @@ function attributionMatchesRows(status: AttributionStatus, flows: readonly Traff
   if (flows.some((flow) => flow.attribution === null)) return false;
   if (status.level === 'endpoint') return flows.every((flow) => flow.attribution?.person === null);
   return true;
+}
+
+/**
+ * The Explorer's cohort rule: the detail tier is shown every item; the aggregate tier is shown either
+ * nothing (the answer is withheld whole) or an answer with at least the minimum of internal endpoints,
+ * whose small items are withheld one by one and listed last; `too-few-sources` means exactly that.
+ */
+function aggregationsFollowCohort(cohort: CohortStatus, aggregations: FlowAggregations | null): boolean {
+  const items = [...(aggregations?.application_mix?.items ?? []), ...(aggregations?.destinations ?? [])];
+  const anyWithheld = items.some((item) => item.visibility === 'withheld');
+  if (cohort.state === 'not-applied') return !anyWithheld;
+  const minimum = cohort.minimum ?? COHORT_MIN;
+  if (aggregations === null) return cohort.state === 'too-few-sources';
+  const counted = aggregations.volume.internal_endpoints;
+  if (counted === null || counted < minimum) return false;
+  const lists = [aggregations.application_mix?.items ?? [], aggregations.destinations];
+  for (const list of lists) {
+    if (list.some((i) => i.visibility === 'shown' && (i.endpoints === null || i.endpoints < minimum))) {
+      return false;
+    }
+    if (!withheldLast(list)) return false;
+  }
+  return (cohort.state === 'too-few-sources') === anyWithheld;
 }
 
 export function parseTrafficFlowsResponse(value: unknown): TrafficFlowsResponse | null {
@@ -459,13 +535,13 @@ export function parseTrafficFlowsResponse(value: unknown): TrafficFlowsResponse 
   if (!attributionMatchesRows(attribution, flows)) return null;
   if (!cohortMatchesState(value.state, cohort)) return null;
   if (value.state === 'ok' && (cohort.state !== 'not-applied') !== value.flows_restricted) return null;
-  if (cohort.state === 'too-few-sources' && aggregations !== null) return null;
   if (
     value.flows_restricted &&
     aggregations?.destinations.some((destination) => destination.scope === 'internal')
   ) {
     return null;
   }
+  if (value.state === 'ok' && !aggregationsFollowCohort(cohort, aggregations)) return null;
   return {
     state: value.state,
     time_range: timeRange,

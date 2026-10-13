@@ -79,7 +79,7 @@ describe('the table', () => {
     assert.deepEqual(headers, [
       'Application',
       'Volume',
-      'Endpoints (source addresses)',
+      'Endpoints (internal)',
       'Users',
       'Trend',
       'Risk',
@@ -106,7 +106,7 @@ describe('the table', () => {
 
   it('endpoints are labelled as addresses, not people or inventory devices', () => {
     show(okState(applicationsFixture()));
-    assert.match(text(), /distinct source addresses/i);
+    assert.match(text(), /distinct internal endpoints/i);
   });
 
   it('risk and approval are Unknown without an operator policy, and the page says so', () => {

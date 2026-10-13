@@ -7,9 +7,12 @@ bounded and honest:
   destinations, baselines: nothing that names an endpoint). ``traffic:read-detail`` adds flow rows and
   any filter that narrows to one address, one device or one VLAN. Management holds the first only, so
   its Explorer shows aggregates and *no rows are read from the flow store for it*;
-* **Small cohorts.** The aggregate rung is held to a minimum cohort of source addresses
-  (``traffic.cohort``): an answer about fewer is withheld and says so, an endpoint count below the
-  minimum is withheld, and a destination inside the organisation is not listed;
+* **Small cohorts.** The aggregate rung is held to a minimum cohort of internal endpoints
+  (``traffic.cohort``): an answer about fewer is withheld whole, a row (application, destination, mix
+  item) that fewer stood behind keeps its name and loses every figure, an hourly series with too few
+  contributors is not evaluated, a destination inside the organisation is not listed, and the
+  freshness it is told is the source's, never the filtered answer's. There is no route that ranks raw
+  addresses for this rung (the legacy ``/traffic/top-*`` routes were retired);
 * **People only through the identity service.** Naming the person behind a source address needs
   ``users:read`` (a human); ``users:read-limited`` gets the device and the word "restricted"; every
   other role gets rows without attribution. The flow store's own user field is never used. Every
@@ -275,7 +278,14 @@ def _flows_query(
         raise reject(request, identity, FLOWS_ACTION, error) from error
     detail, minimum = _tier(identity)
     if filters.endpoint_level() and not detail:
-        audit_trail.denied(request, identity.id, FLOWS_ACTION, "filter-needs-detail")
+        audit_trail.denied(
+            request,
+            identity.id,
+            FLOWS_ACTION,
+            "filter-needs-detail",
+            filters=",".join(filters.active()),
+            **audit_trail.filter_fingerprints(filters),
+        )
         raise ApiError(403, "FORBIDDEN", "Permission is required")
     return FlowsQuery(
         filters, window, detail, attribution_level(identity, restricted=not detail), minimum

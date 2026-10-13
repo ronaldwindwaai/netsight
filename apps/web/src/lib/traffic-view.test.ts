@@ -408,7 +408,7 @@ test('working hours are context: not configured is unknown, never "after hours"'
 
 test('an insufficient baseline is stated plainly and flags nothing', () => {
   const notice = evaluationNotice(
-    { status: 'insufficient-baseline', series: 1, buckets: 24, evaluated: 0, insufficient_baseline: 24, no_data: 0, anomalies_total: 0, application_series: 'evaluated', daylight_saving: 'none' },
+    { status: 'insufficient-baseline', series: 1, series_withheld: 0, buckets: 24, evaluated: 0, insufficient_baseline: 24, no_data: 0, anomalies_total: 0, application_series: 'evaluated', daylight_saving: 'none' },
     { algorithm: 'same-hour-of-week-median-mad', weeks: 4, min_weeks: 3, threshold: 3.5, min_difference_bytes: 10485760 },
   );
   assert.match(notice, /Insufficient baseline/);
@@ -418,7 +418,7 @@ test('an insufficient baseline is stated plainly and flags nothing', () => {
 
 test('every evaluation status has a notice or none', () => {
   const method = { algorithm: 'same-hour-of-week-median-mad' as const, weeks: 4, min_weeks: 3, threshold: 3.5, min_difference_bytes: 1 };
-  const base = { series: 1, buckets: 10, evaluated: 10, insufficient_baseline: 0, no_data: 0, anomalies_total: 0, application_series: 'evaluated' as const, daylight_saving: 'none' as const };
+  const base = { series: 1, series_withheld: 0, buckets: 10, evaluated: 10, insufficient_baseline: 0, no_data: 0, anomalies_total: 0, application_series: 'evaluated' as const, daylight_saving: 'none' as const };
   assert.equal(evaluationNotice({ ...base, status: 'evaluated' }, method), '');
   assert.match(evaluationNotice({ ...base, status: 'partial', evaluated: 6, insufficient_baseline: 4 }, method), /4 of 10/);
   assert.match(evaluationNotice({ ...base, status: 'no-data', evaluated: 0, no_data: 10 }, method), /No flow data/);

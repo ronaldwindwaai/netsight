@@ -1,11 +1,9 @@
 import {
   RATIO_TOLERANCE,
   asn,
-  count,
   country,
   exact,
   finite,
-  instant,
   isTrafficState,
   nullableCount,
   nullableInstant,
@@ -15,8 +13,9 @@ import {
 } from './api-contracts-traffic-guards.ts';
 import {
   cohortMatchesState,
-  endpointCountsFollowCohort,
+  figuresFollowVisibility,
   parseCohort,
+  rowsFollowCohort,
   type CohortStatus,
 } from './api-contracts-traffic-cohort.ts';
 import {
@@ -33,12 +32,14 @@ import {
   POLICY_STATES,
   REPUTATIONS,
   RISK_LEVELS,
+  ROW_VISIBILITIES,
   TREND_STATES,
   type Approval,
   type DestinationScope,
   type PolicyState,
   type Reputation,
   type RiskLevel,
+  type RowVisibility,
   type TrendState,
 } from './api-contracts-traffic-shared.ts';
 
@@ -82,10 +83,16 @@ export interface ApplicationRow {
   /** Source-reported and untrusted. */
   application: string;
   category: string | null;
-  bytes: number;
+  /**
+   * `withheld`: fewer than the cohort minimum of internal endpoints stood behind the row, so its
+   * volume, share, trend and counts are null. Only the aggregate tier is ever shown one, and after the
+   * shown rows.
+   */
+  visibility: RowVisibility;
+  bytes: number | null;
   packets: number | null;
   share: number | null;
-  /** Distinct source addresses seen using the application: not people, not inventory devices. */
+  /** Distinct internal endpoints seen using the application: not people, not inventory devices. */
   endpoints: number | null;
   /** Null: counting people needs per-flow identity attribution, which is not done here. */
   users: number | null;
@@ -98,6 +105,7 @@ const APPLICATION_KEYS = [
   'rank',
   'application',
   'category',
+  'visibility',
   'bytes',
   'packets',
   'share',
@@ -117,7 +125,8 @@ export function parseApplicationRow(value: unknown): ApplicationRow | null {
     !isIntegerInRange(v.rank, 1, 100) ||
     !isText(v.application, 1, 255) ||
     !nullableText(v.category, 128) ||
-    !count(v.bytes) ||
+    !isOneOf(v.visibility, ROW_VISIBILITIES) ||
+    !nullableCount(v.bytes) ||
     !nullableCount(v.packets) ||
     !share(v.share) ||
     !nullableCount(v.endpoints) ||
@@ -127,7 +136,12 @@ export function parseApplicationRow(value: unknown): ApplicationRow | null {
   ) {
     return null;
   }
-  if (trend.previous_bytes && trend.change_ratio !== null) {
+  if (!figuresFollowVisibility(v.visibility, [v.bytes, v.packets, v.share, v.endpoints, v.users], [v.bytes])) {
+    return null;
+  }
+  // A withheld row carries no trend at all, not even the earlier bytes.
+  if (v.visibility === 'withheld' && trend.state !== 'unknown') return null;
+  if (v.bytes !== null && trend.previous_bytes && trend.change_ratio !== null) {
     const expected = (v.bytes - trend.previous_bytes) / trend.previous_bytes;
     if (Math.abs(trend.change_ratio - expected) > RATIO_TOLERANCE) return null;
   }
@@ -135,6 +149,7 @@ export function parseApplicationRow(value: unknown): ApplicationRow | null {
     rank: v.rank,
     application: v.application,
     category: v.category,
+    visibility: v.visibility,
     bytes: v.bytes,
     packets: v.packets,
     share: v.share,
@@ -163,7 +178,7 @@ export interface TrafficApplicationsResponse {
   unsupported: 'application'[];
   total_bytes: number | null;
   items: ApplicationRow[];
-  /** The aggregate tier withholds an endpoint count below the minimum (null) instead of listing it. */
+  /** The aggregate tier withholds a row below the minimum whole (its `visibility` says so). */
   cohort: CohortStatus;
   freshness: Freshness;
 }
@@ -213,12 +228,10 @@ export function parseTrafficApplicationsResponse(value: unknown): TrafficApplica
   if (unsupported.length > 0 && value.state !== 'unknown') return null;
   if (value.state === 'ok') {
     if (value.total_bytes === null) return null;
-    if (items.reduce((sum, item) => sum + item.bytes, 0) > value.total_bytes) return null;
+    if (items.reduce((sum, item) => sum + (item.bytes ?? 0), 0) > value.total_bytes) return null;
   }
   if (!cohortMatchesState(value.state, cohort)) return null;
-  if (value.state === 'ok' && !endpointCountsFollowCohort(cohort, items.map((i) => i.endpoints))) {
-    return null;
-  }
+  if (value.state === 'ok' && !rowsFollowCohort(cohort, items)) return null;
   if (!ranks(items)) return null;
   return {
     state: value.state,
@@ -240,13 +253,18 @@ export interface DestinationRow {
   address: string;
   /** `internal`: a private or otherwise non-routable address; only the detail tier is told. */
   scope: DestinationScope;
+  /**
+   * `withheld`: fewer than the cohort minimum of internal endpoints reached the destination, so its
+   * volume, counts, dates, domain, ASN and country are null. Only the aggregate tier is ever shown one.
+   */
+  visibility: RowVisibility;
   /** Source-reported (reverse DNS or SNI) and untrusted. */
   domain: string | null;
   asn: number | null;
   country: string | null;
   first_seen: string | null;
-  last_seen: string;
-  bytes: number;
+  last_seen: string | null;
+  bytes: number | null;
   packets: number | null;
   share: number | null;
   endpoints: number | null;
@@ -258,6 +276,7 @@ const DESTINATION_KEYS = [
   'rank',
   'address',
   'scope',
+  'visibility',
   'domain',
   'asn',
   'country',
@@ -278,12 +297,13 @@ export function parseDestinationRow(value: unknown): DestinationRow | null {
     !isIntegerInRange(v.rank, 1, 100) ||
     !isText(v.address, 1, 45) ||
     !isOneOf(v.scope, DESTINATION_SCOPES) ||
+    !isOneOf(v.visibility, ROW_VISIBILITIES) ||
     !nullableText(v.domain, 255) ||
     !asn(v.asn) ||
     !country(v.country) ||
     !nullableInstant(v.first_seen) ||
-    !instant(v.last_seen) ||
-    !count(v.bytes) ||
+    !nullableInstant(v.last_seen) ||
+    !nullableCount(v.bytes) ||
     !nullableCount(v.packets) ||
     !share(v.share) ||
     !nullableCount(v.endpoints) ||
@@ -292,11 +312,31 @@ export function parseDestinationRow(value: unknown): DestinationRow | null {
   ) {
     return null;
   }
-  if (v.first_seen !== null && Date.parse(v.first_seen) > Date.parse(v.last_seen)) return null;
+  const figures = [
+    v.bytes,
+    v.packets,
+    v.share,
+    v.endpoints,
+    v.users,
+    v.domain,
+    v.asn,
+    v.country,
+    v.first_seen,
+    v.last_seen,
+  ];
+  if (!figuresFollowVisibility(v.visibility, figures, [v.bytes, v.last_seen])) return null;
+  if (
+    v.first_seen !== null &&
+    v.last_seen !== null &&
+    Date.parse(v.first_seen) > Date.parse(v.last_seen)
+  ) {
+    return null;
+  }
   return {
     rank: v.rank,
     address: v.address,
     scope: v.scope,
+    visibility: v.visibility,
     domain: v.domain,
     asn: v.asn,
     country: v.country,
@@ -359,12 +399,10 @@ export function parseTrafficDestinationsResponse(value: unknown): TrafficDestina
   }
   if (value.state === 'ok') {
     if (value.total_bytes === null) return null;
-    if (items.reduce((sum, item) => sum + item.bytes, 0) > value.total_bytes) return null;
+    if (items.reduce((sum, item) => sum + (item.bytes ?? 0), 0) > value.total_bytes) return null;
   }
   if (!cohortMatchesState(value.state, cohort)) return null;
-  if (value.state === 'ok' && !endpointCountsFollowCohort(cohort, items.map((i) => i.endpoints))) {
-    return null;
-  }
+  if (value.state === 'ok' && !rowsFollowCohort(cohort, items)) return null;
   if (cohort.state !== 'not-applied' && items.some((item) => item.scope === 'internal')) return null;
   if (!ranks(items)) return null;
   const since = value.first_seen_since;
