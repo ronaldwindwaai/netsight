@@ -2,7 +2,7 @@
 # Required so the package is a real installable distribution rather than a
 # "virtual" project: without it `uv sync` cannot install netsight_api and both
 # the test suite and the production service need a PYTHONPATH side-channel.
-requires = ["hatchling>=1.25"]
+requires = ["hatchling>=1.32.4"]
 build-backend = "hatchling.build"
 
 [project]
@@ -41,7 +41,7 @@ dev = [
   # transitively via `pyjwt[crypto]`, but is declared so the test environment is reproducible.
   "cryptography>=50,<51",
   # Lets the packaging test build the wheel in-process (no network, no uv).
-  "hatchling>=1.25",
+  "hatchling>=1.32.4",
 ]
 
 [tool.hatch.build.targets.wheel]
