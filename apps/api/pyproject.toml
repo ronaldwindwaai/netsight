@@ -33,7 +33,7 @@ dev = [
   "pytest-asyncio>=0.24,<1",
   "ruff>=0.8,<1",
   "mypy>=1.13,<2",
-  "types-qrcode>=7.4,<9",
+  "types-qrcode>=8.2.0.20260518,<9",
   "pyyaml>=6,<7",
   # Tests use the bundled CA file as a known-good PEM (also a transitive dependency of httpx).
   "certifi>=2024",
