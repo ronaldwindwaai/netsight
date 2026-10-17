@@ -103,3 +103,8 @@ test('configuration menu is visible only with its backend permission', () => {
   assert.ok(!labels(menuItemsFor(null)).includes('Configuration'));
   assert.ok(!labels(menuItemsFor(['reports:read'])).includes('Configuration'));
 });
+
+test('reports navigation follows the reports:read permission', () => {
+  assert.ok(labels(menuItemsFor(['reports:read'])).includes('Reports'));
+  assert.ok(!labels(menuItemsFor(null)).includes('Reports'));
+});

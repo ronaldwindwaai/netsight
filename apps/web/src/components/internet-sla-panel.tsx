@@ -21,11 +21,12 @@ export interface SlaPanelProps {
   adjusted: boolean;
   /** The viewer holds internet:export (advisory: the API enforces it). */
   canExport: boolean;
+  monthAction?: '/internet' | '/reports/wan-sla';
 }
 
-function MonthPicker({ month, months }: { month: string; months: readonly string[] }) {
+function MonthPicker({ month, months, action }: { month: string; months: readonly string[]; action: '/internet' | '/reports/wan-sla' }) {
   return (
-    <form method="get" action="/internet" className="d-flex flex-wrap align-items-end gap-2">
+    <form method="get" action={action} className="d-flex flex-wrap align-items-end gap-2">
       <div>
         <label htmlFor="sla-month" className="form-label small mb-1">
           SLA month (UTC)
@@ -234,7 +235,7 @@ function SlaBody({ state }: { state: FetchState<SlaResponse> }) {
   return <SlaTable data={data} />;
 }
 
-export function InternetSlaPanel({ state, month, months, adjusted, canExport }: SlaPanelProps) {
+export function InternetSlaPanel({ state, month, months, adjusted, canExport, monthAction = "/internet" }: SlaPanelProps) {
   const exportable = state.kind === 'ok' && state.data.state === 'ok' && state.data.links.length > 0;
   return (
     <Card
@@ -246,7 +247,7 @@ export function InternetSlaPanel({ state, month, months, adjusted, canExport }: 
       bodyClass="p-0"
     >
       <div className="d-flex flex-wrap justify-content-between align-items-end gap-3 p-3 border-bottom">
-        <MonthPicker month={month} months={months} />
+        <MonthPicker month={month} months={months} action={monthAction} />
         {exportable ? <ExportControls month={month} canExport={canExport} /> : null}
       </div>
       {adjusted ? (

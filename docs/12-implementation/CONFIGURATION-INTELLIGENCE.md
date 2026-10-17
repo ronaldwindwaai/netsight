@@ -107,3 +107,9 @@ or diff is exposed; safe two-version comparisons; intentional-baseline drift
 comparison; source-backed change/incident correlation; policy-controlled rollback
 requests with step-up/approval/idempotency/verification. None is implied by a
 backup timestamp or a successful metadata read.
+
+Follow-up: the adapter now uses the upstream `full_name` to disambiguate
+ungrouped nodes: oxidized-web substitutes the display group `default` even when
+the real lookup has no group. Ambiguous default-group rows without `full_name`
+fail closed rather than querying the wrong node. A new adapter regression test
+verifies the upstream `node_full` query; the focused backend suite now has 55 tests.

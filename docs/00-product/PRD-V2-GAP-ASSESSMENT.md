@@ -42,8 +42,8 @@ Dynamic parameter names are normalized when matching existing routes.
 | `/ai` | Ask Netsight AI | Route absent; implementation required |
 | `/ai/investigations/[id]` | AI Investigation | Route absent; implementation required |
 | `/recommendations` | Recommendations | Route absent; implementation required |
-| `/reports` | Reports | Route absent; implementation required |
-| `/reports/[id]` | Report Viewer | Route absent; implementation required |
+| `/reports` | Reports | Catalog and WAN/SLA viewer implemented; other families/scheduler/archive pending |
+| `/reports/[id]` | Report Viewer | On-demand WAN/SLA template viewer implemented; archived-report IDs pending |
 | `/admin/users` | User Administration | Route absent; implementation required |
 | `/admin/roles` | Roles & Permissions | Route absent; implementation required |
 | `/admin/integrations` | Integrations | Route absent; implementation required |
@@ -139,3 +139,9 @@ PWA stage 1 adds installation metadata, branded icons, a native install affordan
 and a public-only offline/unknown shell. Browser checks verify that operational
 data and sessions are not placed in the worker cache. Push delivery/subscriptions
 and the remaining mobile workflows are still pending; see MOBILE-PWA.md.
+
+Reports stage 1 adds a permission-filtered catalog and the on-demand WAN/SLA
+viewer at `/reports/wan-sla`, reusing existing bounded/read-audited backend data
+and protected CSV/JSON exports. Native print/save-PDF is user initiated. Archived
+reports, scheduling/delivery and the other report families remain incomplete;
+see `docs/12-implementation/REPORTING.md`.
