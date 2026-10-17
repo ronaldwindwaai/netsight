@@ -1,0 +1,300 @@
+{
+  "$defs": {
+    "ConfigurationNode": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^config-node-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 255,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "group": {
+          "anyOf": [
+            {
+              "maxLength": 255,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Group"
+        },
+        "model": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model"
+        },
+        "backup_status": {
+          "enum": [
+            "success",
+            "failed",
+            "never",
+            "unknown"
+          ],
+          "title": "Backup Status",
+          "type": "string"
+        },
+        "last_attempt_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Last Attempt At"
+        },
+        "backup_freshness": {
+          "enum": [
+            "fresh",
+            "stale",
+            "unknown"
+          ],
+          "title": "Backup Freshness",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "backup_status",
+        "last_attempt_at",
+        "backup_freshness"
+      ],
+      "title": "ConfigurationNode",
+      "type": "object",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "backup_freshness": {
+                "enum": [
+                  "fresh",
+                  "stale"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "backup_status": {
+                "const": "success"
+              },
+              "last_attempt_at": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "source": {
+      "const": "oxidized",
+      "default": "oxidized",
+      "title": "Source",
+      "type": "string"
+    },
+    "state": {
+      "enum": [
+        "ok",
+        "partial",
+        "not-connected",
+        "unknown"
+      ],
+      "title": "State",
+      "type": "string"
+    },
+    "observed_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Observed At"
+    },
+    "items": {
+      "items": {
+        "$ref": "#/$defs/ConfigurationNode"
+      },
+      "maxItems": 2000,
+      "title": "Items",
+      "type": "array",
+      "uniqueItems": true
+    },
+    "skipped": {
+      "default": 0,
+      "maximum": 2000,
+      "minimum": 0,
+      "title": "Skipped",
+      "type": "integer"
+    },
+    "truncated": {
+      "default": false,
+      "title": "Truncated",
+      "type": "boolean"
+    },
+    "page": {
+      "default": 1,
+      "maximum": 2000,
+      "minimum": 1,
+      "title": "Page",
+      "type": "integer"
+    },
+    "page_size": {
+      "default": 2000,
+      "maximum": 2000,
+      "minimum": 1,
+      "title": "Page Size",
+      "type": "integer"
+    },
+    "total": {
+      "anyOf": [
+        {
+          "maximum": 2000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Total"
+    },
+    "has_more": {
+      "default": false,
+      "title": "Has More",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "state",
+    "observed_at"
+  ],
+  "title": "ConfigurationRead[ConfigurationNode]",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://netsight.local/schemas/configuration-nodes.schema.json",
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "enum": [
+              "not-connected",
+              "unknown"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "observed_at": {
+            "type": "null"
+          },
+          "items": {
+            "maxItems": 0
+          },
+          "skipped": {
+            "const": 0
+          },
+          "truncated": {
+            "const": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "enum": [
+              "ok",
+              "partial"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "observed_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "const": "ok"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "skipped": {
+            "const": 0
+          },
+          "truncated": {
+            "const": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "const": "partial"
+          }
+        }
+      },
+      "then": {
+        "anyOf": [
+          {
+            "properties": {
+              "skipped": {
+                "minimum": 1
+              }
+            }
+          },
+          {
+            "properties": {
+              "truncated": {
+                "const": true
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

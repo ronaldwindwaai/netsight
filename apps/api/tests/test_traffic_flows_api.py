@@ -513,9 +513,17 @@ def test_a_busy_source_is_refused_rather_than_queued(monkeypatch: pytest.MonkeyP
 # --- audit --------------------------------------------------------------------------------------------------------
 
 
-def test_every_read_is_audited_without_values(caplog: pytest.LogCaptureFixture) -> None:
+def test_every_read_is_audited_without_values(
+    caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("NETSIGHT_AUDIT_FILTER_KEY", "test-audit-key-0123456789abcdef0123456789")
+    monkeypatch.setenv("NETSIGHT_AUDIT_FILTER_FINGERPRINT", "on")
     with caplog.at_level(logging.INFO, logger="netsight_api.audit"):
-        body_of("administrator", source_ip="10.0.0.10", application="Zoom", port="443")
+        response = Caller("administrator").http.get(
+            PATH, params={**WINDOW, "source_ip": "10.0.0.10", "application": "Zoom", "port": "443"},
+            headers={"X-Correlation-ID": "flow-audit-443"},
+        )
+        assert response.status_code == 200
     (record,) = [r for r in audit_records(caplog) if r["action"] == "traffic.flows.read"]
     assert record["outcome"] == "success" and record["actor_id"]
     assert record["state"] == "ok" and record["row_count"] == 1
@@ -524,10 +532,25 @@ def test_every_read_is_audited_without_values(caplog: pytest.LogCaptureFixture) 
         and record["filters"] == "source_ip,application,port"
     )
     assert record["restricted"] is False and record["attributed_count"] == 1
-    text = json.dumps(record)
-    assert (
-        "10.0.0.10" not in text and "Zoom" not in text and "Alice" not in text and "443" not in text
+    # Correlation IDs and fingerprints can coincidentally contain a short port
+    # number. Check the permitted record structure and query-derived fields,
+    # while proving correlation IDs still pass through unmodified.
+    assert record["correlation_id"] == "flow-audit-443"
+    assert set(record) == {
+        "action", "actor_id", "attributed_count", "attribution_level", "attribution_state",
+        "cohort", "correlation_id", "event", "filters", "fp_source_ip", "outcome",
+        "restricted", "row_count", "state", "target", "tier", "ts", "window_seconds",
+    }
+    from netsight_api.traffic.audit_trail import fingerprint_of
+
+    assert record["fp_source_ip"] == fingerprint_of(
+        "source_ip", "10.0.0.10", b"test-audit-key-0123456789abcdef0123456789"
     )
+    text = json.dumps({
+        key: value for key, value in record.items()
+        if key not in {"correlation_id", "ts", "fp_source_ip"}
+    })
+    assert all(value not in text for value in ["10.0.0.10", "Zoom", "Alice", "443"])
 
 
 def test_denials_and_rejected_input_are_audited(caplog: pytest.LogCaptureFixture) -> None:

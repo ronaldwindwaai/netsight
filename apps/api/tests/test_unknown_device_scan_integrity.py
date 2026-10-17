@@ -138,7 +138,7 @@ async def test_a_store_that_is_unavailable_still_fails_the_scan_loudly() -> None
 
 @pytest.mark.asyncio
 async def test_a_hostile_name_with_nul_and_bidi_characters_is_cleaned_before_it_reaches_the_store() -> None:
-    librenms = FakeLibrenms([device("librenms", "9", "prin\x00ter‮-x", ip="10.20.5.9", mac=MAC)])
+    librenms = FakeLibrenms([device("librenms", "9", "prin\x00ter\u202e-x", ip="10.20.5.9", mac=MAC)])
     scanner, repo = make(librenms=librenms)
     result = await scanner.scan()
     assert result.created == 1
@@ -217,7 +217,7 @@ async def test_a_failed_scan_is_not_remembered_and_frees_the_guard() -> None:
 async def test_the_scheduler_and_the_api_share_one_guard_so_a_cycle_defers_to_a_running_scan() -> None:
     guard = ScanGuard(min_interval=0.0, clock=Ticker())
     scanner, repo = make()
-    scanner._guard = guard  # noqa: SLF001 - the wiring injects the shared guard
+    scanner._guard = guard
     release = asyncio.Event()
     started = asyncio.Event()
 

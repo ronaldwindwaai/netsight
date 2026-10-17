@@ -666,3 +666,22 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Report printouts omit the session menu, navigation and interactive controls. */
+@media print {
+  body:has([data-print-report]) .app-sidebar,
+  body:has([data-print-report]) .app-header,
+  body:has([data-print-report]) .app-footer,
+  body:has([data-print-report]) [data-report-controls],
+  body:has([data-print-report]) form,
+  body:has([data-print-report]) a.btn {
+    display: none !important;
+  }
+  body:has([data-print-report]) .app-main {
+    margin: 0 !important;
+  }
+  [data-print-report] .card {
+    box-shadow: none !important;
+    break-inside: avoid;
+  }
+}

@@ -75,6 +75,7 @@ class Permission(StrEnum):
     ACTIONS_PROPOSE = "actions:propose"
     ACTIONS_APPROVE = "actions:approve"
     ADMIN_CONFIG = "admin:config"
+    CONFIGURATION_READ = "configuration:read"
     REPORTS_READ = "reports:read"
     AUDIT_READ = "audit:read"
 
@@ -204,7 +205,7 @@ ROLE_PERMISSIONS: Mapping[Role, frozenset[Permission]] = {
         | _INVENTORY_ROWS
         | _FINDINGS_READ
         | _FINDINGS_TRIAGE
-        | {Permission.ACTIONS_PROPOSE}
+        | {Permission.ACTIONS_PROPOSE, Permission.CONFIGURATION_READ}
     ),
     Role.SECURITY_ANALYST: frozenset(
         _ALL_READ
@@ -217,11 +218,12 @@ ROLE_PERMISSIONS: Mapping[Role, frozenset[Permission]] = {
         | _INVENTORY_ROWS
         | _FINDINGS_READ
         | _FINDINGS_TRIAGE
-        | {Permission.ACTIONS_PROPOSE}
+        | {Permission.ACTIONS_PROPOSE, Permission.CONFIGURATION_READ}
     ),
     Role.TECHNICIAN: frozenset(
         {
             Permission.DEVICES_READ,
+            Permission.CONFIGURATION_READ,
             Permission.ALERTS_READ,
             Permission.INCIDENTS_READ,
             Permission.INCIDENTS_READ_SUMMARY,
@@ -249,7 +251,7 @@ ROLE_PERMISSIONS: Mapping[Role, frozenset[Permission]] = {
         | _INTERNET_EXPORT
         | _INVENTORY_ROWS
         | _FINDINGS_READ
-        | {Permission.AUDIT_READ}
+        | {Permission.AUDIT_READ, Permission.CONFIGURATION_READ}
     ),
 }
 

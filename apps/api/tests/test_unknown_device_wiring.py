@@ -204,4 +204,4 @@ def test_the_scheduled_and_the_on_demand_scanner_share_one_guard(
     monkeypatch.setattr("netsight_api.main.get_optional_librenms_client", lambda: None)
     store = InMemoryUnknownDeviceRepository()
     first, second = wiring.build_scanner(store), wiring.build_scanner(store)
-    assert first._guard is second._guard is wiring.SCAN_GUARD  # noqa: SLF001
+    assert first._guard is second._guard is wiring.SCAN_GUARD

@@ -12,10 +12,12 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import json
 import secrets
 import time
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import urlsplit
 
 import httpx
 import jwt
@@ -27,6 +29,13 @@ from netsight_api.auth.settings import ProviderSettings
 HTTP_TIMEOUT = httpx.Timeout(15.0, connect=10.0)
 METADATA_TTL_SECONDS = 3600.0
 JWKS_TTL_SECONDS = 3600.0
+MAX_ID_TOKEN_BYTES = 32_768
+# Only the approved providers may supply signing keys. Never follow a JWKS
+# redirect into an internal service or a host supplied by an untrusted token.
+JWKS_HOSTS = frozenset({
+    "login.microsoftonline.com", "www.googleapis.com", "oauth2.googleapis.com",
+    "accounts.google.com",
+})
 
 
 class OidcError(Exception):
@@ -63,7 +72,7 @@ _jwks_cache: dict[str, tuple[float, dict[str, Any]]] = {}
 def _http() -> httpx.AsyncClient:
     global _client
     if _client is None or _client.is_closed:
-        _client = httpx.AsyncClient(timeout=HTTP_TIMEOUT, follow_redirects=True)
+        _client = httpx.AsyncClient(timeout=HTTP_TIMEOUT, follow_redirects=False)
     return _client
 
 
@@ -130,19 +139,39 @@ async def _jwks(metadata: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(jwks_uri, str) or not jwks_uri.startswith("https://"):
         raise OidcError("OIDC_JWKS_MISSING", "Provider did not publish an HTTPS JWKS URI")
 
+    try:
+        parsed = urlsplit(jwks_uri)
+    except ValueError as exc:
+        raise OidcError("OIDC_JWKS_INVALID", "Provider JWKS URI is invalid") from exc
+    if (
+        parsed.hostname not in JWKS_HOSTS or parsed.username is not None
+        or parsed.password is not None or parsed.netloc != parsed.hostname
+        or parsed.fragment
+    ):
+        raise OidcError("OIDC_JWKS_INVALID", "Provider JWKS URI is not approved")
+
     now = time.monotonic()
     cached = _jwks_cache.get(jwks_uri)
     if cached is not None and now - cached[0] < JWKS_TTL_SECONDS:
         return cached[1]
 
     try:
-        response = await _http().get(jwks_uri)
-        response.raise_for_status()
-        keys = response.json()
-    except (httpx.HTTPError, ValueError) as exc:
+        async with _http().stream("GET", jwks_uri) as response:
+            response.raise_for_status()
+            document = bytearray()
+            async for chunk in response.aiter_bytes():
+                document.extend(chunk)
+                if len(document) > 262_144:
+                    raise OidcError("OIDC_JWKS_INVALID", "Provider JWKS exceeds the size limit")
+            keys = json.loads(document)
+    except (httpx.HTTPError, ValueError, RecursionError) as exc:
         raise OidcError("OIDC_JWKS_FETCH_FAILED", "Provider signing keys could not be fetched") from exc
 
-    if not isinstance(keys, dict) or not isinstance(keys.get("keys"), list):
+    if (
+        not isinstance(keys, dict) or not isinstance(keys.get("keys"), list)
+        or not keys["keys"] or len(keys["keys"]) > 100
+        or any(not isinstance(key, dict) for key in keys["keys"])
+    ):
         raise OidcError("OIDC_JWKS_INVALID", "Provider JWKS was invalid")
 
     _jwks_cache[jwks_uri] = (now, keys)
@@ -273,6 +302,8 @@ def _validate_issuer(provider: ProviderId, issuer: object, settings: ProviderSet
         tenant = remainder[0] if remainder else ""
         if tenant not in settings.tenant_ids:
             raise OidcError("OIDC_TENANT_NOT_ALLOWED", "Token was issued by a non-approved Microsoft tenant")
+        if issuer != f"{expected_prefix}{tenant}/v2.0":
+            raise OidcError("OIDC_ISSUER_INVALID", "Token issuer is not an exact Entra v2 issuer")
         return issuer
 
     if provider is GOOGLE:
@@ -306,9 +337,11 @@ async def validate_id_token(
     id_token: str,
     expected_nonce: str,
 ) -> VerifiedClaims:
+    if len(id_token) > MAX_ID_TOKEN_BYTES:
+        raise OidcError("OIDC_TOKEN_INVALID", "Identity token exceeds the size limit")
     try:
         header = jwt.get_unverified_header(id_token)
-    except jwt.PyJWKError as exc:
+    except (jwt.PyJWKError, ValueError, TypeError, RecursionError) as exc:
         raise OidcError("OIDC_TOKEN_INVALID", "Identity token could not be parsed") from exc
     except jwt.InvalidTokenError as exc:
         raise OidcError("OIDC_TOKEN_INVALID", "Identity token could not be parsed") from exc
@@ -332,6 +365,7 @@ async def validate_id_token(
             algorithms=[alg],
             audience=settings.client_id,
             options={
+                "require": ["iss", "aud", "sub", "exp", "iat", "nonce"],
                 "verify_signature": True,
                 "verify_aud": True,
                 "verify_exp": True,
@@ -344,7 +378,7 @@ async def validate_id_token(
         raise OidcError("OIDC_TOKEN_EXPIRED", "Identity token has expired") from exc
     except jwt.InvalidAudienceError as exc:
         raise OidcError("OIDC_AUDIENCE_INVALID", "Identity token audience is not this application") from exc
-    except jwt.InvalidTokenError as exc:
+    except (jwt.PyJWTError, ValueError, TypeError, KeyError, RecursionError) as exc:
         raise OidcError("OIDC_TOKEN_INVALID", "Identity token signature or claims were invalid") from exc
 
     if not isinstance(claims, dict):

@@ -121,22 +121,22 @@ def test_every_name_matching_detection_is_a_valid_finding() -> None:
 
 @pytest.mark.parametrize(
     "hostile",
-    ["bad\x00name", "tab\tname", "new\nline", "esc\x1b[31m", "rlo‮name", "iso⁦x⁩", "zw​sp"],
+    ["bad\x00name", "tab\tname", "new\nline", "esc\x1b[31m", "rlo\u202ename", "iso\u2066x\u2069", "zw\u200bsp"],
 )
 def test_control_nul_and_bidirectional_characters_never_reach_a_finding(hostile: str) -> None:
     finding = only(run([obs(ip="10.0.5.9", hostname=hostile)]))
     name = finding.endpoint.hostname
     assert name is not None
-    assert all(ord(ch) >= 0x20 and ch not in "‪‫‬‭‮⁦⁧⁨⁩​\x7f" for ch in name)
+    assert all(ord(ch) >= 0x20 and ch not in "\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069\u200b\x7f" for ch in name)
 
 
 def test_a_name_made_only_of_such_characters_is_no_name() -> None:
-    finding = only(run([obs(ip="10.0.5.9", hostname="\x00‮\x1b")]))
+    finding = only(run([obs(ip="10.0.5.9", hostname="\x00\u202e\x1b")]))
     assert finding.endpoint.hostname is None
 
 
 def test_a_hostname_cannot_borrow_a_netbox_name_with_hidden_characters() -> None:
-    result = run([obs(ip="10.0.5.50", mac=MAC, hostname="core-​sw-1")], netbox=KNOWN)
+    result = run([obs(ip="10.0.5.50", mac=MAC, hostname="core-\u200bsw-1")], netbox=KNOWN)
     assert only(result).endpoint.hostname == "core-sw-1"  # stripped, and still only corroboration
 
 
@@ -188,7 +188,7 @@ def test_one_candidate_that_cannot_be_built_is_unverified_and_the_others_survive
 
 
 def test_an_inferred_vlan_never_drives_the_severity() -> None:
-    inferred = d._vlan_number  # noqa: SLF001 - the rule is unit-tested directly
+    inferred = d._vlan_number
     from netsight_api.schemas_unknown_devices import UnknownDeviceEvidenceRef, UnknownDeviceLinkSlot
 
     ref = UnknownDeviceEvidenceRef(
@@ -228,7 +228,7 @@ def test_lookups_go_to_endpoints_not_seen_before_then_the_most_recent() -> None:
 
     correlation = CorrelationPolicy()
     index = CorrelationIndex([], correlation)
-    macs = ["aa:bb:cc:00:00:0%d" % i for i in range(1, 5)]
+    macs = [f"aa:bb:cc:00:00:0{i}" for i in range(1, 5)]
     seen = [
         d.Observed("librenms", "device-poll", str(i), NOW - timedelta(minutes=age), mac=mac)
         for i, (mac, age) in enumerate(zip(macs, (50, 10, 30, 20), strict=True))
