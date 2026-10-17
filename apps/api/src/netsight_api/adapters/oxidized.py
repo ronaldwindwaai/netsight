@@ -144,6 +144,20 @@ class OxidizedClient:
             return None
         name = str(row["name"])
         group = row.get("group")
+        # oxidized-web rewrites a missing group to the display word "default".
+        # full_name is the upstream key; do not mistake that display label for
+        # a real group when requesting version metadata.
+        full = row.get("full_name")
+        if full is not None:
+            if (
+                not isinstance(full, str) or len(full) > 511
+                or any(not valid_segment(part) for part in full.split("/"))
+                or full.split("/")[-1] != name
+            ):
+                return None
+            group = full.rpartition("/")[0] or None
+        elif group == "default":
+            return None  # ambiguous without the upstream key: fail closed
         if group is not None and (
             not isinstance(group, str) or len(group) > 255
             or any(not valid_segment(part) for part in group.split("/"))

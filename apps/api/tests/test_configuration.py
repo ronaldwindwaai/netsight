@@ -245,3 +245,20 @@ def test_shared_configuration_vectors(case: dict[str, Any]) -> None:
         else:
             with pytest.raises((ValidationError, ContractViolation)):
                 validation()
+
+
+@pytest.mark.asyncio
+async def test_upstream_full_name_disambiguates_ungrouped_nodes() -> None:
+    queries = []
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("nodes.json"):
+            return httpx.Response(200, json=[node(group="default", full_name="core-switch")])
+        queries.append(request.url.params["node_full"])
+        return httpx.Response(200, json=[])
+
+    adapter = OxidizedClient("https://oxidized.example", _transport=httpx.MockTransport(respond))
+    snapshot = await adapter.nodes()
+    assert snapshot.items[0].group is None
+    await adapter.versions(snapshot.items[0].id)
+    assert queries == ["core-switch"]
