@@ -24,7 +24,6 @@ from traffic_support import (
     applications_read,
     destinations_read,
     exploration,
-    first_seen,
     make_aggregations,
     make_application,
     make_destination,

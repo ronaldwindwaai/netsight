@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: Commit SHA on main to deploy (default: latest main)
+        description: "Commit SHA on main to deploy (default: latest main)"
         required: false
 
 permissions:

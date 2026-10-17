@@ -10,4 +10,9 @@ allowBuilds:
   # esbuild (component-test bundler) ships its binary via optional platform packages.
   esbuild: false
 patchedDependencies:
+  braces@3.0.3: patches/braces@3.0.3.patch
   ecc-universal: patches/ecc-universal.patch
+
+# GHSA-ch52-4w7c-c8xp: keep OpenCode cache handling on the fixed release.
+overrides:
+  http-cache-semantics@<4.3.0: 4.3.0

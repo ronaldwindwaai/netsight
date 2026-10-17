@@ -80,27 +80,29 @@ systemctl --user daemon-reload
 systemctl --user enable netsight-web.service >/dev/null
 systemctl --user enable netsight-api.service >/dev/null
 
-# Install the API virtualenv into the shared runtime location. netsight-api is
-# a real installable package (hatchling), so the service resolves it from the
-# venv and needs no PYTHONPATH side-channel.
+# Keep each release's API environment alongside its lockfile. A failed candidate
+# must not overwrite the API dependencies used by the previous release.
 if [ -f "$RELEASE/apps/api/pyproject.toml" ]; then
   (
     cd "$RELEASE/apps/api"
-    UV_PROJECT_ENVIRONMENT="$HOME/netsight/shared/api-venv" \
-      "$HOME/.local/bin/uv" sync --frozen --no-dev
+    "$HOME/.local/bin/uv" sync --locked --no-dev --no-editable
   )
 fi
 
 PREVIOUS="$(readlink -f "$BASE/current" 2>/dev/null || true)"
 ln -sfn "$RELEASE" "$BASE/current"
-systemctl --user restart netsight-web.service
-systemctl --user restart netsight-api.service
-
 healthy=0
+if systemctl --user restart netsight-web.service &&
+   systemctl --user restart netsight-api.service; then
 for _ in $(seq 1 30); do
-  if curl -fsS -o /dev/null --max-time 3 "http://127.0.0.1:${NETSIGHT_WEB_PORT}/"; then healthy=1; break; fi
+  if curl -fsS -o /dev/null --max-time 3 "http://127.0.0.1:${NETSIGHT_WEB_PORT}/" &&
+     curl -fsS -o /dev/null --max-time 3 "http://127.0.0.1:8000/api/v1/health"; then
+    healthy=1
+    break
+  fi
   sleep 2
 done
+fi
 
 if [ "$healthy" -ne 1 ]; then
   echo "health check failed for $SHA" >&2
@@ -108,7 +110,12 @@ if [ "$healthy" -ne 1 ]; then
   if [ -n "$PREVIOUS" ] && [ -d "$PREVIOUS" ]; then
     echo "rolling back to $PREVIOUS" >&2
     ln -sfn "$PREVIOUS" "$BASE/current"
+    # Older releases used the shared API environment. Restore their unit file
+    # as well as their source/runtime when rolling back across this migration.
+    install -m 0644 "$PREVIOUS/infrastructure/vps/netsight-api.service" "$HOME/.config/systemd/user/netsight-api.service"
+    systemctl --user daemon-reload
     systemctl --user restart netsight-web.service
+    systemctl --user restart netsight-api.service
   fi
   exit 1
 fi

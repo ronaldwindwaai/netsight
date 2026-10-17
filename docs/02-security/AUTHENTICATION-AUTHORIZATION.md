@@ -38,6 +38,17 @@ Configuration must explicitly list:
 
 An empty allow-list denies every identity (fail closed).
 
+## OIDC signing-key retrieval
+
+The custom HTTPX client accepts JWKS only from approved public Google/Entra HTTPS
+hosts and does not follow redirects. URI credentials, explicit ports and fragments
+are rejected. Key documents are bounded to 256 KiB and 100 keys; only valid
+responses enter the one-hour cache. Unknown key IDs fail closed until normal cache
+expiry; provider rotation must allow for this window. Tokens require issuer,
+audience, subject, expiry, issued-at and nonce claims. Entra issuer URLs must match
+the approved tenant's exact v2 issuer. See the dependency remediation runbook under
+`docs/09-testing/DEPENDENCY-REMEDIATION.md` for validation and staging gates.
+
 ## Session
 - Secure + HttpOnly cookie
 - SameSite appropriate to deployment

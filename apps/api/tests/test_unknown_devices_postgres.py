@@ -420,9 +420,8 @@ def test_the_subject_must_be_the_endpoint_and_severity_must_match_its_basis(db: 
 )
 def test_a_subject_key_must_be_lower_case_and_canonical(db: Db, subject: str) -> None:
     endpoint = {"ip": subject.removeprefix("ip:"), "mac": None, "hostname": None}
-    with db.owner.connect() as conn:
-        with pytest.raises(psycopg.errors.CheckViolation):
-            insert_finding(conn, subject=subject, endpoint=endpoint)
+    with db.owner.connect() as conn, pytest.raises(psycopg.errors.CheckViolation):
+        insert_finding(conn, subject=subject, endpoint=endpoint)
 
 
 @requires_pg
@@ -549,8 +548,8 @@ def test_a_finding_without_its_detected_event_cannot_be_committed(db: Db) -> Non
         "chain = jsonb_set(chain, '{0,basis}', '\"observed\"')",
         "comparison = jsonb_set(comparison, '{checks,0,result}', '\"not-checked\"')",
         "comparison = jsonb_set(comparison, '{reason}', '\"name-matches-mac-does-not\"')",
-        "proposed_action = "
-        "'{\"action_type\":\"endpoint.isolate\",\"state\":\"proposed\",\"executable\":false}'",
+        ("proposed_action = "
+        "'{\"action_type\":\"endpoint.isolate\",\"state\":\"proposed\",\"executable\":false}'"),
     ],
 )
 def test_a_change_of_state_assignee_or_evidence_without_its_event_cannot_be_committed(
@@ -559,7 +558,7 @@ def test_a_change_of_state_assignee_or_evidence_without_its_event_cannot_be_comm
     with db.owner.connect() as conn:
         key = insert_finding(conn)
         conn.commit()
-        conn.execute(f"UPDATE unknown_device_findings SET {change} WHERE id = %s", (key,))  # noqa: S608
+        conn.execute(f"UPDATE unknown_device_findings SET {change} WHERE id = %s", (key,))
         with pytest.raises(psycopg.errors.IntegrityConstraintViolation):
             conn.commit()
 
@@ -753,7 +752,7 @@ def test_a_finding_cannot_go_back_in_time_or_lose_sightings(db: Db) -> None:
             "last_seen_at = last_seen_at - interval '1 hour'",
         ):
             with pytest.raises(psycopg.errors.IntegrityConstraintViolation):
-                conn.execute(f"UPDATE unknown_device_findings SET {change} WHERE id = %s", (key,))  # noqa: S608
+                conn.execute(f"UPDATE unknown_device_findings SET {change} WHERE id = %s", (key,))
             conn.rollback()
 
 
@@ -852,8 +851,9 @@ def test_the_rollback_is_guarded_and_reversible(db: Db) -> None:
 
 @requires_pg
 def test_counters_saturate_at_the_cap_instead_of_failing(db: Db) -> None:
-    from netsight_api.storage.postgres_unknown_devices import PostgresUnknownDeviceRepository
     from unknown_support import detection
+
+    from netsight_api.storage.postgres_unknown_devices import PostgresUnknownDeviceRepository
 
     repository = PostgresUnknownDeviceRepository(db.app)
     first = repository.observe(detection())

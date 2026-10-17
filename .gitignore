@@ -28,3 +28,6 @@ secrets/
 
 # Local demo environment (scripts/demo-local.py)
 .demo/
+
+# Local task scratch files and validation logs
+/work/
