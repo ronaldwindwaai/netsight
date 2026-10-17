@@ -1,0 +1,214 @@
+{
+  "$defs": {
+    "ConfigurationVersion": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$",
+          "title": "Id",
+          "type": "string"
+        },
+        "saved_at": {
+          "format": "date-time",
+          "title": "Saved At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "saved_at"
+      ],
+      "title": "ConfigurationVersion",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "source": {
+      "const": "oxidized",
+      "default": "oxidized",
+      "title": "Source",
+      "type": "string"
+    },
+    "state": {
+      "enum": [
+        "ok",
+        "partial",
+        "not-connected",
+        "unknown"
+      ],
+      "title": "State",
+      "type": "string"
+    },
+    "observed_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Observed At"
+    },
+    "items": {
+      "items": {
+        "$ref": "#/$defs/ConfigurationVersion"
+      },
+      "maxItems": 2000,
+      "title": "Items",
+      "type": "array",
+      "uniqueItems": true
+    },
+    "skipped": {
+      "default": 0,
+      "maximum": 2000,
+      "minimum": 0,
+      "title": "Skipped",
+      "type": "integer"
+    },
+    "truncated": {
+      "default": false,
+      "title": "Truncated",
+      "type": "boolean"
+    },
+    "page": {
+      "default": 1,
+      "maximum": 2000,
+      "minimum": 1,
+      "title": "Page",
+      "type": "integer"
+    },
+    "page_size": {
+      "default": 2000,
+      "maximum": 2000,
+      "minimum": 1,
+      "title": "Page Size",
+      "type": "integer"
+    },
+    "total": {
+      "anyOf": [
+        {
+          "maximum": 2000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Total"
+    },
+    "has_more": {
+      "default": false,
+      "title": "Has More",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "state",
+    "observed_at"
+  ],
+  "title": "ConfigurationRead[ConfigurationVersion]",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://netsight.local/schemas/configuration-versions.schema.json",
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "enum": [
+              "not-connected",
+              "unknown"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "observed_at": {
+            "type": "null"
+          },
+          "items": {
+            "maxItems": 0
+          },
+          "skipped": {
+            "const": 0
+          },
+          "truncated": {
+            "const": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "enum": [
+              "ok",
+              "partial"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "observed_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "const": "ok"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "skipped": {
+            "const": 0
+          },
+          "truncated": {
+            "const": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "const": "partial"
+          }
+        }
+      },
+      "then": {
+        "anyOf": [
+          {
+            "properties": {
+              "skipped": {
+                "minimum": 1
+              }
+            }
+          },
+          {
+            "properties": {
+              "truncated": {
+                "const": true
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

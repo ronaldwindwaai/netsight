@@ -37,8 +37,8 @@ Dynamic parameter names are normalized when matching existing routes.
 | `/wifi` | Wi-Fi | Route absent; implementation required |
 | `/inventory` | Inventory | Route exists: `apps/web/src/app/(dashboard)/inventory/page.tsx` |
 | `/ipam` | IP Address Management | Route exists: `apps/web/src/app/(dashboard)/ipam/page.tsx` |
-| `/config` | Configuration | Route absent; implementation required |
-| `/config/changes` | Change History | Route absent; implementation required |
+| `/config` | Configuration | Backup metadata stage implemented; contents/diffs/drift remain pending |
+| `/config/changes` | Change History | Saved-version metadata stage implemented; causal correlation/rollback pending |
 | `/ai` | Ask Netsight AI | Route absent; implementation required |
 | `/ai/investigations/[id]` | AI Investigation | Route absent; implementation required |
 | `/recommendations` | Recommendations | Route absent; implementation required |
@@ -126,3 +126,11 @@ Implement the remaining product in the PRD's phases, with source contracts,
 RBAC/privacy/audit controls, realistic integration tests, design acceptance and
 independent review per slice. Do not substitute placeholder screens or invented
 monitoring evidence for missing capabilities.
+
+## Subsequent staged implementation
+
+E08 stage 1 adds real Oxidized metadata reads and `/config`/`/config/changes`,
+with privacy/role controls and browser verification. See
+`docs/12-implementation/CONFIGURATION-INTELLIGENCE.md`. The full Configuration
+PRD remains incomplete; backup metadata is not a substitute for diffs, drift or
+approved rollback. No ordinary-login behavior or production deployment changed.

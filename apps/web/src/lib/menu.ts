@@ -54,6 +54,7 @@ const MENU_ENTRIES: readonly MenuEntry[] = [
   },
   { node: { type: 'item', text: 'Incidents', href: '/incidents', icon: 'bi-exclamation-triangle' } },
   { node: { type: 'item', text: 'Alerts', href: '/alerts', icon: 'bi-bell' } },
+  { node: { type: 'item', text: 'Configuration', href: '/config', icon: 'bi-file-earmark-code' }, requires: 'configuration:read' },
 ];
 
 /**

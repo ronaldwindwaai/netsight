@@ -53,6 +53,7 @@ from netsight_api.auth.oidc import aclose as oidc_aclose
 from netsight_api.auth.routes import router as auth_router
 from netsight_api.auth.settings import session_policy
 from netsight_api.body_limit import BodySizeLimitMiddleware
+from netsight_api.configuration_routes import router as configuration_router
 from netsight_api.contracts import ContractViolation, validate
 from netsight_api.diagnostic_routes import router as diagnostic_router
 from netsight_api.diagnostic_session_routes import router as diagnostic_session_router
@@ -141,6 +142,7 @@ _NO_STORE_ERROR_PREFIXES = (
     f"{API_PREFIX}/users",
     f"{API_PREFIX}/identity/",
     f"{API_PREFIX}/traffic/",
+    f"{API_PREFIX}/config/",
 )
 
 app = FastAPI(title="Netsight Platform API", version="0.1.0", lifespan=lifespan)
@@ -1029,6 +1031,7 @@ app.include_router(diagnostic_router, prefix=API_PREFIX)
 app.include_router(diagnostic_session_router, prefix=API_PREFIX)
 app.include_router(internet_router, prefix=API_PREFIX)
 app.include_router(identity_router, prefix=API_PREFIX)
+app.include_router(configuration_router, prefix=API_PREFIX)
 app.include_router(inventory_router, prefix=API_PREFIX)
 app.include_router(ipam_router, prefix=API_PREFIX)
 app.include_router(unknown_device_router, prefix=API_PREFIX)

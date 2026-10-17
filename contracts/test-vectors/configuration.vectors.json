@@ -1,0 +1,511 @@
+[
+  {
+    "name": "nodes ok",
+    "target": "nodes",
+    "data": {
+      "source": "oxidized",
+      "state": "ok",
+      "observed_at": "2026-10-17T10:00:00Z",
+      "items": [
+        {
+          "id": "config-node-1a0a8a19-1819-552a-9a51-f84402631349",
+          "name": "fixture-core",
+          "group": "hq",
+          "model": "ios",
+          "backup_status": "success",
+          "last_attempt_at": "2026-10-17T10:00:00Z",
+          "backup_freshness": "fresh"
+        }
+      ],
+      "skipped": 0,
+      "truncated": false,
+      "page": 1,
+      "page_size": 50,
+      "total": 1,
+      "has_more": false
+    },
+    "valid": true
+  },
+  {
+    "name": "nodes empty",
+    "target": "nodes",
+    "data": {
+      "source": "oxidized",
+      "state": "ok",
+      "observed_at": "2026-10-17T10:00:00Z",
+      "items": [],
+      "skipped": 0,
+      "truncated": false,
+      "page": 1,
+      "page_size": 50,
+      "total": 0,
+      "has_more": false
+    },
+    "valid": true
+  },
+  {
+    "name": "nodes unknown",
+    "target": "nodes",
+    "data": {
+      "source": "oxidized",
+      "state": "unknown",
+      "observed_at": null,
+      "items": [],
+      "skipped": 0,
+      "truncated": false,
+      "page": 1,
+      "page_size": 50,
+      "total": null,
+      "has_more": false
+    },
+    "valid": true
+  },
+  {
+    "name": "nodes not-connected",
+    "target": "nodes",
+    "data": {
+      "source": "oxidized",
+      "state": "not-connected",
+      "observed_at": null,
+      "items": [],
+      "skipped": 0,
+      "truncated": false,
+      "page": 1,
+      "page_size": 50,
+      "total": null,
+      "has_more": false
+    },
+    "valid": true
+  },
+  {
+    "name": "nodes partial",
+    "target": "nodes",
+    "data": {
+      "source": "oxidized",
+      "state": "partial",
+      "observed_at": "2026-10-17T10:00:00Z",
+      "items": [
+        {
+          "id": "config-node-1a0a8a19-1819-552a-9a51-f84402631349",
+          "name": "fixture-core",
+          "group": "hq",
+          "model": "ios",
+          "backup_status": "success",
+          "last_attempt_at": "2026-10-17T10:00:00Z",
+          "backup_freshness": "fresh"
+        }
+      ],
+      "skipped": 1,
+      "truncated": false,
+      "page": 1,
+      "page_size": 50,
+      "total": 1,
+      "has_more": false
+    },
+    "valid": true
+  },
+  {
+    "name": "nodes secret field",
+    "target": "nodes",
+    "data": {
+      "source": "oxidized",
+      "state": "ok",
+      "observed_at": "2026-10-17T10:00:00Z",
+      "items": [
+        {
+          "id": "config-node-1a0a8a19-1819-552a-9a51-f84402631349",
+          "name": "fixture-core",
+          "group": "hq",
+          "model": "ios",
+          "backup_status": "success",
+          "last_attempt_at": "2026-10-17T10:00:00Z",
+          "backup_freshness": "fresh"
+        }
+      ],
+      "skipped": 0,
+      "truncated": false,
+      "page": 1,
+      "page_size": 50,
+      "total": 1,
+      "has_more": false,
+      "token": "not-allowed"
+    },
+    "valid": false
+  },
+  {
+    "name": "nodes no timestamp",
+    "target": "nodes",
+    "data": {
+      "source": "oxidized",
+      "state": "ok",
+      "observed_at": null,
+      "items": [
+        {
+          "id": "config-node-1a0a8a19-1819-552a-9a51-f84402631349",
+          "name": "fixture-core",
+          "group": "hq",
+          "model": "ios",
+          "backup_status": "success",
+          "last_attempt_at": "2026-10-17T10:00:00Z",
+          "backup_freshness": "fresh"
+        }
+      ],
+      "skipped": 0,
+      "truncated": false,
+      "page": 1,
+      "page_size": 50,
+      "total": 1,
+      "has_more": false
+    },
+    "valid": false
+  },
+  {
+    "name": "nodes partial hidden",
+    "target": "nodes",
+    "data": {
+      "source": "oxidized",
+      "state": "partial",
+      "observed_at": "2026-10-17T10:00:00Z",
+      "items": [
+        {
+          "id": "config-node-1a0a8a19-1819-552a-9a51-f84402631349",
+          "name": "fixture-core",
+          "group": "hq",
+          "model": "ios",
+          "backup_status": "success",
+          "last_attempt_at": "2026-10-17T10:00:00Z",
+          "backup_freshness": "fresh"
+        }
+      ],
+      "skipped": 0,
+      "truncated": false,
+      "page": 1,
+      "page_size": 50,
+      "total": 1,
+      "has_more": false
+    },
+    "valid": false
+  },
+  {
+    "name": "nodes unknown rows",
+    "target": "nodes",
+    "data": {
+      "source": "oxidized",
+      "state": "unknown",
+      "observed_at": null,
+      "items": [
+        {
+          "id": "config-node-1a0a8a19-1819-552a-9a51-f84402631349",
+          "name": "fixture-core",
+          "group": "hq",
+          "model": "ios",
+          "backup_status": "success",
+          "last_attempt_at": "2026-10-17T10:00:00Z",
+          "backup_freshness": "fresh"
+        }
+      ],
+      "skipped": 0,
+      "truncated": false,
+      "page": 1,
+      "page_size": 50,
+      "total": 1,
+      "has_more": false
+    },
+    "valid": false
+  },
+  {
+    "name": "nodes negative page",
+    "target": "nodes",
+    "data": {
+      "source": "oxidized",
+      "state": "ok",
+      "observed_at": "2026-10-17T10:00:00Z",
+      "items": [
+        {
+          "id": "config-node-1a0a8a19-1819-552a-9a51-f84402631349",
+          "name": "fixture-core",
+          "group": "hq",
+          "model": "ios",
+          "backup_status": "success",
+          "last_attempt_at": "2026-10-17T10:00:00Z",
+          "backup_freshness": "fresh"
+        }
+      ],
+      "skipped": 0,
+      "truncated": false,
+      "page": 0,
+      "page_size": 50,
+      "total": 1,
+      "has_more": false
+    },
+    "valid": false
+  },
+  {
+    "name": "nodes duplicates",
+    "target": "nodes",
+    "data": {
+      "source": "oxidized",
+      "state": "ok",
+      "observed_at": "2026-10-17T10:00:00Z",
+      "items": [
+        {
+          "id": "config-node-1a0a8a19-1819-552a-9a51-f84402631349",
+          "name": "fixture-core",
+          "group": "hq",
+          "model": "ios",
+          "backup_status": "success",
+          "last_attempt_at": "2026-10-17T10:00:00Z",
+          "backup_freshness": "fresh"
+        },
+        {
+          "id": "config-node-1a0a8a19-1819-552a-9a51-f84402631349",
+          "name": "fixture-core",
+          "group": "hq",
+          "model": "ios",
+          "backup_status": "success",
+          "last_attempt_at": "2026-10-17T10:00:00Z",
+          "backup_freshness": "fresh"
+        }
+      ],
+      "skipped": 0,
+      "truncated": false,
+      "page": 1,
+      "page_size": 50,
+      "total": 1,
+      "has_more": false
+    },
+    "valid": false
+  },
+  {
+    "name": "versions ok",
+    "target": "versions",
+    "data": {
+      "source": "oxidized",
+      "state": "ok",
+      "observed_at": "2026-10-17T10:00:00Z",
+      "items": [
+        {
+          "id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "saved_at": "2026-10-17T10:00:00Z"
+        }
+      ],
+      "skipped": 0,
+      "truncated": false,
+      "page": 1,
+      "page_size": 50,
+      "total": 1,
+      "has_more": false
+    },
+    "valid": true
+  },
+  {
+    "name": "versions empty",
+    "target": "versions",
+    "data": {
+      "source": "oxidized",
+      "state": "ok",
+      "observed_at": "2026-10-17T10:00:00Z",
+      "items": [],
+      "skipped": 0,
+      "truncated": false,
+      "page": 1,
+      "page_size": 50,
+      "total": 0,
+      "has_more": false
+    },
+    "valid": true
+  },
+  {
+    "name": "versions unknown",
+    "target": "versions",
+    "data": {
+      "source": "oxidized",
+      "state": "unknown",
+      "observed_at": null,
+      "items": [],
+      "skipped": 0,
+      "truncated": false,
+      "page": 1,
+      "page_size": 50,
+      "total": null,
+      "has_more": false
+    },
+    "valid": true
+  },
+  {
+    "name": "versions not-connected",
+    "target": "versions",
+    "data": {
+      "source": "oxidized",
+      "state": "not-connected",
+      "observed_at": null,
+      "items": [],
+      "skipped": 0,
+      "truncated": false,
+      "page": 1,
+      "page_size": 50,
+      "total": null,
+      "has_more": false
+    },
+    "valid": true
+  },
+  {
+    "name": "versions partial",
+    "target": "versions",
+    "data": {
+      "source": "oxidized",
+      "state": "partial",
+      "observed_at": "2026-10-17T10:00:00Z",
+      "items": [
+        {
+          "id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "saved_at": "2026-10-17T10:00:00Z"
+        }
+      ],
+      "skipped": 1,
+      "truncated": false,
+      "page": 1,
+      "page_size": 50,
+      "total": 1,
+      "has_more": false
+    },
+    "valid": true
+  },
+  {
+    "name": "versions secret field",
+    "target": "versions",
+    "data": {
+      "source": "oxidized",
+      "state": "ok",
+      "observed_at": "2026-10-17T10:00:00Z",
+      "items": [
+        {
+          "id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "saved_at": "2026-10-17T10:00:00Z"
+        }
+      ],
+      "skipped": 0,
+      "truncated": false,
+      "page": 1,
+      "page_size": 50,
+      "total": 1,
+      "has_more": false,
+      "token": "not-allowed"
+    },
+    "valid": false
+  },
+  {
+    "name": "versions no timestamp",
+    "target": "versions",
+    "data": {
+      "source": "oxidized",
+      "state": "ok",
+      "observed_at": null,
+      "items": [
+        {
+          "id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "saved_at": "2026-10-17T10:00:00Z"
+        }
+      ],
+      "skipped": 0,
+      "truncated": false,
+      "page": 1,
+      "page_size": 50,
+      "total": 1,
+      "has_more": false
+    },
+    "valid": false
+  },
+  {
+    "name": "versions partial hidden",
+    "target": "versions",
+    "data": {
+      "source": "oxidized",
+      "state": "partial",
+      "observed_at": "2026-10-17T10:00:00Z",
+      "items": [
+        {
+          "id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "saved_at": "2026-10-17T10:00:00Z"
+        }
+      ],
+      "skipped": 0,
+      "truncated": false,
+      "page": 1,
+      "page_size": 50,
+      "total": 1,
+      "has_more": false
+    },
+    "valid": false
+  },
+  {
+    "name": "versions unknown rows",
+    "target": "versions",
+    "data": {
+      "source": "oxidized",
+      "state": "unknown",
+      "observed_at": null,
+      "items": [
+        {
+          "id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "saved_at": "2026-10-17T10:00:00Z"
+        }
+      ],
+      "skipped": 0,
+      "truncated": false,
+      "page": 1,
+      "page_size": 50,
+      "total": 1,
+      "has_more": false
+    },
+    "valid": false
+  },
+  {
+    "name": "versions negative page",
+    "target": "versions",
+    "data": {
+      "source": "oxidized",
+      "state": "ok",
+      "observed_at": "2026-10-17T10:00:00Z",
+      "items": [
+        {
+          "id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "saved_at": "2026-10-17T10:00:00Z"
+        }
+      ],
+      "skipped": 0,
+      "truncated": false,
+      "page": 0,
+      "page_size": 50,
+      "total": 1,
+      "has_more": false
+    },
+    "valid": false
+  },
+  {
+    "name": "versions duplicates",
+    "target": "versions",
+    "data": {
+      "source": "oxidized",
+      "state": "ok",
+      "observed_at": "2026-10-17T10:00:00Z",
+      "items": [
+        {
+          "id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "saved_at": "2026-10-17T10:00:00Z"
+        },
+        {
+          "id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "saved_at": "2026-10-17T10:00:00Z"
+        }
+      ],
+      "skipped": 0,
+      "truncated": false,
+      "page": 1,
+      "page_size": 50,
+      "total": 1,
+      "has_more": false
+    },
+    "valid": false
+  }
+]

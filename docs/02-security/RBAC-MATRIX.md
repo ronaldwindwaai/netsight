@@ -271,3 +271,11 @@ Fail closed: unknown roles, no identity and unknown permission names are denied.
   never an address, MAC, hostname, comment or reason text.
 * **Decisions for the owner.** (1) The role mapping above, in particular Technician (finding counts only) and Auditor (rows, no comment). (2) Step-up on resolve and dismiss. (3) Whether Management should see
   inventory and IPAM counts at all. (4) Site scoping does not exist, so a "scoped" role sees every site.
+
+## Configuration backup metadata (E08 stage 1)
+
+`configuration:read` implements the Config history row for Administrator, Network
+Engineer, Security Analyst, Technician and Auditor. Management holds no permission.
+Only backup-attempt metadata and revision IDs/timestamps are exposed, with every
+read authorized, rate-limited, audited and non-cacheable. This grants no access to
+configuration bodies, author identities, raw diffs or remote write/restore actions.

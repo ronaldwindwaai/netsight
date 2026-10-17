@@ -1,5 +1,8 @@
 # Oxidized Adapter
 
-Status: scaffold only.
+Read-only node-backup and saved-version metadata is implemented in
+`apps/api/src/netsight_api/adapters/oxidized.py`.
 
-Implement according to `/docs/04-integrations/` and `/skills/integration-adapter/SKILL.md`.
+See `docs/04-integrations/OXIDIZED.md` and
+`docs/12-implementation/CONFIGURATION-INTELLIGENCE.md`.
+Configuration contents, diffs, drift and remote rollback remain separate stages.

@@ -20,6 +20,8 @@ REPO_ROOT = Path(__file__).resolve().parents[4]
 SCHEMA_DIR = REPO_ROOT / "contracts" / "json-schema"
 
 SCHEMA_FILES = {
+    "configuration_nodes": "configuration-nodes.schema.json",
+    "configuration_versions": "configuration-versions.schema.json",
     "device": "device.schema.json",
     "interface": "interface.schema.json",
     "alert": "alert.schema.json",
