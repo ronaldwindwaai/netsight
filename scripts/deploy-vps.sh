@@ -74,12 +74,6 @@ pnpm --filter @netsight/web deploy --frozen-lockfile "$RUNTIME"
 mv "$SOURCE_WEB" "$SOURCE_ARCHIVE"
 ln -s ../runtime "$SOURCE_WEB"
 
-install -m 0644 infrastructure/vps/netsight-web.service "$HOME/.config/systemd/user/netsight-web.service"
-install -m 0644 infrastructure/vps/netsight-api.service "$HOME/.config/systemd/user/netsight-api.service"
-systemctl --user daemon-reload
-systemctl --user enable netsight-web.service >/dev/null
-systemctl --user enable netsight-api.service >/dev/null
-
 # Keep each release's API environment alongside its lockfile. A failed candidate
 # must not overwrite the API dependencies used by the previous release.
 if [ -f "$RELEASE/apps/api/pyproject.toml" ]; then
@@ -88,6 +82,14 @@ if [ -f "$RELEASE/apps/api/pyproject.toml" ]; then
     "$HOME/.local/bin/uv" sync --locked --no-dev --no-editable
   )
 fi
+
+# Dependency preparation must finish before changing active service definitions.
+# Older releases may still need their shared API environment on any restart.
+install -m 0644 infrastructure/vps/netsight-web.service "$HOME/.config/systemd/user/netsight-web.service"
+install -m 0644 infrastructure/vps/netsight-api.service "$HOME/.config/systemd/user/netsight-api.service"
+systemctl --user daemon-reload
+systemctl --user enable netsight-web.service >/dev/null
+systemctl --user enable netsight-api.service >/dev/null
 
 PREVIOUS="$(readlink -f "$BASE/current" 2>/dev/null || true)"
 ln -sfn "$RELEASE" "$BASE/current"
