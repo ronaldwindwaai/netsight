@@ -102,7 +102,9 @@ Deploy now checks successful main-push CI, Security and CodeQL runs on the exact
 commit, verifies the release is on main, and uses that SHA for deployment. Manual
 workflow dispatch uses the same checks. Missing, pending, skipped, failed,
 wrong-branch and wrong-commit results fail closed; a failed latest run cannot be
-masked by an older success. Twelve release/rollback tests pass locally.
+masked by an older success. Thirteen release/rollback tests pass locally. A failed candidate API dependency
+install leaves the current symlink and both installed service definitions unchanged,
+including when the previous release still uses the shared API environment.
 
 The first PostgreSQL-enabled GitHub run completed with 11,832 passed, two skipped
 and one flaky audit-test failure: a generated correlation UUID happened to contain
