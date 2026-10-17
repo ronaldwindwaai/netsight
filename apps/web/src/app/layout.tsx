@@ -4,6 +4,9 @@ import './globals.css';
 
 export const metadata = {
   title: 'Netsight',
+  manifest: '/manifest.webmanifest',
+  appleWebApp: { capable: true, title: 'Netsight', statusBarStyle: 'default' },
+  icons: { apple: '/icons/apple-touch-icon.png' },
   description: 'AI-assisted Network Operations & Security Command Centre'
 };
 

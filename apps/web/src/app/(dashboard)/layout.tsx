@@ -1,6 +1,7 @@
 import { DashboardLayout } from '@adminlte/react';
 
 import { IdentityMenu } from '@/components/identity-menu';
+import { PwaInstall } from '@/components/pwa-install';
 import { AppLink } from '@/components/app-link';
 import { apiGet } from '@/lib/api';
 import { parseSessionInfo } from '@/lib/api-contracts';
@@ -34,6 +35,7 @@ export default async function Layout({ children }: { children: React.ReactNode }
               Read only
             </span>
           ) : null}
+          <PwaInstall />
           <IdentityMenu session={session} />
         </>
       }

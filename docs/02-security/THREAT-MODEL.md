@@ -577,3 +577,24 @@ Mitigate with:
 - evidence citations;
 - no direct write tools in MVP;
 - baseline governance.
+
+## PWA install/offline shell (stage 1)
+
+New boundary: same-origin service worker with application-wide scope. Persistent
+CacheStorage is restricted to three public resources: a generic offline HTML page
+and two public brand icons fetched with credentials omitted. No API/auth/login
+request, write, cross-origin resource or authenticated navigation response is
+cached. Navigation falls back only on network failure, returns 503/no-store and
+states that current health is unknown without echoing a path, identity, query or
+telemetry. Worker updates bypass HTTP cache; activation deletes only obsolete
+feature-owned caches. Installation uses a browser-provided prompt after a user
+gesture. No push subscriptions or notification permissions are requested.
+
+Tests exercise cache allow-listing, omitted credentials, route/method isolation,
+online no-cache behavior, offline status, safe cache cleanup and browser reconnect.
+Revocation must serve a reviewed retirement worker at the same URL; deleting the
+script alone does not remove existing client registrations. XSS resistance and
+secure hosting remain prerequisites: a compromised same-origin script can affect
+service-worker registration, so the worker does not reduce existing CSP/output
+encoding/authentication requirements. No additional production scope was granted
+in this stage.

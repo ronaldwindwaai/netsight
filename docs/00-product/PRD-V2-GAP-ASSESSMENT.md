@@ -134,3 +134,8 @@ with privacy/role controls and browser verification. See
 `docs/12-implementation/CONFIGURATION-INTELLIGENCE.md`. The full Configuration
 PRD remains incomplete; backup metadata is not a substitute for diffs, drift or
 approved rollback. No ordinary-login behavior or production deployment changed.
+
+PWA stage 1 adds installation metadata, branded icons, a native install affordance
+and a public-only offline/unknown shell. Browser checks verify that operational
+data and sessions are not placed in the worker cache. Push delivery/subscriptions
+and the remaining mobile workflows are still pending; see MOBILE-PWA.md.

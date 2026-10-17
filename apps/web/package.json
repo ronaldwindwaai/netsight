@@ -4,7 +4,8 @@
   "files": [
     "src",
     "next-env.d.ts",
-    "tsconfig.json"
+    "tsconfig.json",
+    "public"
   ],
   "scripts": {
     "dev": "next dev",
