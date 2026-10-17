@@ -1,9 +1,9 @@
 name: Deploy
-# Deploys main to the VPS (netsight.sadcpf.org) after CI succeeds on main.
+# Deploys main only after CI, Security and CodeQL pass on the exact commit.
 # Merging to main is the human approval gate: protect main (PR + CI required).
 on:
   workflow_run:
-    workflows: [CI]
+    workflows: [CI, Security, CodeQL]
     types: [completed]
     branches: [main]
   workflow_dispatch:
@@ -14,14 +14,41 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: deploy-vps
   cancel-in-progress: false
 
 jobs:
+  release-gates:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      sha: ${{ steps.release.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || inputs.ref || 'main' }}
+          fetch-depth: 0
+      - name: Require reviewed main commit and all release checks
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          SHA="$(git rev-parse HEAD)"
+          git merge-base --is-ancestor "$SHA" origin/main
+          python scripts/check-release-gates.py --repository "$REPOSITORY" --sha "$SHA"
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+
   deploy:
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    needs: release-gates
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment:
@@ -30,7 +57,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha || inputs.ref || 'main' }}
+          ref: ${{ needs.release-gates.outputs.sha }}
 
       - name: Resolve release SHA
         id: rel

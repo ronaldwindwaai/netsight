@@ -1,6 +1,13 @@
 # Dependency remediation and release gates
 
 Status: local implementation, 17 October 2026. All ten dependency PRs remain on hold.
+
+Update: the subsequent PRD v2 release-readiness change removes the braces chain
+entirely via the scoped tinyglobby override and Next utility compatibility patch;
+the standard npm audit now reports no known vulnerabilities. It also replaces
+Trivy's broken nested action reference and adds exact-commit deployment gates.
+See `docs/00-product/PRD-V2-GAP-ASSESSMENT.md`. Historical validation and the
+original findings below describe the preceding revision, not current audit status.
 No PR has been merged, approved, rebased, or deployed by this work.
 
 ## Implementation

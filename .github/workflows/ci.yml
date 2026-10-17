@@ -59,9 +59,9 @@ jobs:
         with:
           version: '0.12.23'
       - run: uv sync --project apps/api --locked --extra dev
-      - run: uv run --project apps/api --no-sync ruff check apps/api scripts/tests/*.py
+      - run: uv run --project apps/api --no-sync ruff check apps/api scripts/check-release-gates.py scripts/tests/*.py
       - run: uv run --project apps/api --no-sync mypy apps/api/src
-      - run: uv run --project apps/api --no-sync pytest apps/api/tests scripts/tests/test_deploy_rollback.py
+      - run: uv run --project apps/api --no-sync pytest apps/api/tests scripts/tests
       - run: uv build --project apps/api --wheel
 
   workflows:
