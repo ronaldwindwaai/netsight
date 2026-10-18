@@ -38,7 +38,7 @@ Every "human decision pending / needed" recorded in `docs/00-product/BUILD-PLAN-
 | D-17 | `internet:read_detail` and export: should Technician and Auditor hold detail; Management hold the export; probe targets withheld from the export | Keep as is (detail: Administrator, Network Engineer, Security Analyst; export: Administrator, Network Engineer, Auditor); do not give Management the export | As described | BUILD-PLAN E04 (Internet) |
 | D-18 | Unknown-device RBAC: Technician finding counts only, Auditor rows without comment, Management counts only | Confirm | Implemented as stated | BUILD-PLAN E08 |
 | D-19 | Step-up on resolve and dismiss of an unknown-device finding | Keep step-up for resolve and dismiss | Step-up required for both | RBAC-MATRIX (Unknown devices) |
-| D-20 | Configuration history RBAC (Technician and Auditor see the same redacted content) | Confirm | Administrator, Network Engineer, Security Analyst, Technician and Auditor hold `config:read`; Management none | CONFIGURATION-INTELLIGENCE |
+| D-20 | Configuration history RBAC (Technician and Auditor see the same redacted content) | Confirm | Not applicable on this branch: only upstream metadata is exposed (`configuration:read`: Administrator, Network Engineer, Security Analyst, Technician, Auditor; Management none). Redacted content/diffs were not integrated (see Integration notes) | CONFIGURATION-INTELLIGENCE |
 | D-21 | `copilot:ask` for Management | None | Management holds none | AI-COPILOT |
 | D-22 | Whether Technician may export the capacity report | No (no reporting role in the matrix) | Technician cannot export | FORECASTING |
 | D-23 | Who may approve and execute actions; the matrix says "Policy" for Network Engineer and Security Analyst; whether a risk A/B requester may approve | Administrator-only for risk C and D; revisit A/B after a lab proves a real executor | Administrator holds `actions:approve`, `actions:execute`, `actions:kill-switch`; requester never approves (a risk D request needs two Administrators) | ACTION-ENGINE, RBAC-MATRIX |
@@ -58,7 +58,7 @@ Every "human decision pending / needed" recorded in `docs/00-product/BUILD-PLAN-
 | D-32 | NetBox: role/type class map; the custom field joining Wazuh agents; contact roles meaning "uses this device" (default `Owner,User`); device role names for diagnostics (access point / access switch / core / firewall) | None (deployment data) | Fixed vocabulary or env-supplied; nothing classified without the map | BUILD-PLAN E07/E08/E04 |
 | D-33 | Network classification of the real estate (NAT, VPN, guest, internal public blocks, server/static ranges); provision and rotate `NETSIGHT_IDENTITY_ID_KEY` | None (deployment prerequisite) | Required for identity answers | BUILD-PLAN E07 |
 | D-34 | Probe targets and exporter locations per link; backup-link probing | None (deployment data) | Local prober only | BUILD-PLAN E04 |
-| D-35 | Oxidized credentials and rotation; an approved reference configuration source for true drift | Read-only Oxidized account, rotated with the other service secrets | No drift detection (no reference source) | CONFIGURATION-INTELLIGENCE |
+| D-35 | Oxidized credentials and rotation; an approved reference configuration source for true drift | Read-only Oxidized account, rotated with the other service secrets | No drift detection (no reference source); upstream stage 1 reads metadata only | CONFIGURATION-INTELLIGENCE |
 | D-36 | Which model/provider for the copilot and whether evidence may leave the host; model budgets; the knowledge corpus and its `roles:` headers | Local or in-region model first; evidence leaves the host only by explicit opt-in | Provider from env; unset is `not-connected` | AI-COPILOT |
 | D-37 | Web Push provider and who runs the gateway/subscription store; SMTP relay and sender | None (infrastructure) | Provider-agnostic gateway, not built; email via env | BUILD-PLAN E05/E10 |
 | D-38 | Notification routing table and minimum severity | A routing table in the database with per-severity rules | One flat list from the environment | BUILD-PLAN E05 |
@@ -75,7 +75,7 @@ Every "human decision pending / needed" recorded in `docs/00-product/BUILD-PLAN-
 | D-44 | Whether SLA evidence needs signing or independent attestation | Defer until a dispute needs it | Only as trustworthy as the recording host | BUILD-PLAN E04 |
 | D-45 | Identity trust TTLs and thresholds (open session 15 min RADIUS/VPN/Wi-Fi/MAC table, DHCP 1 h, agent and sign-in 30 min, directory/assignment 24 h; observed >= 0.8; inferred cap 0.7) | Keep | As stated | BUILD-PLAN E07 |
 | D-46 | Unknown-device stale window (24 h), severity policy and `quarantine_recommended_at` threshold, scheduled scan on or off and its interval | 24 h; severity policy from the owner; scheduled scan off until the policy exists | Stale 24 h; nothing classified without a severity policy; scan on request only | BUILD-PLAN E08 |
-| D-47 | Configuration stale threshold (48 h) and the risk rule catalogue and severities | Keep 48 h; review the six rules with the network team | 48 h; six explicit text-pattern rules | CONFIGURATION-INTELLIGENCE |
+| D-47 | Configuration stale threshold (48 h) and the risk rule catalogue and severities | Keep 48 h; review the six rules with the network team | Not applicable on this branch: upstream labels a successful backup older than 24 h stale; no risk rules (see Integration notes) | CONFIGURATION-INTELLIGENCE |
 | D-48 | Action approval and run windows (24 h / 1 h) and default isolation duration (60 min) | Keep | As stated | ACTION-ENGINE |
 | D-49 | Forecast: daily traffic limit and how it relates to link capacity; growth (20 %) and weekend (60 %) rule thresholds | Limit from the ISP contract or link rating; keep 20 % and 60 % | Limit only from `NETSIGHT_FORECAST_TRAFFIC_DAILY_LIMIT_BYTES`; thresholds fixed | FORECASTING |
 | D-50 | **Forecast partial-day rules**: a newest day is partial when its last flow is more than 1 h before midnight; a day is an outage day when fewer than 22 of 24 UTC hours held a flow | Keep (22 h and 1 h are engineering judgement) | **changed 2026-10-18**: such days are excluded and counted as missing, never shown as measured | FORECASTING |
@@ -87,12 +87,12 @@ Every "human decision pending / needed" recorded in `docs/00-product/BUILD-PLAN-
 
 | ID | Decision | Recommended default | Current behaviour | Source |
 |---|---|---|---|---|
-| D-60 | Page CSP and HSTS policy for the web app | Strict CSP with nonces; HSTS preload only after a stable HTTPS period | `next.config.mjs` sets `default-src 'self'; script-src 'self'` for pages; no HSTS decision recorded | MOBILE-PWA |
+| D-60 | Page CSP and HSTS policy for the web app | Strict CSP with nonces; HSTS preload only after a stable HTTPS period | `next.config.mjs` sets baseline headers on every route and a tight CSP only on `/sw.js` and `/offline.html`; no page CSP, no HSTS decision recorded | MOBILE-PWA |
 | D-61 | A mobile home combining health/WAN/incidents/alerts/top traffic before approvals | No; approvals wait for the Action Request mobile design | Not built | MOBILE-PWA |
 | D-62 | Exporter authentication for diagnostic probes (mTLS or a management network) and egress policy | Management network plus mTLS | Exporters carry no authentication | BUILD-PLAN E04, BLACKBOX |
 | D-63 | Tamper-evident audit store (PRD 32) | An append-only sink outside the application host | Operational log sink | ACTION-ENGINE, BUILD-PLAN |
 | D-64 | Approved designs for the Explorer sub-pages, `/internet`, the unknown-device pages and the configuration, copilot and mobile pages (the repository has none) | Commission designs, or accept the current ones explicitly | Built to AGENTS.md UI rules without an approved design | BUILD-PLAN E03/E04/E08/E09/E10 |
-| D-65 | Icon artwork for the PWA | Supply final artwork | Generated placeholder glyph | MOBILE-PWA |
+| D-65 | Icon artwork for the PWA | Supply final artwork | Upstream-supplied `netsight-192/512` icons | MOBILE-PWA |
 | D-66 | Shared (cross-worker) rate limits, caches and kill switch | Redis-backed once more than one worker runs | Per-process | BUILD-PLAN (several) |
 | D-67 | Secret storage for webhook URLs and headers once persisted | Secret manager reference, never the database | Environment only | BUILD-PLAN E05 |
 
@@ -103,21 +103,19 @@ Every "human decision pending / needed" recorded in `docs/00-product/BUILD-PLAN-
 3. Export routes (`/internet/export`, `/forecast/export`) now refuse a request that has no `Sec-Fetch-Site` and no matching
    `Origin`/`Referer` (previously a header-less request was allowed). Non-browser clients must send a same-site `Origin`.
 
-Also closed that day: skipped Oxidized nodes are counted in the configuration summary (`nodes_skipped`), and the configuration
-change timeline names each limit it hit (`devices_truncated`, `versions_truncated`, `items_truncated`).
 
 ## Accepted defaults (2026-10-19)
 
 The owner chose "adopt recommended defaults" for the low-risk, offline decisions. In each case the recommended default equals
 the current behaviour, so no code changed. These stay revisitable.
 
-- **D-20** Technician and Auditor see the same redacted configuration content.
+- **D-20** (not applicable on this branch: redacted configuration content was not integrated; see Integration notes.)
 - **D-21** Management holds no `copilot:ask`.
 - **D-22** Technician cannot export the capacity report.
 - **D-24** Technician cannot propose risk B actions beyond the catalogue grants.
 - **D-40** Baseline constants stay fixed.
 - **D-45** Identity trust TTLs and thresholds stay as stated.
-- **D-47** Configuration stale threshold stays 48 h; the six risk rules stay as shipped.
+- **D-47** (not applicable on this branch: upstream configuration stage 1 has a 24 h stale label and no risk rules; see Integration notes.)
 - **D-48** Action approval and run windows (24 h / 1 h) and the 60 min isolation default stay.
 - **D-49** Growth (20 %) and weekend (60 %) thresholds stay; the traffic limit remains owner data.
 - **D-50** Partial-day tolerances (1 h and 22 of 24 UTC hours) stay until checked on real flow data.
@@ -126,3 +124,14 @@ the current behaviour, so no code changed. These stay revisitable.
 Deliberately not adopted (privacy, security or infrastructure choices): D-01 to D-08 retention and privacy, D-23 approver
 policy, D-36 model provider, D-37 push and SMTP, D-41 and D-42 cohort and audit-key policy, D-52 and D-53 executors and the
 durable store.
+
+## Integration notes (2026-10-19, branch `integrate/steps-9-13`)
+
+The local Configuration Intelligence (Step 9: redacted configuration text, diffs, risk findings, change timeline, `config:read`)
+was not integrated. Upstream already ships a reviewed metadata-only stage 1 (`configuration:read`, `/config/nodes`), which states
+that content viewing, diffs and drift are separate stages with their own security gates. Reintroducing content fetching would
+contradict that boundary and duplicate its routes, permission and pages. Those pieces remain on local `main` and need an explicit
+decision (and an ADR, since they read device configuration text) before being ported onto the upstream adapter. Only the
+configuration redactor (`configuration/redact.py`, `text.py`) was kept, because the copilot sanitiser uses it. The copilot's
+`get_recent_config_changes` tool was removed for the same reason. D-20, D-47 and the "skipped Oxidized nodes" note therefore
+describe code that is not on this branch.

@@ -491,7 +491,9 @@ def test_recorded_state_changes_must_be_legal_and_carry_their_reason(db: Db) -> 
                 insert_event(conn, finding, seq, **{"message": None, **fields})
             conn.execute("ROLLBACK TO SAVEPOINT s")
         with pytest.raises(psycopg.errors.UniqueViolation):
-            insert_event(conn, finding, seq - 1, kind="comment", message="duplicate sequence number")
+            insert_event(
+                conn, finding, seq - 1, kind="comment", message="duplicate sequence number"
+            )
 
 
 @requires_pg
@@ -548,8 +550,10 @@ def test_a_finding_without_its_detected_event_cannot_be_committed(db: Db) -> Non
         "chain = jsonb_set(chain, '{0,basis}', '\"observed\"')",
         "comparison = jsonb_set(comparison, '{checks,0,result}', '\"not-checked\"')",
         "comparison = jsonb_set(comparison, '{reason}', '\"name-matches-mac-does-not\"')",
-        ("proposed_action = "
-        "'{\"action_type\":\"endpoint.isolate\",\"state\":\"proposed\",\"executable\":false}'"),
+        (
+            "proposed_action = "
+            '\'{"action_type":"endpoint.isolate","state":"proposed","executable":false}\''
+        ),
     ],
 )
 def test_a_change_of_state_assignee_or_evidence_without_its_event_cannot_be_committed(
@@ -569,7 +573,9 @@ def test_the_same_changes_commit_when_their_events_are_in_the_same_transaction(d
         key = insert_finding(conn)
         conn.commit()
         move(conn, key, "new", "acknowledged", 2)
-        conn.execute("UPDATE unknown_device_findings SET assignee_id = 'someone' WHERE id = %s", (key,))
+        conn.execute(
+            "UPDATE unknown_device_findings SET assignee_id = 'someone' WHERE id = %s", (key,)
+        )
         insert_event(conn, key, 3, kind="assignee-changed", subject_id="someone")
         conn.execute(
             "UPDATE unknown_device_findings SET severity = 'high', severity_basis = 'policy-rule' "
@@ -627,10 +633,17 @@ def test_a_state_change_must_start_from_where_the_timeline_left_the_finding(db: 
     with db.owner.connect() as conn:
         key = insert_finding(conn)
         conn.commit()
-        conn.execute("UPDATE unknown_device_findings SET state = 'acknowledged' WHERE id = %s", (key,))
+        conn.execute(
+            "UPDATE unknown_device_findings SET state = 'acknowledged' WHERE id = %s", (key,)
+        )
         # the event says investigating -> resolved, which the finding never did
         insert_event(
-            conn, key, 2, kind="state-changed", state_from="investigating", state_to="resolved",
+            conn,
+            key,
+            2,
+            kind="state-changed",
+            state_from="investigating",
+            state_to="resolved",
             reason="x",
         )
         with pytest.raises(psycopg.errors.IntegrityConstraintViolation):
@@ -641,7 +654,9 @@ def test_a_state_change_must_start_from_where_the_timeline_left_the_finding(db: 
 def test_an_assignment_that_changes_nothing_cannot_be_recorded(db: Db) -> None:
     with db.owner.connect() as conn:
         key = insert_finding(conn)
-        conn.execute("UPDATE unknown_device_findings SET assignee_id = 'someone' WHERE id = %s", (key,))
+        conn.execute(
+            "UPDATE unknown_device_findings SET assignee_id = 'someone' WHERE id = %s", (key,)
+        )
         insert_event(conn, key, 2, kind="assignee-changed", subject_id="someone")
         conn.commit()
         insert_event(conn, key, 3, kind="assignee-changed", subject_id="someone")
@@ -653,7 +668,9 @@ def test_an_assignment_that_changes_nothing_cannot_be_recorded(db: Db) -> None:
 def test_unassigning_is_recorded_as_a_change_to_nobody(db: Db) -> None:
     with db.owner.connect() as conn:
         key = insert_finding(conn)
-        conn.execute("UPDATE unknown_device_findings SET assignee_id = 'someone' WHERE id = %s", (key,))
+        conn.execute(
+            "UPDATE unknown_device_findings SET assignee_id = 'someone' WHERE id = %s", (key,)
+        )
         insert_event(conn, key, 2, kind="assignee-changed", subject_id="someone")
         conn.commit()
         conn.execute("UPDATE unknown_device_findings SET assignee_id = NULL WHERE id = %s", (key,))
@@ -676,7 +693,9 @@ def test_the_triggers_hold_for_the_application_role_too(db: Db) -> None:
         key = insert_finding(conn)
         conn.commit()
     with db.app.connect() as conn:
-        conn.execute("UPDATE unknown_device_findings SET state = 'acknowledged' WHERE id = %s", (key,))
+        conn.execute(
+            "UPDATE unknown_device_findings SET state = 'acknowledged' WHERE id = %s", (key,)
+        )
         with pytest.raises(psycopg.errors.IntegrityConstraintViolation):
             conn.commit()
 
@@ -685,7 +704,9 @@ def test_the_triggers_hold_for_the_application_role_too(db: Db) -> None:
 
 
 def version(conn: psycopg.Connection[Any], key: uuid.UUID) -> int:
-    row = conn.execute("SELECT evidence_version AS v FROM unknown_device_findings WHERE id = %s", (key,))
+    row = conn.execute(
+        "SELECT evidence_version AS v FROM unknown_device_findings WHERE id = %s", (key,)
+    )
     found = row.fetchone()
     assert found is not None
     return int(found["v"])
@@ -703,7 +724,9 @@ def test_the_evidence_version_moves_by_one_exactly_when_the_evidence_does(db: Db
             (key,),
         )
         assert version(conn, key) == 1  # a sighting is not a change of the evidence
-        conn.execute("UPDATE unknown_device_findings SET assignee_id = 'someone' WHERE id = %s", (key,))
+        conn.execute(
+            "UPDATE unknown_device_findings SET assignee_id = 'someone' WHERE id = %s", (key,)
+        )
         assert version(conn, key) == 1  # nor is an assignment
         conn.execute(
             "UPDATE unknown_device_findings SET severity = 'high', severity_basis = 'policy-rule' "
@@ -719,11 +742,15 @@ def test_nobody_can_set_the_evidence_version(db: Db) -> None:
     with db.owner.connect() as conn:
         key = insert_finding(conn)
         conn.commit()
-        conn.execute("UPDATE unknown_device_findings SET evidence_version = 99 WHERE id = %s", (key,))
+        conn.execute(
+            "UPDATE unknown_device_findings SET evidence_version = 99 WHERE id = %s", (key,)
+        )
         assert version(conn, key) == 1  # the trigger decides, whatever the statement said
         conn.rollback()
     with db.app.connect() as conn, pytest.raises(psycopg.errors.InsufficientPrivilege):
-        conn.execute("UPDATE unknown_device_findings SET evidence_version = 99 WHERE id = %s", (key,))
+        conn.execute(
+            "UPDATE unknown_device_findings SET evidence_version = 99 WHERE id = %s", (key,)
+        )
 
 
 @requires_pg
@@ -838,10 +865,13 @@ def test_the_rollback_is_guarded_and_reversible(db: Db) -> None:
         assert conn.execute(
             "SELECT to_regclass('unknown_device_findings') IS NULL AS gone"
         ).fetchone()["gone"]  # type: ignore[index]
-        assert conn.execute(
-            "SELECT count(*) AS n FROM pg_proc WHERE proname LIKE 'netsight_%unknown_device%' "
-            "OR proname = 'netsight_udf_evidence'"
-        ).fetchone()["n"] == 0  # type: ignore[index]
+        assert (
+            conn.execute(
+                "SELECT count(*) AS n FROM pg_proc WHERE proname LIKE 'netsight_%unknown_device%' "
+                "OR proname = 'netsight_udf_evidence'"
+            ).fetchone()["n"]
+            == 0
+        )  # type: ignore[index]
         assert migrate.apply_up(conn) == ["0006"]
         conn.commit()
         assert conn.execute(

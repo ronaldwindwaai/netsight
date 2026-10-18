@@ -444,6 +444,7 @@ _STANDARD_ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {
     503: {"model": ErrorEnvelope, "description": "Source unavailable"},
 }
 
+
 def _raise_adapter_error(exc: AdapterError) -> NoReturn:
     if exc.status is AdapterStatus.UNAVAILABLE:
         raise ApiError(503, "SOURCE_UNAVAILABLE", "LibreNMS source is unavailable") from exc

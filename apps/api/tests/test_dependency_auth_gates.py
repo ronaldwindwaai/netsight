@@ -1,4 +1,5 @@
 """Security regression gates for the PyJWT minimum and custom JWKS client."""
+
 from __future__ import annotations
 
 import time
@@ -31,19 +32,26 @@ def provider_stubs(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
 @pytest.mark.asyncio
 @pytest.mark.parametrize("missing", ["iss", "aud", "sub", "exp", "iat", "nonce"])
 async def test_required_claims_fail_closed(
-    provider_stubs: dict[str, Any], missing: str,
+    provider_stubs: dict[str, Any],
+    missing: str,
 ) -> None:
     claims = {
-        "iss": "https://accounts.google.com", "aud": "client", "sub": "user",
-        "iat": int(time.time()), "exp": int(time.time()) + 300,
-        "nonce": "nonce", "hd": "example.com",
+        "iss": "https://accounts.google.com",
+        "aud": "client",
+        "sub": "user",
+        "iat": int(time.time()),
+        "exp": int(time.time()) + 300,
+        "nonce": "nonce",
+        "hd": "example.com",
     }
     del claims[missing]
     token = _encode(provider_stubs["private_key"], claims)
     with pytest.raises(oidc.OidcError, match="signature or claims"):
         await oidc.validate_id_token(
-            GOOGLE, ProviderSettings(client_id="client", hosted_domains=["example.com"]),
-            token, "nonce",
+            GOOGLE,
+            ProviderSettings(client_id="client", hosted_domains=["example.com"]),
+            token,
+            "nonce",
         )
 
 
@@ -51,7 +59,8 @@ async def test_required_claims_fail_closed(
 def test_entra_issuer_must_match_exactly(suffix: str) -> None:
     with pytest.raises(oidc.OidcError):
         oidc._validate_issuer(
-            MICROSOFT, f"https://login.microsoftonline.com/tenant{suffix}",
+            MICROSOFT,
+            f"https://login.microsoftonline.com/tenant{suffix}",
             ProviderSettings(tenant_ids=["tenant"]),
         )
 
@@ -64,12 +73,17 @@ async def test_malformed_token_rejected_without_network(token: str) -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("uri", [
-    "http://www.googleapis.com/keys", "https://127.0.0.1/keys",
-    "https://www.googleapis.com.attacker.example/keys",
-    "https://user:password@www.googleapis.com/keys",
-    "https://www.googleapis.com:8443/keys", "https://www.googleapis.com/keys#fragment",
-])
+@pytest.mark.parametrize(
+    "uri",
+    [
+        "http://www.googleapis.com/keys",
+        "https://127.0.0.1/keys",
+        "https://www.googleapis.com.attacker.example/keys",
+        "https://user:password@www.googleapis.com/keys",
+        "https://www.googleapis.com:8443/keys",
+        "https://www.googleapis.com/keys#fragment",
+    ],
+)
 async def test_untrusted_jwks_uri_rejected_without_network(uri: str) -> None:
     with pytest.raises(oidc.OidcError):
         await oidc._jwks({"jwks_uri": uri})
@@ -78,12 +92,13 @@ async def test_untrusted_jwks_uri_rejected_without_network(uri: str) -> None:
 @pytest.mark.asyncio
 @pytest.mark.parametrize("payload", [{}, {"keys": []}, {"keys": [None]}, {"keys": [{}] * 101}])
 async def test_malformed_jwks_not_cached(
-    monkeypatch: pytest.MonkeyPatch, payload: dict[str, Any],
+    monkeypatch: pytest.MonkeyPatch,
+    payload: dict[str, Any],
 ) -> None:
     oidc._jwks_cache.clear()
-    async with httpx.AsyncClient(transport=httpx.MockTransport(
-        lambda request: httpx.Response(200, json=payload)
-    )) as client:
+    async with httpx.AsyncClient(
+        transport=httpx.MockTransport(lambda request: httpx.Response(200, json=payload))
+    ) as client:
         monkeypatch.setattr(oidc, "_http", lambda: client)
         with pytest.raises(oidc.OidcError):
             await oidc._jwks({"jwks_uri": "https://www.googleapis.com/keys"})
@@ -109,15 +124,24 @@ async def test_jwks_redirect_is_not_followed(monkeypatch: pytest.MonkeyPatch) ->
 
 @pytest.mark.asyncio
 async def test_valid_google_token_with_trailing_padding(provider_stubs: dict[str, Any]) -> None:
-    token = _encode(provider_stubs["private_key"], {
-        "iss": "https://accounts.google.com", "aud": "client", "sub": "user",
-        "iat": int(time.time()), "exp": int(time.time()) + 300,
-        "nonce": "nonce", "hd": "example.com",
-    })
+    token = _encode(
+        provider_stubs["private_key"],
+        {
+            "iss": "https://accounts.google.com",
+            "aud": "client",
+            "sub": "user",
+            "iat": int(time.time()),
+            "exp": int(time.time()) + 300,
+            "nonce": "nonce",
+            "hd": "example.com",
+        },
+    )
     token += "=" * (-len(token.rsplit(".", 1)[1]) % 4)
     result = await oidc.validate_id_token(
-        GOOGLE, ProviderSettings(client_id="client", hosted_domains=["example.com"]),
-        token, "nonce",
+        GOOGLE,
+        ProviderSettings(client_id="client", hosted_domains=["example.com"]),
+        token,
+        "nonce",
     )
     assert result.subject == "user"
 
@@ -151,15 +175,23 @@ async def test_jwks_size_limit_and_cache_expiry(monkeypatch: pytest.MonkeyPatch)
 
 @pytest.mark.asyncio
 async def test_malformed_signing_key_is_a_controlled_rejection(
-    monkeypatch: pytest.MonkeyPatch, provider_stubs: dict[str, Any],
+    monkeypatch: pytest.MonkeyPatch,
+    provider_stubs: dict[str, Any],
 ) -> None:
     async def invalid_keys(*args: Any, **kwargs: Any) -> dict[str, Any]:
         return {"keys": [{"kid": "test-key-1", "kty": "RSA"}]}
 
     monkeypatch.setattr(oidc, "_jwks", invalid_keys)
-    token = _encode(provider_stubs["private_key"], {
-        "iss": "https://accounts.google.com", "aud": "client", "sub": "user",
-        "iat": int(time.time()), "exp": int(time.time()) + 300, "nonce": "nonce",
-    })
+    token = _encode(
+        provider_stubs["private_key"],
+        {
+            "iss": "https://accounts.google.com",
+            "aud": "client",
+            "sub": "user",
+            "iat": int(time.time()),
+            "exp": int(time.time()) + 300,
+            "nonce": "nonce",
+        },
+    )
     with pytest.raises(oidc.OidcError, match="signature or claims"):
         await oidc.validate_id_token(GOOGLE, ProviderSettings(client_id="client"), token, "nonce")

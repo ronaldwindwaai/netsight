@@ -100,7 +100,9 @@ def test_a_name_alone_cannot_clear_an_endpoint_that_has_no_mac_to_verify(
 
 def test_the_spoofed_name_finding_is_one_step_lower_than_the_policy_says() -> None:
     plain = only(run([obs(ip="10.20.4.5", mac=MAC, hostname="other")], policy=POLICY))
-    spoof = only(run([obs(ip="10.20.4.5", mac=MAC, hostname="core-sw-1")], netbox=KNOWN, policy=POLICY))
+    spoof = only(
+        run([obs(ip="10.20.4.5", mac=MAC, hostname="core-sw-1")], netbox=KNOWN, policy=POLICY)
+    )
     assert (plain.severity, plain.comparison.reason) == ("high", "no-match")
     assert (spoof.severity, spoof.severity_basis) == ("medium", "policy-rule")
     assert spoof.proposed_action is None  # medium is below the operator's quarantine threshold
@@ -121,13 +123,25 @@ def test_every_name_matching_detection_is_a_valid_finding() -> None:
 
 @pytest.mark.parametrize(
     "hostile",
-    ["bad\x00name", "tab\tname", "new\nline", "esc\x1b[31m", "rlo\u202ename", "iso\u2066x\u2069", "zw\u200bsp"],
+    [
+        "bad\x00name",
+        "tab\tname",
+        "new\nline",
+        "esc\x1b[31m",
+        "rlo\u202ename",
+        "iso\u2066x\u2069",
+        "zw\u200bsp",
+    ],
 )
 def test_control_nul_and_bidirectional_characters_never_reach_a_finding(hostile: str) -> None:
     finding = only(run([obs(ip="10.0.5.9", hostname=hostile)]))
     name = finding.endpoint.hostname
     assert name is not None
-    assert all(ord(ch) >= 0x20 and ch not in "\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069\u200b\x7f" for ch in name)
+    assert all(
+        ord(ch) >= 0x20
+        and ch not in "\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069\u200b\x7f"
+        for ch in name
+    )
 
 
 def test_a_name_made_only_of_such_characters_is_no_name() -> None:
@@ -191,9 +205,7 @@ def test_an_inferred_vlan_never_drives_the_severity() -> None:
     inferred = d._vlan_number
     from netsight_api.schemas_unknown_devices import UnknownDeviceEvidenceRef, UnknownDeviceLinkSlot
 
-    ref = UnknownDeviceEvidenceRef(
-        id="x:1", source="x", kind="k", observed_at=NOW, confidence=0.5
-    )
+    ref = UnknownDeviceEvidenceRef(id="x:1", source="x", kind="k", observed_at=NOW, confidence=0.5)
     slot = UnknownDeviceLinkSlot(
         slot="vlan",
         basis="inferred",
@@ -214,7 +226,10 @@ def test_an_inferred_vlan_never_drives_the_severity() -> None:
 def test_incomplete_netbox_data_never_makes_a_finding_but_a_positive_match_still_clears() -> None:
     incomplete = d.NetboxFacts(primary_ips={"10.0.5.9": "core"}, incomplete=True)
     result = run(
-        [obs(native="1", ip="10.0.5.9", mac=MAC), obs(native="2", ip="10.0.5.70", mac="aa:bb:cc:00:11:99")],
+        [
+            obs(native="1", ip="10.0.5.9", mac=MAC),
+            obs(native="2", ip="10.0.5.70", mac="aa:bb:cc:00:11:99"),
+        ],
         netbox=incomplete,
     )
     assert result.detections == () and result.unverified == 1
@@ -235,7 +250,9 @@ def test_lookups_go_to_endpoints_not_seen_before_then_the_most_recent() -> None:
     ]
     candidates, _ = d.collect_candidates(seen, [], index, correlation, NOW)
     # mac 01 and 02 were seen before (an earlier finding); 03 and 04 are new to us
-    order = d.macs_to_check(candidates, None, known_subjects=frozenset({f"mac:{macs[0]}", f"mac:{macs[1]}"}))
+    order = d.macs_to_check(
+        candidates, None, known_subjects=frozenset({f"mac:{macs[0]}", f"mac:{macs[1]}"})
+    )
     assert order == [macs[3], macs[2], macs[1], macs[0]]
 
 
@@ -244,8 +261,12 @@ def test_lookup_ranking_is_not_an_ascending_sort_of_the_mac() -> None:
     index = CorrelationIndex([], correlation)
     from datetime import timedelta
 
-    low = d.Observed("librenms", "device-poll", "1", NOW - timedelta(hours=5), mac="00:00:00:00:00:01")
-    high = d.Observed("librenms", "device-poll", "2", NOW - timedelta(minutes=1), mac="ff:ff:ff:00:00:01")
+    low = d.Observed(
+        "librenms", "device-poll", "1", NOW - timedelta(hours=5), mac="00:00:00:00:00:01"
+    )
+    high = d.Observed(
+        "librenms", "device-poll", "2", NOW - timedelta(minutes=1), mac="ff:ff:ff:00:00:01"
+    )
     candidates, _ = d.collect_candidates([low, high], [], index, correlation, NOW)
     assert d.macs_to_check(candidates) == ["ff:ff:ff:00:00:01", "00:00:00:00:00:01"]
 

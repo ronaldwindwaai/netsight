@@ -1,4 +1,5 @@
 """Audited, authorized read-only configuration-backup metadata."""
+
 from __future__ import annotations
 
 import os
@@ -32,9 +33,17 @@ def get_configuration_source() -> OxidizedClient | None:
 
 
 Source = Annotated[OxidizedClient | None, Depends(get_configuration_source)]
-Reader = Annotated[Identity, Depends(reader(
-    Permission.CONFIGURATION_READ, "configuration.read", "configuration", lambda: 60,
-))]
+Reader = Annotated[
+    Identity,
+    Depends(
+        reader(
+            Permission.CONFIGURATION_READ,
+            "configuration.read",
+            "configuration",
+            lambda: 60,
+        )
+    ),
+]
 NodeId = Annotated[str, Path(pattern=NODE_ID_PATTERN, min_length=48, max_length=48)]
 
 
@@ -46,20 +55,37 @@ def pagination(request: Request) -> tuple[int, int]:
 def page_of[T: ConfigurationNodes | ConfigurationVersions](snapshot: T, page: int, size: int) -> T:
     available = snapshot.state in {"ok", "partial"}
     start = (page - 1) * size
-    return cast(T, snapshot.model_copy(update={
-        "items": snapshot.items[start:start + size], "page": page, "page_size": size,
-        "total": len(snapshot.items) if available and not snapshot.truncated else None,
-        "has_more": available and start + size < len(snapshot.items),
-    }))
+    return cast(
+        T,
+        snapshot.model_copy(
+            update={
+                "items": snapshot.items[start : start + size],
+                "page": page,
+                "page_size": size,
+                "total": len(snapshot.items) if available and not snapshot.truncated else None,
+                "has_more": available and start + size < len(snapshot.items),
+            }
+        ),
+    )
 
 
 def audit_result(request: Request, identity: Identity, state: str, count: int) -> None:
-    audit_trail.read(request, identity.id, "configuration.read", state=state, row_count=count, failure=state == "unknown")
+    audit_trail.read(
+        request,
+        identity.id,
+        "configuration.read",
+        state=state,
+        row_count=count,
+        failure=state == "unknown",
+    )
 
 
 @router.get("/nodes", response_model=ConfigurationNodes)
 async def nodes(
-    request: Request, response: Response, identity: Reader, source: Source,
+    request: Request,
+    response: Response,
+    identity: Reader,
+    source: Source,
 ) -> ConfigurationNodes:
     no_store(response)
     try:
@@ -80,7 +106,11 @@ async def nodes(
 
 @router.get("/nodes/{node_id}/versions", response_model=ConfigurationVersions)
 async def versions(
-    node_id: NodeId, request: Request, response: Response, identity: Reader, source: Source,
+    node_id: NodeId,
+    request: Request,
+    response: Response,
+    identity: Reader,
+    source: Source,
 ) -> ConfigurationVersions:
     no_store(response)
     try:

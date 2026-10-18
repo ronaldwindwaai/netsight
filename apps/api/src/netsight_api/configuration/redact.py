@@ -1,4 +1,4 @@
-"""Secret redaction for device configuration text (Step 9).
+"""Secret redaction for device configuration text (Step 9; kept on integration because the copilot sanitiser uses it).
 
 A device configuration is full of secrets (enable secrets, SNMP communities, pre-shared keys,
 private keys). Nothing here is shown to a person until it has been through ``redact_lines``. The
