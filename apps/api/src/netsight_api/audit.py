@@ -139,7 +139,9 @@ def _build_handler(settings: AuditLogSettings) -> logging.Handler:
     if settings.destination == "file":
         handler = logging.FileHandler(settings.file, encoding="utf-8")
     else:
-        handler = logging.StreamHandler(sys.stdout if settings.destination == "stdout" else sys.stderr)
+        handler = logging.StreamHandler(
+            sys.stdout if settings.destination == "stdout" else sys.stderr
+        )
     handler.setFormatter(logging.Formatter("%(message)s"))  # the record is already a JSON line
     setattr(handler, _HANDLER_MARKER, True)
     return handler

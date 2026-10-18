@@ -27,7 +27,8 @@ class PendingEnrolmentStore:
     def _prune_locked(self) -> None:
         now = self._now()
         for key in [
-            key for key, (_secret, created) in self._entries.items()
+            key
+            for key, (_secret, created) in self._entries.items()
             if now - created > ENROLMENT_TTL_SECONDS
         ]:
             del self._entries[key]

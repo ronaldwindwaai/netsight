@@ -249,9 +249,7 @@ def counts_from_groups(groups: Iterable[tuple[FindingState, Severity, int]]) -> 
     return UnknownDeviceCounts(
         open=sum(n for s, n in by_state.items() if is_open(s)),
         by_state=[
-            UnknownDeviceStateCount(state=s, count=by_state[s])
-            for s in _STATE_ORDER
-            if by_state[s]
+            UnknownDeviceStateCount(state=s, count=by_state[s]) for s in _STATE_ORDER if by_state[s]
         ],
         by_severity=[
             UnknownDeviceSeverityCount(severity=s, count=by_severity[s])
@@ -415,9 +413,7 @@ class InMemoryUnknownDeviceRepository:
             recurrence = decision.known.finding.id if decision.known is not None else None
             return self._create(detection, now, recurrence)
 
-    def _create(
-        self, detection: Detection, now: datetime, recurrence: str | None
-    ) -> Observation:
+    def _create(self, detection: Detection, now: datetime, recurrence: str | None) -> Observation:
         finding_id = lifecycle.format_id(FINDING_PREFIX, self._new_uuid())
         finding = detection.as_finding(finding_id, now, recurrence_of=recurrence)
         self._store(finding, now)
@@ -567,4 +563,3 @@ class InMemoryUnknownDeviceRepository:
             self._locked(finding_id)
             event = self._event(finding_id, "comment", actor_id, self._clock(), message=text)
             return event.model_copy(deep=True)
-

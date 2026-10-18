@@ -306,7 +306,11 @@ def translate(exc: Exception) -> tuple[ApiError, AuditOutcome, str]:
 
 
 def _auditor(
-    action: str, identity: Identity, request: Request, finding_id: str | None, details: dict[str, Any]
+    action: str,
+    identity: Identity,
+    request: Request,
+    finding_id: str | None,
+    details: dict[str, Any],
 ) -> Callable[..., None]:
     request_correlation = correlation_id(request)
 

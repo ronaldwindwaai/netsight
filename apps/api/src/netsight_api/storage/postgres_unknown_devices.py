@@ -355,7 +355,9 @@ class PostgresUnknownDeviceRepository:
                 key,
             ),
         )
-        self._append(conn, key, "evidence-updated", SYSTEM_ACTOR, now, snapshot=_snapshot(detection))
+        self._append(
+            conn, key, "evidence-updated", SYSTEM_ACTOR, now, snapshot=_snapshot(detection)
+        )
         if current.proposed_action is None and detection.proposed_action is not None:
             self._append(conn, key, "action-proposed", SYSTEM_ACTOR, now)
         return Observation("refreshed", current.id)
