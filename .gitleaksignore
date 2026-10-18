@@ -9,25 +9,25 @@
 
 # Step 9/10/12 verified test fixtures (inspected unredacted); inert fake values, not credentials.
 # Step 12 web test fixture: fake UI key
-cd14a74f526af0ddf95b35dfff0afb42eb261757:apps/web/src/lib/actions-view.test.ts:generic-api-key:33
+acc05ff5ae3194df858b16abdc9b1a518d52f9b7:apps/web/src/lib/actions-view.test.ts:generic-api-key:33
 
 # Step 10 test fixture: fake token shape fed to the sanitiser
-893cbc537d460d705a05fd7cc32892469dd01d4e:apps/api/tests/test_copilot_prompt_answer.py:generic-api-key:132
+ee215e109047ac268ffb6e99e5509e5712b4a913:apps/api/tests/test_copilot_prompt_answer.py:generic-api-key:132
 
 # Step 10 test fixture: fake provider key
-893cbc537d460d705a05fd7cc32892469dd01d4e:apps/api/tests/test_copilot_provider.py:generic-api-key:14
+ee215e109047ac268ffb6e99e5509e5712b4a913:apps/api/tests/test_copilot_provider.py:generic-api-key:14
 
 # Step 10 test fixture: fake key / hostile-question string (hunter2 style)
-893cbc537d460d705a05fd7cc32892469dd01d4e:apps/api/tests/test_copilot_api.py:generic-api-key:35
+ee215e109047ac268ffb6e99e5509e5712b4a913:apps/api/tests/test_copilot_api.py:generic-api-key:30
 
 # Step 10 test fixture: fake key / hostile-question string (hunter2 style)
-893cbc537d460d705a05fd7cc32892469dd01d4e:apps/api/tests/test_copilot_api.py:generic-api-key:347
+ee215e109047ac268ffb6e99e5509e5712b4a913:apps/api/tests/test_copilot_api.py:generic-api-key:332
 
 # Step 10 test fixture: fake token shapes (api_key, JWT, glpat) used to prove redaction
-893cbc537d460d705a05fd7cc32892469dd01d4e:apps/api/tests/test_copilot_sanitize.py:generic-api-key:13
+ee215e109047ac268ffb6e99e5509e5712b4a913:apps/api/tests/test_copilot_sanitize.py:generic-api-key:13
 
 # Step 10 test fixture: fake token shapes (api_key, JWT, glpat) used to prove redaction
-893cbc537d460d705a05fd7cc32892469dd01d4e:apps/api/tests/test_copilot_sanitize.py:gitlab-pat:23
+ee215e109047ac268ffb6e99e5509e5712b4a913:apps/api/tests/test_copilot_sanitize.py:gitlab-pat:23
 
 # Step 10 test fixture: fake token shapes (api_key, JWT, glpat) used to prove redaction
-893cbc537d460d705a05fd7cc32892469dd01d4e:apps/api/tests/test_copilot_sanitize.py:jwt:19
+ee215e109047ac268ffb6e99e5509e5712b4a913:apps/api/tests/test_copilot_sanitize.py:jwt:19

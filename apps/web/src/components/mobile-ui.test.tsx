@@ -3,7 +3,7 @@ import '@/test/dom-setup';
 import assert from 'node:assert/strict';
 import { afterEach, describe, it } from 'node:test';
 
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 
 import { ConnectivityBanner } from '@/components/connectivity-banner';
 import { MobileNav } from '@/components/mobile-nav';

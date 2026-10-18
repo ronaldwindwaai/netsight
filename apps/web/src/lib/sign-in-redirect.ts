@@ -23,6 +23,7 @@ const UI_AREAS = [
   'inventory',
   'ipam',
   'unknown-devices',
+  'config',
   'copilot',
   'actions',
   'forecast',
