@@ -488,6 +488,19 @@ Design doc: `docs/12-implementation/AI-COPILOT.md`. Built as **Step 10** below (
    - **Human decisions needed.** Which model and whether evidence may leave the host; RBAC reading (Management none); the knowledge corpus and its `roles:` headers; model budgets; conversation retention (none today); page design.
    - **Deferred.** Scanning model output for URLs/shell-like lines; remaining catalog tools (device health, flows, security events, probes, path, identity) with per-tool review; `propose_action` via E11; embeddings; shared (cross-worker) limits; conversation memory; live-model eval run; Playwright run; gitleaks was not run locally (not installed): the test fixtures contain obviously fake token shapes and may need a `.gitleaksignore` baseline entry.
 
+### E10 - Mobile/PWA (PRD 33; `docs/03-ui-ux/MOBILE-PWA.md`)
+Design doc: `docs/12-implementation/MOBILE-PWA.md`. Built as **Step 11** (web only; no API change).
+
+1. DONE **Step 11 - mobile navigation, honest offline/stale banner, baseline and PWA-file headers**, layered on the reviewed upstream installable PWA shell (manifest, public-only offline service worker, install button), which is the base. Delivered on top of it:
+   - **Mobile.** Bottom tab bar below `lg` (Overview, Incidents, Diagnostics, Internet; same permission gates as the sidebar), 44 px touch targets on coarse pointers, safe-area aware bar and content padding; desktop unchanged.
+   - **Honest states.** Offline and stale banner in an always-mounted live region (offline: not live, load time in UTC, no offline copy of operational data; stale after 5 minutes with Reload).
+   - **Headers.** `apps/web/next.config.mjs`: `sw.js` and `offline.html` are always revalidated and carry their own tight CSP and `nosniff`; every route gets anti-framing, referrer and permissions headers. No page CSP (needs per-request nonces: a separate decision).
+   - **Dropped on integration (duplicate or contradicts upstream).** My allow-list service worker (it also cached hashed `/_next/static/` assets; upstream caches only the public offline page, which is the safer minimum), my manifest, generated icons, offline page, install prompt, SW registration and cache-clearing on sign-out (upstream caches nothing personal, so there is nothing to clear).
+   - **Push: decision, not built** (provider is an open human decision; see `MOBILE-PWA.md`).
+   - **Rollback.** Remove `MobileNav` and `ConnectivityBanner` from the dashboard layout and delete `next.config.mjs`. Nothing was persisted.
+   - **Human decisions needed.** Web Push provider; page CSP and HSTS; whether a mobile home is wanted before approvals; icon artwork.
+   - **Deferred.** Web Push; mobile acknowledge/assign and approvals (wait for E11 Action Requests and step-up); API-reachability based offline detection; real-browser/device/Lighthouse verification.
+
 ## Definition of Done per slice
 - Acceptance criteria met; tests (unit + integration + contract + slice E2E) pass.
 - OpenAPI + JSON-schema updated; type/lint/security checks pass.

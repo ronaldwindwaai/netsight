@@ -685,3 +685,109 @@ body {
     break-inside: avoid;
   }
 }
+
+/* ------------------------------------------------------------------
+   Mobile / PWA (E10; docs/12-implementation/MOBILE-PWA.md)
+   ------------------------------------------------------------------ */
+
+.connectivity-banner {
+  margin-bottom: 1rem;
+}
+
+.mobile-nav {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1030;
+  display: flex;
+  padding-right: env(safe-area-inset-right);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  border-top: 1px solid var(--bs-border-color);
+  background: var(--bs-body-bg);
+  box-shadow: 0 -0.25rem 1rem rgb(15 23 42 / 8%);
+}
+
+.mobile-nav__link {
+  display: flex;
+  min-width: 0;
+  min-height: 3.5rem;
+  flex: 1 1 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.1rem;
+  padding: 0.35rem 0.25rem;
+  color: var(--bs-secondary-color);
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.mobile-nav__link i {
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.mobile-nav__link.is-active {
+  color: var(--netsight-signal);
+}
+
+@media (max-width: 991.98px) {
+  /* keep the last content clear of the fixed bottom bar and the home-indicator inset */
+  .netsight-dashboard .app-main {
+    padding-bottom: calc(4.5rem + env(safe-area-inset-bottom));
+  }
+}
+
+@media (max-width: 767.98px) {
+  .netsight-dashboard .app-content {
+    padding-right: 0.75rem;
+    padding-left: 0.75rem;
+  }
+
+  .netsight-dashboard .table-responsive {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .netsight-dashboard .card-header {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+}
+
+/* touch devices: comfortable targets (WCAG 2.2 target size, 44px) without enlarging desktop mouse UI */
+@media (pointer: coarse) {
+  .netsight-dashboard .btn,
+  .netsight-dashboard .form-control,
+  .netsight-dashboard .form-select,
+  .netsight-dashboard .dropdown-item,
+  .netsight-dashboard .nav-tabs .nav-link,
+  .netsight-dashboard .nav-pills .nav-link,
+  .netsight-dashboard .page-link {
+    min-height: 44px;
+  }
+
+  .netsight-dashboard .btn-sm,
+  .netsight-dashboard .form-control-sm,
+  .netsight-dashboard .form-select-sm {
+    min-height: 44px;
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+  }
+
+  .netsight-dashboard .form-check-input {
+    width: 1.35rem;
+    height: 1.35rem;
+  }
+
+}
+
+/* Dense tables keep their row height on tablets; only phones get padded link targets. */
+@media (pointer: coarse) and (max-width: 767.98px) {
+  .netsight-dashboard .table td > a:only-child {
+    display: inline-block;
+    padding-block: 0.65rem;
+  }
+}
