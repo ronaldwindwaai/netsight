@@ -29,13 +29,18 @@ class FakeSource:
         return self.totals
 
 
-def totals(values: dict[date, int], *, first_flow_at: datetime | None = None) -> DailyTotals:
+def totals(
+    values: dict[date, int],
+    *,
+    first_flow_at: datetime | None = None,
+    last_flow_at: datetime | None = None,
+    hours_covered: dict[date, int] | None = None,
+) -> DailyTotals:
     if not values:
         return DailyTotals({}, None, None)
     first = first_flow_at or datetime.combine(min(values), datetime.min.time(), tzinfo=UTC)
-    return DailyTotals(
-        dict(values), first, datetime.combine(max(values), datetime.max.time(), tzinfo=UTC)
-    )
+    last = last_flow_at or datetime.combine(max(values), datetime.max.time(), tzinfo=UTC)
+    return DailyTotals(dict(values), first, last, hours_covered)
 
 
 def growing(days: int, *, start: int = 100 * GB, step: int = GB) -> dict[date, int]:

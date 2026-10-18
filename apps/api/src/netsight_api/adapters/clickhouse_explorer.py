@@ -605,12 +605,20 @@ class ExplorerClickhouse(ClickhouseClient):
         if len(rows) > q.MAX_DAILY_ROWS:
             raise _invalid("daily totals hit their row cap")
         daily: dict[date, int] = {}
+        hours: dict[date, int] = {}
         for row in rows:
             day = self._day(row.get("total_day"))
             if not first_day <= day < end_day:
                 raise _invalid("daily bucket is outside the requested window")
             daily[day] = _parse_counter(row.get("agg_bytes"), "bytes")
-        return self._with_edges(daily, edges)
+            if row.get("hours_seen") is not None:
+                seen = _parse_counter(row.get("hours_seen"), "hours")
+                if seen > 24:
+                    raise _invalid("a day cannot hold more than 24 hours")
+                hours[day] = seen
+        if hours and len(hours) != len(daily):
+            raise _invalid("hours were reported for only some days")
+        return self._with_edges(daily, edges, hours or None)
 
     @staticmethod
     def _day(value: Any) -> date:
@@ -620,14 +628,16 @@ class ExplorerClickhouse(ClickhouseClient):
         return datetime.fromtimestamp(seconds, tz=UTC).date()
 
     @staticmethod
-    def _with_edges(daily: dict[date, int], edges: dict[str, Any]) -> DailyTotals:
+    def _with_edges(
+        daily: dict[date, int], edges: dict[str, Any], hours: dict[date, int] | None = None
+    ) -> DailyTotals:
         rows = _data_rows(edges)
         if len(rows) != 1:
             raise _invalid("daily edge read returned no row")
         if _parse_counter(rows[0].get("agg_rows"), "rows") == 0:
             return DailyTotals(daily, None, None)
         return DailyTotals(
-            daily, _epoch(rows[0].get("first_seen")), _epoch(rows[0].get("last_seen"))
+            daily, _epoch(rows[0].get("first_seen")), _epoch(rows[0].get("last_seen")), hours
         )
 
     @staticmethod

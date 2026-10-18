@@ -379,7 +379,9 @@ _DAY = "intDiv(toUnixTimestamp(`TimeReceived`), 86400) * 86400"
 
 def daily_totals() -> str:
     return (
-        f"SELECT {_DAY} AS total_day, toString(sum(`Bytes`)) AS agg_bytes FROM {{table}} "
+        f"SELECT {_DAY} AS total_day, toString(sum(`Bytes`)) AS agg_bytes, "
+        "toString(uniqExact(intDiv(toUnixTimestamp(`TimeReceived`), 3600))) AS hours_seen "
+        "FROM {table} "
         f"WHERE {_RANGE} GROUP BY total_day ORDER BY total_day "
         f"LIMIT {MAX_DAILY_ROWS + 1} FORMAT JSON"
     )

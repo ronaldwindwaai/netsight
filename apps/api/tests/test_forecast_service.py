@@ -112,6 +112,52 @@ async def test_a_first_day_the_store_only_partly_covers_is_dropped() -> None:
 
 
 @pytest.mark.asyncio
+async def test_a_last_day_the_collector_stopped_during_is_not_shown_as_measured() -> None:
+    values = growing(30)
+    newest = max(values)
+    stopped = datetime.combine(newest, datetime.min.time(), tzinfo=UTC) + timedelta(hours=9)
+    series = traffic(await build(FakeSource(totals(values, last_flow_at=stopped)), history=30))
+    assert newest.isoformat() not in [p.day for p in series.history]
+    assert series.history_missing_days == 1  # excluded days are counted, never filled with zero
+
+
+@pytest.mark.asyncio
+async def test_a_last_day_covered_to_its_end_is_kept() -> None:
+    values = growing(30)
+    newest = max(values)
+    near_end = datetime.combine(newest, datetime.min.time(), tzinfo=UTC) + timedelta(
+        hours=23, minutes=30
+    )
+    series = traffic(await build(FakeSource(totals(values, last_flow_at=near_end)), history=30))
+    assert newest.isoformat() in [p.day for p in series.history]
+
+
+@pytest.mark.asyncio
+async def test_a_day_with_hours_of_no_flows_inside_the_window_is_excluded_not_measured() -> None:
+    values = growing(30)
+    outage = day(10)
+    hours = {d: 24 for d in values} | {outage: 11}  # a collector outage: 13 hours silent
+    series = traffic(await build(FakeSource(totals(values, hours_covered=hours)), history=30))
+    assert outage.isoformat() not in [p.day for p in series.history]
+    assert series.history_missing_days == 1 and series.state == "ok"
+    assert all(p.value > 0 for p in series.history)
+
+
+@pytest.mark.asyncio
+async def test_a_day_missing_only_a_couple_of_quiet_hours_is_kept() -> None:
+    values = growing(30)
+    hours = {d: 24 for d in values} | {day(10): service.MIN_COVERED_HOURS}
+    series = traffic(await build(FakeSource(totals(values, hours_covered=hours)), history=30))
+    assert day(10).isoformat() in [p.day for p in series.history]
+
+
+@pytest.mark.asyncio
+async def test_a_source_that_cannot_report_hours_does_not_exclude_days() -> None:
+    series = traffic(await build(FakeSource(totals(growing(30), hours_covered=None)), history=30))
+    assert len(series.history) == 30 and series.history_missing_days == 0
+
+
+@pytest.mark.asyncio
 async def test_wan_and_inventory_are_not_connected_because_no_source_gives_their_history() -> None:
     response = await build(FakeSource(totals(growing(30))))
     others = [s for s in response.series if s.id != "traffic-volume"]

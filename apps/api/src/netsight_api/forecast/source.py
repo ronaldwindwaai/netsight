@@ -19,12 +19,17 @@ class DailyTotals:
 
     ``first_flow_at`` and ``last_flow_at`` are ``None`` when the window holds no flow at all.
     ``first_flow_at`` lets the caller drop a first day the store only partly covers (retention
-    starts mid-day).
+    starts mid-day); ``last_flow_at`` does the same for a newest day the collector stopped during.
+
+    ``hours_covered`` is how many distinct UTC hours of each day held at least one flow, or ``None``
+    when the source cannot say. A day with long silent stretches (a collector outage) understates
+    its bytes; the caller excludes such a day rather than present it as measured.
     """
 
     daily: dict[date, int]
     first_flow_at: datetime | None
     last_flow_at: datetime | None
+    hours_covered: dict[date, int] | None = None
 
 
 class DailyTotalsSource(Protocol):

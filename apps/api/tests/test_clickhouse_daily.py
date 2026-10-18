@@ -55,8 +55,16 @@ def answers(**overrides: Any) -> dict[str, Any]:
     base: dict[str, Any] = {
         "AS total_day": {
             "data": [
-                {"total_day": midnight(date(2026, 9, 1)), "agg_bytes": "100"},
-                {"total_day": midnight(date(2026, 9, 3)), "agg_bytes": "300"},
+                {
+                    "total_day": midnight(date(2026, 9, 1)),
+                    "agg_bytes": "100",
+                    "hours_seen": "24",
+                },
+                {
+                    "total_day": midnight(date(2026, 9, 3)),
+                    "agg_bytes": "300",
+                    "hours_seen": "9",
+                },
             ]
         },
         "AS first_seen": {
@@ -91,6 +99,28 @@ async def test_days_are_keyed_by_utc_date_and_a_day_without_flows_is_absent() ->
     assert result.last_flow_at == datetime.fromtimestamp(
         midnight(date(2026, 9, 3)) + 80_000, tz=UTC
     )
+
+
+@pytest.mark.asyncio
+async def test_hours_with_flows_are_reported_per_day_so_an_outage_day_can_be_excluded() -> None:
+    result = await read(Script(CORE, answers()))
+    assert result.hours_covered == {date(2026, 9, 1): 24, date(2026, 9, 3): 9}
+
+
+@pytest.mark.asyncio
+async def test_the_daily_query_counts_distinct_hours_with_flows() -> None:
+    script = Script(CORE, answers())
+    await read(script)
+    sql = script.data_requests[0].content.decode()
+    assert "uniqExact(intDiv(toUnixTimestamp(`TimeReceived`), 3600))" in sql
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("bad", ["25", "-1", "x", 3.5])
+async def test_an_impossible_hour_count_is_invalid_source_data(bad: Any) -> None:
+    rows = [{"total_day": midnight(FIRST), "agg_bytes": "1", "hours_seen": bad}]
+    with pytest.raises(AdapterError):
+        await read(Script(CORE, answers(**{"AS total_day": {"data": rows}})))
 
 
 @pytest.mark.asyncio

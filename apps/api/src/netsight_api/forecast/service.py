@@ -10,8 +10,11 @@ Honesty rules, in one place:
 * no flow source: ``not-connected``; a source that fails: ``unknown`` (the error text is never
   returned); a reachable source with too little history: ``insufficient-data`` with the days it had;
 * the window is whole UTC days ending with the last *complete* day; a day with no flows is absent,
-  never zero; a first day the store covers only from mid-day is dropped as partial; days before the
-  store's first complete day are not "missing", they are before the history began;
+  never zero; a first day the store covers only from mid-day is dropped as partial; a newest day
+  whose last flow is more than an hour before midnight (the collector stopped) is dropped as
+  partial; a day with fewer than ``MIN_COVERED_HOURS`` hours holding a flow (an outage inside the
+  window) is dropped when the source reports hours. Dropped days count as missing, never as zero;
+  days before the store's first complete day are not "missing", they are before the history began;
 * every projected value lives in ``forecast`` with a band and the response is labelled a forecast;
 * a limit comes only from the operator; the crossing days are derived from the forecast.
 """
@@ -43,6 +46,10 @@ from netsight_api.schemas_forecast import (
 
 _LOGGER: Final = logging.getLogger("netsight_api")
 PARTIAL_DAY_GRACE: Final = timedelta(hours=1)
+# A day is "covered" when at least this many of its 24 UTC hours held a flow. Two silent hours are
+# tolerated (a quiet network, a short exporter restart); longer silence is an outage, and the day's
+# bytes are then understated and must not be presented as measured. A human decision (OPEN-DECISIONS).
+MIN_COVERED_HOURS: Final = 22
 READ_DAYS: Final = MAX_HISTORY_DAYS
 TRAFFIC_NAME: Final = "Network traffic volume"
 _NO_HISTORY: Final = (
@@ -91,21 +98,50 @@ def _unknown_traffic() -> ForecastSeries:
 
 
 def _usable_days(totals: DailyTotals, read_first: date) -> dict[date, int]:
-    """Observed days, without a first day the store only covers from mid-day.
+    """Observed days, without any day the source only partly covers.
 
-    Only a first day *after* the start of the read can be partial: a first day at the very edge
-    of the read may simply have older data behind it, so it is kept.
+    Dropped: a first day the store only covers from mid-day (only a first day *after* the start of
+    the read: one at the very edge may simply have older data behind it), a newest day the
+    collector stopped during, and any day with long silent stretches when hours are reported.
     """
     days = dict(totals.daily)
     if not days:
         return days
+    _drop_partial_first_day(days, totals, read_first)
+    _drop_partial_last_day(days, totals)
+    _drop_outage_days(days, totals)
+    return days
+
+
+def _drop_partial_first_day(days: dict[date, int], totals: DailyTotals, read_first: date) -> None:
+    if not days:
+        return
     first = min(days)
     started = totals.first_flow_at
     if first > read_first and started is not None and started.astimezone(UTC).date() == first:
         midnight = datetime.combine(first, datetime.min.time(), tzinfo=UTC)
         if started - midnight > PARTIAL_DAY_GRACE:
             del days[first]
-    return days
+
+
+def _drop_partial_last_day(days: dict[date, int], totals: DailyTotals) -> None:
+    if not days:
+        return
+    newest = max(days)
+    ended = totals.last_flow_at
+    if ended is None or ended.astimezone(UTC).date() != newest:
+        return
+    day_end = datetime.combine(newest + timedelta(days=1), datetime.min.time(), tzinfo=UTC)
+    if day_end - ended > PARTIAL_DAY_GRACE:
+        del days[newest]
+
+
+def _drop_outage_days(days: dict[date, int], totals: DailyTotals) -> None:
+    hours = totals.hours_covered
+    if hours is None:
+        return
+    for day in [d for d in days if hours.get(d, 0) < MIN_COVERED_HOURS]:
+        del days[day]
 
 
 def _history(days: dict[date, int]) -> list[ForecastHistoryPoint]:
