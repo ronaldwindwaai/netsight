@@ -105,3 +105,24 @@ Every "human decision pending / needed" recorded in `docs/00-product/BUILD-PLAN-
 
 Also closed that day: skipped Oxidized nodes are counted in the configuration summary (`nodes_skipped`), and the configuration
 change timeline names each limit it hit (`devices_truncated`, `versions_truncated`, `items_truncated`).
+
+## Accepted defaults (2026-10-19)
+
+The owner chose "adopt recommended defaults" for the low-risk, offline decisions. In each case the recommended default equals
+the current behaviour, so no code changed. These stay revisitable.
+
+- **D-20** Technician and Auditor see the same redacted configuration content.
+- **D-21** Management holds no `copilot:ask`.
+- **D-22** Technician cannot export the capacity report.
+- **D-24** Technician cannot propose risk B actions beyond the catalogue grants.
+- **D-40** Baseline constants stay fixed.
+- **D-45** Identity trust TTLs and thresholds stay as stated.
+- **D-47** Configuration stale threshold stays 48 h; the six risk rules stay as shipped.
+- **D-48** Action approval and run windows (24 h / 1 h) and the 60 min isolation default stay.
+- **D-49** Growth (20 %) and weekend (60 %) thresholds stay; the traffic limit remains owner data.
+- **D-50** Partial-day tolerances (1 h and 22 of 24 UTC hours) stay until checked on real flow data.
+- **D-51** No scheduled or archived capacity report, PDF/Excel or inventory report until a consumer asks.
+
+Deliberately not adopted (privacy, security or infrastructure choices): D-01 to D-08 retention and privacy, D-23 approver
+policy, D-36 model provider, D-37 push and SMTP, D-41 and D-42 cohort and audit-key policy, D-52 and D-53 executors and the
+durable store.
