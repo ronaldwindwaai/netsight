@@ -275,8 +275,7 @@ def test_every_new_openapi_traffic_component_is_paired() -> None:
     declared = {
         name
         for name in OPENAPI["components"]["schemas"]
-        if name.startswith("Traffic")
-        and name not in {"TrafficTimeRange"}
+        if name.startswith("Traffic") and name not in {"TrafficTimeRange"}
     }
     assert declared == paired
 

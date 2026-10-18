@@ -287,7 +287,9 @@ def test_a_restricted_document_is_retrieved_only_for_the_roles_it_names(tmp_path
     b = restricted_broker(tmp_path)
     technician = run(b.call(TECH, "search_knowledge", {"query": "sentinelterm rotation"}))
     assert technician.state == "ok" and technician.items == ()
-    admin = run(b.call(who("administrator"), "search_knowledge", {"query": "sentinelterm rotation"}))
+    admin = run(
+        b.call(who("administrator"), "search_knowledge", {"query": "sentinelterm rotation"})
+    )
     assert [i.reference.split("#")[0] for i in admin.items] == ["09-private/PLAN.md"]
 
 

@@ -93,7 +93,9 @@ def test_smtp_implicit_tls_defaults_to_465() -> None:
     assert settings is not None and (settings.tls, settings.port) == ("tls", 465)
 
 
-@pytest.mark.parametrize("mode", ["none", "off", "false", "plain", "disabled", "0", "no", "STARTTLS "])
+@pytest.mark.parametrize(
+    "mode", ["none", "off", "false", "plain", "disabled", "0", "no", "STARTTLS "]
+)
 def test_smtp_refuses_any_way_to_turn_tls_off(mode: str) -> None:
     env = {**BASE_ENV, "NETSIGHT_SMTP_TLS": mode}
     if mode.strip().lower() == "starttls":
@@ -248,7 +250,9 @@ def test_server_without_starttls_is_refused_and_nothing_is_sent_or_authenticated
 
 
 def test_failed_starttls_never_falls_back_to_plaintext() -> None:
-    client = FakeSmtp(fail_on={"starttls": smtplib.SMTPResponseException(454, b"TLS not available")})
+    client = FakeSmtp(
+        fail_on={"starttls": smtplib.SMTPResponseException(454, b"TLS not available")}
+    )
     sender, _ = smtp_sender(client, NETSIGHT_SMTP_USERNAME="svc", NETSIGHT_SMTP_PASSWORD=PASSWORD)
     result = sender.send(EmailDestination("ops@example.com"), payload())
     assert result.status == "retryable"
@@ -581,5 +585,7 @@ def test_dispatcher_delivers_even_when_every_recorder_write_fails() -> None:
         sleep=lambda seconds: None,
         policy=RetryPolicy(max_attempts=1),
     )
-    outcome = dispatcher.deliver(Notification("n-1", payload(), EmailDestination("ops@example.com")))
+    outcome = dispatcher.deliver(
+        Notification("n-1", payload(), EmailDestination("ops@example.com"))
+    )
     assert (outcome.status, outcome.attempts) == ("sent", 1)
