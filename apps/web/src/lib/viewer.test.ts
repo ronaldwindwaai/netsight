@@ -3,6 +3,8 @@ import test from 'node:test';
 
 import type { SessionInfo } from './api-contracts.ts';
 import {
+  canExportForecast,
+  canReadForecast,
   canChangeAnything,
   canExportInternet,
   canReadFindings,
@@ -179,4 +181,15 @@ test('the action helpers read exactly their own permission and fail closed', asy
   for (const helper of [canReadActions, canProposeHighRiskAction, canUseActionKillSwitch]) {
     assert.equal(helper(null), false);
   }
+});
+
+test('forecast helpers follow forecast:read and forecast:export and fail closed without a viewer', () => {
+  const reader = { identityId: 'a', permissions: ['forecast:read'] };
+  const exporter = { identityId: 'b', permissions: ['forecast:read', 'forecast:export'] };
+  assert.equal(canReadForecast(reader), true);
+  assert.equal(canExportForecast(reader), false);
+  assert.equal(canExportForecast(exporter), true);
+  assert.equal(canReadForecast({ identityId: 'c', permissions: ['traffic:read'] }), false);
+  assert.equal(canReadForecast(null), false);
+  assert.equal(canExportForecast(null), false);
 });

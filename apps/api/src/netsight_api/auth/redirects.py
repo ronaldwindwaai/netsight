@@ -30,6 +30,7 @@ UI_AREAS: Final = frozenset(
         "unknown-devices",
         "copilot",
         "actions",
+        "forecast",
     }
 )
 

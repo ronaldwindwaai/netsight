@@ -287,6 +287,17 @@ configuration bodies, author identities, raw diffs or remote write/restore actio
 
 The matrix has no AI Copilot row (PRD 26 names the feature, not a role split). One permission, `copilot:ask`, opens the read-only copilot: Administrator, Network Engineer, Security Analyst, Technician and Auditor hold it; **Management holds nothing** (it holds none of the data the tools read). It is in `HUMAN_ONLY_PERMISSIONS`: a service or AI principal cannot start a conversation whatever its role. `copilot:ask` grants **no data**: every tool the copilot runs is authorised separately against the asker's own permissions (`incidents:read` for incidents; knowledge search needs only `copilot:ask`; no tool reads configuration), and a denied tool is reported as a gap. There is no copilot write, execute or approval permission. Open decision: confirm this reading, and whether Management should get a summary-only copilot.
 
+## Capacity forecast (Step 13, E12)
+
+The matrix has no Forecast row (PRD 21/36 name "capacity forecast" in the monthly report list). Two permissions, both read-only and neither human-only:
+
+| Permission | Administrator | Network Engineer | Security Analyst | Technician | Management | Auditor |
+| --- | --- | --- | --- | --- | --- | --- |
+| `forecast:read` (organisation-wide daily forecast, method, advice) | Yes | Yes | Yes | Yes | Yes | Yes |
+| `forecast:export` (the capacity report as CSV) | Yes | Yes | Yes | **No** | Yes | Yes |
+
+`forecast:read` is the same rung as `traffic:read` (aggregates only; no endpoint, address, application, user or device is in any forecast response). Technician has no reporting role in the matrix, so it is not given the export. Open decision: confirm both readings.
+
 ## Controlled action permissions (Step 12, E11)
 
 Six permissions, in the matrix above. Guard order, budgets and audit are in `docs/12-implementation/ACTION-ENGINE.md`.

@@ -13,6 +13,7 @@ const IPAM_PERMISSION = 'ipam:read-summary';
 const FINDINGS_PERMISSION = 'unknown-devices:read-summary';
 const COPILOT_PERMISSION = 'copilot:ask';
 const ACTIONS_PERMISSION = 'actions:read';
+const FORECAST_PERMISSION = 'forecast:read';
 
 interface MenuEntry {
   node: MenuNode;
@@ -48,6 +49,10 @@ const MENU_ENTRIES: readonly MenuEntry[] = [
   {
     node: { type: 'item', text: 'Internet', href: '/internet', icon: 'bi-globe2' },
     requires: INTERNET_PERMISSION,
+  },
+  {
+    node: { type: 'item', text: 'Capacity forecast', href: '/forecast', icon: 'bi-graph-up-arrow' },
+    requires: FORECAST_PERMISSION,
   },
   { node: { type: 'item', text: 'Security', href: '/security', icon: 'bi-shield-exclamation' } },
   {

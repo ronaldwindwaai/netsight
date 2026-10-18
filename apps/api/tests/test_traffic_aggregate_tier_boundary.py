@@ -152,7 +152,8 @@ def test_an_aggregate_only_caller_never_sees_an_internal_address_or_a_sub_cohort
         response = caller.get(path)
         if response.status_code >= 500:
             continue  # a route with an unrelated, unconfigured dependency; it holds no flow data
-        text = json.dumps(response.json()) if response.content else ""
+        # raw text, so the CSV capacity report is swept like every JSON body
+        text = response.text if response.content else ""
         for secret in (
             INTERNAL_SERVER,
             INTERNAL_SERVER_NAME,

@@ -791,3 +791,88 @@ body {
     padding-block: 0.65rem;
   }
 }
+
+/* ------------------------------------------------------------------
+   Capacity forecast (Step 13): forecast is dashed and hatched, measured is solid,
+   so the difference never rests on colour alone.
+   ------------------------------------------------------------------ */
+
+.forecast-chart svg {
+  width: 100%;
+  height: auto;
+  max-height: 22rem;
+}
+
+.forecast-chart .measured-line {
+  stroke: var(--bs-body-color);
+  stroke-width: 2;
+}
+
+.forecast-chart .measured-dot {
+  fill: var(--bs-body-color);
+}
+
+.forecast-chart .forecast-line {
+  stroke: var(--bs-primary);
+  stroke-width: 2;
+}
+
+.forecast-chart .forecast-hatch-line,
+.forecast-chart .forecast-key__swatch--band {
+  stroke: var(--bs-primary);
+}
+
+.forecast-chart .forecast-band {
+  opacity: 0.55;
+}
+
+.forecast-chart .forecast-boundary {
+  stroke: var(--bs-secondary-color);
+  stroke-width: 1;
+  stroke-dasharray: 2 3;
+}
+
+.forecast-chart .forecast-limit {
+  stroke: var(--bs-danger);
+  stroke-width: 1.5;
+}
+
+.forecast-chart .forecast-grid {
+  stroke: var(--bs-border-color);
+  stroke-width: 1;
+}
+
+.forecast-chart .forecast-axis {
+  fill: var(--bs-secondary-color);
+  font-size: 11px;
+}
+
+.forecast-key {
+  margin-left: 0;
+  padding-left: 0;
+}
+
+.forecast-key__swatch {
+  display: inline-block;
+  width: 1.5rem;
+  height: 0;
+  margin-right: 0.25rem;
+  vertical-align: middle;
+  border-top: 2px solid var(--bs-body-color);
+}
+
+.forecast-key__swatch--forecast {
+  border-top: 2px dashed var(--bs-primary);
+}
+
+.forecast-key__swatch--band {
+  height: 0.7rem;
+  border-top: 0;
+  background: repeating-linear-gradient(
+    45deg,
+    var(--bs-primary),
+    var(--bs-primary) 2px,
+    transparent 2px,
+    transparent 5px
+  );
+}

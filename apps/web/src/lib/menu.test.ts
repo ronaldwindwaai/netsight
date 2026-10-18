@@ -117,3 +117,12 @@ test('the menu offers Action requests only to a session holding actions:read, an
   assert.ok(!labels(menuItemsFor([])).includes('Action requests'));
   assert.ok(!labels(menuItemsFor(null)).includes('Action requests'));
 });
+
+test('the menu offers Capacity forecast only to a session holding forecast:read, and fails closed without one', () => {
+  const items = menuItemsFor(['forecast:read']);
+  const entry = items.find((item) => item.type === 'item' && item.text === 'Capacity forecast');
+  assert.ok(entry && entry.type === 'item' && entry.href === '/forecast');
+  assert.ok(!labels(menuItemsFor(['forecast:export', 'traffic:read'])).includes('Capacity forecast'));
+  assert.ok(!labels(menuItemsFor([])).includes('Capacity forecast'));
+  assert.ok(!labels(menuItemsFor(null)).includes('Capacity forecast'));
+});

@@ -23,7 +23,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Awaitable, Mapping
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 from pydantic import ValidationError
@@ -45,6 +45,7 @@ from netsight_api.adapters.clickhouse import (
     _window_params,
 )
 from netsight_api.adapters.clickhouse_queries import Params, bucket_seconds
+from netsight_api.forecast.source import DailyTotals
 from netsight_api.schemas_traffic import (
     TREND_FLAT_BAND,
     ApplicationMix,
@@ -143,6 +144,10 @@ def _trend(current: int, previous: int | None, history_exists: bool) -> AppTrend
     elif ratio < -TREND_FLAT_BAND:
         state = "down"
     return AppTrend(state=state, previous_bytes=previous, change_ratio=ratio)  # type: ignore[arg-type]
+
+
+def _midnight(day: date) -> int:
+    return int(datetime(day.year, day.month, day.day, tzinfo=UTC).timestamp())
 
 
 def _epoch(value: Any) -> datetime:
@@ -581,6 +586,48 @@ class ExplorerClickhouse(ClickhouseClient):
             sources_by_application=(
                 self._sources_by_application(payloads["app_sources"]) if has_apps else {}
             ),
+        )
+
+    # --- capacity forecast inputs ---------------------------------------------------------------
+
+    async def daily_totals(self, *, first_day: date, end_day: date) -> DailyTotals:
+        """Bytes per whole UTC day for ``first_day <= day < end_day`` (at most 120 days)."""
+        if not first_day < end_day or (end_day - first_day).days > q.MAX_DAILY_ROWS:
+            raise ValueError("the daily window is ordered and at most 120 days")
+        return await self._bounded(self._daily_totals(first_day, end_day))
+
+    async def _daily_totals(self, first_day: date, end_day: date) -> DailyTotals:
+        columns = await self._ensure_columns()
+        self._require(columns, "TimeReceived", "Bytes")
+        params: Params = {"range_from": _midnight(first_day), "range_to": _midnight(end_day)}
+        days, edges = await self._run((q.daily_totals(), params), (q.daily_edges(), params))
+        rows = _data_rows(days)
+        if len(rows) > q.MAX_DAILY_ROWS:
+            raise _invalid("daily totals hit their row cap")
+        daily: dict[date, int] = {}
+        for row in rows:
+            day = self._day(row.get("total_day"))
+            if not first_day <= day < end_day:
+                raise _invalid("daily bucket is outside the requested window")
+            daily[day] = _parse_counter(row.get("agg_bytes"), "bytes")
+        return self._with_edges(daily, edges)
+
+    @staticmethod
+    def _day(value: Any) -> date:
+        seconds = _parse_counter(value, "day")
+        if seconds % 86_400:
+            raise _invalid("daily bucket is not on a UTC midnight")
+        return datetime.fromtimestamp(seconds, tz=UTC).date()
+
+    @staticmethod
+    def _with_edges(daily: dict[date, int], edges: dict[str, Any]) -> DailyTotals:
+        rows = _data_rows(edges)
+        if len(rows) != 1:
+            raise _invalid("daily edge read returned no row")
+        if _parse_counter(rows[0].get("agg_rows"), "rows") == 0:
+            return DailyTotals(daily, None, None)
+        return DailyTotals(
+            daily, _epoch(rows[0].get("first_seen")), _epoch(rows[0].get("last_seen"))
         )
 
     @staticmethod

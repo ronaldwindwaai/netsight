@@ -62,6 +62,7 @@ from netsight_api.diagnostic_routes import router as diagnostic_router
 from netsight_api.diagnostic_session_routes import router as diagnostic_session_router
 from netsight_api.errors import ApiError
 from netsight_api.evaluation.wiring import build_evaluation_service, start_evaluation
+from netsight_api.forecast_routes import router as forecast_router
 from netsight_api.identity_routes import router as identity_router
 from netsight_api.incident_list_routes import router as incident_list_router
 from netsight_api.incident_routes import router as incident_router
@@ -1038,6 +1039,7 @@ app.include_router(internet_router, prefix=API_PREFIX)
 app.include_router(identity_router, prefix=API_PREFIX)
 app.include_router(configuration_router, prefix=API_PREFIX)
 app.include_router(inventory_router, prefix=API_PREFIX)
+app.include_router(forecast_router, prefix=API_PREFIX)
 app.include_router(copilot_router, prefix=API_PREFIX)
 app.include_router(actions_router, prefix=API_PREFIX)
 app.include_router(ipam_router, prefix=API_PREFIX)

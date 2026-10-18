@@ -85,6 +85,10 @@ class Permission(StrEnum):
     ACTIONS_APPROVE = "actions:approve"
     ACTIONS_EXECUTE = "actions:execute"
     ACTIONS_KILL_SWITCH = "actions:kill-switch"
+    # Capacity forecasts and their CSV report (Step 13): organisation-wide aggregates only, no
+    # endpoint, application or person. Everyone reads; the report is for those who plan and audit.
+    FORECAST_READ = "forecast:read"
+    FORECAST_EXPORT = "forecast:export"
     ADMIN_CONFIG = "admin:config"
     CONFIGURATION_READ = "configuration:read"
     REPORTS_READ = "reports:read"
@@ -172,6 +176,7 @@ _ALL_READ = {
     Permission.SECURITY_READ,
     Permission.REPORTS_READ,
     Permission.INTERNET_READ,
+    Permission.FORECAST_READ,
 }
 # The WAN card is an Overview widget and the matrix gives Overview to every role, so every role
 # reads the Internet surface (Technician included); the evidence export is narrower.
@@ -202,6 +207,8 @@ _INVENTORY_SUMMARY = {Permission.INVENTORY_READ_SUMMARY, Permission.IPAM_READ_SU
 _INVENTORY_ROWS = _INVENTORY_SUMMARY | {Permission.INVENTORY_READ, Permission.IPAM_READ}
 _FINDINGS_SUMMARY = {Permission.UNKNOWN_DEVICES_READ_SUMMARY}
 _FINDINGS_READ = _FINDINGS_SUMMARY | {Permission.UNKNOWN_DEVICES_READ}
+# Capacity forecast report (Step 13): not for the Technician, who has no reporting role in the matrix.
+_FORECAST_EXPORT = {Permission.FORECAST_EXPORT}
 # AI Copilot (PRD 26): every role that can read operational evidence may ask. Management holds only
 # summaries and none of the tools' data, so it is not given the conversation (human decision).
 _COPILOT = {Permission.COPILOT_ASK}
@@ -237,6 +244,7 @@ ROLE_PERMISSIONS: Mapping[Role, frozenset[Permission]] = {
         | _FINDINGS_READ
         | _FINDINGS_TRIAGE
         | {Permission.CONFIGURATION_READ}
+        | _FORECAST_EXPORT
         | _COPILOT
         | _ACTIONS_PROPOSER
     ),
@@ -252,6 +260,7 @@ ROLE_PERMISSIONS: Mapping[Role, frozenset[Permission]] = {
         | _FINDINGS_READ
         | _FINDINGS_TRIAGE
         | {Permission.CONFIGURATION_READ}
+        | _FORECAST_EXPORT
         | _COPILOT
         | _ACTIONS_PROPOSER
     ),
@@ -265,6 +274,7 @@ ROLE_PERMISSIONS: Mapping[Role, frozenset[Permission]] = {
             Permission.INCIDENTS_WRITE_ASSIGNED,
             Permission.DIAGNOSTICS_READ,
             Permission.INTERNET_READ,
+            Permission.FORECAST_READ,
             Permission.ACTIONS_READ,
             Permission.ACTIONS_PROPOSE,
             *_USERS_LIMITED,
@@ -279,6 +289,7 @@ ROLE_PERMISSIONS: Mapping[Role, frozenset[Permission]] = {
         | _USERS_SUMMARY
         | _INVENTORY_SUMMARY
         | _FINDINGS_SUMMARY
+        | _FORECAST_EXPORT
         | {Permission.AUDIT_READ}
     ),
     Role.AUDITOR: frozenset(
@@ -289,6 +300,7 @@ ROLE_PERMISSIONS: Mapping[Role, frozenset[Permission]] = {
         | _INVENTORY_ROWS
         | _FINDINGS_READ
         | {Permission.AUDIT_READ, Permission.CONFIGURATION_READ}
+        | _FORECAST_EXPORT
         | _COPILOT
         | {Permission.ACTIONS_READ}
     ),

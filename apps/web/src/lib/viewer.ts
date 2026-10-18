@@ -68,6 +68,16 @@ export function canReadInventorySummary(viewer: Viewer | null): boolean {
   return viewer !== null && viewer.permissions.includes('inventory:read-summary');
 }
 
+/** True when the viewer holds forecast:read (capacity forecasts; every defined role does today). Advisory only. */
+export function canReadForecast(viewer: Viewer | null): boolean {
+  return viewer !== null && viewer.permissions.includes('forecast:read');
+}
+
+/** True when the viewer holds forecast:export (the capacity report CSV; not the Technician). Advisory only. */
+export function canExportForecast(viewer: Viewer | null): boolean {
+  return viewer !== null && viewer.permissions.includes('forecast:export');
+}
+
 /** True when the viewer holds copilot:ask (open the read-only AI copilot; its tools check their own). Advisory only. */
 export function canAskCopilot(viewer: Viewer | null): boolean {
   return viewer !== null && viewer.permissions.includes('copilot:ask');

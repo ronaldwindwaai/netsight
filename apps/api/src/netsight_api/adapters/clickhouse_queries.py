@@ -373,6 +373,26 @@ def baseline_oldest() -> str:
     )
 
 
+MAX_DAILY_ROWS: Final = 120
+_DAY = "intDiv(toUnixTimestamp(`TimeReceived`), 86400) * 86400"
+
+
+def daily_totals() -> str:
+    return (
+        f"SELECT {_DAY} AS total_day, toString(sum(`Bytes`)) AS agg_bytes FROM {{table}} "
+        f"WHERE {_RANGE} GROUP BY total_day ORDER BY total_day "
+        f"LIMIT {MAX_DAILY_ROWS + 1} FORMAT JSON"
+    )
+
+
+def daily_edges() -> str:
+    return (
+        "SELECT toUnixTimestamp(min(`TimeReceived`)) AS first_seen, "
+        "toUnixTimestamp(max(`TimeReceived`)) AS last_seen, toString(count()) AS agg_rows "
+        f"FROM {{table}} WHERE {_RANGE} LIMIT 1 FORMAT JSON"
+    )
+
+
 _OBSERVED_ROW = "`TimeReceived` >= toDateTime({obs_from:UInt32})"
 
 

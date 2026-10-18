@@ -25,6 +25,7 @@ const UI_AREAS = [
   'unknown-devices',
   'copilot',
   'actions',
+  'forecast',
 ];
 
 type RawParam = string | string[] | undefined;

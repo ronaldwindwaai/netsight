@@ -143,6 +143,7 @@
 - `docs/12-implementation/ACTION-ENGINE.md`
 - `docs/12-implementation/ALERT-ENGINE.md`
 - `docs/12-implementation/DATABASE-OWNERSHIP.md`
+- `docs/12-implementation/FORECASTING.md`
 - `docs/12-implementation/IDENTITY-CORRELATION.md`
 - `docs/12-implementation/INCIDENT-ENGINE.md`
 - `docs/12-implementation/MULTI-SITE.md`
