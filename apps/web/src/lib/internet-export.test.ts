@@ -121,3 +121,15 @@ test('Sec-Fetch-Site cross-site is refused even when a matching Origin is presen
   const headers = new Headers({ host: HOST, 'sec-fetch-site': 'cross-site', origin: `https://${HOST}` });
   assert.equal(isCrossSiteRequest(headers, POLICY), true);
 });
+
+test('behind a trusted proxy the forwarded host is the site an Origin must name', () => {
+  const proxied = { trustProxy: true, production: true };
+  const headers = new Headers({
+    host: 'internal:3000',
+    'x-forwarded-host': HOST,
+    'x-forwarded-proto': 'https',
+    origin: `https://${HOST}`,
+  });
+  assert.equal(isCrossSiteRequest(headers, proxied), false);
+  assert.equal(isCrossSiteRequest(headers, POLICY), true); // forwarded headers ignored without opt-in
+});

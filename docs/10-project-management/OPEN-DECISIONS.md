@@ -5,8 +5,8 @@ Every "human decision pending / needed" recorded in `docs/00-product/BUILD-PLAN-
 
 * **Recommended default** is a proposal for the owner to accept or change. It is *not* applied. Where the table says "none", nothing is
   recommended because the answer depends on facts only the owner has (a contract, a deployment, a legal opinion).
-* **Current behaviour** is what the code does today. Nothing here was changed to the recommended default, except the three items marked
-  **changed 2026-10-18** (they were decided as engineering follow-ups, not policy; see the last section).
+* **Current behaviour** is what the code does today. Nothing here was changed to the recommended default, except the items marked
+  **changed 2026-10-18** (D-25, D-50 and the export-route guard in the last section) (they were decided as engineering follow-ups, not policy; see the last section).
 * Decisions already taken (for example the 2026-10-10 step-up and Management summary decisions, and the `diagnostics:read` narrowing)
   are not repeated; the documents that record them stay authoritative.
 * Authority order is `AGENTS.md`: a decision that touches security or privacy goes through an ADR or a requirement correction.
@@ -43,7 +43,7 @@ Every "human decision pending / needed" recorded in `docs/00-product/BUILD-PLAN-
 | D-22 | Whether Technician may export the capacity report | No (no reporting role in the matrix) | Technician cannot export | FORECASTING |
 | D-23 | Who may approve and execute actions; the matrix says "Policy" for Network Engineer and Security Analyst; whether a risk A/B requester may approve | Administrator-only for risk C and D; revisit A/B after a lab proves a real executor | Administrator holds `actions:approve`, `actions:execute`, `actions:kill-switch`; requester never approves (a risk D request needs two Administrators) | ACTION-ENGINE, RBAC-MATRIX |
 | D-24 | Technician proposing risk B (`switch.port.enable`) | No | Per catalog and `actions:propose` grants | ACTION-ENGINE |
-| D-25 | **May a requester execute their own request** (new, Step 12 review) | No | **changed 2026-10-18**: refused with `409 SELF_EXECUTION` unless `NETSIGHT_ACTIONS_ALLOW_SELF_EXECUTE` is set; default off | ACTION-ENGINE |
+| D-25 | **May a requester execute their own request** (new, Step 12 review) | No | **changed 2026-10-18**: refused with `409 SELF_EXECUTION` unless `NETSIGHT_ACTIONS_ALLOW_SELF_EXECUTE` is set; default off. Dry runs are refused too, so a single-Administrator deployment cannot run its own request until the flag is set or a second person executes | ACTION-ENGINE |
 
 ## 3. Integrations and data sources
 

@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
   originOf,
+  originPolicyFromEnv,
   readTrustProxy,
   sameOrigin,
   type OriginPolicy,
@@ -162,4 +163,13 @@ test('readTrustProxy is on only for the exact value true', () => {
   for (const value of [undefined, '', 'false', '1', 'TRUE', 'yes', ' true']) {
     assert.equal(readTrustProxy({ NETSIGHT_TRUST_PROXY_HEADERS: value }), false, String(value));
   }
+});
+
+test('originPolicyFromEnv trusts proxy headers only on the exact opt-in and is https-only in production', () => {
+  assert.deepEqual(originPolicyFromEnv({}), { trustProxy: false, production: false });
+  assert.deepEqual(originPolicyFromEnv({ NODE_ENV: 'production', NETSIGHT_TRUST_PROXY_HEADERS: 'true' }), {
+    trustProxy: true,
+    production: true,
+  });
+  assert.equal(originPolicyFromEnv({ NETSIGHT_TRUST_PROXY_HEADERS: 'yes' }).trustProxy, false);
 });

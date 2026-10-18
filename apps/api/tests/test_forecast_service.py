@@ -122,6 +122,18 @@ async def test_a_last_day_the_collector_stopped_during_is_not_shown_as_measured(
 
 
 @pytest.mark.asyncio
+async def test_a_last_flow_exactly_one_hour_before_midnight_is_still_within_the_grace() -> None:
+    values = growing(30)
+    newest = max(values)
+    edge = datetime.combine(newest, datetime.min.time(), tzinfo=UTC) + timedelta(hours=23)
+    series = traffic(await build(FakeSource(totals(values, last_flow_at=edge)), history=30))
+    assert newest.isoformat() in [p.day for p in series.history]
+    just_over = edge - timedelta(seconds=1)
+    dropped = traffic(await build(FakeSource(totals(values, last_flow_at=just_over)), history=30))
+    assert newest.isoformat() not in [p.day for p in dropped.history]
+
+
+@pytest.mark.asyncio
 async def test_a_last_day_covered_to_its_end_is_kept() -> None:
     values = growing(30)
     newest = max(values)

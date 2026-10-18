@@ -1,5 +1,6 @@
 /**
- * Explicit same-origin check for browser-invoked server actions.
+ * Explicit same-origin check for browser-invoked server actions and for the export download routes
+ * (`isCrossSiteRequest` in `internet-export.ts`, which treats "no proof of same origin" as refusal).
  *
  * A server action is a public POST. Next.js rejects a cross-site origin by default, but a
  * privileged action should not rely on that alone: a later config change, or a request that
