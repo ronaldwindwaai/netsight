@@ -36,6 +36,11 @@ class SelfApproval(ActionError):
     message = "A request cannot be approved by the person who made it"
 
 
+class SelfExecution(ActionError):
+    code, status = "SELF_EXECUTION", 409
+    message = "A request cannot be executed by the person who made it"
+
+
 class ApproverNotHuman(ActionError):
     code, status = "APPROVER_NOT_HUMAN", 403
     message = "Only a person can approve an action"

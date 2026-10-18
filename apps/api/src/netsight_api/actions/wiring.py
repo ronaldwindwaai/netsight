@@ -4,6 +4,10 @@
   else fails start-up): without it the surface answers ``not-connected`` and nothing is stored,
   approved or executed. The default is off because the store is volatile and no live executor exists.
 * ``NETSIGHT_ACTIONS_KILL_SWITCH`` (same syntax; an unreadable value counts as *engaged*).
+* ``NETSIGHT_ACTIONS_ALLOW_SELF_EXECUTE`` (same syntax; fails start-up if garbled): policy flag, **off**
+  by default. Off, the person who requested an action cannot execute it (approval is separate and is
+  always refused to the requester). On, a requester who is also permitted to execute may run their own
+  approved request; the approval(s) are still required.
 * ``NETSIGHT_ACTIONS_LIVE_EXECUTION`` (same syntax; fails start-up if garbled): reported as ``disabled``
   when off and ``not-connected`` when on, because no live connector ships.
 
@@ -28,6 +32,7 @@ from netsight_api.actions.store import ActionStore, InMemoryActionStore
 from netsight_api.audit import record_audit
 
 ENABLED_ENV: Final = "NETSIGHT_ACTIONS_ENABLED"
+SELF_EXECUTE_ENV: Final = "NETSIGHT_ACTIONS_ALLOW_SELF_EXECUTE"
 _TRUE: Final = frozenset({"1", "true", "yes", "on"})
 _FALSE: Final = frozenset({"0", "false", "no", "off", ""})
 
@@ -49,6 +54,15 @@ def actions_enabled(env: Mapping[str, str]) -> bool:
     raise ValueError(f"{ENABLED_ENV} must be 1/true/yes/on or 0/false/no/off")
 
 
+def self_execute_allowed(env: Mapping[str, str]) -> bool:
+    raw = env.get(SELF_EXECUTE_ENV, "").strip().lower()
+    if raw in _TRUE:
+        return True
+    if raw in _FALSE:
+        return False
+    raise ValueError(f"{SELF_EXECUTE_ENV} must be 1/true/yes/on or 0/false/no/off")
+
+
 def utc_now() -> datetime:
     return datetime.now(UTC)
 
@@ -57,6 +71,7 @@ def validate_environment(env: Mapping[str, str] | None = None) -> None:
     """Fail start-up on a garbled flag instead of running with a guessed setting."""
     source = os.environ if env is None else env
     actions_enabled(source)
+    self_execute_allowed(source)
     build_executors(source)
 
 
@@ -84,7 +99,9 @@ def build_runtime(
         return None
     kill_switch = KillSwitch(env_engaged=env_engaged(env))
     store = InMemoryActionStore(
-        kill_switch=kill_switch, on_system_transition=_audit_system_transition
+        kill_switch=kill_switch,
+        on_system_transition=_audit_system_transition,
+        allow_self_execute=self_execute_allowed(env),
     )
     executors = build_executors(env)
     checks = [finding_pre_check(findings)] if findings is not None else []

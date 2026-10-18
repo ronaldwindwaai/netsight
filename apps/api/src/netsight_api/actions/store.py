@@ -7,6 +7,8 @@ Every rule that must hold under concurrency lives *here*, inside one lock, not i
   ``version`` (its position in the history) and loses with ``StaleRequest`` if either moved, so a
   decision is always about what the person saw and a replayed approval changes nothing;
 * a requester never approves their own request, one person approves once, and only a human approves;
+* a requester does not execute their own request either, unless the operator sets the policy flag
+  ``allow_self_execute`` (default off); both rules compare the stable ``ActionActor.id``;
 * two-person requests need ``approvals_required`` distinct approvers;
 * an idempotency key is scoped to its requester: the same key and body returns the first request, the
   same key with another body is refused; an execution key starts a run once;
@@ -141,8 +143,10 @@ class InMemoryActionStore:
         max_open_per_requester: int = MAX_OPEN_PER_REQUESTER,
         max_stored: int = MAX_STORED,
         on_system_transition: Callable[[str, str, str], None] | None = None,
+        allow_self_execute: bool = False,
     ) -> None:
         self._kill = kill_switch
+        self.allow_self_execute = allow_self_execute
         # Called with (request id, new state, code) when the clock, not a person, moves a request.
         self._on_system = on_system_transition
         self._max_open = max_open_per_requester
@@ -375,6 +379,8 @@ class InMemoryActionStore:
                 raise e.KillSwitchEngaged
             if actor.kind != "human":
                 raise e.ApproverNotHuman
+            if not self.allow_self_execute and actor.id == rec.request.requester.id:
+                raise e.SelfExecution
             request = self._quoted(rec, expected_digest, expected_version)
             self._require(request, "approved")
             if any(
