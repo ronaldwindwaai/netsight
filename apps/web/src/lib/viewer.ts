@@ -68,6 +68,11 @@ export function canReadInventorySummary(viewer: Viewer | null): boolean {
   return viewer !== null && viewer.permissions.includes('inventory:read-summary');
 }
 
+/** True when the viewer holds copilot:ask (open the read-only AI copilot; its tools check their own). Advisory only. */
+export function canAskCopilot(viewer: Viewer | null): boolean {
+  return viewer !== null && viewer.permissions.includes('copilot:ask');
+}
+
 /** True when the viewer holds ipam:read (prefixes, VLANs and addresses). Advisory only. */
 export function canReadIpam(viewer: Viewer | null): boolean {
   return viewer !== null && viewer.permissions.includes('ipam:read');

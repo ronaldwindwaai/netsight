@@ -66,6 +66,9 @@ class Permission(StrEnum):
     IPAM_READ_SUMMARY = "ipam:read-summary"
     UNKNOWN_DEVICES_READ = "unknown-devices:read"
     UNKNOWN_DEVICES_READ_SUMMARY = "unknown-devices:read-summary"
+    # Ask the read-only AI copilot (Step 10). The tools it runs are checked against the asker's own
+    # permissions one by one; this only lets a person open the conversation. Human-only.
+    COPILOT_ASK = "copilot:ask"
     # Triage of an unknown-device finding; every one is a human judgement (HUMAN_ONLY_PERMISSIONS).
     UNKNOWN_DEVICES_ACKNOWLEDGE = "unknown-devices:acknowledge"  # acknowledge, mark investigating
     UNKNOWN_DEVICES_ASSIGN = "unknown-devices:assign"
@@ -111,6 +114,9 @@ HUMAN_ONLY_PERMISSIONS: frozenset[Permission] = frozenset(
         Permission.UNKNOWN_DEVICES_COMMENT,
         Permission.UNKNOWN_DEVICES_RESOLVE,
         Permission.UNKNOWN_DEVICES_SCAN,
+        # The copilot answers a person. A service or AI principal cannot start one: that would let
+        # one model drive another and spend the model budget without an accountable asker.
+        Permission.COPILOT_ASK,
     }
 )
 
@@ -183,6 +189,9 @@ _INVENTORY_SUMMARY = {Permission.INVENTORY_READ_SUMMARY, Permission.IPAM_READ_SU
 _INVENTORY_ROWS = _INVENTORY_SUMMARY | {Permission.INVENTORY_READ, Permission.IPAM_READ}
 _FINDINGS_SUMMARY = {Permission.UNKNOWN_DEVICES_READ_SUMMARY}
 _FINDINGS_READ = _FINDINGS_SUMMARY | {Permission.UNKNOWN_DEVICES_READ}
+# AI Copilot (PRD 26): every role that can read operational evidence may ask. Management holds only
+# summaries and none of the tools' data, so it is not given the conversation (human decision).
+_COPILOT = {Permission.COPILOT_ASK}
 _FINDINGS_TRIAGE = {
     Permission.UNKNOWN_DEVICES_ACKNOWLEDGE,
     Permission.UNKNOWN_DEVICES_ASSIGN,
@@ -206,6 +215,7 @@ ROLE_PERMISSIONS: Mapping[Role, frozenset[Permission]] = {
         | _FINDINGS_READ
         | _FINDINGS_TRIAGE
         | {Permission.ACTIONS_PROPOSE, Permission.CONFIGURATION_READ}
+        | _COPILOT
     ),
     Role.SECURITY_ANALYST: frozenset(
         _ALL_READ
@@ -219,6 +229,7 @@ ROLE_PERMISSIONS: Mapping[Role, frozenset[Permission]] = {
         | _FINDINGS_READ
         | _FINDINGS_TRIAGE
         | {Permission.ACTIONS_PROPOSE, Permission.CONFIGURATION_READ}
+        | _COPILOT
     ),
     Role.TECHNICIAN: frozenset(
         {
@@ -234,6 +245,7 @@ ROLE_PERMISSIONS: Mapping[Role, frozenset[Permission]] = {
             *_USERS_LIMITED,
             *_INVENTORY_ROWS,
             *_FINDINGS_SUMMARY,
+            *_COPILOT,
         }
     ),
     # Summary only: the full incident read is withheld (human decision 2026-10-10).
@@ -252,6 +264,7 @@ ROLE_PERMISSIONS: Mapping[Role, frozenset[Permission]] = {
         | _INVENTORY_ROWS
         | _FINDINGS_READ
         | {Permission.AUDIT_READ, Permission.CONFIGURATION_READ}
+        | _COPILOT
     ),
 }
 

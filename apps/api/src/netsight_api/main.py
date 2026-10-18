@@ -55,6 +55,7 @@ from netsight_api.auth.settings import session_policy
 from netsight_api.body_limit import BodySizeLimitMiddleware
 from netsight_api.configuration_routes import router as configuration_router
 from netsight_api.contracts import ContractViolation, validate
+from netsight_api.copilot_routes import router as copilot_router
 from netsight_api.diagnostic_routes import router as diagnostic_router
 from netsight_api.diagnostic_session_routes import router as diagnostic_session_router
 from netsight_api.errors import ApiError
@@ -1033,6 +1034,7 @@ app.include_router(internet_router, prefix=API_PREFIX)
 app.include_router(identity_router, prefix=API_PREFIX)
 app.include_router(configuration_router, prefix=API_PREFIX)
 app.include_router(inventory_router, prefix=API_PREFIX)
+app.include_router(copilot_router, prefix=API_PREFIX)
 app.include_router(ipam_router, prefix=API_PREFIX)
 app.include_router(unknown_device_router, prefix=API_PREFIX)
 app.include_router(traffic_router, prefix=API_PREFIX)

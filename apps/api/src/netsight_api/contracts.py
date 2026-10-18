@@ -148,6 +148,13 @@ SCHEMA_FILES = {
     "unknown_device_comment_request": "unknown-devices.schema.json#/$defs/commentRequest",
     "unknown_device_resolve_request": "unknown-devices.schema.json#/$defs/resolveRequest",
     "unknown_device_scan": "unknown-devices.schema.json#/$defs/scanResponse",
+    "copilot_ask": "copilot.schema.json",
+    "copilot_evidence": "copilot.schema.json#/$defs/evidence",
+    "copilot_tool_call": "copilot.schema.json#/$defs/toolCall",
+    "copilot_claim": "copilot.schema.json#/$defs/claim",
+    "copilot_answer": "copilot.schema.json#/$defs/answer",
+    "copilot_ask_request": "copilot.schema.json#/$defs/askRequest",
+    "copilot_status": "copilot.schema.json#/$defs/statusResponse",
 }
 
 

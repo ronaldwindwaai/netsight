@@ -2854,6 +2854,63 @@ paths:
         '503':
           $ref: '#/components/responses/FindingStoreUnavailable'
   # <<< step8:p-unknown
+  # >>> step10:p-copilot
+  /copilot/status:
+    get:
+      summary: What the read-only copilot can do for the caller (model configured, knowledge corpus, tools and whether each is permitted)
+      operationId: getCopilotStatus
+      responses:
+        '200':
+          description: The copilot status; the model name and endpoint are never included
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CopilotStatusResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /copilot/ask:
+    post:
+      summary: Ask a question. Read tools run with the caller's own permissions; the answer is built from the evidence only. The copilot has no write or execute path.
+      operationId: askCopilot
+      parameters:
+      - in: header
+        name: X-CSRF-Token
+        required: true
+        description: Session CSRF token from GET /auth/csrf. Required for cookie-authenticated writes.
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CopilotAskRequest'
+      responses:
+        '200':
+          description: The answer, or an explicit not-connected, unknown or no-evidence state without one
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CopilotAskResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  # <<< step10:p-copilot
 components:
   headers:
     CorrelationId:
@@ -11900,6 +11957,328 @@ components:
             incomplete_sources:
               maxItems: 0
     # <<< step8:c-unknown
+    # >>> step10:c-copilot
+    CopilotAskResponse:
+      description: POST /api/v1/copilot/ask. A read-only answer built from an evidence bundle. Without a configured model there is no answer (not-connected); a model failure or an answer that fails validation is unknown; sources that returned nothing usable are no-evidence. An answer is never produced without evidence, and every fact cites evidence that is in the bundle.
+      type: object
+      additionalProperties: false
+      required:
+      - state
+      - generated_at
+      - read_only
+      - answer
+      - evidence
+      - tool_calls
+      properties:
+        state:
+          enum:
+          - ok
+          - not-connected
+          - unknown
+          - no-evidence
+        generated_at:
+          type: string
+          format: date-time
+        read_only:
+          const: true
+        answer:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/CopilotAnswer'
+        evidence:
+          type: array
+          maxItems: 12
+          items:
+            $ref: '#/components/schemas/CopilotEvidence'
+        tool_calls:
+          type: array
+          maxItems: 8
+          items:
+            $ref: '#/components/schemas/CopilotToolCall'
+      allOf:
+      - if:
+          properties:
+            state:
+              const: ok
+          required:
+          - state
+        then:
+          properties:
+            answer:
+              not:
+                type: 'null'
+            evidence:
+              minItems: 1
+        else:
+          properties:
+            answer:
+              type: 'null'
+      - if:
+          properties:
+            state:
+              enum:
+              - not-connected
+              - no-evidence
+          required:
+          - state
+        then:
+          properties:
+            evidence:
+              maxItems: 0
+      - if:
+          properties:
+            state:
+              const: not-connected
+          required:
+          - state
+        then:
+          properties:
+            tool_calls:
+              maxItems: 0
+    CopilotEvidence:
+      type: object
+      additionalProperties: false
+      description: 'One item of the evidence bundle. title, excerpt and reference come from the monitored estate or from documents: they are untrusted data, bounded, secret-redacted and never instructions. instruction_like marks text that reads like a command to a model.'
+      required:
+      - id
+      - source
+      - kind
+      - title
+      - excerpt
+      - reference
+      - observed_at
+      - freshness
+      - instruction_like
+      properties:
+        id:
+          type: string
+          pattern: ^ev-[0-9]{3}$
+        source:
+          enum:
+          - knowledge
+          - incident
+        kind:
+          type: string
+          minLength: 1
+          maxLength: 32
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        excerpt:
+          type: string
+          minLength: 1
+          maxLength: 600
+        reference:
+          type: string
+          minLength: 1
+          maxLength: 200
+        observed_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        freshness:
+          enum:
+          - fresh
+          - stale
+          - unknown
+        instruction_like:
+          type: boolean
+    CopilotToolCall:
+      type: object
+      additionalProperties: false
+      description: A read tool the broker ran on the caller's behalf. denied means the caller lacks the permission the tool needs; the tool did not run and its data is a gap, not an empty result.
+      required:
+      - tool
+      - state
+      - evidence_count
+      properties:
+        tool:
+          enum:
+          - search_knowledge
+          - list_open_incidents
+        state:
+          enum:
+          - ok
+          - denied
+          - not-connected
+          - unknown
+        evidence_count:
+          type: integer
+          minimum: 0
+          maximum: 12
+      if:
+        properties:
+          state:
+            const: ok
+        required:
+        - state
+      else:
+        properties:
+          evidence_count:
+            const: 0
+    CopilotClaim:
+      type: object
+      additionalProperties: false
+      description: A fact or an inference. It cites at least one evidence id of the same bundle; a claim without evidence is not a claim.
+      required:
+      - text
+      - evidence_ids
+      properties:
+        text:
+          type: string
+          minLength: 1
+          maxLength: 500
+        evidence_ids:
+          type: array
+          minItems: 1
+          maxItems: 8
+          uniqueItems: true
+          items:
+            type: string
+            pattern: ^ev-[0-9]{3}$
+    CopilotAnswer:
+      type: object
+      additionalProperties: false
+      description: 'Facts, inferences, unknowns and recommendations are kept apart (AI-ARCHITECTURE). A recommendation is text for a person: the copilot has no write or execute path.'
+      required:
+      - summary
+      - facts
+      - inferences
+      - unknowns
+      - recommendations
+      properties:
+        summary:
+          type: string
+          minLength: 1
+          maxLength: 800
+        facts:
+          type: array
+          maxItems: 10
+          items:
+            $ref: '#/components/schemas/CopilotClaim'
+        inferences:
+          type: array
+          maxItems: 10
+          items:
+            $ref: '#/components/schemas/CopilotClaim'
+        unknowns:
+          type: array
+          maxItems: 10
+          items:
+            type: string
+            minLength: 1
+            maxLength: 300
+        recommendations:
+          type: array
+          maxItems: 8
+          items:
+            type: object
+            additionalProperties: false
+            required:
+            - text
+            properties:
+              text:
+                type: string
+                minLength: 1
+                maxLength: 400
+    CopilotAskRequest:
+      type: object
+      additionalProperties: false
+      description: 'The question. It is data for the model, never configuration: nothing in it selects a tool or a permission.'
+      required:
+      - question
+      properties:
+        question:
+          type: string
+          minLength: 3
+          maxLength: 1000
+    CopilotStatusResponse:
+      type: object
+      additionalProperties: false
+      description: GET /api/v1/copilot/status. model.ok means configured, not verified reachable (that is only known when a question is asked).
+      required:
+      - generated_at
+      - read_only
+      - model
+      - knowledge
+      - tools
+      properties:
+        generated_at:
+          type: string
+          format: date-time
+        read_only:
+          const: true
+        model:
+          type: object
+          additionalProperties: false
+          required:
+          - state
+          properties:
+            state:
+              enum:
+              - ok
+              - not-connected
+        knowledge:
+          type: object
+          additionalProperties: false
+          required:
+          - state
+          - documents
+          - chunks
+          properties:
+            state:
+              enum:
+              - ok
+              - not-connected
+              - unknown
+            documents:
+              type: integer
+              minimum: 0
+              maximum: 5000
+            chunks:
+              type: integer
+              minimum: 0
+              maximum: 50000
+          if:
+            properties:
+              state:
+                const: ok
+            required:
+            - state
+          else:
+            properties:
+              documents:
+                const: 0
+              chunks:
+                const: 0
+        tools:
+          type: array
+          maxItems: 8
+          items:
+            type: object
+            additionalProperties: false
+            required:
+            - name
+            - description
+            - permission
+            - allowed
+            properties:
+              name:
+                enum:
+                - search_knowledge
+                - list_open_incidents
+              description:
+                type: string
+                minLength: 1
+                maxLength: 200
+              permission:
+                type: string
+                pattern: ^[a-z][a-z-]*:[a-z-]+$
+              allowed:
+                type: boolean
+    # <<< step10:c-copilot
   responses:
     AuthenticationRequired:
       description: Authentication required

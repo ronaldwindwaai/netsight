@@ -12,6 +12,7 @@
 | Internet / WAN | Full | Full | Read | Read | Summary | Read |
 | WAN evidence export | Yes | Yes | No | No | No | Yes |
 | Config history | Full | Full | Read | Read | No | Read |
+| AI Copilot (`copilot:ask`; Step 10) | Yes | Yes | Yes | Yes | No | Yes |
 | Propose action | Yes | Scoped | Scoped | Limited | No | No |
 | Approve high risk | Policy | Policy | Policy | No | No | No |
 | Execute high risk | Policy | Policy | Policy | No | No | No |
@@ -279,3 +280,7 @@ Engineer, Security Analyst, Technician and Auditor. Management holds no permissi
 Only backup-attempt metadata and revision IDs/timestamps are exposed, with every
 read authorized, rate-limited, audited and non-cacheable. This grants no access to
 configuration bodies, author identities, raw diffs or remote write/restore actions.
+
+## AI Copilot (Step 10)
+
+The matrix has no AI Copilot row (PRD 26 names the feature, not a role split). One permission, `copilot:ask`, opens the read-only copilot: Administrator, Network Engineer, Security Analyst, Technician and Auditor hold it; **Management holds nothing** (it holds none of the data the tools read). It is in `HUMAN_ONLY_PERMISSIONS`: a service or AI principal cannot start a conversation whatever its role. `copilot:ask` grants **no data**: every tool the copilot runs is authorised separately against the asker's own permissions (`incidents:read` for incidents; knowledge search needs only `copilot:ask`; no tool reads configuration), and a denied tool is reported as a gap. There is no copilot write, execute or approval permission. Open decision: confirm this reading, and whether Management should get a summary-only copilot.

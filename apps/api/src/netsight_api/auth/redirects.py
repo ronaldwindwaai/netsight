@@ -28,6 +28,7 @@ UI_AREAS: Final = frozenset(
         "inventory",
         "ipam",
         "unknown-devices",
+        "copilot",
     }
 )
 
