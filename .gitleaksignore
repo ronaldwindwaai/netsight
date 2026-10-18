@@ -7,27 +7,12 @@
 # Verified backlog prose; not a credential.
 22179d05a14451a34b0f0b761752a7e4a717c242:backlog/backlog.csv:generic-api-key:37
 
-# Step 9/10/12 verified test fixtures (inspected unredacted); inert fake values, not credentials.
-# Step 12 web test fixture: fake UI key
-acc05ff5ae3194df858b16abdc9b1a518d52f9b7:apps/web/src/lib/actions-view.test.ts:generic-api-key:33
-
-# Step 10 test fixture: fake token shape fed to the sanitiser
-ee215e109047ac268ffb6e99e5509e5712b4a913:apps/api/tests/test_copilot_prompt_answer.py:generic-api-key:132
-
-# Step 10 test fixture: fake provider key
-ee215e109047ac268ffb6e99e5509e5712b4a913:apps/api/tests/test_copilot_provider.py:generic-api-key:14
-
-# Step 10 test fixture: fake key / hostile-question string (hunter2 style)
-ee215e109047ac268ffb6e99e5509e5712b4a913:apps/api/tests/test_copilot_api.py:generic-api-key:30
-
-# Step 10 test fixture: fake key / hostile-question string (hunter2 style)
-ee215e109047ac268ffb6e99e5509e5712b4a913:apps/api/tests/test_copilot_api.py:generic-api-key:332
-
-# Step 10 test fixture: fake token shapes (api_key, JWT, glpat) used to prove redaction
-ee215e109047ac268ffb6e99e5509e5712b4a913:apps/api/tests/test_copilot_sanitize.py:generic-api-key:13
-
-# Step 10 test fixture: fake token shapes (api_key, JWT, glpat) used to prove redaction
-ee215e109047ac268ffb6e99e5509e5712b4a913:apps/api/tests/test_copilot_sanitize.py:gitlab-pat:23
-
-# Step 10 test fixture: fake token shapes (api_key, JWT, glpat) used to prove redaction
-ee215e109047ac268ffb6e99e5509e5712b4a913:apps/api/tests/test_copilot_sanitize.py:jwt:19
+# Step 10/12 verified test fixtures (inspected unredacted); inert fake values, not credentials.
+072b4780b869b6e85b292a0254b0e7bfd2f9c5d1:apps/api/tests/test_copilot_api.py:generic-api-key:30
+072b4780b869b6e85b292a0254b0e7bfd2f9c5d1:apps/api/tests/test_copilot_api.py:generic-api-key:332
+072b4780b869b6e85b292a0254b0e7bfd2f9c5d1:apps/api/tests/test_copilot_prompt_answer.py:generic-api-key:132
+072b4780b869b6e85b292a0254b0e7bfd2f9c5d1:apps/api/tests/test_copilot_provider.py:generic-api-key:14
+072b4780b869b6e85b292a0254b0e7bfd2f9c5d1:apps/api/tests/test_copilot_sanitize.py:generic-api-key:13
+072b4780b869b6e85b292a0254b0e7bfd2f9c5d1:apps/api/tests/test_copilot_sanitize.py:gitlab-pat:23
+072b4780b869b6e85b292a0254b0e7bfd2f9c5d1:apps/api/tests/test_copilot_sanitize.py:jwt:19
+4a401415838151c4881acedad499d6f073527aae:apps/web/src/lib/actions-view.test.ts:generic-api-key:33
