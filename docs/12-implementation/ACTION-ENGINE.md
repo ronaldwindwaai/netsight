@@ -148,7 +148,7 @@ and `/action-requests` paths are replaced).
 
 | Route | Permission | Notes |
 | --- | --- | --- |
-| `GET /status` | `actions:read` | engine state, `dry_run_only`, kill switch, executors, definitions, `store.durable: false` |
+| `GET /status` | `actions:read` | engine state, `dry_run_only`, kill switch, executors, definitions, `store.durable: false`, `policy.self_execute_allowed` |
 | `GET /` | `actions:read` | newest first, `state`, `page`, `page_size` <= 50, unknown parameters refused |
 | `GET /{id}` | `actions:read` | request + history + `chain_intact` |
 | `POST /` | `actions:propose` (+ `actions:propose-high` for risk C and D) | `Idempotency-Key` |
@@ -201,7 +201,7 @@ targets are rendered as text. Menu entry "Action requests" (`actions:read`); `ac
    call cannot be interrupted, it is abandoned on a daemon thread and the target lock is released, so a second action could
    start while the first is still working: a live executor must honour its own deadline/cancellation, or the engine must
    keep the target locked until the call has actually returned; (b) engaging the kill switch does not abort a run already
-   past its last check; (c) ~~the requester may run their own request~~ fixed: the requester cannot execute their own request unless `NETSIGHT_ACTIONS_ALLOW_SELF_EXECUTE` is set (default off; `409 SELF_EXECUTION`; dry runs included, so a lone Administrator cannot run their own request). The web decision panel does not yet explain this beforehand (the status contract does not carry the flag), so the control is enabled and the API refuses;
+   past its last check; (c) ~~the requester may run their own request~~ fixed: the requester cannot execute their own request unless `NETSIGHT_ACTIONS_ALLOW_SELF_EXECUTE` is set (default off; `409 SELF_EXECUTION`; dry runs included, so a lone Administrator cannot run their own request). The status contract carries the flag as `policy.self_execute_allowed` (additive; false when the engine is not connected), so the web decision panel disables Run / Record a dry run for the requester with "The person who requested an action cannot execute it" instead of enabling a control the API then refuses (the API stays authoritative);
    (d) one person holding two identities (for example a local and an OIDC account) is two people to the requester rule. Both the requester rule and the per-requester open-request cap key on `Identity.id` (`provider:subject`, the immutable provider subject; never an email address or display name). A local account's id is `local:<username>`, a login name rather than an opaque id, so it is stable only while usernames are never reused;
    (e) a durable store and a tamper-evident audit sink.
 

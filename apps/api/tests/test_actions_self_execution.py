@@ -89,6 +89,25 @@ def test_the_flag_is_off_unless_set_and_a_garbled_value_stops_start_up() -> None
         validate_environment({**ENV_ON, ALLOW: "maybe"})
 
 
+def test_the_status_contract_carries_the_policy_so_the_ui_can_explain_it_beforehand() -> None:
+    from netsight_api.actions_read_routes import status_body
+
+    off = build_runtime(ENV_ON)
+    on = build_runtime({**ENV_ON, ALLOW: "true"})
+    assert off is not None and on is not None
+    assert status_body(off, lambda: NOW).policy.self_execute_allowed is False
+    assert status_body(on, lambda: NOW).policy.self_execute_allowed is True
+    assert status_body(None, lambda: NOW).policy.self_execute_allowed is False
+
+
+def test_the_status_endpoint_reports_the_policy(clock: Clock, findings: FindingStub) -> None:
+    runtime = build_runtime({**ENV_ON, ALLOW: "true"}, clock=clock, findings=lambda: findings)
+    assert runtime is not None
+    app.dependency_overrides[support.get_runtime] = lambda: runtime
+    body = Person("auditor").get("/api/v1/actions/status").json()
+    assert body["policy"] == {"self_execute_allowed": True}
+
+
 def test_the_api_refuses_self_execution(clock: Clock, findings: FindingStub) -> None:
     runtime = build_runtime(ENV_ON, clock=clock, findings=lambda: findings)
     assert runtime is not None

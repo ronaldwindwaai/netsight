@@ -23,6 +23,7 @@ from netsight_api.schemas_actions import (
     ActionListResponse,
     ActionStatusResponse,
     KillSwitchStatus,
+    PolicyStatus,
     RequestState,
     StoreStatus,
 )
@@ -66,6 +67,7 @@ def status_body(runtime: ActionRuntime | None, now: support.Clock) -> ActionStat
             dry_run_only=True,
             kill_switch=KillSwitchStatus(engaged=False, source="none", since=None),
             store=StoreStatus(kind="memory", durable=False),
+            policy=PolicyStatus(self_execute_allowed=False),
             executors=[],
             definitions=[],
         )
@@ -76,6 +78,7 @@ def status_body(runtime: ActionRuntime | None, now: support.Clock) -> ActionStat
         dry_run_only=not any(e.mode == "live" and e.state == "ok" for e in executors),
         kill_switch=runtime.kill_switch.status(),
         store=StoreStatus(kind="memory", durable=False),
+        policy=PolicyStatus(self_execute_allowed=runtime.store.allow_self_execute),
         executors=executors,
         definitions=[definition_contract(d) for d in CATALOG.values()],
     )

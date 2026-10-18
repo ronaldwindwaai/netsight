@@ -110,6 +110,7 @@ export function actionStatus(changes: Record<string, unknown> = {}): ActionStatu
       dry_run_only: true,
       kill_switch: { engaged: false, source: 'none', since: null },
       store: { kind: 'memory', durable: false },
+      policy: { self_execute_allowed: false },
       executors: [
         { id: 'dry-run', mode: 'dry-run', state: 'ok' },
         { id: 'live', mode: 'live', state: 'disabled' },

@@ -43,7 +43,7 @@ Every "human decision pending / needed" recorded in `docs/00-product/BUILD-PLAN-
 | D-22 | Whether Technician may export the capacity report | No (no reporting role in the matrix) | Technician cannot export | FORECASTING |
 | D-23 | Who may approve and execute actions; the matrix says "Policy" for Network Engineer and Security Analyst; whether a risk A/B requester may approve | Administrator-only for risk C and D; revisit A/B after a lab proves a real executor | Administrator holds `actions:approve`, `actions:execute`, `actions:kill-switch`; requester never approves (a risk D request needs two Administrators) | ACTION-ENGINE, RBAC-MATRIX |
 | D-24 | Technician proposing risk B (`switch.port.enable`) | No | Per catalog and `actions:propose` grants | ACTION-ENGINE |
-| D-25 | **May a requester execute their own request** (new, Step 12 review) | No | **changed 2026-10-18**: refused with `409 SELF_EXECUTION` unless `NETSIGHT_ACTIONS_ALLOW_SELF_EXECUTE` is set; default off. Dry runs are refused too, so a single-Administrator deployment cannot run its own request until the flag is set or a second person executes | ACTION-ENGINE |
+| D-25 | **May a requester execute their own request** (new, Step 12 review) | No | **changed 2026-10-18**: refused with `409 SELF_EXECUTION` unless `NETSIGHT_ACTIONS_ALLOW_SELF_EXECUTE` is set; default off. Dry runs are refused too, so a single-Administrator deployment cannot run its own request until the flag is set or a second person executes. The status contract exposes the flag (`policy.self_execute_allowed`) and the UI disables Execute for the requester with an explanation | ACTION-ENGINE |
 
 ## 3. Integrations and data sources
 

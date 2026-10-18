@@ -327,12 +327,19 @@ class StoreStatus(ApiModel):
     durable: Literal[False]
 
 
+class PolicyStatus(ApiModel):
+    """Operator policy the UI needs to explain a refusal before the API gives it."""
+
+    self_execute_allowed: StrictBool
+
+
 class ActionStatusResponse(ApiModel):
     state: EngineState
     generated_at: AwareDatetime
     dry_run_only: StrictBool
     kill_switch: KillSwitchStatus
     store: StoreStatus
+    policy: PolicyStatus
     executors: list[ExecutorStatus] = Field(max_length=8)
     definitions: list[ActionDefinition] = Field(max_length=16)
 

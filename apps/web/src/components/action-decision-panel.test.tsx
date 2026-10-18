@@ -222,6 +222,17 @@ describe('running', () => {
     assert.equal(first.version, 4);
   });
 
+  it('disables Run for the requester and explains why, unless the policy allows it', () => {
+    const own = approvedRequest({ requester: { id: 'oidc:admin-1', kind: 'human' } });
+    renderPanel(ADMIN, own, actionStatus({ policy: { self_execute_allowed: false } }));
+    const blocked = button(/^Record a dry run/);
+    assert.equal(blocked.disabled, true);
+    assert.match(describedText(blocked), /The person who requested an action cannot execute it/);
+    cleanup();
+    renderPanel(ADMIN, own, actionStatus({ policy: { self_execute_allowed: true } }));
+    assert.equal(button(/^Record a dry run/).disabled, false);
+  });
+
   it('a live-capable status labels the control Run, not a dry run', () => {
     const live = actionStatus({ dry_run_only: false, executors: [{ id: 'dry-run', mode: 'dry-run', state: 'ok' }, { id: 'live', mode: 'live', state: 'ok' }] });
     renderPanel(ADMIN, approvedRequest(), live);

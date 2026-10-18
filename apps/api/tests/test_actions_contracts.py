@@ -50,6 +50,7 @@ REFS = {
     "#/$defs/executorStatus": "ActionExecutorStatus",
     "#/$defs/killSwitchStatus": "ActionKillSwitchStatus",
     "#/$defs/storeStatus": "ActionStoreStatus",
+    "#/$defs/policyStatus": "ActionPolicyStatus",
 }
 PAIRS: list[tuple[str, str | None, str]] = [
     ("actions.schema.json", None, "ActionListResponse"),
@@ -67,6 +68,7 @@ PAIRS: list[tuple[str, str | None, str]] = [
     ("actions.schema.json", "executorStatus", "ActionExecutorStatus"),
     ("actions.schema.json", "killSwitchStatus", "ActionKillSwitchStatus"),
     ("actions.schema.json", "storeStatus", "ActionStoreStatus"),
+    ("actions.schema.json", "policyStatus", "ActionPolicyStatus"),
     ("actions.schema.json", "statusResponse", "ActionStatusResponse"),
     ("actions.schema.json", "detailResponse", "ActionDetailResponse"),
     ("actions.schema.json", "createRequest", "ActionCreateRequest"),

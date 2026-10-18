@@ -652,6 +652,9 @@
         "kind": "memory",
         "durable": false
       },
+      "policy": {
+        "self_execute_allowed": false
+      },
       "executors": [
         {
           "id": "dry-run",
@@ -703,6 +706,15 @@
             "engaged": true,
             "source": "environment",
             "since": "2026-10-18T12:00:00Z"
+          }
+        }
+      },
+      {
+        "name": "self execution allowed by policy",
+        "valid": true,
+        "set": {
+          "policy": {
+            "self_execute_allowed": true
           }
         }
       },
@@ -762,6 +774,27 @@
             "engaged": true,
             "source": "none",
             "since": "2026-10-18T12:00:00Z"
+          }
+        }
+      },
+      {
+        "name": "policy flag is not a boolean",
+        "valid": false,
+        "jsonschema_rejects": true,
+        "set": {
+          "policy": {
+            "self_execute_allowed": "yes"
+          }
+        }
+      },
+      {
+        "name": "policy carries an unknown field",
+        "valid": false,
+        "jsonschema_rejects": true,
+        "set": {
+          "policy": {
+            "self_execute_allowed": false,
+            "approve_own": true
           }
         }
       },

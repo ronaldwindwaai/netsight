@@ -196,6 +196,7 @@ export interface DecisionAvailability {
 
 const ROLE_REASON = 'Your role does not permit this action.';
 const SIGN_IN_REASON = 'Sign in to act on action requests.';
+const SELF_EXECUTE_REASON = 'The person who requested an action cannot execute it. A different person must run it.';
 const KILL_REASON = 'The kill switch is engaged: no action can be approved or run until it is released.';
 
 function holds(viewer: Viewer | null, permission: string): boolean {
@@ -239,7 +240,11 @@ export function decisionAvailability(
   const executeReason = gate(
     holds(viewer, 'actions:execute'),
     request.state === 'approved' ? null : 'Only an approved request can be run.',
-    killed ? KILL_REASON : null,
+    isRequester && status?.policy.self_execute_allowed !== true
+      ? SELF_EXECUTE_REASON
+      : killed
+        ? KILL_REASON
+        : null,
   );
   return [
     { verb: 'approve', label: 'Approve', enabled: approveReason === null, reason: approveReason, needsStepUp: true },

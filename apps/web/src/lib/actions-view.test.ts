@@ -193,6 +193,23 @@ test('an approved request is run by the executor role, and the label is honest a
   assert.doesNotMatch(execute.label, /^execute$/i);
 });
 
+test('the requester cannot execute their own request unless the policy allows it, and is told why', () => {
+  const approved = request({
+    state: 'approved', execute_by: '2026-10-18T13:00:00Z',
+    requester: { id: 'admin-1', kind: 'human' },
+    approvals: [{ approver_id: 'admin-2', approved_at: '2026-10-18T12:01:00Z' }],
+  });
+  const refused = by(decisionAvailability(approved, ADMIN, status({ policy: { self_execute_allowed: false } })), 'execute');
+  assert.equal(refused.enabled, false);
+  assert.match(refused.reason ?? '', /The person who requested an action cannot execute it/);
+  const allowed = by(decisionAvailability(approved, ADMIN, status({ policy: { self_execute_allowed: true } })), 'execute');
+  assert.equal(allowed.enabled, true);
+  // Someone else is unaffected by the policy, and a missing status fails closed for the requester.
+  const other = { ...approved, requester: { id: 'someone-else', kind: 'human' } } as unknown as ActionRequest;
+  assert.equal(by(decisionAvailability(other, ADMIN, status()), 'execute').enabled, true);
+  assert.equal(by(decisionAvailability(approved, ADMIN, null), 'execute').enabled, false);
+});
+
 test('the kill switch disables approve and execute with a reason', () => {
   const engaged = status({ kill_switch: { engaged: true, source: 'runtime', since: '2026-10-18T12:00:00Z' } });
   const approve = by(decisionAvailability(request(), ADMIN, engaged), 'approve');

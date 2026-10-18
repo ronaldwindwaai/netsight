@@ -13402,6 +13402,15 @@ components:
       - kind
       - durable
       type: object
+    ActionPolicyStatus:
+      additionalProperties: false
+      properties:
+        self_execute_allowed:
+          type: boolean
+      required:
+      - self_execute_allowed
+      type: object
+      description: 'Operator policy the UI needs to explain a refusal beforehand. self_execute_allowed is false unless NETSIGHT_ACTIONS_ALLOW_SELF_EXECUTE is set: the requester of an action cannot execute it (409 SELF_EXECUTION).'
     ActionStatusResponse:
       additionalProperties: false
       properties:
@@ -13419,6 +13428,8 @@ components:
           $ref: '#/components/schemas/ActionKillSwitchStatus'
         store:
           $ref: '#/components/schemas/ActionStoreStatus'
+        policy:
+          $ref: '#/components/schemas/ActionPolicyStatus'
         executors:
           items:
             $ref: '#/components/schemas/ActionExecutorStatus'
@@ -13435,6 +13446,7 @@ components:
       - dry_run_only
       - kill_switch
       - store
+      - policy
       - executors
       - definitions
       type: object

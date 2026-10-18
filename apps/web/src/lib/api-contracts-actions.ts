@@ -185,6 +185,7 @@ export interface ActionStatus {
   dry_run_only: boolean;
   kill_switch: KillSwitchStatus;
   store: { kind: 'memory'; durable: false };
+  policy: { self_execute_allowed: boolean };
   executors: ExecutorStatus[];
   definitions: ActionDefinition[];
 }
@@ -581,6 +582,7 @@ export function parseActionStatus(value: unknown): ActionStatus | null {
     'dry_run_only',
     'kill_switch',
     'store',
+    'policy',
     'executors',
     'definitions',
   ]);
@@ -589,6 +591,8 @@ export function parseActionStatus(value: unknown): ActionStatus | null {
   }
   const store = exactRecord(r.store, ['kind', 'durable']);
   if (store === null || store.kind !== 'memory' || store.durable !== false) return null;
+  const policy = exactRecord(r.policy, ['self_execute_allowed']);
+  if (policy === null || !isBoolean(policy.self_execute_allowed)) return null;
   const kill = parseKillSwitch(r.kill_switch);
   const executors = parseArray(r.executors, 0, 8, parseExecutor);
   const definitions = parseArray(r.definitions, 0, 16, parseActionDefinition);
@@ -602,6 +606,7 @@ export function parseActionStatus(value: unknown): ActionStatus | null {
     dry_run_only: r.dry_run_only,
     kill_switch: kill,
     store: { kind: 'memory', durable: false },
+    policy: { self_execute_allowed: policy.self_execute_allowed },
     executors,
     definitions,
   };
