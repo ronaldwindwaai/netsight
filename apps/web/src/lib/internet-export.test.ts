@@ -93,10 +93,31 @@ test('an unexpected type or disposition is refused, not relayed', () => {
   }
 });
 
+const POLICY = { trustProxy: false, production: true };
+const HOST = 'noc.example.com';
+
 test('a cross-site request cannot trigger an export (it would spend the identity rate limit and audit trail)', () => {
-  assert.equal(isCrossSiteRequest(new Headers({ 'sec-fetch-site': 'cross-site' })), true);
-  assert.equal(isCrossSiteRequest(new Headers({ 'sec-fetch-site': 'same-site' })), true);
-  assert.equal(isCrossSiteRequest(new Headers({ 'sec-fetch-site': 'same-origin' })), false);
-  assert.equal(isCrossSiteRequest(new Headers({ 'sec-fetch-site': 'none' })), false); // typed URL
-  assert.equal(isCrossSiteRequest(new Headers()), false); // non-browser clients do not send it
+  const blocked = (init: Record<string, string>) =>
+    isCrossSiteRequest(new Headers({ host: HOST, ...init }), POLICY);
+  assert.equal(blocked({ 'sec-fetch-site': 'cross-site' }), true);
+  assert.equal(blocked({ 'sec-fetch-site': 'same-site' }), true);
+  assert.equal(blocked({ 'sec-fetch-site': 'same-origin' }), false);
+  assert.equal(blocked({ 'sec-fetch-site': 'none' }), false); // typed URL
+});
+
+test('a request with no Sec-Fetch-Site must carry a matching Origin or Referer', () => {
+  const blocked = (init: Record<string, string>) =>
+    isCrossSiteRequest(new Headers({ host: HOST, ...init }), POLICY);
+  assert.equal(blocked({}), true); // no signal at all: refused, not assumed safe
+  assert.equal(blocked({ origin: 'https://evil.example' }), true);
+  assert.equal(blocked({ origin: 'null' }), true);
+  assert.equal(blocked({ referer: 'https://evil.example/x' }), true);
+  assert.equal(blocked({ origin: 'https://evil.example', referer: `https://${HOST}/x` }), true);
+  assert.equal(blocked({ origin: `https://${HOST}` }), false);
+  assert.equal(blocked({ referer: `https://${HOST}/internet` }), false);
+});
+
+test('Sec-Fetch-Site cross-site is refused even when a matching Origin is present', () => {
+  const headers = new Headers({ host: HOST, 'sec-fetch-site': 'cross-site', origin: `https://${HOST}` });
+  assert.equal(isCrossSiteRequest(headers, POLICY), true);
 });

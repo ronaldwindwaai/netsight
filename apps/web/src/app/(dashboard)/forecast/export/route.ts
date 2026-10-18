@@ -1,4 +1,5 @@
 import { apiGetRaw } from '@/lib/api';
+import { originPolicyFromEnv } from '@/lib/request-origin';
 import { apiExportPath, parseExportQuery, safeDownloadHeaders } from '@/lib/forecast-export';
 import { isCrossSiteRequest } from '@/lib/internet-export';
 
@@ -7,7 +8,7 @@ import { isCrossSiteRequest } from '@/lib/internet-export';
  *
  * It forwards the session cookie to the API, which enforces `forecast:export`, the export rate
  * limit and the audit record. The route validates the query first (only the offered windows),
- * refuses a request a browser marks as cross-site, relays only the fixed text/csv attachment, and
+ * refuses a request that is cross-site or that cannot show a same-site Origin/Referer, relays only the fixed text/csv attachment, and
  * answers failures with fixed text: nothing the API said is echoed.
  */
 
@@ -30,7 +31,7 @@ const UPSTREAM_REFUSALS: Readonly<Record<number, readonly [number, string]>> = {
 };
 
 export async function GET(request: Request): Promise<Response> {
-  if (isCrossSiteRequest(request.headers)) {
+  if (isCrossSiteRequest(request.headers, originPolicyFromEnv(process.env))) {
     return refusal(403, 'Exports can only be started from Netsight.');
   }
   const parsed = parseExportQuery(new URL(request.url).searchParams);

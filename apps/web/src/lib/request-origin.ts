@@ -89,3 +89,8 @@ export function sameOrigin(headers: RequestHeaders, policy: OriginPolicy): boole
 export function readTrustProxy(env: Record<string, string | undefined>): boolean {
   return env.NETSIGHT_TRUST_PROXY_HEADERS === 'true';
 }
+
+/** The origin policy for this process: proxy headers only on explicit opt-in, https in production. */
+export function originPolicyFromEnv(env: Record<string, string | undefined>): OriginPolicy {
+  return { trustProxy: readTrustProxy(env), production: env.NODE_ENV === 'production' };
+}

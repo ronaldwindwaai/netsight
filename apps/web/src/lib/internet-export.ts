@@ -1,4 +1,5 @@
 import { monthOptions } from './internet-view.ts';
+import { sameOrigin, type OriginPolicy } from './request-origin.ts';
 
 /**
  * Pure rules for the read-only evidence download route (`/internet/export`): which requests are
@@ -57,11 +58,26 @@ export function safeDownloadHeaders(upstream: Headers): Headers | null {
 }
 
 /**
- * True for a request a browser says came from another site. An export is a read, but it spends the
- * identity's export rate limit and writes an audit record, so it is only ever started from this
- * application (a link here) or by typing the address (`none`). Non-browser clients send no header.
+ * True for a request that cannot be shown to come from this application. An export is a read, but
+ * it spends the identity's export rate limit and writes an audit record, so it is only ever started
+ * from this application (a link here) or by typing the address.
+ *
+ * `Sec-Fetch-Site`, when the browser sends it, decides: `same-origin` and `none` (typed URL) pass,
+ * anything else is refused. Without it (old browsers, non-browser clients, stripped headers) the
+ * request must carry an `Origin` (else `Referer`) naming this very site; a request with neither is
+ * refused rather than assumed safe. The same rule applies to every export route.
  */
-export function isCrossSiteRequest(headers: Headers): boolean {
+export function isCrossSiteRequest(headers: Headers, policy: OriginPolicy): boolean {
   const site = headers.get('sec-fetch-site');
-  return site !== null && site !== 'same-origin' && site !== 'none';
+  if (site !== null) return site !== 'same-origin' && site !== 'none';
+  return !sameOrigin(
+    {
+      host: headers.get('host'),
+      forwardedHost: headers.get('x-forwarded-host'),
+      forwardedProto: headers.get('x-forwarded-proto'),
+      origin: headers.get('origin'),
+      referer: headers.get('referer'),
+    },
+    policy,
+  );
 }
