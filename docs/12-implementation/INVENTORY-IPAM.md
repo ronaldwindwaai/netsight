@@ -17,7 +17,7 @@ and NetBox as the source of truth). Nothing was built from a section that is not
 * **Per-field provenance** on name, site, IP and MAC: `netbox`, `discovered`, `both` (the sources agree) or `conflict` (they disagree: the
   NetBox value is shown and both readings are returned).
 * **Nothing is written to NetBox or any network system.** All adapters are read-only. A quarantine is a PROPOSED record; no execution path
-  exists (Step 14, the action engine, owns execution).
+  exists (the action engine, Step 12, owns execution; called Step 14 in earlier notes).
 * **Untrusted text** (names, roles, descriptions, hostnames, comments) is returned as data and rendered as text nodes.
 
 ## Inventory (`GET /api/v1/inventory`, `/inventory/summary`, `/inventory/{id}`)

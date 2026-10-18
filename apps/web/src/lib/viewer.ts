@@ -73,6 +73,21 @@ export function canAskCopilot(viewer: Viewer | null): boolean {
   return viewer !== null && viewer.permissions.includes('copilot:ask');
 }
 
+/** True when the viewer holds actions:read (action requests and their history). Advisory only. */
+export function canReadActions(viewer: Viewer | null): boolean {
+  return viewer !== null && viewer.permissions.includes('actions:read');
+}
+
+/** True when the viewer may propose a risk C or D action (actions:propose-high). Advisory only. */
+export function canProposeHighRiskAction(viewer: Viewer | null): boolean {
+  return viewer !== null && viewer.permissions.includes('actions:propose-high');
+}
+
+/** True when the viewer may engage or release the action kill switch. Advisory only. */
+export function canUseActionKillSwitch(viewer: Viewer | null): boolean {
+  return viewer !== null && viewer.permissions.includes('actions:kill-switch');
+}
+
 /** True when the viewer holds ipam:read (prefixes, VLANs and addresses). Advisory only. */
 export function canReadIpam(viewer: Viewer | null): boolean {
   return viewer !== null && viewer.permissions.includes('ipam:read');

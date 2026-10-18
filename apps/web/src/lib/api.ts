@@ -95,6 +95,8 @@ export interface ApiPostOptions {
   timeoutMs?: number;
   /** HTTP verb of the state-changing call; defaults to POST (PUT for full-replacement edits). */
   method?: 'POST' | 'PUT';
+  /** Sent as the Idempotency-Key header (controlled actions: a retry returns the first result). */
+  idempotencyKey?: string;
 }
 
 /**
@@ -179,6 +181,7 @@ export async function apiPost<T, B>(
         'Content-Type': 'application/json',
         'X-Correlation-ID': requestCorrelationId,
         [CSRF_HEADER]: token,
+        ...(options.idempotencyKey !== undefined ? { 'Idempotency-Key': options.idempotencyKey } : {}),
         Cookie: cookieHeader,
       },
       body: JSON.stringify(body),

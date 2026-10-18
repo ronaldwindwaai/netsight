@@ -1,0 +1,1063 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ActionListResponse",
+  "additionalProperties": false,
+  "properties": {
+    "state": {
+      "enum": [
+        "ok",
+        "not-connected"
+      ],
+      "type": "string"
+    },
+    "generated_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "items": {
+      "items": {
+        "$ref": "#/$defs/request"
+      },
+      "maxItems": 50,
+      "type": "array"
+    },
+    "total": {
+      "maximum": 1000000,
+      "minimum": 0,
+      "type": "integer"
+    },
+    "page": {
+      "maximum": 1000,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "page_size": {
+      "maximum": 50,
+      "minimum": 1,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "state",
+    "generated_at",
+    "items",
+    "total",
+    "page",
+    "page_size"
+  ],
+  "type": "object",
+  "description": "GET /api/v1/actions. A page of action requests. not-connected means the action engine is not enabled on this deployment (nothing is stored or executed); it is never an empty success.",
+  "$defs": {
+    "actor": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maxLength": 255,
+          "minLength": 1,
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "human",
+            "service",
+            "ai"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "kind"
+      ],
+      "type": "object"
+    },
+    "source": {
+      "additionalProperties": false,
+      "description": "Where a proposal came from. Only the Step 8 quarantine proposal exists today.",
+      "properties": {
+        "kind": {
+          "const": "unknown-device-finding",
+          "type": "string"
+        },
+        "id": {
+          "maxLength": 51,
+          "minLength": 51,
+          "pattern": "^unknown-device-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+          "type": "string"
+        },
+        "evidence_version": {
+          "maximum": 1000000,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "evidence_version"
+      ],
+      "type": "object"
+    },
+    "approval": {
+      "additionalProperties": false,
+      "properties": {
+        "approver_id": {
+          "maxLength": 255,
+          "minLength": 1,
+          "type": "string"
+        },
+        "approved_at": {
+          "format": "date-time",
+          "type": "string"
+        }
+      },
+      "required": [
+        "approver_id",
+        "approved_at"
+      ],
+      "type": "object"
+    },
+    "check": {
+      "additionalProperties": false,
+      "description": "One policy or pre-execution check. detail is a static code, never derived from input.",
+      "properties": {
+        "name": {
+          "maxLength": 64,
+          "minLength": 2,
+          "pattern": "^[a-z][a-z0-9-]{1,63}$",
+          "type": "string"
+        },
+        "state": {
+          "enum": [
+            "pass",
+            "fail",
+            "unknown"
+          ],
+          "type": "string"
+        },
+        "detail": {
+          "maxLength": 64,
+          "minLength": 2,
+          "pattern": "^[a-z][a-z0-9-]{1,63}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "state",
+        "detail"
+      ],
+      "type": "object"
+    },
+    "verification": {
+      "additionalProperties": false,
+      "properties": {
+        "state": {
+          "enum": [
+            "passed",
+            "failed",
+            "not-applicable",
+            "unknown"
+          ],
+          "type": "string"
+        },
+        "detail": {
+          "maxLength": 64,
+          "minLength": 2,
+          "pattern": "^[a-z][a-z0-9-]{1,63}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "state",
+        "detail"
+      ],
+      "type": "object"
+    },
+    "rollback": {
+      "additionalProperties": false,
+      "properties": {
+        "state": {
+          "enum": [
+            "completed",
+            "failed",
+            "not-needed"
+          ],
+          "type": "string"
+        },
+        "detail": {
+          "maxLength": 64,
+          "minLength": 2,
+          "pattern": "^[a-z][a-z0-9-]{1,63}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "state",
+        "detail"
+      ],
+      "type": "object"
+    },
+    "execution": {
+      "additionalProperties": false,
+      "properties": {
+        "executor": {
+          "maxLength": 64,
+          "minLength": 2,
+          "pattern": "^[a-z][a-z0-9-]{1,63}$",
+          "type": "string"
+        },
+        "mode": {
+          "enum": [
+            "dry-run",
+            "live"
+          ],
+          "type": "string"
+        },
+        "effect": {
+          "enum": [
+            "none",
+            "applied",
+            "unknown"
+          ],
+          "type": "string"
+        },
+        "started_at": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "finished_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "planned_steps": {
+          "items": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 10,
+          "type": "array"
+        },
+        "verification": {
+          "$ref": "#/$defs/verification"
+        },
+        "rollback": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/rollback"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "failure": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "minLength": 2,
+              "pattern": "^[a-z][a-z0-9-]{1,63}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "executor",
+        "mode",
+        "effect",
+        "started_at",
+        "finished_at",
+        "planned_steps",
+        "verification",
+        "rollback",
+        "failure"
+      ],
+      "type": "object",
+      "description": "What an execution did. A dry-run records what WOULD happen and never changes anything (effect is none); applied exists only for a live executor, none ships in this release."
+    },
+    "request": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maxLength": 43,
+          "minLength": 43,
+          "pattern": "^action-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+          "type": "string"
+        },
+        "action_type": {
+          "enum": [
+            "endpoint.isolate",
+            "switch.port.disable",
+            "switch.port.enable"
+          ],
+          "type": "string"
+        },
+        "target_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-z0-9][a-z0-9._:-]{0,127}$",
+          "type": "string"
+        },
+        "params": {
+          "maxProperties": 8,
+          "patternProperties": {
+            "^[a-z][a-z0-9_]{0,31}$": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "maxLength": 64,
+                  "minLength": 1,
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
+        "risk": {
+          "enum": [
+            "A",
+            "B",
+            "C",
+            "D"
+          ],
+          "type": "string"
+        },
+        "state": {
+          "enum": [
+            "proposed",
+            "pending-approval",
+            "approved",
+            "rejected",
+            "expired",
+            "cancelled",
+            "executing",
+            "succeeded",
+            "failed",
+            "rolled-back"
+          ],
+          "type": "string"
+        },
+        "requester": {
+          "$ref": "#/$defs/actor"
+        },
+        "reason": {
+          "maxLength": 500,
+          "minLength": 3,
+          "type": "string"
+        },
+        "source": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/source"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "approvals_required": {
+          "maximum": 2,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "approvals": {
+          "items": {
+            "$ref": "#/$defs/approval"
+          },
+          "maxItems": 2,
+          "type": "array"
+        },
+        "created_at": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "approve_by": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "execute_by": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "version": {
+          "maximum": 1000000,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "digest": {
+          "maxLength": 71,
+          "minLength": 71,
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "policy_checks": {
+          "items": {
+            "$ref": "#/$defs/check"
+          },
+          "maxItems": 16,
+          "type": "array"
+        },
+        "pre_checks": {
+          "items": {
+            "$ref": "#/$defs/check"
+          },
+          "maxItems": 16,
+          "type": "array"
+        },
+        "execution": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/execution"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "action_type",
+        "target_id",
+        "params",
+        "risk",
+        "state",
+        "requester",
+        "reason",
+        "source",
+        "approvals_required",
+        "approvals",
+        "created_at",
+        "approve_by",
+        "execute_by",
+        "version",
+        "digest",
+        "policy_checks",
+        "pre_checks",
+        "execution"
+      ],
+      "type": "object",
+      "description": "One controlled remote action request: an allow-listed action type with typed parameters, a target, a reason and a lifecycle. Parameters are data; there is no command field. reason is untrusted free text and is shown as text only."
+    },
+    "historyEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "seq": {
+          "maximum": 1000000,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "at": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "type": {
+          "enum": [
+            "proposed",
+            "policy-checked",
+            "submitted",
+            "approved",
+            "rejected",
+            "cancelled",
+            "expired",
+            "execution-started",
+            "pre-check-failed",
+            "executed",
+            "verification-passed",
+            "verification-failed",
+            "rolled-back",
+            "rollback-failed",
+            "failed"
+          ],
+          "type": "string"
+        },
+        "actor_id": {
+          "anyOf": [
+            {
+              "maxLength": 255,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "from_state": {
+          "anyOf": [
+            {
+              "enum": [
+                "proposed",
+                "pending-approval",
+                "approved",
+                "rejected",
+                "expired",
+                "cancelled",
+                "executing",
+                "succeeded",
+                "failed",
+                "rolled-back"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "to_state": {
+          "enum": [
+            "proposed",
+            "pending-approval",
+            "approved",
+            "rejected",
+            "expired",
+            "cancelled",
+            "executing",
+            "succeeded",
+            "failed",
+            "rolled-back"
+          ],
+          "type": "string"
+        },
+        "code": {
+          "maxLength": 64,
+          "minLength": 2,
+          "pattern": "^[a-z][a-z0-9-]{1,63}$",
+          "type": "string"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "maxLength": 500,
+              "minLength": 3,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "prev_hash": {
+          "maxLength": 64,
+          "minLength": 64,
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "hash": {
+          "maxLength": 64,
+          "minLength": 64,
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "at",
+        "type",
+        "actor_id",
+        "from_state",
+        "to_state",
+        "code",
+        "note",
+        "prev_hash",
+        "hash"
+      ],
+      "type": "object",
+      "description": "One append-only, hash-chained history entry. hash covers the previous hash, so an edit or a gap is detectable (chain_intact in the detail response)."
+    },
+    "paramSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "pattern": "^[a-z][a-z0-9_]{0,31}$",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "integer",
+            "boolean",
+            "choice"
+          ],
+          "type": "string"
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "minimum": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "maximum": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "choices": {
+          "anyOf": [
+            {
+              "items": {
+                "maxLength": 64,
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 16,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "name",
+        "kind",
+        "required",
+        "minimum",
+        "maximum",
+        "choices"
+      ],
+      "type": "object"
+    },
+    "definition": {
+      "additionalProperties": false,
+      "properties": {
+        "action_type": {
+          "enum": [
+            "endpoint.isolate",
+            "switch.port.disable",
+            "switch.port.enable"
+          ],
+          "type": "string"
+        },
+        "title": {
+          "maxLength": 80,
+          "minLength": 1,
+          "type": "string"
+        },
+        "risk": {
+          "enum": [
+            "A",
+            "B",
+            "C",
+            "D"
+          ],
+          "type": "string"
+        },
+        "target_kind": {
+          "maxLength": 64,
+          "minLength": 2,
+          "pattern": "^[a-z][a-z0-9-]{1,63}$",
+          "type": "string"
+        },
+        "params": {
+          "items": {
+            "$ref": "#/$defs/paramSpec"
+          },
+          "maxItems": 8,
+          "type": "array"
+        },
+        "approvals_required": {
+          "maximum": 2,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "step_up_required": {
+          "const": true,
+          "type": "boolean"
+        },
+        "approve_within_seconds": {
+          "maximum": 604800,
+          "minimum": 60,
+          "type": "integer"
+        },
+        "execute_within_seconds": {
+          "maximum": 86400,
+          "minimum": 60,
+          "type": "integer"
+        },
+        "timeout_seconds": {
+          "maximum": 600,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "propose_permission": {
+          "pattern": "^actions:[a-z-]+$",
+          "type": "string"
+        },
+        "rollback_guidance": {
+          "maxLength": 300,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "action_type",
+        "title",
+        "risk",
+        "target_kind",
+        "params",
+        "approvals_required",
+        "step_up_required",
+        "approve_within_seconds",
+        "execute_within_seconds",
+        "timeout_seconds",
+        "propose_permission",
+        "rollback_guidance"
+      ],
+      "type": "object",
+      "description": "An allow-listed action type: its risk, target kind, typed parameters, approval policy and timings."
+    },
+    "executorStatus": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maxLength": 64,
+          "minLength": 2,
+          "pattern": "^[a-z][a-z0-9-]{1,63}$",
+          "type": "string"
+        },
+        "mode": {
+          "enum": [
+            "dry-run",
+            "live"
+          ],
+          "type": "string"
+        },
+        "state": {
+          "enum": [
+            "ok",
+            "disabled",
+            "not-connected"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "mode",
+        "state"
+      ],
+      "type": "object"
+    },
+    "killSwitchStatus": {
+      "additionalProperties": false,
+      "properties": {
+        "engaged": {
+          "type": "boolean"
+        },
+        "source": {
+          "enum": [
+            "none",
+            "runtime",
+            "environment"
+          ],
+          "type": "string"
+        },
+        "since": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "engaged",
+        "source",
+        "since"
+      ],
+      "type": "object"
+    },
+    "storeStatus": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "memory",
+          "type": "string"
+        },
+        "durable": {
+          "const": false,
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "kind",
+        "durable"
+      ],
+      "type": "object"
+    },
+    "statusResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "state": {
+          "enum": [
+            "ok",
+            "not-connected"
+          ],
+          "type": "string"
+        },
+        "generated_at": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "dry_run_only": {
+          "type": "boolean"
+        },
+        "kill_switch": {
+          "$ref": "#/$defs/killSwitchStatus"
+        },
+        "store": {
+          "$ref": "#/$defs/storeStatus"
+        },
+        "executors": {
+          "items": {
+            "$ref": "#/$defs/executorStatus"
+          },
+          "maxItems": 8,
+          "type": "array"
+        },
+        "definitions": {
+          "items": {
+            "$ref": "#/$defs/definition"
+          },
+          "maxItems": 16,
+          "type": "array"
+        }
+      },
+      "required": [
+        "state",
+        "generated_at",
+        "dry_run_only",
+        "kill_switch",
+        "store",
+        "executors",
+        "definitions"
+      ],
+      "type": "object",
+      "description": "GET /api/v1/actions/status. dry_run_only is true exactly when no live executor is ready. store.durable is false: requests are lost on restart until a persistent store ships."
+    },
+    "detailResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "generated_at": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "request": {
+          "$ref": "#/$defs/request"
+        },
+        "history": {
+          "items": {
+            "$ref": "#/$defs/historyEvent"
+          },
+          "maxItems": 100,
+          "minItems": 1,
+          "type": "array"
+        },
+        "chain_intact": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "generated_at",
+        "request",
+        "history",
+        "chain_intact"
+      ],
+      "type": "object",
+      "description": "GET /api/v1/actions/{id}. The request, its append-only history and whether the hash chain verifies."
+    },
+    "createRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "action_type": {
+          "enum": [
+            "endpoint.isolate",
+            "switch.port.disable",
+            "switch.port.enable"
+          ],
+          "type": "string"
+        },
+        "target_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-z0-9][a-z0-9._:-]{0,127}$",
+          "type": "string"
+        },
+        "params": {
+          "maxProperties": 8,
+          "patternProperties": {
+            "^[a-z][a-z0-9_]{0,31}$": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "maxLength": 64,
+                  "minLength": 1,
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
+        "reason": {
+          "maxLength": 500,
+          "minLength": 3,
+          "type": "string"
+        }
+      },
+      "required": [
+        "action_type",
+        "target_id",
+        "params",
+        "reason"
+      ],
+      "type": "object",
+      "description": "Propose an action. params is validated against the definition of action_type; unknown keys are refused."
+    },
+    "fromFindingRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "finding_id": {
+          "maxLength": 51,
+          "minLength": 51,
+          "pattern": "^unknown-device-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+          "type": "string"
+        },
+        "expected_evidence_version": {
+          "maximum": 1000000,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "reason": {
+          "maxLength": 500,
+          "minLength": 3,
+          "type": "string"
+        }
+      },
+      "required": [
+        "finding_id",
+        "expected_evidence_version",
+        "reason"
+      ],
+      "type": "object",
+      "description": "Create the action request for a Step 8 quarantine proposal. Proposal only: nothing is executed."
+    },
+    "decisionRequest": {
+      "additionalProperties": false,
+      "description": "Approve or execute exactly the request the person saw (digest and version); a stale quote loses with 409.",
+      "properties": {
+        "expected_digest": {
+          "maxLength": 71,
+          "minLength": 71,
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "expected_version": {
+          "maximum": 1000000,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "expected_digest",
+        "expected_version"
+      ],
+      "type": "object"
+    },
+    "reasonRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "expected_digest": {
+          "maxLength": 71,
+          "minLength": 71,
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "expected_version": {
+          "maximum": 1000000,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "reason": {
+          "maxLength": 500,
+          "minLength": 3,
+          "type": "string"
+        }
+      },
+      "required": [
+        "expected_digest",
+        "expected_version",
+        "reason"
+      ],
+      "type": "object"
+    },
+    "killSwitchRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "engaged": {
+          "type": "boolean"
+        },
+        "reason": {
+          "maxLength": 500,
+          "minLength": 3,
+          "type": "string"
+        }
+      },
+      "required": [
+        "engaged",
+        "reason"
+      ],
+      "type": "object"
+    }
+  }
+}

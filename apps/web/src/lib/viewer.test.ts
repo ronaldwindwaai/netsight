@@ -166,3 +166,17 @@ test('finding writes count as a change anyone holding them can make', () => {
   }
   assert.equal(canChangeAnything(viewerFromSession(session(['unknown-devices:read']))), false);
 });
+
+test('the action helpers read exactly their own permission and fail closed', async () => {
+  const { canProposeHighRiskAction, canReadActions, canUseActionKillSwitch } = await import('./viewer.ts');
+  const only = (permission: string) => ({ identityId: 'u', permissions: [permission] });
+  assert.equal(canReadActions(only('actions:read')), true);
+  assert.equal(canReadActions(only('actions:approve')), false);
+  assert.equal(canProposeHighRiskAction(only('actions:propose-high')), true);
+  assert.equal(canProposeHighRiskAction(only('actions:propose')), false);
+  assert.equal(canUseActionKillSwitch(only('actions:kill-switch')), true);
+  assert.equal(canUseActionKillSwitch(only('actions:execute')), false);
+  for (const helper of [canReadActions, canProposeHighRiskAction, canUseActionKillSwitch]) {
+    assert.equal(helper(null), false);
+  }
+});

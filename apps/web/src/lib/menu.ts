@@ -12,6 +12,7 @@ const INVENTORY_PERMISSION = 'inventory:read-summary';
 const IPAM_PERMISSION = 'ipam:read-summary';
 const FINDINGS_PERMISSION = 'unknown-devices:read-summary';
 const COPILOT_PERMISSION = 'copilot:ask';
+const ACTIONS_PERMISSION = 'actions:read';
 
 interface MenuEntry {
   node: MenuNode;
@@ -56,6 +57,10 @@ const MENU_ENTRIES: readonly MenuEntry[] = [
   {
     node: { type: 'item', text: 'Ask Netsight', href: '/copilot', icon: 'bi-chat-left-text' },
     requires: COPILOT_PERMISSION,
+  },
+  {
+    node: { type: 'item', text: 'Action requests', href: '/actions', icon: 'bi-shield-check' },
+    requires: ACTIONS_PERMISSION,
   },
   { node: { type: 'item', text: 'Incidents', href: '/incidents', icon: 'bi-exclamation-triangle' } },
   { node: { type: 'item', text: 'Alerts', href: '/alerts', icon: 'bi-bell' } },

@@ -131,3 +131,26 @@ test('an unknown status is reported as a generic failure without leaking interna
   assert.equal(result.category, 'error');
   assert.equal(result.advice, 'reload');
 });
+
+test('the action kill switch is described as a stop, not as broken storage', () => {
+  const result = describe({ kind: 'error', code: 'KILL_SWITCH', status: 503 });
+  assert.equal(result.category, 'unavailable');
+  assert.match(result.title, /stopped/i);
+  assert.match(result.message, /kill switch/i);
+  assert.match(result.message, /nothing was changed/i);
+  assert.doesNotMatch(result.message, /store/i);
+  assert.equal(result.advice, 'none');
+});
+
+test('a disabled action engine is described as not enabled, with no retry advice', () => {
+  const result = describe({ kind: 'error', code: 'ACTIONS_NOT_ENABLED', status: 503 });
+  assert.match(result.title, /not enabled/i);
+  assert.equal(result.advice, 'none');
+});
+
+test('a stale action request tells the operator to reload and review before deciding again', () => {
+  const result = describe({ kind: 'error', code: 'STALE_REQUEST', status: 409, message: 'The request changed since you looked at it; reload and review it again' });
+  assert.equal(result.category, 'conflict');
+  assert.equal(result.advice, 'reload');
+  assert.match(result.message, /nothing was changed/i);
+});

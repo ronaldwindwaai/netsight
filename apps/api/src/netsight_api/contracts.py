@@ -27,7 +27,7 @@ SCHEMA_FILES = {
     "alert": "alert.schema.json",
     "incident": "incident.schema.json",
     "evidence": "evidence.schema.json",
-    "action_request": "action-request.schema.json",
+    "action_request": "actions.schema.json#/$defs/request",
     "ai_answer": "ai-answer.schema.json",
     "topology": "topology.schema.json",
     "traffic_cohort": "traffic.schema.json#/$defs/cohort",
@@ -155,6 +155,18 @@ SCHEMA_FILES = {
     "copilot_answer": "copilot.schema.json#/$defs/answer",
     "copilot_ask_request": "copilot.schema.json#/$defs/askRequest",
     "copilot_status": "copilot.schema.json#/$defs/statusResponse",
+    "action_check": "actions.schema.json#/$defs/check",
+    "action_execution": "actions.schema.json#/$defs/execution",
+    "action_event": "actions.schema.json#/$defs/historyEvent",
+    "action_definition": "actions.schema.json#/$defs/definition",
+    "action_status": "actions.schema.json#/$defs/statusResponse",
+    "action_list": "actions.schema.json",
+    "action_detail": "actions.schema.json#/$defs/detailResponse",
+    "action_create_request": "actions.schema.json#/$defs/createRequest",
+    "action_from_finding_request": "actions.schema.json#/$defs/fromFindingRequest",
+    "action_decision_request": "actions.schema.json#/$defs/decisionRequest",
+    "action_reason_request": "actions.schema.json#/$defs/reasonRequest",
+    "action_kill_switch_request": "actions.schema.json#/$defs/killSwitchRequest",
 }
 
 

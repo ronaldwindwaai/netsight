@@ -29,6 +29,7 @@ UI_AREAS: Final = frozenset(
         "ipam",
         "unknown-devices",
         "copilot",
+        "actions",
     }
 )
 

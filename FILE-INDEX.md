@@ -59,7 +59,7 @@
 - `branding/logo-horizontal.svg`
 - `branding/logo-mark.svg`
 - `contracts/events/EVENT-CATALOG.md`
-- `contracts/json-schema/action-request.schema.json`
+- `contracts/json-schema/actions.schema.json`
 - `contracts/json-schema/ai-answer.schema.json`
 - `contracts/json-schema/alert.schema.json`
 - `contracts/json-schema/common.schema.json`

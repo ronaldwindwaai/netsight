@@ -116,3 +116,9 @@ test('signInHref drops an unsafe or non-dashboard return path rather than echoin
   assert.equal(signInHref('/' + String.fromCharCode(92) + 'evil.example'), '/login');
   assert.equal(signInHref('/api/v1/incidents'), '/login');
 });
+
+test('the actions area is a valid place to return to after a step-up sign-in', () => {
+  assert.equal(safeNextPath('/actions/action-11111111-2222-4333-8444-555555555555'), '/actions/action-11111111-2222-4333-8444-555555555555');
+  assert.equal(safeNextPath('/actions'), '/actions');
+  assert.equal(safeNextPath('/actions-evil'), null);
+});

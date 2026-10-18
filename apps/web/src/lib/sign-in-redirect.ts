@@ -24,6 +24,7 @@ const UI_AREAS = [
   'ipam',
   'unknown-devices',
   'copilot',
+  'actions',
 ];
 
 type RawParam = string | string[] | undefined;

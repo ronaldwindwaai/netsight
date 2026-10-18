@@ -23,6 +23,8 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.base import RequestResponseEndpoint
 from starlette.responses import Response
 
+from netsight_api.actions.wiring import validate_environment as validate_actions_environment
+from netsight_api.actions_routes import router as actions_router
 from netsight_api.adapters.clickhouse_shared import shared_client
 from netsight_api.adapters.librenms import (
     AdapterError,
@@ -115,6 +117,7 @@ async def lifespan(app_: FastAPI) -> AsyncIterator[None]:
     # on the first request (or, worse, running a weaker evaluator than configured).
     session_policy()
     configure_audit_logging()
+    validate_actions_environment()  # a garbled action flag fails start-up, never opens
     service = build_evaluation_service(librenms_client=get_optional_librenms_client)
     # All three services are built before any starts: a bad setting fails start-up, not later.
     wan_service = build_wan_collector()
@@ -144,6 +147,7 @@ _NO_STORE_ERROR_PREFIXES = (
     f"{API_PREFIX}/identity/",
     f"{API_PREFIX}/traffic/",
     f"{API_PREFIX}/config/",
+    f"{API_PREFIX}/actions",
 )
 
 app = FastAPI(title="Netsight Platform API", version="0.1.0", lifespan=lifespan)
@@ -1035,6 +1039,7 @@ app.include_router(identity_router, prefix=API_PREFIX)
 app.include_router(configuration_router, prefix=API_PREFIX)
 app.include_router(inventory_router, prefix=API_PREFIX)
 app.include_router(copilot_router, prefix=API_PREFIX)
+app.include_router(actions_router, prefix=API_PREFIX)
 app.include_router(ipam_router, prefix=API_PREFIX)
 app.include_router(unknown_device_router, prefix=API_PREFIX)
 app.include_router(traffic_router, prefix=API_PREFIX)

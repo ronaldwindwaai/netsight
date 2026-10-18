@@ -2068,24 +2068,6 @@ paths:
                 $ref: '#/components/schemas/ErrorEnvelope'
         '422':
           $ref: '#/components/responses/ValidationError'
-  /action-requests:
-    post:
-      summary: Propose a controlled remote action
-      responses:
-        '201':
-          description: Action request created
-  /action-requests/{action_id}/approve:
-    post:
-      summary: Approve an action request subject to policy and step-up authentication
-      parameters:
-        - in: path
-          name: action_id
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Approval recorded
   # >>> step8:p-inventory
   /inventory:
     get:
@@ -2911,6 +2893,463 @@ paths:
         '429':
           $ref: '#/components/responses/RateLimited'
   # <<< step10:p-copilot
+  # >>> step12:p-actions
+  /actions/status:
+    get:
+      summary: Whether the action engine is enabled, the kill switch, the executors (dry-run only today) and the allow-listed action definitions
+      operationId: getActionStatus
+      responses:
+        '200':
+          description: The engine status; dry_run_only is true unless a live executor is ready
+          headers: &id001
+            X-Correlation-ID: &id002
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActionStatusResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /actions:
+    get:
+      summary: Action requests, newest first, bounded and filtered server-side
+      operationId: listActions
+      parameters:
+      - in: query
+        name: state
+        schema:
+          enum:
+          - proposed
+          - pending-approval
+          - approved
+          - rejected
+          - expired
+          - cancelled
+          - executing
+          - succeeded
+          - failed
+          - rolled-back
+      - in: query
+        name: page
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 1000
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 50
+          default: 25
+      responses:
+        '200':
+          description: A page of action requests, or not-connected when the engine is not enabled
+          headers: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActionListResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    post:
+      summary: Propose a controlled action (it is pending approval; nothing is executed)
+      operationId: createAction
+      parameters:
+      - &id003
+        in: header
+        name: X-CSRF-Token
+        required: true
+        description: Session CSRF token from GET /auth/csrf. Required for cookie-authenticated writes.
+        schema:
+          type: string
+      - &id004
+        in: header
+        name: Idempotency-Key
+        required: true
+        description: 16 to 64 characters of A-Z a-z 0-9 . _ -. The same key with the same body returns the first result; the same key with a different body is 409 IDEMPOTENCY_CONFLICT.
+        schema:
+          type: string
+          pattern: ^[A-Za-z0-9._-]{16,64}$
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActionCreateRequest'
+      responses:
+        '201':
+          description: The new action request, or the first result when the idempotency key was already used
+          headers:
+            X-Correlation-ID: *id002
+            Idempotent-Replay: &id006
+              description: true when this answer repeats the first result for the same Idempotency-Key; nothing was done again
+              schema:
+                type: string
+                enum:
+                - 'true'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActionRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '409':
+          description: Idempotency key reused with a different body, the kill switch is engaged, or too many open requests
+          headers: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          description: The action engine is not enabled or the kill switch is engaged
+          headers: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /actions/from-finding:
+    post:
+      summary: Create the action request for a Step 8 quarantine proposal (proposal only; nothing is executed)
+      operationId: createActionFromFinding
+      parameters:
+      - *id003
+      - *id004
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActionFromFindingRequest'
+      responses:
+        '201':
+          description: The new action request
+          headers: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActionRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '409':
+          description: STALE_EVIDENCE, finding closed, no proposal on the finding, or idempotency conflict
+          headers: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          description: The action engine is not enabled or the kill switch is engaged
+          headers: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /actions/kill-switch:
+    post:
+      summary: Engage or release the runtime kill switch (releasing needs step-up and cannot override the environment switch)
+      description: Requires a second factor proven within NETSIGHT_STEP_UP_MAX_AGE_SECONDS; otherwise 403 STEP_UP_REQUIRED.
+      operationId: setActionKillSwitch
+      parameters:
+      - *id003
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActionKillSwitchRequest'
+      responses:
+        '200':
+          description: The status after the change
+          headers: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActionStatusResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '409':
+          description: The environment kill switch is engaged and cannot be released here
+          headers: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          description: The action engine is not enabled or the kill switch is engaged
+          headers: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /actions/{action_id}:
+    get:
+      summary: One action request with its append-only, hash-chained history
+      operationId: getAction
+      parameters:
+      - &id005
+        in: path
+        name: action_id
+        required: true
+        schema:
+          type: string
+          pattern: ^action-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+      responses:
+        '200':
+          description: The request and its history
+          headers: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActionDetailResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '404':
+          description: No action request has this id
+          headers: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /actions/{action_id}/approve:
+    post:
+      summary: Approve exactly the request the person saw (digest and version). Human only, never the requester, needs step-up
+      description: Requires a second factor proven within NETSIGHT_STEP_UP_MAX_AGE_SECONDS; otherwise 403 STEP_UP_REQUIRED.
+      operationId: approveAction
+      parameters:
+      - *id005
+      - *id003
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActionDecisionRequest'
+      responses:
+        '200':
+          description: The request with the approval recorded
+          headers: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActionRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '404':
+          description: No action request has this id
+          headers: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: STALE_REQUEST, ALREADY_APPROVED, SELF_APPROVAL, ILLEGAL_STATE, EXPIRED or KILL_SWITCH
+          headers: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          description: The action engine is not enabled or the kill switch is engaged
+          headers: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /actions/{action_id}/reject:
+    post:
+      summary: Reject a pending request with a reason (human only)
+      operationId: rejectAction
+      parameters:
+      - *id005
+      - *id003
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActionReasonRequest'
+      responses:
+        '200':
+          description: The rejected request
+          headers: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActionRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '404':
+          description: No action request has this id
+          headers: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: STALE_REQUEST or ILLEGAL_STATE
+          headers: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          description: The action engine is not enabled or the kill switch is engaged
+          headers: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /actions/{action_id}/cancel:
+    post:
+      summary: 'Cancel an open request: the requester or an approver'
+      operationId: cancelAction
+      parameters:
+      - *id005
+      - *id003
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActionReasonRequest'
+      responses:
+        '200':
+          description: The cancelled request
+          headers: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActionRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '404':
+          description: No action request has this id
+          headers: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: STALE_REQUEST or ILLEGAL_STATE
+          headers: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          description: The action engine is not enabled or the kill switch is engaged
+          headers: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /actions/{action_id}/execute:
+    post:
+      summary: 'Run an approved request through its executor. Only the dry-run executor exists: it records what would happen and contacts nothing'
+      description: Requires a second factor proven within NETSIGHT_STEP_UP_MAX_AGE_SECONDS; otherwise 403 STEP_UP_REQUIRED.
+      operationId: executeAction
+      parameters:
+      - *id005
+      - *id003
+      - *id004
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActionDecisionRequest'
+      responses:
+        '200':
+          description: The request with the recorded dry-run result (effect none); a retry with the same key repeats it
+          headers:
+            X-Correlation-ID: *id002
+            Idempotent-Replay: *id006
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActionRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '404':
+          description: No action request has this id
+          headers: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: STALE_REQUEST, ILLEGAL_STATE, EXPIRED, TARGET_LOCKED, KILL_SWITCH or idempotency conflict
+          headers: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          description: The action engine is not enabled or the kill switch is engaged
+          headers: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  # <<< step12:p-actions
 components:
   headers:
     CorrelationId:
@@ -11391,7 +11830,7 @@ components:
           minLength: 1
           maxLength: 255
           type: string
-      description: 'A recommendation only. No execution path exists: isolating an endpoint is owned by the action engine (Step 14) and needs step-up, a reason and human approval.'
+      description: 'A recommendation only. No execution path exists: isolating an endpoint is owned by the action engine (Step 12) and needs step-up, a reason and human approval.'
     UnknownDeviceFinding:
       type: object
       additionalProperties: false
@@ -12279,6 +12718,778 @@ components:
               allowed:
                 type: boolean
     # <<< step10:c-copilot
+    # >>> step12:c-actions
+    ActionListResponse:
+      additionalProperties: false
+      properties:
+        state:
+          enum:
+          - ok
+          - not-connected
+          type: string
+        generated_at:
+          format: date-time
+          type: string
+        items:
+          items:
+            $ref: '#/components/schemas/ActionRequest'
+          maxItems: 50
+          type: array
+        total:
+          maximum: 1000000
+          minimum: 0
+          type: integer
+        page:
+          maximum: 1000
+          minimum: 1
+          type: integer
+        page_size:
+          maximum: 50
+          minimum: 1
+          type: integer
+      required:
+      - state
+      - generated_at
+      - items
+      - total
+      - page
+      - page_size
+      type: object
+      description: GET /api/v1/actions. A page of action requests. not-connected means the action engine is not enabled on this deployment (nothing is stored or executed); it is never an empty success.
+    ActionActor:
+      additionalProperties: false
+      properties:
+        id:
+          maxLength: 255
+          minLength: 1
+          type: string
+        kind:
+          enum:
+          - human
+          - service
+          - ai
+          type: string
+      required:
+      - id
+      - kind
+      type: object
+    ActionSource:
+      additionalProperties: false
+      description: Where a proposal came from. Only the Step 8 quarantine proposal exists today.
+      properties:
+        kind:
+          const: unknown-device-finding
+          type: string
+        id:
+          maxLength: 51
+          minLength: 51
+          pattern: ^unknown-device-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+          type: string
+        evidence_version:
+          maximum: 1000000
+          minimum: 1
+          type: integer
+      required:
+      - kind
+      - id
+      - evidence_version
+      type: object
+    ActionApproval:
+      additionalProperties: false
+      properties:
+        approver_id:
+          maxLength: 255
+          minLength: 1
+          type: string
+        approved_at:
+          format: date-time
+          type: string
+      required:
+      - approver_id
+      - approved_at
+      type: object
+    ActionCheck:
+      additionalProperties: false
+      description: One policy or pre-execution check. detail is a static code, never derived from input.
+      properties:
+        name:
+          maxLength: 64
+          minLength: 2
+          pattern: ^[a-z][a-z0-9-]{1,63}$
+          type: string
+        state:
+          enum:
+          - pass
+          - fail
+          - unknown
+          type: string
+        detail:
+          maxLength: 64
+          minLength: 2
+          pattern: ^[a-z][a-z0-9-]{1,63}$
+          type: string
+      required:
+      - name
+      - state
+      - detail
+      type: object
+    ActionVerification:
+      additionalProperties: false
+      properties:
+        state:
+          enum:
+          - passed
+          - failed
+          - not-applicable
+          - unknown
+          type: string
+        detail:
+          maxLength: 64
+          minLength: 2
+          pattern: ^[a-z][a-z0-9-]{1,63}$
+          type: string
+      required:
+      - state
+      - detail
+      type: object
+    ActionRollback:
+      additionalProperties: false
+      properties:
+        state:
+          enum:
+          - completed
+          - failed
+          - not-needed
+          type: string
+        detail:
+          maxLength: 64
+          minLength: 2
+          pattern: ^[a-z][a-z0-9-]{1,63}$
+          type: string
+      required:
+      - state
+      - detail
+      type: object
+    ActionExecution:
+      additionalProperties: false
+      properties:
+        executor:
+          maxLength: 64
+          minLength: 2
+          pattern: ^[a-z][a-z0-9-]{1,63}$
+          type: string
+        mode:
+          enum:
+          - dry-run
+          - live
+          type: string
+        effect:
+          enum:
+          - none
+          - applied
+          - unknown
+          type: string
+        started_at:
+          format: date-time
+          type: string
+        finished_at:
+          anyOf:
+          - format: date-time
+            type: string
+          - type: 'null'
+        planned_steps:
+          items:
+            maxLength: 200
+            minLength: 1
+            type: string
+          maxItems: 10
+          type: array
+        verification:
+          $ref: '#/components/schemas/ActionVerification'
+        rollback:
+          anyOf:
+          - $ref: '#/components/schemas/ActionRollback'
+          - type: 'null'
+        failure:
+          anyOf:
+          - maxLength: 64
+            minLength: 2
+            pattern: ^[a-z][a-z0-9-]{1,63}$
+            type: string
+          - type: 'null'
+      required:
+      - executor
+      - mode
+      - effect
+      - started_at
+      - finished_at
+      - planned_steps
+      - verification
+      - rollback
+      - failure
+      type: object
+      description: What an execution did. A dry-run records what WOULD happen and never changes anything (effect is none); applied exists only for a live executor, none ships in this release.
+    ActionRequest:
+      additionalProperties: false
+      properties:
+        id:
+          maxLength: 43
+          minLength: 43
+          pattern: ^action-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+          type: string
+        action_type:
+          enum:
+          - endpoint.isolate
+          - switch.port.disable
+          - switch.port.enable
+          type: string
+        target_id:
+          maxLength: 128
+          minLength: 1
+          pattern: ^[a-z0-9][a-z0-9._:-]{0,127}$
+          type: string
+        params:
+          maxProperties: 8
+          patternProperties:
+            ^[a-z][a-z0-9_]{0,31}$:
+              anyOf:
+              - type: boolean
+              - type: integer
+              - maxLength: 64
+                minLength: 1
+                type: string
+          type: object
+          additionalProperties: false
+        risk:
+          enum:
+          - A
+          - B
+          - C
+          - D
+          type: string
+        state:
+          enum:
+          - proposed
+          - pending-approval
+          - approved
+          - rejected
+          - expired
+          - cancelled
+          - executing
+          - succeeded
+          - failed
+          - rolled-back
+          type: string
+        requester:
+          $ref: '#/components/schemas/ActionActor'
+        reason:
+          maxLength: 500
+          minLength: 3
+          type: string
+        source:
+          anyOf:
+          - $ref: '#/components/schemas/ActionSource'
+          - type: 'null'
+        approvals_required:
+          maximum: 2
+          minimum: 1
+          type: integer
+        approvals:
+          items:
+            $ref: '#/components/schemas/ActionApproval'
+          maxItems: 2
+          type: array
+        created_at:
+          format: date-time
+          type: string
+        approve_by:
+          format: date-time
+          type: string
+        execute_by:
+          anyOf:
+          - format: date-time
+            type: string
+          - type: 'null'
+        version:
+          maximum: 1000000
+          minimum: 1
+          type: integer
+        digest:
+          maxLength: 71
+          minLength: 71
+          pattern: ^sha256:[0-9a-f]{64}$
+          type: string
+        policy_checks:
+          items:
+            $ref: '#/components/schemas/ActionCheck'
+          maxItems: 16
+          type: array
+        pre_checks:
+          items:
+            $ref: '#/components/schemas/ActionCheck'
+          maxItems: 16
+          type: array
+        execution:
+          anyOf:
+          - $ref: '#/components/schemas/ActionExecution'
+          - type: 'null'
+      required:
+      - id
+      - action_type
+      - target_id
+      - params
+      - risk
+      - state
+      - requester
+      - reason
+      - source
+      - approvals_required
+      - approvals
+      - created_at
+      - approve_by
+      - execute_by
+      - version
+      - digest
+      - policy_checks
+      - pre_checks
+      - execution
+      type: object
+      description: 'One controlled remote action request: an allow-listed action type with typed parameters, a target, a reason and a lifecycle. Parameters are data; there is no command field. reason is untrusted free text and is shown as text only.'
+    ActionHistoryEvent:
+      additionalProperties: false
+      properties:
+        seq:
+          maximum: 1000000
+          minimum: 1
+          type: integer
+        at:
+          format: date-time
+          type: string
+        type:
+          enum:
+          - proposed
+          - policy-checked
+          - submitted
+          - approved
+          - rejected
+          - cancelled
+          - expired
+          - execution-started
+          - pre-check-failed
+          - executed
+          - verification-passed
+          - verification-failed
+          - rolled-back
+          - rollback-failed
+          - failed
+          type: string
+        actor_id:
+          anyOf:
+          - maxLength: 255
+            minLength: 1
+            type: string
+          - type: 'null'
+        from_state:
+          anyOf:
+          - enum:
+            - proposed
+            - pending-approval
+            - approved
+            - rejected
+            - expired
+            - cancelled
+            - executing
+            - succeeded
+            - failed
+            - rolled-back
+            type: string
+          - type: 'null'
+        to_state:
+          enum:
+          - proposed
+          - pending-approval
+          - approved
+          - rejected
+          - expired
+          - cancelled
+          - executing
+          - succeeded
+          - failed
+          - rolled-back
+          type: string
+        code:
+          maxLength: 64
+          minLength: 2
+          pattern: ^[a-z][a-z0-9-]{1,63}$
+          type: string
+        note:
+          anyOf:
+          - maxLength: 500
+            minLength: 3
+            type: string
+          - type: 'null'
+        prev_hash:
+          maxLength: 64
+          minLength: 64
+          pattern: ^[0-9a-f]{64}$
+          type: string
+        hash:
+          maxLength: 64
+          minLength: 64
+          pattern: ^[0-9a-f]{64}$
+          type: string
+      required:
+      - seq
+      - at
+      - type
+      - actor_id
+      - from_state
+      - to_state
+      - code
+      - note
+      - prev_hash
+      - hash
+      type: object
+      description: One append-only, hash-chained history entry. hash covers the previous hash, so an edit or a gap is detectable (chain_intact in the detail response).
+    ActionParamSpec:
+      additionalProperties: false
+      properties:
+        name:
+          pattern: ^[a-z][a-z0-9_]{0,31}$
+          type: string
+        kind:
+          enum:
+          - integer
+          - boolean
+          - choice
+          type: string
+        required:
+          type: boolean
+        minimum:
+          anyOf:
+          - type: integer
+          - type: 'null'
+        maximum:
+          anyOf:
+          - type: integer
+          - type: 'null'
+        choices:
+          anyOf:
+          - items:
+              maxLength: 64
+              minLength: 1
+              type: string
+            maxItems: 16
+            type: array
+          - type: 'null'
+      required:
+      - name
+      - kind
+      - required
+      - minimum
+      - maximum
+      - choices
+      type: object
+    ActionDefinition:
+      additionalProperties: false
+      properties:
+        action_type:
+          enum:
+          - endpoint.isolate
+          - switch.port.disable
+          - switch.port.enable
+          type: string
+        title:
+          maxLength: 80
+          minLength: 1
+          type: string
+        risk:
+          enum:
+          - A
+          - B
+          - C
+          - D
+          type: string
+        target_kind:
+          maxLength: 64
+          minLength: 2
+          pattern: ^[a-z][a-z0-9-]{1,63}$
+          type: string
+        params:
+          items:
+            $ref: '#/components/schemas/ActionParamSpec'
+          maxItems: 8
+          type: array
+        approvals_required:
+          maximum: 2
+          minimum: 1
+          type: integer
+        step_up_required:
+          const: true
+          type: boolean
+        approve_within_seconds:
+          maximum: 604800
+          minimum: 60
+          type: integer
+        execute_within_seconds:
+          maximum: 86400
+          minimum: 60
+          type: integer
+        timeout_seconds:
+          maximum: 600
+          minimum: 1
+          type: integer
+        propose_permission:
+          pattern: ^actions:[a-z-]+$
+          type: string
+        rollback_guidance:
+          maxLength: 300
+          minLength: 1
+          type: string
+      required:
+      - action_type
+      - title
+      - risk
+      - target_kind
+      - params
+      - approvals_required
+      - step_up_required
+      - approve_within_seconds
+      - execute_within_seconds
+      - timeout_seconds
+      - propose_permission
+      - rollback_guidance
+      type: object
+      description: 'An allow-listed action type: its risk, target kind, typed parameters, approval policy and timings.'
+    ActionExecutorStatus:
+      additionalProperties: false
+      properties:
+        id:
+          maxLength: 64
+          minLength: 2
+          pattern: ^[a-z][a-z0-9-]{1,63}$
+          type: string
+        mode:
+          enum:
+          - dry-run
+          - live
+          type: string
+        state:
+          enum:
+          - ok
+          - disabled
+          - not-connected
+          type: string
+      required:
+      - id
+      - mode
+      - state
+      type: object
+    ActionKillSwitchStatus:
+      additionalProperties: false
+      properties:
+        engaged:
+          type: boolean
+        source:
+          enum:
+          - none
+          - runtime
+          - environment
+          type: string
+        since:
+          anyOf:
+          - format: date-time
+            type: string
+          - type: 'null'
+      required:
+      - engaged
+      - source
+      - since
+      type: object
+    ActionStoreStatus:
+      additionalProperties: false
+      properties:
+        kind:
+          const: memory
+          type: string
+        durable:
+          const: false
+          type: boolean
+      required:
+      - kind
+      - durable
+      type: object
+    ActionStatusResponse:
+      additionalProperties: false
+      properties:
+        state:
+          enum:
+          - ok
+          - not-connected
+          type: string
+        generated_at:
+          format: date-time
+          type: string
+        dry_run_only:
+          type: boolean
+        kill_switch:
+          $ref: '#/components/schemas/ActionKillSwitchStatus'
+        store:
+          $ref: '#/components/schemas/ActionStoreStatus'
+        executors:
+          items:
+            $ref: '#/components/schemas/ActionExecutorStatus'
+          maxItems: 8
+          type: array
+        definitions:
+          items:
+            $ref: '#/components/schemas/ActionDefinition'
+          maxItems: 16
+          type: array
+      required:
+      - state
+      - generated_at
+      - dry_run_only
+      - kill_switch
+      - store
+      - executors
+      - definitions
+      type: object
+      description: 'GET /api/v1/actions/status. dry_run_only is true exactly when no live executor is ready. store.durable is false: requests are lost on restart until a persistent store ships.'
+    ActionDetailResponse:
+      additionalProperties: false
+      properties:
+        generated_at:
+          format: date-time
+          type: string
+        request:
+          $ref: '#/components/schemas/ActionRequest'
+        history:
+          items:
+            $ref: '#/components/schemas/ActionHistoryEvent'
+          maxItems: 100
+          minItems: 1
+          type: array
+        chain_intact:
+          type: boolean
+      required:
+      - generated_at
+      - request
+      - history
+      - chain_intact
+      type: object
+      description: GET /api/v1/actions/{id}. The request, its append-only history and whether the hash chain verifies.
+    ActionCreateRequest:
+      additionalProperties: false
+      properties:
+        action_type:
+          enum:
+          - endpoint.isolate
+          - switch.port.disable
+          - switch.port.enable
+          type: string
+        target_id:
+          maxLength: 128
+          minLength: 1
+          pattern: ^[a-z0-9][a-z0-9._:-]{0,127}$
+          type: string
+        params:
+          maxProperties: 8
+          patternProperties:
+            ^[a-z][a-z0-9_]{0,31}$:
+              anyOf:
+              - type: boolean
+              - type: integer
+              - maxLength: 64
+                minLength: 1
+                type: string
+          type: object
+          additionalProperties: false
+        reason:
+          maxLength: 500
+          minLength: 3
+          type: string
+      required:
+      - action_type
+      - target_id
+      - params
+      - reason
+      type: object
+      description: Propose an action. params is validated against the definition of action_type; unknown keys are refused.
+    ActionFromFindingRequest:
+      additionalProperties: false
+      properties:
+        finding_id:
+          maxLength: 51
+          minLength: 51
+          pattern: ^unknown-device-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+          type: string
+        expected_evidence_version:
+          maximum: 1000000
+          minimum: 1
+          type: integer
+        reason:
+          maxLength: 500
+          minLength: 3
+          type: string
+      required:
+      - finding_id
+      - expected_evidence_version
+      - reason
+      type: object
+      description: 'Create the action request for a Step 8 quarantine proposal. Proposal only: nothing is executed.'
+    ActionDecisionRequest:
+      additionalProperties: false
+      description: Approve or execute exactly the request the person saw (digest and version); a stale quote loses with 409.
+      properties:
+        expected_digest:
+          maxLength: 71
+          minLength: 71
+          pattern: ^sha256:[0-9a-f]{64}$
+          type: string
+        expected_version:
+          maximum: 1000000
+          minimum: 1
+          type: integer
+      required:
+      - expected_digest
+      - expected_version
+      type: object
+    ActionReasonRequest:
+      additionalProperties: false
+      properties:
+        expected_digest:
+          maxLength: 71
+          minLength: 71
+          pattern: ^sha256:[0-9a-f]{64}$
+          type: string
+        expected_version:
+          maximum: 1000000
+          minimum: 1
+          type: integer
+        reason:
+          maxLength: 500
+          minLength: 3
+          type: string
+      required:
+      - expected_digest
+      - expected_version
+      - reason
+      type: object
+    ActionKillSwitchRequest:
+      additionalProperties: false
+      properties:
+        engaged:
+          type: boolean
+        reason:
+          maxLength: 500
+          minLength: 3
+          type: string
+      required:
+      - engaged
+      - reason
+      type: object
+    # <<< step12:c-actions
   responses:
     AuthenticationRequired:
       description: Authentication required

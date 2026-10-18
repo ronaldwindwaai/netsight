@@ -1,0 +1,1197 @@
+{
+  "action_check": {
+    "base": {
+      "name": "target-shape",
+      "state": "pass",
+      "detail": "ok"
+    },
+    "cases": [
+      {
+        "name": "pass",
+        "valid": true
+      },
+      {
+        "name": "fail",
+        "valid": true,
+        "set": {
+          "state": "fail",
+          "detail": "target-not-found"
+        }
+      },
+      {
+        "name": "unknown",
+        "valid": true,
+        "set": {
+          "state": "unknown"
+        }
+      },
+      {
+        "name": "bad state",
+        "valid": false,
+        "jsonschema_rejects": true,
+        "set": {
+          "state": "maybe"
+        }
+      },
+      {
+        "name": "free text detail",
+        "valid": false,
+        "jsonschema_rejects": true,
+        "set": {
+          "detail": "Free text with spaces"
+        }
+      },
+      {
+        "name": "extra field",
+        "valid": false,
+        "jsonschema_rejects": true,
+        "set": {
+          "command": "ls"
+        }
+      }
+    ]
+  },
+  "action_execution": {
+    "base": {
+      "executor": "dry-run",
+      "mode": "dry-run",
+      "effect": "none",
+      "started_at": "2026-10-18T12:05:00Z",
+      "finished_at": "2026-10-18T12:05:00Z",
+      "planned_steps": [
+        "Would isolate the endpoint named by the finding for 60 minutes"
+      ],
+      "verification": {
+        "state": "not-applicable",
+        "detail": "dry-run"
+      },
+      "rollback": null,
+      "failure": null
+    },
+    "cases": [
+      {
+        "name": "dry run",
+        "valid": true
+      },
+      {
+        "name": "running",
+        "valid": true,
+        "set": {
+          "finished_at": null
+        }
+      },
+      {
+        "name": "live applied",
+        "valid": true,
+        "set": {
+          "mode": "live",
+          "effect": "applied",
+          "executor": "live"
+        }
+      },
+      {
+        "name": "failed",
+        "valid": true,
+        "set": {
+          "failure": "executor-error",
+          "verification": {
+            "state": "unknown",
+            "detail": "not-run"
+          }
+        }
+      },
+      {
+        "name": "rolled back",
+        "valid": true,
+        "set": {
+          "mode": "live",
+          "effect": "applied",
+          "rollback": {
+            "state": "completed",
+            "detail": "ok"
+          }
+        }
+      },
+      {
+        "name": "dry run that changed something",
+        "valid": false,
+        "jsonschema_rejects": false,
+        "set": {
+          "effect": "applied"
+        }
+      },
+      {
+        "name": "finished before it started",
+        "valid": false,
+        "jsonschema_rejects": false,
+        "set": {
+          "finished_at": "2026-10-18T11:00:00Z"
+        }
+      },
+      {
+        "name": "too many steps",
+        "valid": false,
+        "jsonschema_rejects": true,
+        "set": {
+          "planned_steps": [
+            "x",
+            "x",
+            "x",
+            "x",
+            "x",
+            "x",
+            "x",
+            "x",
+            "x",
+            "x",
+            "x"
+          ]
+        }
+      },
+      {
+        "name": "bad mode",
+        "valid": false,
+        "jsonschema_rejects": true,
+        "set": {
+          "mode": "simulate"
+        }
+      },
+      {
+        "name": "missing verification",
+        "valid": false,
+        "jsonschema_rejects": true,
+        "delete": [
+          "verification"
+        ]
+      }
+    ]
+  },
+  "action_event": {
+    "base": {
+      "seq": 1,
+      "at": "2026-10-18T12:00:00Z",
+      "type": "proposed",
+      "actor_id": "user-eng",
+      "from_state": null,
+      "to_state": "proposed",
+      "code": "proposed",
+      "note": null,
+      "prev_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "hash": "1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    "cases": [
+      {
+        "name": "first",
+        "valid": true
+      },
+      {
+        "name": "with a note",
+        "valid": true,
+        "set": {
+          "type": "rejected",
+          "to_state": "rejected",
+          "from_state": "pending-approval",
+          "code": "rejected",
+          "note": "Not justified"
+        }
+      },
+      {
+        "name": "note with a control character",
+        "valid": false,
+        "jsonschema_rejects": false,
+        "set": {
+          "note": "bad\u0007note"
+        }
+      },
+      {
+        "name": "by the system",
+        "valid": true,
+        "set": {
+          "actor_id": null,
+          "type": "expired",
+          "from_state": "pending-approval",
+          "to_state": "expired",
+          "code": "approval-window-closed"
+        }
+      },
+      {
+        "name": "bad hash",
+        "valid": false,
+        "jsonschema_rejects": true,
+        "set": {
+          "hash": "xyz"
+        }
+      },
+      {
+        "name": "unknown type",
+        "valid": false,
+        "jsonschema_rejects": true,
+        "set": {
+          "type": "deleted"
+        }
+      },
+      {
+        "name": "sequence zero",
+        "valid": false,
+        "jsonschema_rejects": true,
+        "set": {
+          "seq": 0
+        }
+      },
+      {
+        "name": "unknown state",
+        "valid": false,
+        "jsonschema_rejects": true,
+        "set": {
+          "to_state": "done"
+        }
+      }
+    ]
+  },
+  "action_definition": {
+    "base": {
+      "action_type": "endpoint.isolate",
+      "title": "Isolate endpoint",
+      "risk": "C",
+      "target_kind": "endpoint",
+      "params": [
+        {
+          "name": "duration_minutes",
+          "kind": "integer",
+          "required": true,
+          "minimum": 5,
+          "maximum": 1440,
+          "choices": null
+        }
+      ],
+      "approvals_required": 1,
+      "step_up_required": true,
+      "approve_within_seconds": 86400,
+      "execute_within_seconds": 3600,
+      "timeout_seconds": 30,
+      "propose_permission": "actions:propose-high",
+      "rollback_guidance": "Restore the endpoint to its previous network segment."
+    },
+    "cases": [
+      {
+        "name": "integer parameter",
+        "valid": true
+      },
+      {
+        "name": "choice parameter",
+        "valid": true,
+        "set": {
+          "params": [
+            {
+              "name": "mode",
+              "kind": "choice",
+              "required": false,
+              "minimum": null,
+              "maximum": null,
+              "choices": [
+                "a",
+                "b"
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "name": "no parameters",
+        "valid": true,
+        "set": {
+          "params": []
+        }
+      },
+      {
+        "name": "step up not required",
+        "valid": false,
+        "jsonschema_rejects": true,
+        "set": {
+          "step_up_required": false
+        }
+      },
+      {
+        "name": "unknown action type",
+        "valid": false,
+        "jsonschema_rejects": true,
+        "set": {
+          "action_type": "shell.exec"
+        }
+      },
+      {
+        "name": "integer without bounds",
+        "valid": false,
+        "jsonschema_rejects": false,
+        "set": {
+          "params": [
+            {
+              "name": "n",
+              "kind": "integer",
+              "required": true,
+              "minimum": null,
+              "maximum": null,
+              "choices": null
+            }
+          ]
+        }
+      },
+      {
+        "name": "choice without choices",
+        "valid": false,
+        "jsonschema_rejects": false,
+        "set": {
+          "params": [
+            {
+              "name": "m",
+              "kind": "choice",
+              "required": true,
+              "minimum": null,
+              "maximum": null,
+              "choices": null
+            }
+          ]
+        }
+      },
+      {
+        "name": "parameter name not safe",
+        "valid": false,
+        "jsonschema_rejects": true,
+        "set": {
+          "params": [
+            {
+              "name": "Bad Name",
+              "kind": "boolean",
+              "required": true,
+              "minimum": null,
+              "maximum": null,
+              "choices": null
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "action_request": {
+    "base": {
+      "id": "action-11111111-2222-4333-8444-555555555555",
+      "action_type": "endpoint.isolate",
+      "target_id": "unknown-device-aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+      "params": {
+        "duration_minutes": 60
+      },
+      "risk": "C",
+      "state": "pending-approval",
+      "requester": {
+        "id": "user-eng",
+        "kind": "human"
+      },
+      "reason": "Unknown device on the finance VLAN",
+      "source": {
+        "kind": "unknown-device-finding",
+        "id": "unknown-device-aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+        "evidence_version": 1
+      },
+      "approvals_required": 1,
+      "approvals": [],
+      "created_at": "2026-10-18T12:00:00Z",
+      "approve_by": "2026-10-19T12:00:00Z",
+      "execute_by": null,
+      "version": 2,
+      "digest": "sha256:abababababababababababababababababababababababababababababababab",
+      "policy_checks": [
+        {
+          "name": "catalog",
+          "state": "pass",
+          "detail": "ok"
+        }
+      ],
+      "pre_checks": [],
+      "execution": null
+    },
+    "cases": [
+      {
+        "name": "pending approval",
+        "valid": true
+      },
+      {
+        "name": "approved",
+        "valid": true,
+        "set": {
+          "state": "approved",
+          "approvals": [
+            {
+              "approver_id": "admin-1",
+              "approved_at": "2026-10-18T12:05:00Z"
+            }
+          ],
+          "execute_by": "2026-10-19T12:00:00Z",
+          "version": 3
+        }
+      },
+      {
+        "name": "rejected",
+        "valid": true,
+        "set": {
+          "state": "rejected"
+        }
+      },
+      {
+        "name": "dry run succeeded",
+        "valid": true,
+        "set": {
+          "state": "succeeded",
+          "approvals": [
+            {
+              "approver_id": "admin-1",
+              "approved_at": "2026-10-18T12:05:00Z"
+            }
+          ],
+          "execute_by": "2026-10-19T12:00:00Z",
+          "execution": {
+            "executor": "dry-run",
+            "mode": "dry-run",
+            "effect": "none",
+            "started_at": "2026-10-18T12:05:00Z",
+            "finished_at": "2026-10-18T12:05:00Z",
+            "planned_steps": [
+              "Would isolate the endpoint named by the finding for 60 minutes"
+            ],
+            "verification": {
+              "state": "not-applicable",
+              "detail": "dry-run"
+            },
+            "rollback": null,
+            "failure": null
+          }
+        }
+      },
+      {
+        "name": "two person",
+        "valid": true,
+        "set": {
+          "risk": "D",
+          "approvals_required": 2,
+          "action_type": "switch.port.disable",
+          "params": {},
+          "source": null,
+          "target_id": "interface:sw1-gi0-1"
+        }
+      },
+      {
+        "name": "no source",
+        "valid": true,
+        "set": {
+          "source": null
+        }
+      },
+      {
+        "name": "unknown action type",
+        "valid": false,
+        "jsonschema_rejects": true,
+        "set": {
+          "action_type": "shell.exec"
+        }
+      },
+      {
+        "name": "command parameter value object",
+        "valid": false,
+        "jsonschema_rejects": true,
+        "set": {
+          "params": {
+            "command": {
+              "run": "ls"
+            }
+          }
+        }
+      },
+      {
+        "name": "parameter name not safe",
+        "valid": false,
+        "jsonschema_rejects": true,
+        "set": {
+          "params": {
+            "Bad Name": 1
+          }
+        }
+      },
+      {
+        "name": "target with a space",
+        "valid": false,
+        "jsonschema_rejects": true,
+        "set": {
+          "target_id": "a b"
+        }
+      },
+      {
+        "name": "requester approved their own request",
+        "valid": false,
+        "jsonschema_rejects": false,
+        "set": {
+          "state": "approved",
+          "approvals": [
+            {
+              "approver_id": "user-eng",
+              "approved_at": "2026-10-18T12:05:00Z"
+            }
+          ],
+          "execute_by": "2026-10-19T12:00:00Z"
+        }
+      },
+      {
+        "name": "approved without enough approvals",
+        "valid": false,
+        "jsonschema_rejects": false,
+        "set": {
+          "state": "approved",
+          "execute_by": "2026-10-19T12:00:00Z"
+        }
+      },
+      {
+        "name": "same approver twice",
+        "valid": false,
+        "jsonschema_rejects": false,
+        "set": {
+          "approvals_required": 2,
+          "approvals": [
+            {
+              "approver_id": "a",
+              "approved_at": "2026-10-18T12:05:00Z"
+            },
+            {
+              "approver_id": "a",
+              "approved_at": "2026-10-18T12:05:00Z"
+            }
+          ]
+        }
+      },
+      {
+        "name": "executed before approval",
+        "valid": false,
+        "jsonschema_rejects": false,
+        "set": {
+          "execution": {
+            "executor": "dry-run",
+            "mode": "dry-run",
+            "effect": "none",
+            "started_at": "2026-10-18T12:05:00Z",
+            "finished_at": "2026-10-18T12:05:00Z",
+            "planned_steps": [
+              "Would isolate the endpoint named by the finding for 60 minutes"
+            ],
+            "verification": {
+              "state": "not-applicable",
+              "detail": "dry-run"
+            },
+            "rollback": null,
+            "failure": null
+          }
+        }
+      },
+      {
+        "name": "reason with a control character",
+        "valid": false,
+        "jsonschema_rejects": false,
+        "set": {
+          "reason": "bad\u0007reason"
+        }
+      },
+      {
+        "name": "reason with a bidi override",
+        "valid": false,
+        "jsonschema_rejects": false,
+        "set": {
+          "reason": "evil‮text"
+        }
+      },
+      {
+        "name": "reason too short",
+        "valid": false,
+        "jsonschema_rejects": true,
+        "set": {
+          "reason": "ab"
+        }
+      },
+      {
+        "name": "risk out of range",
+        "valid": false,
+        "jsonschema_rejects": true,
+        "set": {
+          "risk": "E"
+        }
+      },
+      {
+        "name": "digest not sha256",
+        "valid": false,
+        "jsonschema_rejects": true,
+        "set": {
+          "digest": "md5:abc"
+        }
+      },
+      {
+        "name": "unknown state",
+        "valid": false,
+        "jsonschema_rejects": true,
+        "set": {
+          "state": "authorised"
+        }
+      }
+    ]
+  },
+  "action_status": {
+    "base": {
+      "state": "ok",
+      "generated_at": "2026-10-18T12:00:00Z",
+      "dry_run_only": true,
+      "kill_switch": {
+        "engaged": false,
+        "source": "none",
+        "since": null
+      },
+      "store": {
+        "kind": "memory",
+        "durable": false
+      },
+      "executors": [
+        {
+          "id": "dry-run",
+          "mode": "dry-run",
+          "state": "ok"
+        },
+        {
+          "id": "live",
+          "mode": "live",
+          "state": "disabled"
+        }
+      ],
+      "definitions": [
+        {
+          "action_type": "endpoint.isolate",
+          "title": "Isolate endpoint",
+          "risk": "C",
+          "target_kind": "endpoint",
+          "params": [
+            {
+              "name": "duration_minutes",
+              "kind": "integer",
+              "required": true,
+              "minimum": 5,
+              "maximum": 1440,
+              "choices": null
+            }
+          ],
+          "approvals_required": 1,
+          "step_up_required": true,
+          "approve_within_seconds": 86400,
+          "execute_within_seconds": 3600,
+          "timeout_seconds": 30,
+          "propose_permission": "actions:propose-high",
+          "rollback_guidance": "Restore the endpoint to its previous network segment."
+        }
+      ]
+    },
+    "cases": [
+      {
+        "name": "dry run only",
+        "valid": true
+      },
+      {
+        "name": "engaged by the environment",
+        "valid": true,
+        "set": {
+          "kill_switch": {
+            "engaged": true,
+            "source": "environment",
+            "since": "2026-10-18T12:00:00Z"
+          }
+        }
+      },
+      {
+        "name": "live ready",
+        "valid": true,
+        "set": {
+          "dry_run_only": false,
+          "executors": [
+            {
+              "id": "dry-run",
+              "mode": "dry-run",
+              "state": "ok"
+            },
+            {
+              "id": "live",
+              "mode": "live",
+              "state": "ok"
+            }
+          ]
+        }
+      },
+      {
+        "name": "not connected",
+        "valid": true,
+        "set": {
+          "state": "not-connected",
+          "executors": [],
+          "definitions": []
+        }
+      },
+      {
+        "name": "claims dry run only with a live executor ready",
+        "valid": false,
+        "jsonschema_rejects": false,
+        "set": {
+          "executors": [
+            {
+              "id": "dry-run",
+              "mode": "dry-run",
+              "state": "ok"
+            },
+            {
+              "id": "live",
+              "mode": "live",
+              "state": "ok"
+            }
+          ]
+        }
+      },
+      {
+        "name": "engaged without a source",
+        "valid": false,
+        "jsonschema_rejects": false,
+        "set": {
+          "kill_switch": {
+            "engaged": true,
+            "source": "none",
+            "since": "2026-10-18T12:00:00Z"
+          }
+        }
+      },
+      {
+        "name": "durable store claimed",
+        "valid": false,
+        "jsonschema_rejects": true,
+        "set": {
+          "store": {
+            "kind": "memory",
+            "durable": true
+          }
+        }
+      },
+      {
+        "name": "not connected but lists definitions",
+        "valid": false,
+        "jsonschema_rejects": false,
+        "set": {
+          "state": "not-connected",
+          "executors": []
+        }
+      },
+      {
+        "name": "dry run executor unavailable",
+        "valid": false,
+        "jsonschema_rejects": false,
+        "set": {
+          "executors": [
+            {
+              "id": "dry-run",
+              "mode": "dry-run",
+              "state": "disabled"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "action_list": {
+    "base": {
+      "state": "ok",
+      "generated_at": "2026-10-18T12:00:00Z",
+      "items": [
+        {
+          "id": "action-11111111-2222-4333-8444-555555555555",
+          "action_type": "endpoint.isolate",
+          "target_id": "unknown-device-aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+          "params": {
+            "duration_minutes": 60
+          },
+          "risk": "C",
+          "state": "pending-approval",
+          "requester": {
+            "id": "user-eng",
+            "kind": "human"
+          },
+          "reason": "Unknown device on the finance VLAN",
+          "source": {
+            "kind": "unknown-device-finding",
+            "id": "unknown-device-aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+            "evidence_version": 1
+          },
+          "approvals_required": 1,
+          "approvals": [],
+          "created_at": "2026-10-18T12:00:00Z",
+          "approve_by": "2026-10-19T12:00:00Z",
+          "execute_by": null,
+          "version": 2,
+          "digest": "sha256:abababababababababababababababababababababababababababababababab",
+          "policy_checks": [
+            {
+              "name": "catalog",
+              "state": "pass",
+              "detail": "ok"
+            }
+          ],
+          "pre_checks": [],
+          "execution": null
+        }
+      ],
+      "total": 1,
+      "page": 1,
+      "page_size": 25
+    },
+    "cases": [
+      {
+        "name": "one",
+        "valid": true
+      },
+      {
+        "name": "empty",
+        "valid": true,
+        "set": {
+          "items": [],
+          "total": 0
+        }
+      },
+      {
+        "name": "not connected",
+        "valid": true,
+        "set": {
+          "state": "not-connected",
+          "items": [],
+          "total": 0
+        }
+      },
+      {
+        "name": "not connected with rows",
+        "valid": false,
+        "jsonschema_rejects": false,
+        "set": {
+          "state": "not-connected"
+        }
+      },
+      {
+        "name": "page size over the cap",
+        "valid": false,
+        "jsonschema_rejects": true,
+        "set": {
+          "page_size": 51
+        }
+      },
+      {
+        "name": "missing total",
+        "valid": false,
+        "jsonschema_rejects": true,
+        "delete": [
+          "total"
+        ]
+      }
+    ]
+  },
+  "action_detail": {
+    "base": {
+      "generated_at": "2026-10-18T12:00:00Z",
+      "request": {
+        "id": "action-11111111-2222-4333-8444-555555555555",
+        "action_type": "endpoint.isolate",
+        "target_id": "unknown-device-aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+        "params": {
+          "duration_minutes": 60
+        },
+        "risk": "C",
+        "state": "pending-approval",
+        "requester": {
+          "id": "user-eng",
+          "kind": "human"
+        },
+        "reason": "Unknown device on the finance VLAN",
+        "source": {
+          "kind": "unknown-device-finding",
+          "id": "unknown-device-aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+          "evidence_version": 1
+        },
+        "approvals_required": 1,
+        "approvals": [],
+        "created_at": "2026-10-18T12:00:00Z",
+        "approve_by": "2026-10-19T12:00:00Z",
+        "execute_by": null,
+        "version": 2,
+        "digest": "sha256:abababababababababababababababababababababababababababababababab",
+        "policy_checks": [
+          {
+            "name": "catalog",
+            "state": "pass",
+            "detail": "ok"
+          }
+        ],
+        "pre_checks": [],
+        "execution": null
+      },
+      "history": [
+        {
+          "seq": 1,
+          "at": "2026-10-18T12:00:00Z",
+          "type": "proposed",
+          "actor_id": "user-eng",
+          "from_state": null,
+          "to_state": "proposed",
+          "code": "proposed",
+          "note": null,
+          "prev_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+          "hash": "1111111111111111111111111111111111111111111111111111111111111111"
+        }
+      ],
+      "chain_intact": true
+    },
+    "cases": [
+      {
+        "name": "one event",
+        "valid": true
+      },
+      {
+        "name": "chain broken",
+        "valid": true,
+        "set": {
+          "chain_intact": false
+        }
+      },
+      {
+        "name": "no history",
+        "valid": false,
+        "jsonschema_rejects": true,
+        "set": {
+          "history": []
+        }
+      },
+      {
+        "name": "missing chain verdict",
+        "valid": false,
+        "jsonschema_rejects": true,
+        "delete": [
+          "chain_intact"
+        ]
+      }
+    ]
+  },
+  "action_create_request": {
+    "base": {
+      "action_type": "endpoint.isolate",
+      "target_id": "unknown-device-aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+      "params": {
+        "duration_minutes": 60
+      },
+      "reason": "Unknown device on the finance VLAN"
+    },
+    "cases": [
+      {
+        "name": "typed",
+        "valid": true
+      },
+      {
+        "name": "no params",
+        "valid": true,
+        "set": {
+          "params": {}
+        }
+      },
+      {
+        "name": "unknown action",
+        "valid": false,
+        "jsonschema_rejects": true,
+        "set": {
+          "action_type": "service.restart"
+        }
+      },
+      {
+        "name": "shell in params",
+        "valid": false,
+        "jsonschema_rejects": true,
+        "set": {
+          "params": {
+            "cmd": [
+              "sh",
+              "-c",
+              "id"
+            ]
+          }
+        }
+      },
+      {
+        "name": "target with a slash",
+        "valid": false,
+        "jsonschema_rejects": true,
+        "set": {
+          "target_id": "a/b"
+        }
+      },
+      {
+        "name": "extra top-level field",
+        "valid": false,
+        "jsonschema_rejects": true,
+        "set": {
+          "command": "reload"
+        }
+      },
+      {
+        "name": "reason too long",
+        "valid": false,
+        "jsonschema_rejects": true,
+        "set": {
+          "reason": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        }
+      },
+      {
+        "name": "reason with a newline",
+        "valid": false,
+        "jsonschema_rejects": false,
+        "set": {
+          "reason": "line one\nline two"
+        }
+      }
+    ]
+  },
+  "action_from_finding_request": {
+    "base": {
+      "finding_id": "unknown-device-aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+      "expected_evidence_version": 1,
+      "reason": "Unknown device on the finance VLAN"
+    },
+    "cases": [
+      {
+        "name": "finding",
+        "valid": true
+      },
+      {
+        "name": "bad finding id",
+        "valid": false,
+        "jsonschema_rejects": true,
+        "set": {
+          "finding_id": "nope"
+        }
+      },
+      {
+        "name": "version zero",
+        "valid": false,
+        "jsonschema_rejects": true,
+        "set": {
+          "expected_evidence_version": 0
+        }
+      },
+      {
+        "name": "missing reason",
+        "valid": false,
+        "jsonschema_rejects": true,
+        "delete": [
+          "reason"
+        ]
+      }
+    ]
+  },
+  "action_decision_request": {
+    "base": {
+      "expected_digest": "sha256:abababababababababababababababababababababababababababababababab",
+      "expected_version": 2
+    },
+    "cases": [
+      {
+        "name": "decision",
+        "valid": true
+      },
+      {
+        "name": "bad digest",
+        "valid": false,
+        "jsonschema_rejects": true,
+        "set": {
+          "expected_digest": "abc"
+        }
+      },
+      {
+        "name": "version as a string",
+        "valid": false,
+        "jsonschema_rejects": true,
+        "set": {
+          "expected_version": "2"
+        }
+      },
+      {
+        "name": "extra field",
+        "valid": false,
+        "jsonschema_rejects": true,
+        "set": {
+          "approver_id": "someone-else"
+        }
+      }
+    ]
+  },
+  "action_reason_request": {
+    "base": {
+      "expected_digest": "sha256:abababababababababababababababababababababababababababababababab",
+      "expected_version": 2,
+      "reason": "Not needed any more"
+    },
+    "cases": [
+      {
+        "name": "reason",
+        "valid": true
+      },
+      {
+        "name": "blank reason",
+        "valid": false,
+        "jsonschema_rejects": false,
+        "set": {
+          "reason": "   "
+        }
+      },
+      {
+        "name": "missing digest",
+        "valid": false,
+        "jsonschema_rejects": true,
+        "delete": [
+          "expected_digest"
+        ]
+      }
+    ]
+  },
+  "action_kill_switch_request": {
+    "base": {
+      "engaged": true,
+      "reason": "Suspected compromise of an approver"
+    },
+    "cases": [
+      {
+        "name": "engage",
+        "valid": true
+      },
+      {
+        "name": "release",
+        "valid": true,
+        "set": {
+          "engaged": false
+        }
+      },
+      {
+        "name": "engaged as a string",
+        "valid": false,
+        "jsonschema_rejects": true,
+        "set": {
+          "engaged": "true"
+        }
+      },
+      {
+        "name": "missing reason",
+        "valid": false,
+        "jsonschema_rejects": true,
+        "delete": [
+          "reason"
+        ]
+      }
+    ]
+  }
+}

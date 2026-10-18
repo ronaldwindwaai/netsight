@@ -4,7 +4,7 @@
  *
  * Both halves are advisory/defensive only. The API re-checks authorisation, state, CSRF/origin and
  * step-up on every request. There is no action here that executes, approves or creates an isolation:
- * a quarantine is a recommendation shown on the finding, and the action engine (Step 14) owns it.
+ * a quarantine is a recommendation shown on the finding, and the action engine (Step 12) owns it.
  */
 import { FINDING_ID, isEvidenceVersion, type FindingState } from './api-contracts-unknown-devices.ts';
 import { codePointLength, isOneOf } from './contract-guards.ts';

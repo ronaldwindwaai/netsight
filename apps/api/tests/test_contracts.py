@@ -1,8 +1,9 @@
+import json
 from typing import Any
 
 import pytest
 
-from netsight_api.contracts import ContractViolation, validate
+from netsight_api.contracts import SCHEMA_DIR, ContractViolation, validate
 
 DEVICE = {
     "id": "device-dc425b99-786e-50f0-82dc-ebe2d0aa0e38",
@@ -43,15 +44,12 @@ EVIDENCE = {
     "freshness_state": "fresh",
 }
 
-ACTION_REQUEST = {
-    "id": "act-1",
-    "action_type": "firewall.rule_add",
-    "target_id": "fw-1",
-    "risk": "C",
-    "state": "proposed",
-    "requester_id": "user-1",
-    "reason": "Restore HTTPS path",
-}
+# Step 12 replaced the placeholder action-request schema; the canonical instance is the shared vector.
+ACTION_REQUEST = json.loads(
+    (SCHEMA_DIR.parents[1] / "contracts" / "test-vectors" / "actions.vectors.json").read_text(
+        "utf-8"
+    )
+)["action_request"]["base"]
 
 
 @pytest.mark.parametrize(
