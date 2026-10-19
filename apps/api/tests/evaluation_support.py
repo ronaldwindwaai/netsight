@@ -132,7 +132,11 @@ def decision_for(rule: AlertRule, entity: str, **overrides: Any) -> Decision:
 
 
 def observation(
-    entity: str, value: float | None, *, at: datetime = T0, scopes: frozenset[tuple[str, str]] | None = None
+    entity: str,
+    value: float | None,
+    *,
+    at: datetime = T0,
+    scopes: frozenset[tuple[str, str]] | None = None,
 ) -> Observation:
     return Observation(
         at=at,

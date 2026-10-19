@@ -32,10 +32,14 @@ JWKS_TTL_SECONDS = 3600.0
 MAX_ID_TOKEN_BYTES = 32_768
 # Only the approved providers may supply signing keys. Never follow a JWKS
 # redirect into an internal service or a host supplied by an untrusted token.
-JWKS_HOSTS = frozenset({
-    "login.microsoftonline.com", "www.googleapis.com", "oauth2.googleapis.com",
-    "accounts.google.com",
-})
+JWKS_HOSTS = frozenset(
+    {
+        "login.microsoftonline.com",
+        "www.googleapis.com",
+        "oauth2.googleapis.com",
+        "accounts.google.com",
+    }
+)
 
 
 class OidcError(Exception):
@@ -144,8 +148,10 @@ async def _jwks(metadata: dict[str, Any]) -> dict[str, Any]:
     except ValueError as exc:
         raise OidcError("OIDC_JWKS_INVALID", "Provider JWKS URI is invalid") from exc
     if (
-        parsed.hostname not in JWKS_HOSTS or parsed.username is not None
-        or parsed.password is not None or parsed.netloc != parsed.hostname
+        parsed.hostname not in JWKS_HOSTS
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.netloc != parsed.hostname
         or parsed.fragment
     ):
         raise OidcError("OIDC_JWKS_INVALID", "Provider JWKS URI is not approved")
@@ -165,11 +171,15 @@ async def _jwks(metadata: dict[str, Any]) -> dict[str, Any]:
                     raise OidcError("OIDC_JWKS_INVALID", "Provider JWKS exceeds the size limit")
             keys = json.loads(document)
     except (httpx.HTTPError, ValueError, RecursionError) as exc:
-        raise OidcError("OIDC_JWKS_FETCH_FAILED", "Provider signing keys could not be fetched") from exc
+        raise OidcError(
+            "OIDC_JWKS_FETCH_FAILED", "Provider signing keys could not be fetched"
+        ) from exc
 
     if (
-        not isinstance(keys, dict) or not isinstance(keys.get("keys"), list)
-        or not keys["keys"] or len(keys["keys"]) > 100
+        not isinstance(keys, dict)
+        or not isinstance(keys.get("keys"), list)
+        or not keys["keys"]
+        or len(keys["keys"]) > 100
         or any(not isinstance(key, dict) for key in keys["keys"])
     ):
         raise OidcError("OIDC_JWKS_INVALID", "Provider JWKS was invalid")
@@ -268,7 +278,9 @@ async def exchange_code(
             headers={"Accept": "application/json"},
         )
     except httpx.HTTPError as exc:
-        raise OidcError("OIDC_TOKEN_REQUEST_FAILED", "Token exchange could not reach the provider") from exc
+        raise OidcError(
+            "OIDC_TOKEN_REQUEST_FAILED", "Token exchange could not reach the provider"
+        ) from exc
 
     if response.status_code != 200:
         raise OidcError("OIDC_TOKEN_REJECTED", "Identity provider rejected the authorization code")
@@ -283,9 +295,15 @@ async def exchange_code(
 
     return TokenResponse(
         id_token=payload["id_token"],
-        access_token=payload.get("access_token") if isinstance(payload.get("access_token"), str) else None,
-        expires_in=payload.get("expires_in") if isinstance(payload.get("expires_in"), int) else None,
-        token_type=payload.get("token_type") if isinstance(payload.get("token_type"), str) else None,
+        access_token=payload.get("access_token")
+        if isinstance(payload.get("access_token"), str)
+        else None,
+        expires_in=payload.get("expires_in")
+        if isinstance(payload.get("expires_in"), int)
+        else None,
+        token_type=payload.get("token_type")
+        if isinstance(payload.get("token_type"), str)
+        else None,
     )
 
 
@@ -296,12 +314,16 @@ def _validate_issuer(provider: ProviderId, issuer: object, settings: ProviderSet
     if provider is MICROSOFT:
         expected_prefix = "https://login.microsoftonline.com/"
         if not issuer.startswith(expected_prefix):
-            raise OidcError("OIDC_ISSUER_INVALID", "Token issuer is not a Microsoft Entra authority")
+            raise OidcError(
+                "OIDC_ISSUER_INVALID", "Token issuer is not a Microsoft Entra authority"
+            )
         # issuer shape: .../login.microsoftonline.com/{tenant}/v2.0
         remainder = issuer[len(expected_prefix) :].split("/")
         tenant = remainder[0] if remainder else ""
         if tenant not in settings.tenant_ids:
-            raise OidcError("OIDC_TENANT_NOT_ALLOWED", "Token was issued by a non-approved Microsoft tenant")
+            raise OidcError(
+                "OIDC_TENANT_NOT_ALLOWED", "Token was issued by a non-approved Microsoft tenant"
+            )
         if issuer != f"{expected_prefix}{tenant}/v2.0":
             raise OidcError("OIDC_ISSUER_INVALID", "Token issuer is not an exact Entra v2 issuer")
         return issuer
@@ -377,9 +399,13 @@ async def validate_id_token(
     except jwt.ExpiredSignatureError as exc:
         raise OidcError("OIDC_TOKEN_EXPIRED", "Identity token has expired") from exc
     except jwt.InvalidAudienceError as exc:
-        raise OidcError("OIDC_AUDIENCE_INVALID", "Identity token audience is not this application") from exc
+        raise OidcError(
+            "OIDC_AUDIENCE_INVALID", "Identity token audience is not this application"
+        ) from exc
     except (jwt.PyJWTError, ValueError, TypeError, KeyError, RecursionError) as exc:
-        raise OidcError("OIDC_TOKEN_INVALID", "Identity token signature or claims were invalid") from exc
+        raise OidcError(
+            "OIDC_TOKEN_INVALID", "Identity token signature or claims were invalid"
+        ) from exc
 
     if not isinstance(claims, dict):
         raise OidcError("OIDC_TOKEN_INVALID", "Identity token claims were malformed")

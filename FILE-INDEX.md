@@ -59,7 +59,7 @@
 - `branding/logo-horizontal.svg`
 - `branding/logo-mark.svg`
 - `contracts/events/EVENT-CATALOG.md`
-- `contracts/json-schema/action-request.schema.json`
+- `contracts/json-schema/actions.schema.json`
 - `contracts/json-schema/ai-answer.schema.json`
 - `contracts/json-schema/alert.schema.json`
 - `contracts/json-schema/common.schema.json`
@@ -143,6 +143,7 @@
 - `docs/12-implementation/ACTION-ENGINE.md`
 - `docs/12-implementation/ALERT-ENGINE.md`
 - `docs/12-implementation/DATABASE-OWNERSHIP.md`
+- `docs/12-implementation/FORECASTING.md`
 - `docs/12-implementation/IDENTITY-CORRELATION.md`
 - `docs/12-implementation/INCIDENT-ENGINE.md`
 - `docs/12-implementation/MULTI-SITE.md`

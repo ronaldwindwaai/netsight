@@ -210,8 +210,11 @@ def test_device_native_id_cannot_escape_the_ports_path() -> None:
         ".hidden",
     ):
         with pytest.raises(AdapterError) as exc:
-            _run(_client(lambda request: httpx.Response(200, json={"status": "ok", "ports": []}))
-                 .interfaces(hostile))
+            _run(
+                _client(
+                    lambda request: httpx.Response(200, json={"status": "ok", "ports": []})
+                ).interfaces(hostile)
+            )
         assert exc.value.status is AdapterStatus.INVALID_SOURCE_DATA, hostile
 
 

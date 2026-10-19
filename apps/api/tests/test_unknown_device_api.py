@@ -244,9 +244,7 @@ def test_filters_and_paging_are_applied_on_the_server(
 ) -> None:
     a = seed(store, severity="high", basis="policy-rule")
     b = seed(store, mac="aa:bb:cc:00:11:33", ip="10.0.5.10", severity="low", basis="policy-rule")
-    store.transition_state(
-        b, to_state="acknowledged", actor_id="u", expected_evidence_version=1
-    )
+    store.transition_state(b, to_state="acknowledged", actor_id="u", expected_evidence_version=1)
     store.set_assignee(b, assignee_id="u", actor_id="u", expected_evidence_version=1)
     c = seed(store, mac="aa:bb:cc:00:11:44", ip="10.0.5.11")
     store.transition_state(
@@ -818,9 +816,7 @@ def test_the_finding_carries_its_evidence_version(store: InMemoryUnknownDeviceRe
     validate("unknown_device_detail", body)
 
 
-@pytest.mark.parametrize(
-    "suffix", ["/acknowledge", "/investigate", "/assign", "/resolve"]
-)
+@pytest.mark.parametrize("suffix", ["/acknowledge", "/investigate", "/assign", "/resolve"])
 def test_a_decision_without_the_evidence_version_is_a_422_and_changes_nothing(
     suffix: str, store: InMemoryUnknownDeviceRepository
 ) -> None:
@@ -830,7 +826,12 @@ def test_a_decision_without_the_evidence_version_is_a_422_and_changes_nothing(
         "/resolve": {"outcome": "resolved", "reason": "x"},
     }
     operator = Operator()
-    for bad in (bodies.get(suffix, {}), None, {**V, "expected_evidence_version": 0}, {"expected_evidence_version": "1"}):
+    for bad in (
+        bodies.get(suffix, {}),
+        None,
+        {**V, "expected_evidence_version": 0},
+        {"expected_evidence_version": "1"},
+    ):
         response = operator.http.post(
             finding_url(fid, suffix),
             json=bad,
@@ -873,7 +874,9 @@ def test_a_comment_needs_no_evidence_version(store: InMemoryUnknownDeviceReposit
 # --- audit: a keyed fingerprint of the assignee, or none (security low) ------------------------------------------------------
 
 
-def assign_audit(caplog: pytest.LogCaptureFixture, store: InMemoryUnknownDeviceRepository) -> dict[str, Any]:
+def assign_audit(
+    caplog: pytest.LogCaptureFixture, store: InMemoryUnknownDeviceRepository
+) -> dict[str, Any]:
     caplog.set_level(logging.INFO, logger="netsight_api.audit")
     fid = seed(store)
     Operator().post(finding_url(fid, "/assign"), {**V, "assignee_id": "oidc:tech-secret-name"})
@@ -891,7 +894,9 @@ def test_the_assignee_is_fingerprinted_with_the_audit_key_not_a_plain_hash(
     record = assign_audit(caplog, store)
     plain = hashlib.sha256(b"oidc:tech-secret-name").hexdigest()[:16]
     assert len(record["assignee_fp"]) == 16 and record["assignee_fp"] != plain
-    assert "assignee_hash" not in record and record["assignee_length"] == len("oidc:tech-secret-name")
+    assert "assignee_hash" not in record and record["assignee_length"] == len(
+        "oidc:tech-secret-name"
+    )
     assert "tech-secret-name" not in json.dumps(record)
 
 

@@ -8,6 +8,13 @@ The monthly WAN SLA and the ISP-dispute evidence export are served by `GET /api/
 computed deterministically from stored probe samples; see `INTERNET-WAN.md`. They are synchronous and bounded (not a generated-and-archived report): no scheduler,
 snapshot or delivery exists for them yet.
 
+## Capacity (implemented in Step 13)
+
+The capacity report is the forecast of `FORECASTING.md` as a synchronous, bounded CSV: `GET /api/v1/forecast/capacity/export` (`forecast:export`), downloaded from `/forecast`.
+One row per series day labelled `measured` or `forecast` (forecast rows carry the approximate 95 % range and the method), a `state` row for a series that cannot be forecast (and why),
+and a closing "Forecast, not measurement" notice row. It is computed on read from source-reported history; there is no report definition, snapshot, archive, scheduler or delivery yet.
+The **inventory** report type is not built: inventory has no stored history, and its current state is on the Inventory and IPAM pages.
+
 ## Architecture
 Report definition -> data queries -> snapshot -> renderer -> delivery/archive.
 

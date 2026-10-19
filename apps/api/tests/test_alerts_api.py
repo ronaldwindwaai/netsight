@@ -141,9 +141,7 @@ def test_alert_source_failure_does_not_expose_service_token() -> None:
 
 def test_openapi_exposes_typed_alert_collection() -> None:
     operation = app.openapi()["paths"]["/api/v1/alerts"]["get"]
-    response_schema = operation["responses"]["200"]["content"]["application/json"][
-        "schema"
-    ]
+    response_schema = operation["responses"]["200"]["content"]["application/json"]["schema"]
 
     assert response_schema["$ref"].endswith("/AlertListResponse")
     assert {parameter["name"] for parameter in operation["parameters"]} == {

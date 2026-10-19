@@ -2,6 +2,7 @@ import { AppContent } from '@adminlte/react';
 import { notFound } from 'next/navigation';
 
 import { Step8AccessDenied } from '@/components/step8-access-denied';
+import { ProposeActionPanel } from '@/components/propose-action-panel';
 import { UnknownDeviceActionsPanel } from '@/components/unknown-device-actions-panel';
 import { UnknownDeviceDetailBody } from '@/components/unknown-device-detail-body';
 import { apiGet } from '@/lib/api';
@@ -12,7 +13,12 @@ import {
   parseUnknownDeviceTimeline,
 } from '@/lib/api-contracts-unknown-devices';
 import { timelinePath } from '@/lib/unknown-device-view';
-import { canReadFindings, canReadFindingsSummary, viewerFromSession } from '@/lib/viewer';
+import {
+  canProposeHighRiskAction,
+  canReadFindings,
+  canReadFindingsSummary,
+  viewerFromSession,
+} from '@/lib/viewer';
 
 export default async function UnknownDevicePage({ params }: { params: Promise<{ findingId: string }> }) {
   const { findingId } = await params;
@@ -54,16 +60,27 @@ export default async function UnknownDevicePage({ params }: { params: Promise<{ 
         timeline={timeline}
         actions={
           item === null ? null : (
-            <UnknownDeviceActionsPanel
-              finding={{
-                id: item.id,
-                state: item.state,
-                assignee_id: item.assignee_id,
-                evidence_version: item.evidence_version,
-              }}
-              viewer={viewer}
-              currentPath={`/unknown-devices/${findingId}`}
-            />
+            <>
+              <UnknownDeviceActionsPanel
+                finding={{
+                  id: item.id,
+                  state: item.state,
+                  assignee_id: item.assignee_id,
+                  evidence_version: item.evidence_version,
+                }}
+                viewer={viewer}
+                currentPath={`/unknown-devices/${findingId}`}
+              />
+              {item.proposed_action !== null &&
+              (item.state === 'new' || item.state === 'acknowledged' || item.state === 'investigating') &&
+              canProposeHighRiskAction(viewer) ? (
+                <ProposeActionPanel
+                  findingId={item.id}
+                  evidenceVersion={item.evidence_version}
+                  currentPath={`/unknown-devices/${findingId}`}
+                />
+              ) : null}
+            </>
           )
         }
       />

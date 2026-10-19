@@ -514,13 +514,15 @@ def test_a_busy_source_is_refused_rather_than_queued(monkeypatch: pytest.MonkeyP
 
 
 def test_every_read_is_audited_without_values(
-    caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("NETSIGHT_AUDIT_FILTER_KEY", "test-audit-key-0123456789abcdef0123456789")
     monkeypatch.setenv("NETSIGHT_AUDIT_FILTER_FINGERPRINT", "on")
     with caplog.at_level(logging.INFO, logger="netsight_api.audit"):
         response = Caller("administrator").http.get(
-            PATH, params={**WINDOW, "source_ip": "10.0.0.10", "application": "Zoom", "port": "443"},
+            PATH,
+            params={**WINDOW, "source_ip": "10.0.0.10", "application": "Zoom", "port": "443"},
             headers={"X-Correlation-ID": "flow-audit-443"},
         )
         assert response.status_code == 200
@@ -537,19 +539,37 @@ def test_every_read_is_audited_without_values(
     # while proving correlation IDs still pass through unmodified.
     assert record["correlation_id"] == "flow-audit-443"
     assert set(record) == {
-        "action", "actor_id", "attributed_count", "attribution_level", "attribution_state",
-        "cohort", "correlation_id", "event", "filters", "fp_source_ip", "outcome",
-        "restricted", "row_count", "state", "target", "tier", "ts", "window_seconds",
+        "action",
+        "actor_id",
+        "attributed_count",
+        "attribution_level",
+        "attribution_state",
+        "cohort",
+        "correlation_id",
+        "event",
+        "filters",
+        "fp_source_ip",
+        "outcome",
+        "restricted",
+        "row_count",
+        "state",
+        "target",
+        "tier",
+        "ts",
+        "window_seconds",
     }
     from netsight_api.traffic.audit_trail import fingerprint_of
 
     assert record["fp_source_ip"] == fingerprint_of(
         "source_ip", "10.0.0.10", b"test-audit-key-0123456789abcdef0123456789"
     )
-    text = json.dumps({
-        key: value for key, value in record.items()
-        if key not in {"correlation_id", "ts", "fp_source_ip"}
-    })
+    text = json.dumps(
+        {
+            key: value
+            for key, value in record.items()
+            if key not in {"correlation_id", "ts", "fp_source_ip"}
+        }
+    )
     assert all(value not in text for value in ["10.0.0.10", "Zoom", "Alice", "443"])
 
 

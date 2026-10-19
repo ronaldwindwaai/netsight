@@ -108,3 +108,21 @@ test('reports navigation follows the reports:read permission', () => {
   assert.ok(labels(menuItemsFor(['reports:read'])).includes('Reports'));
   assert.ok(!labels(menuItemsFor(null)).includes('Reports'));
 });
+
+test('the menu offers Action requests only to a session holding actions:read, and fails closed without one', () => {
+  const items = menuItemsFor(['actions:read']);
+  const entry = items.find((item) => item.type === 'item' && item.text === 'Action requests');
+  assert.ok(entry && entry.type === 'item' && entry.href === '/actions');
+  assert.ok(!labels(menuItemsFor(['incidents:read', 'actions:propose'])).includes('Action requests'));
+  assert.ok(!labels(menuItemsFor([])).includes('Action requests'));
+  assert.ok(!labels(menuItemsFor(null)).includes('Action requests'));
+});
+
+test('the menu offers Capacity forecast only to a session holding forecast:read, and fails closed without one', () => {
+  const items = menuItemsFor(['forecast:read']);
+  const entry = items.find((item) => item.type === 'item' && item.text === 'Capacity forecast');
+  assert.ok(entry && entry.type === 'item' && entry.href === '/forecast');
+  assert.ok(!labels(menuItemsFor(['forecast:export', 'traffic:read'])).includes('Capacity forecast'));
+  assert.ok(!labels(menuItemsFor([])).includes('Capacity forecast'));
+  assert.ok(!labels(menuItemsFor(null)).includes('Capacity forecast'));
+});

@@ -62,9 +62,11 @@ def test_granular_incident_permissions_per_role() -> None:
 
 
 def test_administrator_has_all() -> None:
-    admin = Identity("u4", frozenset({"administrator"}))
+    admin = Identity("u4", frozenset({"administrator"}), PrincipalKind.HUMAN)
     assert is_allowed(admin, "admin:config") is True
+    # Approving a remote action is human-only (Step 12): a service principal with the same role is refused.
     assert is_allowed(admin, "actions:approve") is True
+    assert is_allowed(Identity("u4", frozenset({"administrator"})), "actions:approve") is False
 
 
 def test_require_raises() -> None:

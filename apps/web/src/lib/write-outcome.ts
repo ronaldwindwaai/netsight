@@ -34,6 +34,8 @@ export interface WriteFailure {
 
 export const STEP_UP_CODE = 'STEP_UP_REQUIRED';
 export const STALE_EVIDENCE_CODE = 'STALE_EVIDENCE';
+export const KILL_SWITCH_CODE = 'KILL_SWITCH';
+export const ACTIONS_NOT_ENABLED_CODE = 'ACTIONS_NOT_ENABLED';
 const MAX_SERVER_MESSAGE = 500;
 const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f-\u009f]/g;
 
@@ -131,6 +133,24 @@ export function describeWriteFailure(failure: Failure): WriteFailure {
       withServerText('The values were rejected by validation.', failure.message) +
         ' Nothing was changed. Correct the form and try again.',
       'fix-input',
+      failure,
+    );
+  }
+  if (failure.status === 503 && failure.code === KILL_SWITCH_CODE) {
+    return build(
+      'unavailable',
+      'Remote actions are stopped',
+      'The action kill switch is engaged, so no action can be proposed, approved or run. Nothing was changed. An administrator can release it.',
+      'none',
+      failure,
+    );
+  }
+  if (failure.status === 503 && failure.code === ACTIONS_NOT_ENABLED_CODE) {
+    return build(
+      'unavailable',
+      'The action engine is not enabled',
+      'This deployment has not enabled controlled actions, so nothing was stored or run. Nothing was changed.',
+      'none',
       failure,
     );
   }

@@ -23,6 +23,8 @@ const STUBS = [
   [/^next\/navigation$/, join(srcDir, 'test', 'next-navigation-stub.ts')],
   [/^@\/app\/\(dashboard\)\/(incidents\/\[incidentId\]|alerts)\/actions$/, join(srcDir, 'test', 'server-actions-stub.ts')],
   [/^@\/app\/\(dashboard\)\/diagnostics\/actions$/, join(srcDir, 'test', 'diagnostics-actions-stub.ts')],
+  [/^@\/app\/\(dashboard\)\/copilot\/actions$/, join(srcDir, 'test', 'copilot-actions-stub.ts')],
+  [/^@\/app\/\(dashboard\)\/actions\/actions$/, join(srcDir, 'test', 'actions-actions-stub.ts')],
   [/^@\/app\/\(dashboard\)\/unknown-devices\/(\[findingId\]\/)?actions$/, join(srcDir, 'test', 'unknown-device-actions-stub.ts')],
 ];
 

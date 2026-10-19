@@ -6,3 +6,13 @@
 
 # Verified backlog prose; not a credential.
 22179d05a14451a34b0f0b761752a7e4a717c242:backlog/backlog.csv:generic-api-key:37
+
+# Step 10/12 verified test fixtures (inspected unredacted); inert fake values, not credentials.
+072b4780b869b6e85b292a0254b0e7bfd2f9c5d1:apps/api/tests/test_copilot_api.py:generic-api-key:30
+072b4780b869b6e85b292a0254b0e7bfd2f9c5d1:apps/api/tests/test_copilot_api.py:generic-api-key:332
+072b4780b869b6e85b292a0254b0e7bfd2f9c5d1:apps/api/tests/test_copilot_prompt_answer.py:generic-api-key:132
+072b4780b869b6e85b292a0254b0e7bfd2f9c5d1:apps/api/tests/test_copilot_provider.py:generic-api-key:14
+072b4780b869b6e85b292a0254b0e7bfd2f9c5d1:apps/api/tests/test_copilot_sanitize.py:generic-api-key:13
+072b4780b869b6e85b292a0254b0e7bfd2f9c5d1:apps/api/tests/test_copilot_sanitize.py:gitlab-pat:23
+072b4780b869b6e85b292a0254b0e7bfd2f9c5d1:apps/api/tests/test_copilot_sanitize.py:jwt:19
+4a401415838151c4881acedad499d6f073527aae:apps/web/src/lib/actions-view.test.ts:generic-api-key:33

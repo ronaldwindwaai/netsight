@@ -45,6 +45,14 @@ class TtlCache:
             del self._entries[next(iter(self._entries))]
         self._entries[key] = (self._clock(), value)
 
+    def peek(self, key: Hashable) -> bool:
+        """True when ``key`` holds a fresh entry (nothing is loaded)."""
+        return self._fresh(key)[0]
+
+    def put(self, key: Hashable, value: Any) -> None:
+        """Store ``value`` under ``key`` (used for short-lived negative entries)."""
+        self._store(key, value)
+
     async def get_or_load[T](self, key: Hashable, loader: Callable[[], Awaitable[T]]) -> T:
         hit, value = self._fresh(key)
         if hit:

@@ -91,9 +91,7 @@ def get_optional_security_source() -> SecuritySource | None:
     )
 
 
-OptionalSecuritySource = Annotated[
-    SecuritySource | None, Depends(get_optional_security_source)
-]
+OptionalSecuritySource = Annotated[SecuritySource | None, Depends(get_optional_security_source)]
 CurrentIdentity = Annotated[Identity, Depends(get_current_identity)]
 
 
@@ -163,14 +161,10 @@ async def security_events(
         )
 
     if source is None:
-        return _empty(
-            "not-connected", Freshness(state="unknown", observed_at=None, source=None)
-        )
+        return _empty("not-connected", Freshness(state="unknown", observed_at=None, source=None))
     degraded = Freshness(state="unknown", observed_at=None, source=_SOURCE_LABEL)
     try:
-        events, observed_at = await source.events(
-            start=window_start, end=window_end, limit=limit
-        )
+        events, observed_at = await source.events(start=window_start, end=window_end, limit=limit)
     except Exception as exc:  # noqa: BLE001 — deliberate source-read boundary
         _LOGGER.warning(
             "security source read failed",

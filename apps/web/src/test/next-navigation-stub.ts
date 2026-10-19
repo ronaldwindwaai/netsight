@@ -21,7 +21,9 @@ export function useRouter(): typeof router {
   return router;
 }
 
-/** The library's sidebar reads the current path; no tested component mounts it. */
+/** The path `usePathname` reports; tests change it to simulate client-side navigation. */
+export const pathnameSpy = { value: '/' };
+
 export function usePathname(): string {
-  return '/';
+  return pathnameSpy.value;
 }

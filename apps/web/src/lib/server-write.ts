@@ -38,6 +38,8 @@ export interface PlannedWrite {
   method: 'POST' | 'PUT';
   path: string;
   body: Record<string, unknown>;
+  /** Controlled actions only: the Idempotency-Key header, already validated by the planner. */
+  idempotencyKey?: string;
 }
 
 /**
@@ -48,9 +50,13 @@ export interface PlannedWrite {
 export async function runWrite<T>(
   write: PlannedWrite,
   parse: ResponseParser<T>,
+  pick?: (data: T) => { id?: string; state?: string },
 ): Promise<WriteActionResult> {
-  const state = await apiPost(write.path, write.body, parse, { method: write.method });
-  if (state.kind === 'ok') return { ok: true };
+  const state = await apiPost(write.path, write.body, parse, {
+    method: write.method,
+    ...(write.idempotencyKey !== undefined ? { idempotencyKey: write.idempotencyKey } : {}),
+  });
+  if (state.kind === 'ok') return { ok: true, ...(pick !== undefined ? pick(state.data) : {}) };
   return { ok: false, kind: 'failed', failure: describeWriteFailure(state) };
 }
 

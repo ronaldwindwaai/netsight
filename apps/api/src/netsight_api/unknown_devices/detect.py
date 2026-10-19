@@ -630,17 +630,15 @@ def _detection(
 ) -> Detection | None:
     """The finding for one candidate, or ``None`` when its chain can not be shown honestly."""
     subject = (
-        mac_ref(candidate.mac)
-        if candidate.mac
-        else ip_ref(candidate.ip)
-        if candidate.ip
-        else None
+        mac_ref(candidate.mac) if candidate.mac else ip_ref(candidate.ip) if candidate.ip else None
     )
     links = list(index.resolve(subject, now).endpoint) if subject is not None else []
     chain = build_chain(candidate, links, capabilities)
     if chain is None:
         return None
-    endpoint = UnknownDeviceEndpoint(ip=candidate.ip, mac=candidate.mac, hostname=candidate.hostname)
+    endpoint = UnknownDeviceEndpoint(
+        ip=candidate.ip, mac=candidate.mac, hostname=candidate.hostname
+    )
     severity, basis = policy.decide(candidate.ip, _vlan_number(chain[4]))
     if reason == "name-matches-mac-does-not":
         severity = _LOWER[severity]  # a claimed name is weaker evidence than a plain unknown

@@ -6,7 +6,13 @@ import type { WriteFailure } from './write-outcome.ts';
  * API was called and answered (or could not be reached) and carries the operator-facing account.
  */
 export type WriteActionResult =
-  | { ok: true }
+  | {
+      ok: true;
+      /** The id of the record the write created, when it created one. */
+      id?: string;
+      /** The state the record is in after the write, when the API reported one. */
+      state?: string;
+    }
   | { ok: false; kind: 'rejected'; message: string }
   | { ok: false; kind: 'failed'; failure: WriteFailure };
 

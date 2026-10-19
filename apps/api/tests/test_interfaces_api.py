@@ -206,9 +206,7 @@ def test_interfaces_invalid_source_data_is_502(monkeypatch: pytest.MonkeyPatch) 
 
 def test_interfaces_empty_inventory_is_valid(monkeypatch: pytest.MonkeyPatch) -> None:
     _enable_dev_identity(monkeypatch)
-    _override(
-        _router({**PATHS, "/api/v0/devices/1/ports": {"status": "ok", "ports": []}})
-    )
+    _override(_router({**PATHS, "/api/v0/devices/1/ports": {"status": "ok", "ports": []}}))
     response = TestClient(app).get(f"/api/v1/devices/{DEVICE_ID}/interfaces")
     assert response.status_code == 200
     assert response.json() == {

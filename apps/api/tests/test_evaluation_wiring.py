@@ -125,7 +125,11 @@ def test_configured_channels_are_registered_and_their_secrets_stay_out_of_repr()
     "bad",
     [
         {"NETSIGHT_SMTP_HOST": "smtp.example.com"},  # no sender address
-        {"NETSIGHT_SMTP_HOST": "smtp.example.com", "NETSIGHT_SMTP_FROM": "a@b.co", "NETSIGHT_SMTP_TLS": "none"},
+        {
+            "NETSIGHT_SMTP_HOST": "smtp.example.com",
+            "NETSIGHT_SMTP_FROM": "a@b.co",
+            "NETSIGHT_SMTP_TLS": "none",
+        },
         {"NETSIGHT_PUSH_GATEWAY_URL": "http://push.example.com/x"},
         {"NETSIGHT_NOTIFY_EMAIL_TO": "nope"},
         {"NETSIGHT_NOTIFY_MIN_SEVERITY": "urgent"},
@@ -200,7 +204,11 @@ async def test_an_already_set_stop_runs_no_cycle() -> None:
 
 @pytest.fixture
 def clean_env(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
-    for name in ("NETSIGHT_EVALUATION_ENABLED", "DATABASE_URL", "NETSIGHT_EVALUATION_INTERVAL_SECONDS"):
+    for name in (
+        "NETSIGHT_EVALUATION_ENABLED",
+        "DATABASE_URL",
+        "NETSIGHT_EVALUATION_INTERVAL_SECONDS",
+    ):
         monkeypatch.delenv(name, raising=False)
     yield
 

@@ -1,4 +1,5 @@
 """Bounded, read-only Oxidized metadata adapter. Never fetch configurations or trigger backups."""
+
 from __future__ import annotations
 
 import asyncio
@@ -67,10 +68,14 @@ class OxidizedClient:
             _ = parsed.port
             loopback = parsed.hostname in {"127.0.0.1", "localhost", "::1"}
             if (
-                parsed.scheme not in {"http", "https"} or not parsed.hostname
+                parsed.scheme not in {"http", "https"}
+                or not parsed.hostname
                 or (parsed.scheme != "https" and not loopback)
-                or parsed.username is not None or parsed.password is not None
-                or parsed.query or parsed.fragment or "\\" in self.base_url
+                or parsed.username is not None
+                or parsed.password is not None
+                or parsed.query
+                or parsed.fragment
+                or "\\" in self.base_url
                 or any(ord(char) < 33 for char in self.base_url)
                 or any(part in {".", ".."} for part in unquote(parsed.path).split("/"))
             ):
@@ -95,10 +100,14 @@ class OxidizedClient:
         try:
             async with asyncio.timeout(12):
                 async with httpx.AsyncClient(
-                    timeout=5.0, follow_redirects=False, transport=self._transport,
+                    timeout=5.0,
+                    follow_redirects=False,
+                    transport=self._transport,
                 ) as client:
                     for attempt in range(2):
-                        async with client.stream("GET", url, params=params, headers=headers) as response:
+                        async with client.stream(
+                            "GET", url, params=params, headers=headers
+                        ) as response:
                             if response.status_code in {502, 503, 504} and attempt == 0:
                                 continue
                             if response.status_code != 200:
@@ -134,8 +143,11 @@ class OxidizedClient:
         if skipped and not items:
             raise OxidizedUnavailable
         return ConfigurationNodes(
-            state="partial" if skipped or truncated else "ok", observed_at=datetime.now(UTC),
-            items=sorted(items, key=lambda item: item.name), skipped=skipped, truncated=truncated,
+            state="partial" if skipped or truncated else "ok",
+            observed_at=datetime.now(UTC),
+            items=sorted(items, key=lambda item: item.name),
+            skipped=skipped,
+            truncated=truncated,
         )
 
     @staticmethod
@@ -150,7 +162,8 @@ class OxidizedClient:
         full = row.get("full_name")
         if full is not None:
             if (
-                not isinstance(full, str) or len(full) > 511
+                not isinstance(full, str)
+                or len(full) > 511
                 or any(not valid_segment(part) for part in full.split("/"))
                 or full.split("/")[-1] != name
             ):
@@ -159,7 +172,8 @@ class OxidizedClient:
         elif group == "default":
             return None  # ambiguous without the upstream key: fail closed
         if group is not None and (
-            not isinstance(group, str) or len(group) > 255
+            not isinstance(group, str)
+            or len(group) > 255
             or any(not valid_segment(part) for part in group.split("/"))
         ):
             return None
@@ -168,16 +182,30 @@ class OxidizedClient:
         status = last.get("status") if isinstance(last, dict) else row.get("status", "never")
         attempt_at = source_time(last.get("end") if isinstance(last, dict) else row.get("time"))
         backup_status: Literal["success", "failed", "never", "unknown"] = (
-            "success" if status == "success" else "never" if status == "never"
-            else "failed" if status in {"failed", "failure", "no_connection"} else "unknown"
-        ) if isinstance(status, str) else "unknown"
+            (
+                "success"
+                if status == "success"
+                else "never"
+                if status == "never"
+                else "failed"
+                if status in {"failed", "failure", "no_connection"}
+                else "unknown"
+            )
+            if isinstance(status, str)
+            else "unknown"
+        )
         freshness: Literal["fresh", "stale", "unknown"] = "unknown"
         if backup_status == "success" and attempt_at is not None:
             freshness = "stale" if datetime.now(UTC) - attempt_at > timedelta(hours=24) else "fresh"
         try:
             return ConfigurationNode(
-                id=canonical_node_id(full_name), name=name, group=group, model=row.get("model"),
-                backup_status=backup_status, last_attempt_at=attempt_at, backup_freshness=freshness,
+                id=canonical_node_id(full_name),
+                name=name,
+                group=group,
+                model=row.get("model"),
+                backup_status=backup_status,
+                last_attempt_at=attempt_at,
+                backup_freshness=freshness,
             )
         except ValidationError:
             return None
@@ -210,7 +238,9 @@ class OxidizedClient:
             raise OxidizedUnavailable
         truncated = len(rows) > MAX_ROWS
         return ConfigurationVersions(
-            state="partial" if skipped or truncated else "ok", observed_at=datetime.now(UTC),
+            state="partial" if skipped or truncated else "ok",
+            observed_at=datetime.now(UTC),
             items=sorted(items, key=lambda item: item.saved_at, reverse=True),
-            skipped=skipped, truncated=truncated,
+            skipped=skipped,
+            truncated=truncated,
         )

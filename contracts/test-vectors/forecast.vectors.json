@@ -1,0 +1,1291 @@
+{
+  "forecast_history_point": {
+    "base": {
+      "day": "2026-09-20",
+      "value": 1000000
+    },
+    "cases": [
+      {
+        "name": "a zero value is a measurement",
+        "valid": true,
+        "set": {
+          "value": 0
+        }
+      },
+      {
+        "name": "negative value",
+        "valid": false,
+        "set": {
+          "value": -1
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "fractional value",
+        "valid": false,
+        "set": {
+          "value": 1.5
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "day with a time",
+        "valid": false,
+        "set": {
+          "day": "2026-09-20T00:00:00Z"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "extra field",
+        "valid": false,
+        "set": {
+          "estimated": true
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "missing value",
+        "valid": false,
+        "delete": [
+          "value"
+        ],
+        "jsonschema_rejects": true
+      }
+    ]
+  },
+  "forecast_point": {
+    "base": {
+      "day": "2026-10-04",
+      "value": 1140000,
+      "lower": 1100000,
+      "upper": 1180000
+    },
+    "cases": [
+      {
+        "name": "band collapsed to the point",
+        "valid": true,
+        "set": {
+          "lower": 1140000,
+          "upper": 1140000
+        }
+      },
+      {
+        "name": "lower above the point",
+        "valid": false,
+        "set": {
+          "lower": 1150000
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "upper below the point",
+        "valid": false,
+        "set": {
+          "upper": 1130000
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "negative lower",
+        "valid": false,
+        "set": {
+          "lower": -5
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "missing upper",
+        "valid": false,
+        "delete": [
+          "upper"
+        ],
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "extra field",
+        "valid": false,
+        "set": {
+          "measured": true
+        },
+        "jsonschema_rejects": true
+      }
+    ]
+  },
+  "forecast_method": {
+    "base": {
+      "name": "linear-trend",
+      "why": "A straight-line trend fitted to 14 observed days (0 missing days left out).",
+      "observed_days": 14,
+      "slope_per_day": 10000,
+      "linear_mae": 0,
+      "seasonal_mae": null,
+      "band": "approximate-95-percent"
+    },
+    "cases": [
+      {
+        "name": "weekly repeat",
+        "valid": true,
+        "set": {
+          "name": "seasonal-naive-weekly",
+          "slope_per_day": null,
+          "seasonal_mae": 3,
+          "linear_mae": 40,
+          "observed_days": 28
+        }
+      },
+      {
+        "name": "unknown method",
+        "valid": false,
+        "set": {
+          "name": "neural-network"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "a trend method without a slope",
+        "valid": false,
+        "set": {
+          "slope_per_day": null
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "a weekly repeat with a slope",
+        "valid": false,
+        "set": {
+          "name": "seasonal-naive-weekly",
+          "seasonal_mae": 3
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "a weekly repeat without its error",
+        "valid": false,
+        "set": {
+          "name": "seasonal-naive-weekly",
+          "slope_per_day": null
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "under the minimum history",
+        "valid": false,
+        "set": {
+          "observed_days": 13
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "a different band level",
+        "valid": false,
+        "set": {
+          "band": "approximate-99-percent"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "empty reason text",
+        "valid": false,
+        "set": {
+          "why": ""
+        },
+        "jsonschema_rejects": true
+      }
+    ]
+  },
+  "forecast_threshold": {
+    "base": {
+      "value": 5000000000,
+      "basis": "operator-configured"
+    },
+    "cases": [
+      {
+        "name": "the smallest limit",
+        "valid": true,
+        "set": {
+          "value": 1
+        }
+      },
+      {
+        "name": "inferred basis",
+        "valid": false,
+        "set": {
+          "basis": "inferred"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "zero limit",
+        "valid": false,
+        "set": {
+          "value": 0
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "missing basis",
+        "valid": false,
+        "delete": [
+          "basis"
+        ],
+        "jsonschema_rejects": true
+      }
+    ]
+  },
+  "forecast_crossing": {
+    "base": {
+      "point_day": "2026-10-06",
+      "upper_day": "2026-10-04"
+    },
+    "cases": [
+      {
+        "name": "no crossing within the horizon",
+        "valid": true,
+        "set": {
+          "point_day": null,
+          "upper_day": null
+        }
+      },
+      {
+        "name": "only the upper band crosses",
+        "valid": true,
+        "set": {
+          "point_day": null
+        }
+      },
+      {
+        "name": "point crosses but the upper band does not",
+        "valid": false,
+        "set": {
+          "upper_day": null
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "upper band crosses later than the point",
+        "valid": false,
+        "set": {
+          "upper_day": "2026-10-08"
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "not a date",
+        "valid": false,
+        "set": {
+          "point_day": "tomorrow"
+        },
+        "jsonschema_rejects": true
+      }
+    ]
+  },
+  "forecast_series": {
+    "base": {
+      "id": "traffic-volume",
+      "name": "Network traffic volume",
+      "unit": "bytes-per-day",
+      "state": "ok",
+      "reason": null,
+      "detail": null,
+      "source_observed_at": "2026-10-03T23:58:00Z",
+      "history": [
+        {
+          "day": "2026-09-20",
+          "value": 1000000
+        },
+        {
+          "day": "2026-09-21",
+          "value": 1010000
+        },
+        {
+          "day": "2026-09-22",
+          "value": 1020000
+        },
+        {
+          "day": "2026-09-23",
+          "value": 1030000
+        },
+        {
+          "day": "2026-09-24",
+          "value": 1040000
+        },
+        {
+          "day": "2026-09-25",
+          "value": 1050000
+        },
+        {
+          "day": "2026-09-26",
+          "value": 1060000
+        },
+        {
+          "day": "2026-09-27",
+          "value": 1070000
+        },
+        {
+          "day": "2026-09-28",
+          "value": 1080000
+        },
+        {
+          "day": "2026-09-29",
+          "value": 1090000
+        },
+        {
+          "day": "2026-09-30",
+          "value": 1100000
+        },
+        {
+          "day": "2026-10-01",
+          "value": 1110000
+        },
+        {
+          "day": "2026-10-02",
+          "value": 1120000
+        },
+        {
+          "day": "2026-10-03",
+          "value": 1130000
+        }
+      ],
+      "history_missing_days": 0,
+      "method": {
+        "name": "linear-trend",
+        "why": "A straight-line trend fitted to 14 observed days (0 missing days left out).",
+        "observed_days": 14,
+        "slope_per_day": 10000,
+        "linear_mae": 0,
+        "seasonal_mae": null,
+        "band": "approximate-95-percent"
+      },
+      "forecast": [
+        {
+          "day": "2026-10-04",
+          "value": 1140000,
+          "lower": 1100000,
+          "upper": 1180000
+        },
+        {
+          "day": "2026-10-05",
+          "value": 1150000,
+          "lower": 1110000,
+          "upper": 1190000
+        },
+        {
+          "day": "2026-10-06",
+          "value": 1160000,
+          "lower": 1120000,
+          "upper": 1200000
+        },
+        {
+          "day": "2026-10-07",
+          "value": 1170000,
+          "lower": 1130000,
+          "upper": 1210000
+        },
+        {
+          "day": "2026-10-08",
+          "value": 1180000,
+          "lower": 1140000,
+          "upper": 1220000
+        },
+        {
+          "day": "2026-10-09",
+          "value": 1190000,
+          "lower": 1150000,
+          "upper": 1230000
+        },
+        {
+          "day": "2026-10-10",
+          "value": 1200000,
+          "lower": 1160000,
+          "upper": 1240000
+        }
+      ],
+      "threshold": null,
+      "crossing": null
+    },
+    "cases": [
+      {
+        "name": "not connected",
+        "valid": true,
+        "set": {
+          "id": "wan-utilisation",
+          "name": "WAN link utilisation",
+          "unit": "percent",
+          "state": "not-connected",
+          "reason": "no-history-source",
+          "detail": "No source in this deployment provides link-utilisation history.",
+          "source_observed_at": null,
+          "history": [],
+          "history_missing_days": 0,
+          "method": null,
+          "forecast": [],
+          "threshold": null,
+          "crossing": null
+        }
+      },
+      {
+        "name": "insufficient data keeps the measured days",
+        "valid": true,
+        "set": {
+          "state": "insufficient-data",
+          "reason": "too-few-days",
+          "detail": "14 observed days; at least 14 are needed.",
+          "method": null,
+          "forecast": []
+        }
+      },
+      {
+        "name": "a threshold with a crossing",
+        "valid": true,
+        "set": {
+          "threshold": {
+            "value": 1150000,
+            "basis": "operator-configured"
+          },
+          "crossing": {
+            "point_day": "2026-10-05",
+            "upper_day": "2026-10-04"
+          }
+        }
+      },
+      {
+        "name": "ok without forecast points",
+        "valid": false,
+        "set": {
+          "forecast": []
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "ok without a method",
+        "valid": false,
+        "set": {
+          "method": null
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "ok with a reason",
+        "valid": false,
+        "set": {
+          "reason": "too-few-days",
+          "detail": "x"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "ok on fewer than 14 measured days",
+        "valid": false,
+        "set": {
+          "history": [
+            {
+              "day": "2026-09-20",
+              "value": 1000000
+            },
+            {
+              "day": "2026-09-21",
+              "value": 1010000
+            },
+            {
+              "day": "2026-09-22",
+              "value": 1020000
+            },
+            {
+              "day": "2026-09-23",
+              "value": 1030000
+            },
+            {
+              "day": "2026-09-24",
+              "value": 1040000
+            },
+            {
+              "day": "2026-09-25",
+              "value": 1050000
+            },
+            {
+              "day": "2026-09-26",
+              "value": 1060000
+            },
+            {
+              "day": "2026-09-27",
+              "value": 1070000
+            },
+            {
+              "day": "2026-09-28",
+              "value": 1080000
+            },
+            {
+              "day": "2026-09-29",
+              "value": 1090000
+            },
+            {
+              "day": "2026-09-30",
+              "value": 1100000
+            },
+            {
+              "day": "2026-10-01",
+              "value": 1110000
+            },
+            {
+              "day": "2026-10-02",
+              "value": 1120000
+            }
+          ]
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "insufficient data with forecast points",
+        "valid": false,
+        "set": {
+          "state": "insufficient-data",
+          "reason": "too-few-days",
+          "detail": "x",
+          "method": null
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "insufficient data without a reason",
+        "valid": false,
+        "set": {
+          "state": "insufficient-data",
+          "method": null,
+          "forecast": []
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "not connected with measured days",
+        "valid": false,
+        "set": {
+          "state": "not-connected",
+          "reason": "no-source",
+          "detail": "x",
+          "method": null,
+          "forecast": []
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "a threshold without a crossing",
+        "valid": false,
+        "set": {
+          "threshold": {
+            "value": 5,
+            "basis": "operator-configured"
+          }
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "a crossing without a threshold",
+        "valid": false,
+        "set": {
+          "crossing": {
+            "point_day": null,
+            "upper_day": null
+          }
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "history out of order",
+        "valid": false,
+        "set": {
+          "history.0.day": "2026-09-25"
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "forecast not starting after the history",
+        "valid": false,
+        "set": {
+          "forecast.0.day": "2026-10-03"
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "method days differ from history",
+        "valid": false,
+        "set": {
+          "method.observed_days": 20
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "unknown series",
+        "valid": false,
+        "set": {
+          "id": "cpu-load"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "extra field",
+        "valid": false,
+        "set": {
+          "measured": true
+        },
+        "jsonschema_rejects": true
+      }
+    ]
+  },
+  "forecast_recommendation": {
+    "base": {
+      "id": "connect-history-wan-utilisation",
+      "kind": "connect-history-source",
+      "series_id": "wan-utilisation",
+      "title": "Connect a link-utilisation history source",
+      "advice": "WAN capacity cannot be forecast until a source reports utilisation history.",
+      "evidence": [
+        "No source in this deployment provides link-utilisation history."
+      ],
+      "advisory": true,
+      "executable": false
+    },
+    "cases": [
+      {
+        "name": "a capacity review with several evidence lines",
+        "valid": true,
+        "set": {
+          "kind": "capacity-review",
+          "series_id": "traffic-volume",
+          "evidence": [
+            "a",
+            "b",
+            "c"
+          ]
+        }
+      },
+      {
+        "name": "an evidence line at the longest allowed",
+        "valid": true,
+        "set": {
+          "evidence": [
+            "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+          ]
+        }
+      },
+      {
+        "name": "an evidence line over the longest allowed",
+        "valid": false,
+        "set": {
+          "evidence": [
+            "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+          ]
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "executable",
+        "valid": false,
+        "set": {
+          "executable": true
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "not advisory",
+        "valid": false,
+        "set": {
+          "advisory": false
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "no evidence",
+        "valid": false,
+        "set": {
+          "evidence": []
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "an action request field",
+        "valid": false,
+        "set": {
+          "action_request": {
+            "type": "switch.port.disable"
+          }
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "unknown kind",
+        "valid": false,
+        "set": {
+          "kind": "disable-port"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "bad id",
+        "valid": false,
+        "set": {
+          "id": "Not Valid"
+        },
+        "jsonschema_rejects": true
+      }
+    ]
+  },
+  "forecast_response": {
+    "base": {
+      "state": "ok",
+      "generated_at": "2026-10-04T06:00:00Z",
+      "is_forecast": true,
+      "notice": "Forecast, not measurement. Values after the last measured day are projections from past source-reported data. They are not observations and can be wrong.",
+      "horizon_days": 7,
+      "history_days": 14,
+      "history_through": "2026-10-03",
+      "series": [
+        {
+          "id": "traffic-volume",
+          "name": "Network traffic volume",
+          "unit": "bytes-per-day",
+          "state": "ok",
+          "reason": null,
+          "detail": null,
+          "source_observed_at": "2026-10-03T23:58:00Z",
+          "history": [
+            {
+              "day": "2026-09-20",
+              "value": 1000000
+            },
+            {
+              "day": "2026-09-21",
+              "value": 1010000
+            },
+            {
+              "day": "2026-09-22",
+              "value": 1020000
+            },
+            {
+              "day": "2026-09-23",
+              "value": 1030000
+            },
+            {
+              "day": "2026-09-24",
+              "value": 1040000
+            },
+            {
+              "day": "2026-09-25",
+              "value": 1050000
+            },
+            {
+              "day": "2026-09-26",
+              "value": 1060000
+            },
+            {
+              "day": "2026-09-27",
+              "value": 1070000
+            },
+            {
+              "day": "2026-09-28",
+              "value": 1080000
+            },
+            {
+              "day": "2026-09-29",
+              "value": 1090000
+            },
+            {
+              "day": "2026-09-30",
+              "value": 1100000
+            },
+            {
+              "day": "2026-10-01",
+              "value": 1110000
+            },
+            {
+              "day": "2026-10-02",
+              "value": 1120000
+            },
+            {
+              "day": "2026-10-03",
+              "value": 1130000
+            }
+          ],
+          "history_missing_days": 0,
+          "method": {
+            "name": "linear-trend",
+            "why": "A straight-line trend fitted to 14 observed days (0 missing days left out).",
+            "observed_days": 14,
+            "slope_per_day": 10000,
+            "linear_mae": 0,
+            "seasonal_mae": null,
+            "band": "approximate-95-percent"
+          },
+          "forecast": [
+            {
+              "day": "2026-10-04",
+              "value": 1140000,
+              "lower": 1100000,
+              "upper": 1180000
+            },
+            {
+              "day": "2026-10-05",
+              "value": 1150000,
+              "lower": 1110000,
+              "upper": 1190000
+            },
+            {
+              "day": "2026-10-06",
+              "value": 1160000,
+              "lower": 1120000,
+              "upper": 1200000
+            },
+            {
+              "day": "2026-10-07",
+              "value": 1170000,
+              "lower": 1130000,
+              "upper": 1210000
+            },
+            {
+              "day": "2026-10-08",
+              "value": 1180000,
+              "lower": 1140000,
+              "upper": 1220000
+            },
+            {
+              "day": "2026-10-09",
+              "value": 1190000,
+              "lower": 1150000,
+              "upper": 1230000
+            },
+            {
+              "day": "2026-10-10",
+              "value": 1200000,
+              "lower": 1160000,
+              "upper": 1240000
+            }
+          ],
+          "threshold": null,
+          "crossing": null
+        },
+        {
+          "id": "wan-utilisation",
+          "name": "WAN link utilisation",
+          "unit": "percent",
+          "state": "not-connected",
+          "reason": "no-history-source",
+          "detail": "No source in this deployment provides link-utilisation history.",
+          "source_observed_at": null,
+          "history": [],
+          "history_missing_days": 0,
+          "method": null,
+          "forecast": [],
+          "threshold": null,
+          "crossing": null
+        }
+      ],
+      "recommendations": [
+        {
+          "id": "connect-history-wan-utilisation",
+          "kind": "connect-history-source",
+          "series_id": "wan-utilisation",
+          "title": "Connect a link-utilisation history source",
+          "advice": "WAN capacity cannot be forecast until a source reports utilisation history.",
+          "evidence": [
+            "No source in this deployment provides link-utilisation history."
+          ],
+          "advisory": true,
+          "executable": false
+        }
+      ]
+    },
+    "cases": [
+      {
+        "name": "every series not connected",
+        "valid": true,
+        "set": {
+          "state": "not-connected",
+          "series": [
+            {
+              "id": "wan-utilisation",
+              "name": "WAN link utilisation",
+              "unit": "percent",
+              "state": "not-connected",
+              "reason": "no-history-source",
+              "detail": "No source in this deployment provides link-utilisation history.",
+              "source_observed_at": null,
+              "history": [],
+              "history_missing_days": 0,
+              "method": null,
+              "forecast": [],
+              "threshold": null,
+              "crossing": null
+            },
+            {
+              "id": "inventory-growth",
+              "name": "Inventory growth",
+              "unit": "devices",
+              "state": "not-connected",
+              "reason": "no-history-source",
+              "detail": "No source in this deployment provides link-utilisation history.",
+              "source_observed_at": null,
+              "history": [],
+              "history_missing_days": 0,
+              "method": null,
+              "forecast": [],
+              "threshold": null,
+              "crossing": null
+            }
+          ],
+          "recommendations": []
+        }
+      },
+      {
+        "name": "a measurement claim",
+        "valid": false,
+        "set": {
+          "is_forecast": false
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "a changed notice",
+        "valid": false,
+        "set": {
+          "notice": "Measured."
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "horizon above the maximum",
+        "valid": false,
+        "set": {
+          "horizon_days": 31
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "history window below the minimum",
+        "valid": false,
+        "set": {
+          "history_days": 13
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "no series",
+        "valid": false,
+        "set": {
+          "series": []
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "overall state ok with no ok series",
+        "valid": false,
+        "set": {
+          "series": [
+            {
+              "id": "wan-utilisation",
+              "name": "WAN link utilisation",
+              "unit": "percent",
+              "state": "not-connected",
+              "reason": "no-history-source",
+              "detail": "No source in this deployment provides link-utilisation history.",
+              "source_observed_at": null,
+              "history": [],
+              "history_missing_days": 0,
+              "method": null,
+              "forecast": [],
+              "threshold": null,
+              "crossing": null
+            }
+          ]
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "overall not-connected with an ok series",
+        "valid": false,
+        "set": {
+          "state": "not-connected"
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "forecast longer than the horizon",
+        "valid": false,
+        "set": {
+          "horizon_days": 5
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "duplicate series",
+        "valid": false,
+        "set": {
+          "series": [
+            {
+              "id": "traffic-volume",
+              "name": "Network traffic volume",
+              "unit": "bytes-per-day",
+              "state": "ok",
+              "reason": null,
+              "detail": null,
+              "source_observed_at": "2026-10-03T23:58:00Z",
+              "history": [
+                {
+                  "day": "2026-09-20",
+                  "value": 1000000
+                },
+                {
+                  "day": "2026-09-21",
+                  "value": 1010000
+                },
+                {
+                  "day": "2026-09-22",
+                  "value": 1020000
+                },
+                {
+                  "day": "2026-09-23",
+                  "value": 1030000
+                },
+                {
+                  "day": "2026-09-24",
+                  "value": 1040000
+                },
+                {
+                  "day": "2026-09-25",
+                  "value": 1050000
+                },
+                {
+                  "day": "2026-09-26",
+                  "value": 1060000
+                },
+                {
+                  "day": "2026-09-27",
+                  "value": 1070000
+                },
+                {
+                  "day": "2026-09-28",
+                  "value": 1080000
+                },
+                {
+                  "day": "2026-09-29",
+                  "value": 1090000
+                },
+                {
+                  "day": "2026-09-30",
+                  "value": 1100000
+                },
+                {
+                  "day": "2026-10-01",
+                  "value": 1110000
+                },
+                {
+                  "day": "2026-10-02",
+                  "value": 1120000
+                },
+                {
+                  "day": "2026-10-03",
+                  "value": 1130000
+                }
+              ],
+              "history_missing_days": 0,
+              "method": {
+                "name": "linear-trend",
+                "why": "A straight-line trend fitted to 14 observed days (0 missing days left out).",
+                "observed_days": 14,
+                "slope_per_day": 10000,
+                "linear_mae": 0,
+                "seasonal_mae": null,
+                "band": "approximate-95-percent"
+              },
+              "forecast": [
+                {
+                  "day": "2026-10-04",
+                  "value": 1140000,
+                  "lower": 1100000,
+                  "upper": 1180000
+                },
+                {
+                  "day": "2026-10-05",
+                  "value": 1150000,
+                  "lower": 1110000,
+                  "upper": 1190000
+                },
+                {
+                  "day": "2026-10-06",
+                  "value": 1160000,
+                  "lower": 1120000,
+                  "upper": 1200000
+                },
+                {
+                  "day": "2026-10-07",
+                  "value": 1170000,
+                  "lower": 1130000,
+                  "upper": 1210000
+                },
+                {
+                  "day": "2026-10-08",
+                  "value": 1180000,
+                  "lower": 1140000,
+                  "upper": 1220000
+                },
+                {
+                  "day": "2026-10-09",
+                  "value": 1190000,
+                  "lower": 1150000,
+                  "upper": 1230000
+                },
+                {
+                  "day": "2026-10-10",
+                  "value": 1200000,
+                  "lower": 1160000,
+                  "upper": 1240000
+                }
+              ],
+              "threshold": null,
+              "crossing": null
+            },
+            {
+              "id": "traffic-volume",
+              "name": "Network traffic volume",
+              "unit": "bytes-per-day",
+              "state": "ok",
+              "reason": null,
+              "detail": null,
+              "source_observed_at": "2026-10-03T23:58:00Z",
+              "history": [
+                {
+                  "day": "2026-09-20",
+                  "value": 1000000
+                },
+                {
+                  "day": "2026-09-21",
+                  "value": 1010000
+                },
+                {
+                  "day": "2026-09-22",
+                  "value": 1020000
+                },
+                {
+                  "day": "2026-09-23",
+                  "value": 1030000
+                },
+                {
+                  "day": "2026-09-24",
+                  "value": 1040000
+                },
+                {
+                  "day": "2026-09-25",
+                  "value": 1050000
+                },
+                {
+                  "day": "2026-09-26",
+                  "value": 1060000
+                },
+                {
+                  "day": "2026-09-27",
+                  "value": 1070000
+                },
+                {
+                  "day": "2026-09-28",
+                  "value": 1080000
+                },
+                {
+                  "day": "2026-09-29",
+                  "value": 1090000
+                },
+                {
+                  "day": "2026-09-30",
+                  "value": 1100000
+                },
+                {
+                  "day": "2026-10-01",
+                  "value": 1110000
+                },
+                {
+                  "day": "2026-10-02",
+                  "value": 1120000
+                },
+                {
+                  "day": "2026-10-03",
+                  "value": 1130000
+                }
+              ],
+              "history_missing_days": 0,
+              "method": {
+                "name": "linear-trend",
+                "why": "A straight-line trend fitted to 14 observed days (0 missing days left out).",
+                "observed_days": 14,
+                "slope_per_day": 10000,
+                "linear_mae": 0,
+                "seasonal_mae": null,
+                "band": "approximate-95-percent"
+              },
+              "forecast": [
+                {
+                  "day": "2026-10-04",
+                  "value": 1140000,
+                  "lower": 1100000,
+                  "upper": 1180000
+                },
+                {
+                  "day": "2026-10-05",
+                  "value": 1150000,
+                  "lower": 1110000,
+                  "upper": 1190000
+                },
+                {
+                  "day": "2026-10-06",
+                  "value": 1160000,
+                  "lower": 1120000,
+                  "upper": 1200000
+                },
+                {
+                  "day": "2026-10-07",
+                  "value": 1170000,
+                  "lower": 1130000,
+                  "upper": 1210000
+                },
+                {
+                  "day": "2026-10-08",
+                  "value": 1180000,
+                  "lower": 1140000,
+                  "upper": 1220000
+                },
+                {
+                  "day": "2026-10-09",
+                  "value": 1190000,
+                  "lower": 1150000,
+                  "upper": 1230000
+                },
+                {
+                  "day": "2026-10-10",
+                  "value": 1200000,
+                  "lower": 1160000,
+                  "upper": 1240000
+                }
+              ],
+              "threshold": null,
+              "crossing": null
+            }
+          ]
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "extra field",
+        "valid": false,
+        "set": {
+          "confidence": "high"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "missing notice",
+        "valid": false,
+        "delete": [
+          "notice"
+        ],
+        "jsonschema_rejects": true
+      }
+    ]
+  }
+}

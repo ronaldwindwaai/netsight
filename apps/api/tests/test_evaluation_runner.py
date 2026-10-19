@@ -131,7 +131,12 @@ async def test_the_source_is_read_with_the_runner_clock_once_per_metric() -> Non
     )
     rig.stack.active_rule(
         name="alerts",
-        condition={"metric": "device.alert_count", "operator": "gt", "threshold": 0, "pattern": None},
+        condition={
+            "metric": "device.alert_count",
+            "operator": "gt",
+            "threshold": 0,
+            "pattern": None,
+        },
     )
     await rig.cycle()
     assert sorted(m for m, _ in rig.source.calls) == ["device.alert_count", "device.status"]
@@ -153,7 +158,10 @@ async def test_a_source_that_is_not_connected_produces_no_alert_and_no_fabricati
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "failure",
-    [RuntimeError("boom postgresql://u:p@h/x"), ObservationBatch("unknown", detail="SOURCE_FAILED")],
+    [
+        RuntimeError("boom postgresql://u:p@h/x"),
+        ObservationBatch("unknown", detail="SOURCE_FAILED"),
+    ],
 )
 async def test_a_failing_source_is_unknown_and_never_an_alert_or_a_recovery(
     failure: Exception | ObservationBatch,
@@ -197,7 +205,12 @@ async def test_a_reading_the_source_cannot_state_is_no_data_not_down() -> None:
 async def test_an_unsupported_metric_is_reported_and_never_read() -> None:
     rig = Rig()
     rig.stack.active_rule(
-        condition={"metric": "traffic.upload_bytes", "operator": "gt", "threshold": 1, "pattern": None}
+        condition={
+            "metric": "traffic.upload_bytes",
+            "operator": "gt",
+            "threshold": 1,
+            "pattern": None,
+        }
     )
     report = await rig.cycle()
     assert report.rules_unsupported == 1 and rig.source.calls == []
@@ -326,7 +339,12 @@ async def test_maintenance_never_silences_non_availability_alerts() -> None:
     rig = Rig(metrics=("device.status", "device.alert_count"))
     rig.stack.active_rule(
         name="Too many alerts",
-        condition={"metric": "device.alert_count", "operator": "gt", "threshold": 0, "pattern": None},
+        condition={
+            "metric": "device.alert_count",
+            "operator": "gt",
+            "threshold": 0,
+            "pattern": None,
+        },
     )
     rig.stack.window(evaluation="disable")
     rig.stack.window(evaluation="retain", name="also")
@@ -395,7 +413,12 @@ async def test_one_failing_metric_does_not_stop_the_others() -> None:
     rig.stack.active_rule()
     rig.stack.active_rule(
         name="alerts",
-        condition={"metric": "device.alert_count", "operator": "gt", "threshold": 0, "pattern": None},
+        condition={
+            "metric": "device.alert_count",
+            "operator": "gt",
+            "threshold": 0,
+            "pattern": None,
+        },
     )
     rig.source.batches["device.alert_count"] = RuntimeError("boom")
     down(rig, DEVICE_A)

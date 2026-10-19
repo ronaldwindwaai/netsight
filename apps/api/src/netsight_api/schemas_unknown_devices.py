@@ -177,7 +177,9 @@ class UnknownDeviceComparison(ApiModel):
             if (results["ip"] == "match" or results["mac"] != "no-match") or (
                 results["hostname"] != "match"
             ):
-                raise ValueError("a name match is a finding only when the MAC was asked and differs")
+                raise ValueError(
+                    "a name match is a finding only when the MAC was asked and differs"
+                )
             return self
         if "match" in results.values():
             raise ValueError("a finding exists only when nothing cleared the endpoint")
