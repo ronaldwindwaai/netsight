@@ -1,0 +1,32 @@
+# Root build context (used by apps/web/Dockerfile). Per-image ignores live next to each Dockerfile.
+.git
+.github
+.claude
+.opencode
+**/node_modules
+**/.next
+**/.venv
+**/__pycache__
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+.env
+.env.*
+!.env.example
+*.zip
+Netsight_Development_Package
+docs
+designs
+backlog
+feature-specs
+fixtures
+skills
+agents
+
+# apps/web/.dockerignore is only honoured for a web-only context; with the repo-root context the
+# web image uses this file, so its exclusions are repeated here.
+apps/web/e2e
+apps/web/coverage
+apps/web/playwright-report
+apps/web/test-results
+apps/api
