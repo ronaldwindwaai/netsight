@@ -21,9 +21,10 @@ async function apiFetch(path: string, init: RequestInit): Promise<Response> {
   if (!isSafeApiPath(path) || !path.startsWith('/api/v1/')) {
     throw new Error('Only Netsight API v1 paths are allowed');
   }
-  const base = resolveApiBase(process.env.NETSIGHT_API_URL);
-  const target = safeApiUrl(path, process.env.NETSIGHT_API_URL).href;
-  if (!target.startsWith(`${base.origin}/api/v1/`)) {
+  // The host comes only from the validated configuration; the allowlisted path is appended to it.
+  const origin = resolveApiBase(process.env.NETSIGHT_API_URL).origin;
+  const target = `${origin}${path}`;
+  if (safeApiUrl(path, process.env.NETSIGHT_API_URL).origin !== origin) {
     throw new Error('Only Netsight API v1 paths are allowed');
   }
   return fetch(target, init);
