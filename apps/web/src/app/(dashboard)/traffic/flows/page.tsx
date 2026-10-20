@@ -15,6 +15,7 @@ import {
   flowsPath,
   parseExplorerFilters,
   resolveTrafficWindow,
+  trafficHref,
 } from '@/lib/traffic-view';
 import { canReadTraffic, canReadTrafficDetail, viewerFromSession } from '@/lib/viewer';
 
@@ -72,7 +73,11 @@ export default async function FlowExplorerPage({ searchParams }: { searchParams:
         detail={detail}
       />
       <AppliedFilters window={window} values={filters.values} />
-      <FlowExplorerBody state={state} filtered={filtered} />
+      <FlowExplorerBody
+        state={state}
+        filtered={filtered}
+        linkTo={(extra) => trafficHref('flows', window, { ...filters.values, ...extra })}
+      />
     </AppContent>
   );
 }

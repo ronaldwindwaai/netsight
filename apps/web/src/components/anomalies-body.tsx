@@ -1,3 +1,5 @@
+import Link from 'next/link';
+
 import { CohortNotice } from '@/components/cohort-notice';
 import { FreshnessNotice } from '@/components/data-state';
 import { StatusWord } from '@/components/traffic-status';
@@ -10,6 +12,7 @@ import type {
   TrafficAnomaliesResponse,
 } from '@/lib/api-contracts-traffic-explorer';
 import type { FetchState } from '@/lib/api-response';
+import type { TrafficWindow } from '@/lib/traffic-view';
 import { formatBytes } from '@/lib/format-bytes';
 import { formatUtcTimestamp } from '@/lib/format-time';
 import {
@@ -17,7 +20,9 @@ import {
   contextText,
   evaluationNotice,
   formatRatio,
+  flowsDrillHref,
   formatSignedBytes,
+  hourFlowsHref,
   historyNotice,
   patternLabel,
   seriesWithheldNotice,
@@ -74,7 +79,22 @@ function Context({ context, direction }: { context: AnomalyContext; direction: A
   );
 }
 
-function AnomalyCard({ item }: { item: Anomaly }) {
+function AnomalyFlowsLink({ item, detail }: { item: Anomaly; detail: boolean }) {
+  const filters = item.subject.kind === 'application' ? { application: item.subject.label ?? '' } : {};
+  const href = hourFlowsHref(item.bucket_start, item.bucket_end, filters, { detail });
+  if (href === null) return null;
+  return (
+    <p className="small mt-2 mb-0">
+      <Link href={href}>
+        <i className="bi bi-search me-1" aria-hidden="true" />
+        Inspect the flows in this hour
+        {item.subject.kind === 'application' ? ' for this application' : ''}
+      </Link>
+    </p>
+  );
+}
+
+function AnomalyCard({ item, detail }: { item: Anomaly; detail: boolean }) {
   const stat = (label: string, value: string) => (
     <div className="col-6 col-md-3">
       <dt className="small text-body-secondary fw-normal">{label}</dt>
@@ -101,11 +121,44 @@ function AnomalyCard({ item }: { item: Anomaly }) {
         {stat('Ratio', formatRatio(item.ratio))}
       </dl>
       <Context context={item.context} direction={item.direction} />
+      <AnomalyFlowsLink item={item} detail={detail} />
     </article>
   );
 }
 
-function FirstSeenTable({ rows }: { rows: readonly FirstSeen[] }) {
+function FirstSeenSubject({
+  row,
+  window,
+  detail,
+}: {
+  row: FirstSeen;
+  window: TrafficWindow | undefined;
+  detail: boolean;
+}) {
+  const filter =
+    row.kind === 'first-seen-asn'
+      ? { asn: String(row.asn ?? '') }
+      : { destination_ip: row.address ?? '' };
+  const href = window === undefined ? null : flowsDrillHref(window, filter, { detail });
+  const label = row.kind === 'first-seen-asn' ? `AS${row.asn}` : (row.address ?? '');
+  return href === null ? (
+    <span className="fw-semibold">{label}</span>
+  ) : (
+    <Link className="fw-semibold" href={href} title="Show the flows for this subject">
+      {label}
+    </Link>
+  );
+}
+
+function FirstSeenTable({
+  rows,
+  window,
+  detail,
+}: {
+  rows: readonly FirstSeen[];
+  window: TrafficWindow | undefined;
+  detail: boolean;
+}) {
   return (
     <div className="table-responsive">
       <table className="table table-sm table-striped mb-0">
@@ -127,10 +180,10 @@ function FirstSeenTable({ rows }: { rows: readonly FirstSeen[] }) {
               <td>{row.kind === 'first-seen-asn' ? 'First-seen ASN' : 'First-seen destination'}</td>
               <td>
                 {row.kind === 'first-seen-asn' ? (
-                  <span className="fw-semibold">AS{row.asn}</span>
+                  <FirstSeenSubject row={row} window={window} detail={detail} />
                 ) : (
                   <>
-                    <span className="fw-semibold">{row.address}</span>
+                    <FirstSeenSubject row={row} window={window} detail={detail} />
                     {row.domain !== null ? (
                       <span className="d-block small text-body-secondary">{row.domain}</span>
                     ) : null}
@@ -164,7 +217,17 @@ function FirstSeenTable({ rows }: { rows: readonly FirstSeen[] }) {
  * of its own and is never reported as "nothing happened"; working hours are context, not a finding;
  * the arithmetic behind every flag is on the card.
  */
-export function AnomaliesBody({ state }: { state: FetchState<TrafficAnomaliesResponse> }) {
+export function AnomaliesBody({
+  state,
+  window,
+  detail = false,
+}: {
+  state: FetchState<TrafficAnomaliesResponse>;
+  /** When given, first-seen subjects link to the Flow Explorer for that window. */
+  window?: TrafficWindow;
+  /** Whether the viewer holds traffic:read-detail (address filters are refused without it). */
+  detail?: boolean;
+}) {
   return (
     <TrafficGate state={state} noun="baselines" permission="traffic:read">
       {(data) => {
@@ -207,6 +270,7 @@ export function AnomaliesBody({ state }: { state: FetchState<TrafficAnomaliesRes
                     <AnomalyCard
                       key={`${index}:${item.bucket_start}:${item.subject.label ?? 'total'}`}
                       item={item}
+                      detail={detail}
                     />
                   ))}
                 </>
@@ -224,7 +288,7 @@ export function AnomaliesBody({ state }: { state: FetchState<TrafficAnomaliesRes
                 <>
                   <CohortNotice cohort={data.cohort} noun="first-seen entries" />
                   {data.first_seen.length > 0 ? (
-                    <FirstSeenTable rows={data.first_seen} />
+                    <FirstSeenTable rows={data.first_seen} window={window} detail={detail} />
                   ) : data.cohort.state === 'too-few-sources' ? null : (
                     <p className="text-body-secondary">
                       Nothing new was first seen among the highest-volume destinations and ASNs.

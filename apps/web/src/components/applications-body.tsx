@@ -1,3 +1,5 @@
+import Link from 'next/link';
+
 import { CohortNotice } from '@/components/cohort-notice';
 import { FreshnessNotice } from '@/components/data-state';
 import { StateSurface } from '@/components/state-surface';
@@ -9,10 +11,12 @@ import type {
   TrafficApplicationsResponse,
 } from '@/lib/api-contracts-traffic-explorer';
 import type { FetchState } from '@/lib/api-response';
+import type { TrafficWindow } from '@/lib/traffic-view';
 import { formatBytes, formatShare } from '@/lib/format-bytes';
 import {
   UNKNOWN,
   approvalPresentation,
+  flowsDrillHref,
   policyNotice,
   riskPresentation,
   trendPresentation,
@@ -43,7 +47,25 @@ function WithheldRow({ item, cohort }: { item: ApplicationRow; cohort: CohortSta
   );
 }
 
-function Row({ item, cohort }: { item: ApplicationRow; cohort: CohortStatus }) {
+function AppName({ item, drill }: { item: ApplicationRow; drill: string | null }) {
+  return drill === null ? (
+    <span className="fw-semibold">{item.application}</span>
+  ) : (
+    <Link className="fw-semibold" href={drill} title="Show the flows for this application">
+      {item.application}
+    </Link>
+  );
+}
+
+function Row({
+  item,
+  cohort,
+  drill,
+}: {
+  item: ApplicationRow;
+  cohort: CohortStatus;
+  drill: string | null;
+}) {
   if (item.visibility === 'withheld' || item.bytes === null) {
     return <WithheldRow item={item} cohort={cohort} />;
   }
@@ -51,7 +73,7 @@ function Row({ item, cohort }: { item: ApplicationRow; cohort: CohortStatus }) {
   return (
     <tr>
       <td>
-        <span className="fw-semibold">{item.application}</span>
+        <AppName item={item} drill={drill} />
         <span className="d-block small text-body-secondary">
           {item.category ?? 'Category not reported'}
         </span>
@@ -80,7 +102,14 @@ function Row({ item, cohort }: { item: ApplicationRow; cohort: CohortStatus }) {
  * Risk and approval come only from the operator policy file: without one they are Unknown, and the
  * page says so. Users are Unknown because counting people needs per-flow identity attribution.
  */
-export function ApplicationsBody({ state }: { state: FetchState<TrafficApplicationsResponse> }) {
+export function ApplicationsBody({
+  state,
+  window,
+}: {
+  state: FetchState<TrafficApplicationsResponse>;
+  /** When given, application names link to the Flow Explorer for that application and window. */
+  window?: TrafficWindow;
+}) {
   return (
     <TrafficGate
       state={state}
@@ -132,7 +161,16 @@ export function ApplicationsBody({ state }: { state: FetchState<TrafficApplicati
                     </thead>
                     <tbody>
                       {data.items.map((item) => (
-                        <Row key={`${item.rank}:${item.application}`} item={item} cohort={data.cohort} />
+                        <Row
+                          key={`${item.rank}:${item.application}`}
+                          item={item}
+                          cohort={data.cohort}
+                          drill={
+                            window === undefined
+                              ? null
+                              : flowsDrillHref(window, { application: item.application }, { detail: false })
+                          }
+                        />
                       ))}
                     </tbody>
                   </table>

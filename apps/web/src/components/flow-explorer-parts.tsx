@@ -13,6 +13,7 @@ import type {
   Volume,
 } from '@/lib/api-contracts-traffic-explorer';
 import { formatBytes, formatShare } from '@/lib/format-bytes';
+import type { FilterValues } from '@/lib/traffic-view';
 import { formatUtcTimestamp } from '@/lib/format-time';
 import {
   NOT_REPORTED,
@@ -60,7 +61,14 @@ export function AttributionCell({
         </>
       ) : null}
       {view.device !== null ? (
-        <span className="d-block small text-body-secondary">Device {view.device}</span>
+        <span className="d-block small text-body-secondary">
+          Device{' '}
+          {view.deviceId !== null ? (
+            <Link href={`/devices/${encodeURIComponent(view.deviceId)}`}>{view.device}</Link>
+          ) : (
+            view.device
+          )}
+        </span>
       ) : null}
       {view.reason !== '' ? (
         <span className="d-block small text-body-secondary">{view.reason}</span>
@@ -69,12 +77,40 @@ export function AttributionCell({
   );
 }
 
+/** Builds the Flow Explorer address for the current view narrowed by one more filter. */
+export type FlowLinker = (extra: FilterValues) => string;
+
+/** An address that, when a linker is given, drills into the flows to or from it. */
+function Endpoint({
+  address,
+  filter,
+  linkTo,
+}: {
+  address: string;
+  filter: 'source_ip' | 'destination_ip';
+  linkTo: FlowLinker | undefined;
+}) {
+  if (linkTo === undefined) return <span className="fw-semibold">{address}</span>;
+  const verb = filter === 'source_ip' ? 'from' : 'to';
+  return (
+    <Link
+      className="fw-semibold"
+      href={linkTo({ [filter]: address })}
+      title={`Show only flows ${verb} ${address}`}
+    >
+      {address}
+    </Link>
+  );
+}
+
 export function FlowRowsTable({
   flows,
   status,
+  linkTo,
 }: {
   flows: readonly TrafficFlow[];
   status: AttributionStatus;
+  linkTo?: FlowLinker;
 }) {
   return (
     <div className="table-responsive">
@@ -102,14 +138,14 @@ export function FlowRowsTable({
             >
               <td className="text-nowrap">{formatUtcTimestamp(flow.observed_at)}</td>
               <td>
-                <span className="fw-semibold">{flow.source_ip}</span>
+                <Endpoint address={flow.source_ip} filter="source_ip" linkTo={linkTo} />
               </td>
               <td>
                 <AttributionCell flow={flow} status={status} />
               </td>
               <td>{reported(flow.application)}</td>
               <td>
-                <span className="fw-semibold">{flow.destination_ip}</span>
+                <Endpoint address={flow.destination_ip} filter="destination_ip" linkTo={linkTo} />
                 {flow.destination_host !== null ? (
                   <span className="d-block small text-body-secondary">{flow.destination_host}</span>
                 ) : null}
