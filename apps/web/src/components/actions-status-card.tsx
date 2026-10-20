@@ -52,8 +52,9 @@ export function ActionsStatusCard({ state }: { state: FetchState<ActionStatus> }
           </dd>
           <dt className="col-sm-3">Storage</dt>
           <dd className="col-sm-9">
-            Held in memory: requests and their history are lost when the service restarts and are not shared
-            between workers.
+            {status.store.durable
+              ? 'Stored in PostgreSQL: requests and their history survive a restart and are shared between workers.'
+              : 'Held in memory: requests and their history are lost when the service restarts and are not shared between workers.'}
           </dd>
           <dt className="col-sm-3">Action types</dt>
           <dd className="col-sm-9">

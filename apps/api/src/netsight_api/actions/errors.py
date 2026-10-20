@@ -76,6 +76,18 @@ class StoreFull(ActionError):
     message = "The action store is full"
 
 
+class StoreUnavailable(ActionError):
+    code, status = "STORE_UNAVAILABLE", 503
+    message = "The action store is temporarily unavailable"
+
+
+class StoreMisconfigured(StoreUnavailable):
+    """The database answers but the store is not set up: a table, a grant or a trigger is missing."""
+
+    code = "STORE_NOT_READY"
+    message = "The action store is not set up"
+
+
 class TargetLocked(ActionError):
     code, status = "TARGET_LOCKED", 409
     message = "Another action is running on this target"

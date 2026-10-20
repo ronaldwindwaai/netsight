@@ -710,6 +710,16 @@
         }
       },
       {
+        "name": "durable postgres store",
+        "valid": true,
+        "set": {
+          "store": {
+            "kind": "postgres",
+            "durable": true
+          }
+        }
+      },
+      {
         "name": "self execution allowed by policy",
         "valid": true,
         "set": {
@@ -806,6 +816,40 @@
           "store": {
             "kind": "memory",
             "durable": true
+          }
+        }
+      },
+      {
+        "name": "postgres store claimed volatile",
+        "valid": false,
+        "jsonschema_rejects": true,
+        "set": {
+          "store": {
+            "kind": "postgres",
+            "durable": false
+          }
+        }
+      },
+      {
+        "name": "unknown store kind",
+        "valid": false,
+        "jsonschema_rejects": true,
+        "set": {
+          "store": {
+            "kind": "redis",
+            "durable": true
+          }
+        }
+      },
+      {
+        "name": "store carries an unknown field",
+        "valid": false,
+        "jsonschema_rejects": true,
+        "set": {
+          "store": {
+            "kind": "postgres",
+            "durable": true,
+            "dsn": "x"
           }
         }
       },

@@ -10,8 +10,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any, Literal
 
 from netsight_api.schemas_actions import (
@@ -37,6 +38,42 @@ def canonical(value: Any) -> str:
 
 def sha256_hex(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8", "surrogatepass")).hexdigest()
+
+
+def content_digest(
+    *,
+    action_id: str,
+    action_type: str,
+    target_id: str,
+    params: Mapping[str, Any],
+    risk: str,
+    requester_id: str,
+    reason: str,
+    source: Mapping[str, Any] | None,
+    approvals_required: int,
+    created_at: datetime,
+    approve_by: datetime,
+) -> str:
+    """Binds the id, the content and the deadline an approver is shown.
+
+    One function for the proposal and for a stored request, so a store can recompute the digest of what it
+    holds and refuse a row whose content moved. Times are taken in UTC and the reason stripped, exactly as
+    the contract model stores them, so the value survives a round trip through any store.
+    """
+    bound = {
+        "action_type": action_type,
+        "target_id": target_id,
+        "params": params,
+        "risk": risk,
+        "requester": requester_id,
+        "reason": reason.strip(),
+        "source": source,
+        "approvals_required": approvals_required,
+        "id": action_id,
+        "created_at": created_at.astimezone(UTC).isoformat(),
+        "approve_by": approve_by.astimezone(UTC).isoformat(),
+    }
+    return "sha256:" + sha256_hex(canonical(bound))
 
 
 @dataclass(frozen=True)
@@ -70,14 +107,20 @@ class NewAction:
 
     @property
     def digest(self) -> str:
-        """Binds the id, the content and the deadline an approver is shown."""
-        bound = {
-            **self._body(),
-            "id": self.id,
-            "created_at": self.created_at.isoformat(),
-            "approve_by": self.approve_by.isoformat(),
-        }
-        return "sha256:" + sha256_hex(canonical(bound))
+        """Binds the id, the content and the deadline an approver is shown (see ``content_digest``)."""
+        return content_digest(
+            action_id=self.id,
+            action_type=self.action_type,
+            target_id=self.target_id,
+            params=self.params,
+            risk=self.risk,
+            requester_id=self.requester.id,
+            reason=self.reason,
+            source=self.source.model_dump(mode="json") if self.source else None,
+            approvals_required=self.approvals_required,
+            created_at=self.created_at,
+            approve_by=self.approve_by,
+        )
 
     @property
     def fingerprint(self) -> str:

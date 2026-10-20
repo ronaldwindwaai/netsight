@@ -7,9 +7,10 @@ work, so people can see what is waiting and withdraw it. Two sources:
   and **not releasable through the API**, so a compromised session cannot undo an operator's stop;
 * a runtime switch an administrator can engage and release (release needs step-up at the route).
 
-The state is per process. Engaging one worker does not engage the others until a shared store exists:
-use the environment variable (and a restart) for a hard stop across workers. This is documented as a
-limitation, not hidden.
+The state is per process, whichever action store is in use (the PostgreSQL store does not share it
+either). Engaging the runtime switch on one worker does not engage the others: the environment variable
+plus a restart is the hard stop across workers. Persisting the flag (a one-row table read inside each
+decision transaction) is a documented follow-up, not built. This is a limitation, not hidden.
 """
 
 from __future__ import annotations

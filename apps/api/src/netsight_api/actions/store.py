@@ -18,42 +18,54 @@ Every rule that must hold under concurrency lives *here*, inside one lock, not i
   reports back is failed after its timeout;
 * the kill switch is read inside the lock, so a request cannot slip through while it is being engaged.
 
-The store keeps requests in memory: ``durable`` is false and a restart loses them. That is stated in
-the status contract, not hidden. Returned objects are copies; the history is append-only and
-hash-chained (``history.py``).
+``InMemoryActionStore`` keeps requests in memory: ``durable`` is false and a restart loses them. That is
+stated in the status contract, not hidden. ``postgres_store.PostgresActionStore`` implements the same
+Protocol with the same rules (``lifecycle.py``) in transactions under row locks. Returned objects are
+copies; the history is append-only and hash-chained (``history.py``).
 """
 
 from __future__ import annotations
 
-import itertools
+import logging
 import threading
-from collections.abc import Callable, Mapping
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Final, Protocol
+from typing import Final, Literal, Protocol
 
 from netsight_api.actions import errors as e
-from netsight_api.actions.history import next_event, verify_chain
+from netsight_api.actions import lifecycle
+from netsight_api.actions.history import history_matches
 from netsight_api.actions.killswitch import KillSwitch
+from netsight_api.actions.lifecycle import EXECUTION_GRACE_SECONDS, Move
 from netsight_api.actions.model import ExecutionFinish, NewAction
 from netsight_api.schemas_actions import (
-    ALLOWED_TRANSITIONS,
     OPEN_STATES,
     TERMINAL_STATES,
     ActionActor,
-    ActionExecution,
     ActionHistoryEvent,
     ActionRequest,
-    ActionVerification,
-    EventType,
     ExecutionMode,
     RequestState,
 )
 
+__all__ = [
+    "EVICT_MIN_AGE_SECONDS",
+    "EXECUTION_GRACE_SECONDS",
+    "MAX_OPEN_PER_REQUESTER",
+    "MAX_STORED",
+    "ActionStore",
+    "BeginResult",
+    "CreateResult",
+    "InMemoryActionStore",
+]
+
+_LOGGER: Final = logging.getLogger("netsight_api")
 MAX_OPEN_PER_REQUESTER: Final = 25
 MAX_STORED: Final = 5_000
-# A run is failed this long after its own timeout, so a slow executor is not cut off mid-step.
-EXECUTION_GRACE_SECONDS: Final = 60
+# A finished request may be evicted to make room only once it is this old, so a propose-and-cancel
+# loop (whose requests are all young) cannot push other people's finished records out of the store.
+EVICT_MIN_AGE_SECONDS: Final = 3_600
 
 
 @dataclass(frozen=True)
@@ -70,6 +82,8 @@ class BeginResult:
 
 class ActionStore(Protocol):
     allow_self_execute: bool
+    kind: Literal["memory", "postgres"]
+    durable: bool
 
     def create(self, new: NewAction, *, idempotency_key: str, now: datetime) -> CreateResult: ...
     def get(self, action_id: str) -> ActionRequest | None: ...
@@ -124,6 +138,7 @@ class ActionStore(Protocol):
         self, action_id: str, finish: ExecutionFinish, *, now: datetime
     ) -> ActionRequest: ...
     def expire_due(self, now: datetime) -> int: ...
+    def check(self) -> None: ...
 
 
 @dataclass
@@ -138,6 +153,9 @@ class _Record:
 
 
 class InMemoryActionStore:
+    kind: Literal["memory", "postgres"] = "memory"
+    durable = False
+
     def __init__(
         self,
         *,
@@ -157,6 +175,9 @@ class InMemoryActionStore:
         self._records: dict[str, _Record] = {}
         self._create_keys: dict[tuple[str, str], tuple[str, str]] = {}
 
+    def check(self) -> None:
+        """Memory is always reachable."""
+
     # --- reads ---------------------------------------------------------------------------------------
 
     def get(self, action_id: str) -> ActionRequest | None:
@@ -169,23 +190,10 @@ class InMemoryActionStore:
             return [x.model_copy(deep=True) for x in self._record(action_id).history]
 
     def verify_chain(self, action_id: str) -> bool:
-        """The hash chain verifies *and* the history agrees with the request it belongs to.
-
-        A chain alone cannot see its own tail being cut off; the last event must also be the request's
-        current version and state, and every step must start where the previous one ended.
-        """
+        """The hash chain verifies *and* the history agrees with the request it belongs to."""
         with self._lock:
             rec = self._record(action_id)
-            events = rec.history
-            if not verify_chain(action_id, events):
-                return False
-            last = events[-1]
-            if last.seq != rec.request.version or last.to_state != rec.request.state:
-                return False
-            return all(
-                later.from_state in (None, earlier.to_state)
-                for earlier, later in itertools.pairwise(events)
-            )
+            return history_matches(rec.request, rec.history)
 
     def list_requests(
         self, *, state: RequestState | None = None, limit: int, offset: int, now: datetime
@@ -208,43 +216,25 @@ class InMemoryActionStore:
                 if seen[1] != new.fingerprint:
                     raise e.IdempotencyConflict
                 return CreateResult(self._record(seen[0]).request.model_copy(deep=True), True)
-            self._admit(new)
-            request = ActionRequest(
-                id=new.id,
-                action_type=new.action_type,
-                target_id=new.target_id,
-                params=dict(new.params),
-                risk=new.risk,
-                state="proposed",
-                requester=new.requester,
-                reason=new.reason,
-                source=new.source,
-                approvals_required=new.approvals_required,
-                approvals=[],
-                created_at=new.created_at,
-                approve_by=new.approve_by,
-                execute_by=None,
-                version=1,
-                digest=new.digest,
-                policy_checks=list(new.policy_checks),
-                pre_checks=[],
-                execution=None,
+            self._admit(new, now)
+            request = lifecycle.new_request(new)
+            rec = _Record(
+                request,
+                [lifecycle.genesis_event(request, now)],
+                new.execute_within_seconds,
+                new.timeout_seconds,
             )
-            rec = _Record(request, [], new.execute_within_seconds, new.timeout_seconds)
             rec.create_scope = scope
             self._records[new.id] = rec
             self._create_keys[scope] = (new.id, new.fingerprint)
-            self._emit(rec, now, "proposed", new.requester.id, None, "proposed", "proposed")
-            self._apply(rec, now, "policy-checked", None, "proposed", "policy-passed")
-            self._apply(
-                rec, now, "submitted", new.requester.id, "pending-approval", "awaiting-approval"
-            )
+            for move in lifecycle.creation_moves(request):
+                self._apply(rec, now, move)
             return CreateResult(rec.request.model_copy(deep=True), False)
 
-    def _admit(self, new: NewAction) -> None:
+    def _admit(self, new: NewAction, now: datetime) -> None:
         if self._kill.engaged:
             raise e.KillSwitchEngaged
-        if len(self._records) >= self._max_stored and not self._evict_oldest_finished():
+        if len(self._records) >= self._max_stored and not self._evict_oldest_finished(now):
             raise e.StoreFull
         mine = 0
         for rec in self._records.values():
@@ -257,16 +247,22 @@ class InMemoryActionStore:
         if mine >= self._max_open:
             raise e.TooManyOpenRequests
 
-    def _evict_oldest_finished(self) -> bool:
+    def _evict_oldest_finished(self, now: datetime) -> bool:
         """Make room by dropping the oldest finished request (and its idempotency key). Open requests stay.
 
-        The audit log keeps the record of what happened; the volatile store only needs to stay bounded, and
-        a propose-and-cancel loop must not be able to fill it for everyone.
+        Only a request older than ``EVICT_MIN_AGE_SECONDS`` is a candidate. The audit log keeps the record
+        of what happened; the volatile store only needs to stay bounded.
         """
-        finished = [r for r in self._records.values() if r.request.state in TERMINAL_STATES]
+        cutoff = now - timedelta(seconds=EVICT_MIN_AGE_SECONDS)
+        finished = [
+            r
+            for r in self._records.values()
+            if r.request.state in TERMINAL_STATES and r.request.created_at <= cutoff
+        ]
         if not finished:
             return False
         oldest = min(finished, key=lambda r: (r.request.created_at, r.request.id))
+        _LOGGER.warning("action request %s evicted to make room", oldest.request.id)
         del self._records[oldest.request.id]
         if oldest.create_scope is not None:
             self._create_keys.pop(oldest.create_scope, None)
@@ -288,28 +284,9 @@ class InMemoryActionStore:
             self._raise_if_expired(rec, now)
             if self._kill.engaged:
                 raise e.KillSwitchEngaged
-            if approver.kind != "human":
-                raise e.ApproverNotHuman
-            request = self._quoted(rec, expected_digest, expected_version)
-            self._require(request, "pending-approval")
-            if approver.id == request.requester.id:
-                raise e.SelfApproval
-            if any(a.approver_id == approver.id for a in request.approvals):
-                raise e.AlreadyApproved
-            approvals = [*request.approvals, {"approver_id": approver.id, "approved_at": now}]
-            complete = len(approvals) >= request.approvals_required
-            self._apply(
-                rec,
-                now,
-                "approved",
-                approver.id,
-                "approved" if complete else "pending-approval",
-                "approval-complete" if complete else "approval-recorded",
-                update={
-                    "approvals": approvals,
-                    "execute_by": now + timedelta(seconds=rec.execute_within) if complete else None,
-                },
-            )
+            quote = (expected_digest, expected_version)
+            move = lifecycle.approval_move(rec.request, approver, quote, now, rec.execute_within)
+            self._apply(rec, now, move)
             return rec.request.model_copy(deep=True)
 
     def reject(
@@ -325,11 +302,8 @@ class InMemoryActionStore:
         with self._lock:
             rec = self._record(action_id)
             self._raise_if_expired(rec, now)
-            if actor.kind != "human":
-                raise e.ApproverNotHuman
-            request = self._quoted(rec, expected_digest, expected_version)
-            self._require(request, "proposed", "pending-approval")
-            self._apply(rec, now, "rejected", actor.id, "rejected", "rejected", note=reason)
+            quote = (expected_digest, expected_version)
+            self._apply(rec, now, lifecycle.rejection_move(rec.request, actor, quote, reason))
             return rec.request.model_copy(deep=True)
 
     def cancel(
@@ -345,9 +319,8 @@ class InMemoryActionStore:
         with self._lock:
             rec = self._record(action_id)
             self._raise_if_expired(rec, now)
-            request = self._quoted(rec, expected_digest, expected_version)
-            self._require(request, "proposed", "pending-approval", "approved")
-            self._apply(rec, now, "cancelled", actor.id, "cancelled", "cancelled", note=reason)
+            quote = (expected_digest, expected_version)
+            self._apply(rec, now, lifecycle.cancellation_move(rec.request, actor, quote, reason))
             return rec.request.model_copy(deep=True)
 
     # --- execution -----------------------------------------------------------------------------------
@@ -379,40 +352,22 @@ class InMemoryActionStore:
             self._raise_if_expired(rec, now)
             if self._kill.engaged:
                 raise e.KillSwitchEngaged
-            if actor.kind != "human":
-                raise e.ApproverNotHuman
-            if not self.allow_self_execute and actor.id == rec.request.requester.id:
-                raise e.SelfExecution
-            request = self._quoted(rec, expected_digest, expected_version)
-            self._require(request, "approved")
+            quote = (expected_digest, expected_version)
+            lifecycle.check_start(
+                rec.request, actor, quote, allow_self_execute=self.allow_self_execute
+            )
             if any(
-                other.request.target_id == request.target_id
+                other.request.target_id == rec.request.target_id
                 and other.request.state == "executing"
-                and other.request.id != request.id
+                and other.request.id != rec.request.id
                 for other in self._records.values()
             ):
                 raise e.TargetLocked
             rec.exec_key = (idempotency_key, actor.id)
-            execution = ActionExecution(
-                executor=executor_id,
-                mode=mode,
-                effect="none" if mode == "dry-run" else "unknown",
-                started_at=now,
-                finished_at=None,
-                planned_steps=steps,
-                verification=ActionVerification(state="unknown", detail="not-run"),
-                rollback=None,
-                failure=None,
+            move = lifecycle.start_move(
+                actor, executor_id=executor_id, mode=mode, steps=steps, now=now
             )
-            self._apply(
-                rec,
-                now,
-                "execution-started",
-                actor.id,
-                "executing",
-                "execution-started",
-                update={"execution": execution},
-            )
+            self._apply(rec, now, move)
             return BeginResult(rec.request.model_copy(deep=True), False)
 
     def finish_execution(
@@ -420,38 +375,8 @@ class InMemoryActionStore:
     ) -> ActionRequest:
         with self._lock:
             rec = self._record(action_id)
-            self._require(rec.request, "executing")
-            execution = rec.request.execution
-            if execution is None or not finish.events:
-                raise e.InvalidOutcome
-            if execution.mode == "dry-run" and finish.effect != "none":
-                raise e.InvalidOutcome  # a dry run never changes anything, whatever an executor says
-            update_request: dict[str, object] = {}
-            if finish.pre_checks:
-                update_request["pre_checks"] = list(finish.pre_checks)
-            done = execution.model_copy(
-                update={
-                    "effect": finish.effect,
-                    "finished_at": finish.finished_at,
-                    "verification": finish.verification,
-                    "rollback": finish.rollback,
-                    "failure": finish.failure,
-                }
-            )
-            last = len(finish.events) - 1
-            for index, (kind, code) in enumerate(finish.events):
-                if index == last:
-                    self._apply(
-                        rec,
-                        now,
-                        kind,
-                        None,
-                        finish.final_state,
-                        code,
-                        update={"execution": done, **update_request},
-                    )
-                else:
-                    self._apply(rec, now, kind, None, "executing", code)
+            for move in lifecycle.finish_moves(rec.request, finish):
+                self._apply(rec, now, move)
             return rec.request.model_copy(deep=True)
 
     # --- deadlines -----------------------------------------------------------------------------------
@@ -468,44 +393,13 @@ class InMemoryActionStore:
             )
 
     def _expire_one(self, rec: _Record, now: datetime) -> bool:
-        request = rec.request
-        if request.state in ("proposed", "pending-approval") and now > request.approve_by:
-            self._apply(rec, now, "expired", None, "expired", "approval-window-closed")
-            self._report(rec, "expired", "approval-window-closed")
-            return True
-        if (
-            request.state == "approved"
-            and request.execute_by is not None
-            and now > request.execute_by
-        ):
-            self._apply(rec, now, "expired", None, "expired", "execution-window-closed")
-            self._report(rec, "expired", "execution-window-closed")
-            return True
-        execution = request.execution
-        deadline = (
-            execution.started_at + timedelta(seconds=rec.timeout + EXECUTION_GRACE_SECONDS)
-            if execution is not None
-            else None
-        )
-        if (
-            request.state == "executing"
-            and execution is not None
-            and deadline is not None
-            and now > deadline
-        ):
-            failed = execution.model_copy(
-                update={"finished_at": now, "failure": "executor-timeout"}
-            )
-            self._apply(
-                rec, now, "failed", None, "failed", "executor-timeout", update={"execution": failed}
-            )
-            self._report(rec, "failed", "executor-timeout")
-            return True
-        return False
-
-    def _report(self, rec: _Record, state: str, code: str) -> None:
+        move = lifecycle.expiry_move(rec.request, rec.timeout, now)
+        if move is None:
+            return False
+        self._apply(rec, now, move)
         if self._on_system is not None:
-            self._on_system(rec.request.id, state, code)
+            self._on_system(rec.request.id, move.to_state, move.code)
+        return True
 
     def _raise_if_expired(self, rec: _Record, now: datetime) -> None:
         if self._expire_one(rec, now) and rec.request.state == "expired":
@@ -520,62 +414,8 @@ class InMemoryActionStore:
         return rec
 
     @staticmethod
-    def _quoted(rec: _Record, digest: str, version: int) -> ActionRequest:
-        if rec.request.digest != digest or rec.request.version != version:
-            raise e.StaleRequest
-        return rec.request
-
-    @staticmethod
-    def _require(request: ActionRequest, *states: str) -> None:
-        if request.state not in states:
-            raise e.IllegalTransition
-
-    def _emit(
-        self,
-        rec: _Record,
-        now: datetime,
-        kind: EventType,
-        actor_id: str | None,
-        from_state: RequestState | None,
-        to_state: RequestState,
-        code: str,
-        note: str | None = None,
-    ) -> ActionHistoryEvent:
-        moves = from_state is not None and from_state != to_state
-        if moves and to_state not in ALLOWED_TRANSITIONS[from_state]:  # type: ignore[index]
-            raise RuntimeError("illegal lifecycle move")  # a bug, never reachable from a request
-        event = next_event(
-            rec.request.id,
-            rec.history[-1] if rec.history else None,
-            at=now,
-            type=kind,
-            actor_id=actor_id,
-            from_state=from_state,
-            to_state=to_state,
-            code=code,
-            note=note,
-        )
-        rec.history.append(event)
-        return event
-
-    def _apply(
-        self,
-        rec: _Record,
-        now: datetime,
-        kind: EventType,
-        actor_id: str | None,
-        to_state: RequestState,
-        code: str,
-        *,
-        note: str | None = None,
-        update: Mapping[str, object] | None = None,
-    ) -> None:
+    def _apply(rec: _Record, now: datetime, move: Move) -> None:
         """Append the event, then re-validate the whole request against the contract's invariants."""
-        event = self._emit(rec, now, kind, actor_id, rec.request.state, to_state, code, note)
-        merged = {
-            **rec.request.model_dump(),
-            **(update or {}),
-            "state": to_state,
-            "version": event.seq,
-        }
-        rec.request = ActionRequest.model_validate(merged)
+        previous = rec.history[-1] if rec.history else None
+        rec.request, event = lifecycle.advance(rec.request, previous, now, move)
+        rec.history.append(event)
