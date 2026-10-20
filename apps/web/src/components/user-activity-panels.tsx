@@ -5,6 +5,8 @@
  * attribution's basis and evidence beside it. A source that is not connected or failed is said so;
  * an address that is not among the listed talkers is "not listed", never zero bytes.
  */
+import Link from 'next/link';
+
 import { BasisBadge, EvidenceList } from '@/components/identity-parts';
 import { StateSurface } from '@/components/state-surface';
 import type {
@@ -16,6 +18,7 @@ import type {
 import { formatBytes } from '@/lib/format-bytes';
 import { formatUtcTimestamp } from '@/lib/format-time';
 import { confidenceText } from '@/lib/identity-view';
+import { hourFlowsHref } from '@/lib/traffic-view';
 
 const SEVERITY_LABEL = {
   info: 'Info',
@@ -32,7 +35,27 @@ function volumeText(item: UserTrafficItem, topN: number): string {
   return item.bytes === null ? `Not among the top ${topN} talkers` : formatBytes(item.bytes);
 }
 
-export function TrafficPanel({ traffic }: { traffic: UserTraffic }) {
+/** An attributed address, linked to its flows in the evidence window when the viewer may filter by address. */
+function AddressCell({ address, window, inspectFlows }: { address: string; window: { from: string; to: string }; inspectFlows: boolean }) {
+  const href = inspectFlows
+    ? hourFlowsHref(window.from, window.to, { source_ip: address }, { detail: true })
+    : null;
+  if (href === null) return <>{address}</>;
+  return (
+    <Link href={href} title="Show the flows from this address in the evidence window">
+      {address}
+    </Link>
+  );
+}
+
+export function TrafficPanel({
+  traffic,
+  inspectFlows = false,
+}: {
+  traffic: UserTraffic;
+  /** True when the viewer holds traffic:read-detail, so address filters are accepted. */
+  inspectFlows?: boolean;
+}) {
   if (traffic.state === 'not-connected') {
     return (
       <StateSurface
@@ -51,6 +74,7 @@ export function TrafficPanel({ traffic }: { traffic: UserTraffic }) {
       />
     );
   }
+  const range = traffic.window;
   return (
     <>
       <p className="small text-body-secondary">
@@ -72,7 +96,13 @@ export function TrafficPanel({ traffic }: { traffic: UserTraffic }) {
             <tbody>
               {traffic.items.map((item) => (
                 <tr key={item.address}>
-                  <td>{item.address}</td>
+                  <td>
+                    <AddressCell
+                      address={item.address}
+                      window={range}
+                      inspectFlows={inspectFlows}
+                    />
+                  </td>
                   <td>{volumeText(item, traffic.top_n)}</td>
                 </tr>
               ))}

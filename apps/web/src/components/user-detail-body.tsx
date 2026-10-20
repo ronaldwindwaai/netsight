@@ -50,7 +50,14 @@ function SessionCard({ session }: { session: IdentitySession }) {
   );
 }
 
-export function UserDetailBody({ state }: { state: FetchState<UserDetailResponse> }) {
+export function UserDetailBody({
+  state,
+  inspectFlows = false,
+}: {
+  state: FetchState<UserDetailResponse>;
+  /** True when the viewer holds traffic:read-detail, so addresses can link to their flows. */
+  inspectFlows?: boolean;
+}) {
   const surface = stateSurface(state);
   if (state.kind !== 'ok') {
     if (surface === 'permission') {
@@ -123,7 +130,7 @@ export function UserDetailBody({ state }: { state: FetchState<UserDetailResponse
       ) : null}
       {traffic !== null ? (
         <Section id="traffic-heading" title="Traffic">
-          <TrafficPanel traffic={traffic} />
+          <TrafficPanel traffic={traffic} inspectFlows={inspectFlows} />
         </Section>
       ) : null}
       {security !== null ? (

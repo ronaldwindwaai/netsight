@@ -8,6 +8,7 @@
  * identified" with the reason, and an ambiguous one lists every candidate and selects none. Every
  * label (a name, a hostname) is untrusted source text and is rendered as text, never as markup.
  */
+import Link from 'next/link';
 import { Alert } from '@adminlte/react';
 
 import type {
@@ -24,6 +25,7 @@ import {
   attributionHeadline,
   basisPresentation,
   confidenceText,
+  entityHref,
   entityKindLabel,
   entityText,
   evidenceKindLabel,
@@ -43,12 +45,24 @@ export function BasisBadge({ basis }: { basis: Basis }) {
   );
 }
 
+function EntityLabel({ entity }: { entity: EntityRef }) {
+  const href = entityHref(entity);
+  const text = entityText(entity);
+  return href === null ? (
+    <span className="fw-semibold">{text}</span>
+  ) : (
+    <Link className="fw-semibold" href={href}>
+      {text}
+    </Link>
+  );
+}
+
 export function EntityName({ entity }: { entity: EntityRef | null }) {
   if (entity === null) return <span className="fst-italic">{entityText(null)}</span>;
   return (
     <span>
       <span className="small text-body-secondary">{entityKindLabel(entity.type)}</span>{' '}
-      <span className="fw-semibold">{entityText(entity)}</span>
+      <EntityLabel entity={entity} />
     </span>
   );
 }

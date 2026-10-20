@@ -110,6 +110,19 @@ export function entityKindLabel(kind: EntityKind): string {
 }
 
 /** The entity as plain text: its label when it has one, else a typed id. Never markup. */
+/**
+ * Where an entity can be read in full, or null when it has no page of its own (an account, an
+ * address). The id was validated by the contract parser, and is encoded again here.
+ */
+export function entityHref(entity: EntityRef): string | null {
+  const id = encodeURIComponent(entity.id);
+  if (entity.type === 'person') return `/users/${id}`;
+  if (entity.type === 'device' || entity.type === 'switch' || entity.type === 'ap') {
+    return `/devices/${id}`;
+  }
+  return null;
+}
+
 export function entityText(entity: EntityRef | null): string {
   if (entity === null) return NOT_IDENTIFIED;
   if (entity.label !== null) return entity.label;
