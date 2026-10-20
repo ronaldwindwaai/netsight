@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from collections.abc import Iterator
 
 import pytest
@@ -82,3 +83,39 @@ def _fresh_shared_clickhouse_client() -> Iterator[None]:
     clickhouse_shared.reset_for_tests()
     yield
     clickhouse_shared.reset_for_tests()
+
+
+# --- CI guard: the live PostgreSQL suites must not skip silently ----------------------------
+# With NETSIGHT_REQUIRE_PG=1 (set by the CI python job) a missing NETSIGHT_TEST_PG_DSN aborts the
+# run, and any test skipped by the ``requires_pg`` marker fails the session. Without the variable
+# nothing changes: the live suites stay opt-in for local runs.
+REQUIRE_PG_ENV = "NETSIGHT_REQUIRE_PG"
+PG_DSN_ENV = "NETSIGHT_TEST_PG_DSN"
+_pg_skips: list[str] = []
+
+
+def _require_pg() -> bool:
+    return os.environ.get(REQUIRE_PG_ENV) == "1"
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    if _require_pg() and not os.environ.get(PG_DSN_ENV):
+        raise pytest.UsageError(f"{REQUIRE_PG_ENV}=1 but {PG_DSN_ENV} is not set")
+
+
+def pytest_runtest_logreport(report: pytest.TestReport) -> None:
+    if not _require_pg() or not report.skipped:
+        return
+    longrepr = report.longrepr
+    reason = str(longrepr[2]) if isinstance(longrepr, tuple) else str(longrepr)
+    if PG_DSN_ENV in reason:
+        _pg_skips.append(report.nodeid)
+
+
+def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
+    if _pg_skips:
+        print(
+            f"\n{REQUIRE_PG_ENV}=1: {len(_pg_skips)} live PostgreSQL test(s) were skipped:\n  "
+            + "\n  ".join(_pg_skips[:20])
+        )
+        session.exitstatus = 1
