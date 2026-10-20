@@ -64,8 +64,11 @@ async def test_budget_exhaustion_keeps_the_pending_state_of_unreached_entities()
     # B was not reached in the second cycle, yet its debounce (since T0) must survive
     assert pending_phase(rig, rule, DEVICE_B) == "pending"
     third = await rig.cycle(advance=60)  # T0 + 120 s of unbroken evidence for B
-    assert third.fired >= 1
-    assert len(rig.incidents) >= 1
+    assert third.fired == 1  # exactly B: the entity whose debounce survived two unreached cycles
+    (incident,) = rig.incidents
+    assert DEVICE_B in incident.title
+    assert pending_phase(rig, rule, DEVICE_B) == "firing"
+    assert pending_phase(rig, rule, DEVICE_C) == "pending"  # started a minute later: not yet
 
 
 @pytest.mark.asyncio
@@ -402,10 +405,12 @@ async def test_more_than_the_window_cap_marks_the_cycle_truncated(
 
 
 def make_service(stack: Stack, links: Any) -> AlertIncidentService:
-    return AlertIncidentService(stack.incidents, links)
+    return AlertIncidentService(stack.evaluator_with(links), links)
 
 
-def test_a_lost_claim_race_audits_the_orphan_incident(caplog: pytest.LogCaptureFixture) -> None:
+def test_a_lost_claim_race_is_audited_and_leaves_no_orphan(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     stack = Stack.build()
     rule = stack.active_rule()
     winner = stack.incidents.create_incident(title="rival", severity="high", actor_id="x:rival")
@@ -417,8 +422,8 @@ def test_a_lost_claim_race_audits_the_orphan_incident(caplog: pytest.LogCaptureF
     failures = [r for r in audit_records(caplog) if r["outcome"] == "failure"]
     (record,) = failures
     assert record["action"] == "incident.auto_create" and record["reason"] == "CLAIM_LOST"
-    orphan = next(i for i in stack.incidents.list_incidents(limit=10) if i.id != winner.id)
-    assert record["target"] == orphan.id
+    assert [i.id for i in stack.incidents.list_incidents(limit=10)] == [winner.id]
+    assert record["target"] == winner.id  # the incident that carries the alert
 
 
 class AlertKeyRace(InMemoryAlertIncidentLinkRepository):
@@ -474,7 +479,7 @@ def restarted(rig: Rig) -> Rig:
     fresh.runner = EvaluationRunner(
         rules=rig.stack.rules,
         source=rig.source,
-        incidents=AlertIncidentService(rig.stack.incidents, rig.stack.links),
+        incidents=AlertIncidentService(rig.stack.evaluator, rig.stack.links),
         notifier=None,
         clock=rig.stack.clock,
     )
@@ -539,12 +544,12 @@ async def test_recovery_with_the_incident_still_open_re_arms_so_a_later_resoluti
 # --- narrow incident dependency ----------------------------------------------------------------------
 
 
-def test_the_incident_service_needs_only_create_append_and_get() -> None:
+def test_the_incident_service_needs_only_open_append_and_get() -> None:
     stack = Stack.build()
     real = stack.incidents
 
     class Narrow:
-        create_incident = real.create_incident
+        open_linked = stack.opener.open_linked
         append_event = real.append_event
         get_incident = real.get_incident
 

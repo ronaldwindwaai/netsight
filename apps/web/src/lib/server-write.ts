@@ -12,9 +12,11 @@ import { describeWriteFailure } from '@/lib/write-outcome';
  * A server action is a public POST. Its own cross-site control is asserted here rather than left
  * to the framework default: the browser's Origin (Referer only when Origin is absent) must be
  * this very site, scheme and host. `X-Forwarded-Host` / `-Proto` count only when
- * `NETSIGHT_TRUST_PROXY_HEADERS=true` (a proxy that overwrites them). This is defence in depth in
- * front of `apiPost`, which attaches the session cookie and the CSRF token server-side; the API
- * enforces its own origin allow-list as well.
+ * `NETSIGHT_TRUST_PROXY_HEADERS=true` (a proxy that overwrites them). This check is the origin
+ * control for web writes: `apiPost` is a server-to-server call that attaches the session cookie and
+ * the CSRF token but sends no `Origin` or `Referer`, so the API's own origin allow-list (which only
+ * judges a request that carries one) does not apply to it; the API relies on the session CSRF token
+ * for these calls.
  */
 export async function fromSameOrigin(): Promise<boolean> {
   const headerList = await headers();

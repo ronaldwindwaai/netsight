@@ -16,7 +16,13 @@ One ``run_cycle`` is a bounded unit of work; scheduling it is somebody else's jo
    (``AlertIncidentService``); for each released notification, route and send it
    (``AlertNotifier``). Work beyond the per-cycle caps or the notification deadline is deferred
    (incidents are re-derived next cycle; notifications wait in a bounded backlog, most severe
-   first); an overflow is counted and audited (``BACKLOG_FULL``), never dropped silently.
+   first); an overflow is counted and audited (``BACKLOG_FULL``), never dropped silently. A
+   deferred notification whose rule (version) is no longer live is dropped and counted as skipped.
+
+The leader lease is checked once before the apply phase and again before every incident write,
+recovery note and notification send: the apply phase can run for a minute, and a lease lost in
+that time (partition, failover) must stop the rest of the cycle, not merely the next one. Losing
+it resets the in-memory state (``lease_lost`` in the report).
 
 The evaluation budget (``max_evaluations``) is shared fairly between rules, and the entities of a
 rule are visited round-robin across cycles, so a rule with more observations than its share is
@@ -146,6 +152,10 @@ class _Effect:
     recovered: bool = False
 
 
+class _LeaseLost(Exception):
+    """The leader lease was no longer held at a re-check inside the apply phase."""
+
+
 class EvaluationRunner:
     def __init__(
         self,
@@ -215,14 +225,19 @@ class EvaluationRunner:
         self._linked = {k: v for k, v in self._linked.items() if (k[0], k[1]) in live}
         self._cursor = {k: v for k, v in self._cursor.items() if k in live}
         self._recoveries = {k: v for k, v in self._recoveries.items() if (k[0], k[1]) in live}
+        self._prune_backlog(live, tally)
         batches = await self._collect(rules, now)
         effects = await asyncio.to_thread(self._evaluate, rules, windows, batches, now, tally)
         if not await asyncio.to_thread(self._still_leader):
             self.reset_state()  # whoever leads now owns these alerts; stale state must not leak
-            return CycleReport(
-                at=now, correlation_id=correlation_id, rules_loaded=len(rules), lease_lost=True
-            )
-        await asyncio.to_thread(self._apply, effects, correlation_id, tally)
+            evaluated: dict[str, Any] = {**tally.counts, "rules_loaded": len(rules)}
+            return CycleReport(at=now, correlation_id=correlation_id, lease_lost=True, **evaluated)
+        try:
+            await asyncio.to_thread(self._apply, effects, correlation_id, tally)
+        except _LeaseLost:
+            self.reset_state()  # the new leader owns the alerts; what is left here is stale
+            partial: dict[str, Any] = {**tally.counts, "rules_loaded": len(rules)}
+            return CycleReport(at=now, correlation_id=correlation_id, lease_lost=True, **partial)
         counts: dict[str, Any] = {
             **tally.counts,
             "rules_loaded": len(rules),
@@ -241,9 +256,23 @@ class EvaluationRunner:
             _LOGGER.warning("lease check failed", extra={"error_type": type(error).__name__})
             return False
 
+    def _fence(self) -> None:
+        """Re-verify the lease before a side effect; losing it aborts the rest of the cycle."""
+        if not self._still_leader():
+            raise _LeaseLost
+
     @staticmethod
     def _live(rules: Sequence[AlertRule]) -> set[tuple[str, int]]:
         return {(rule.id, rule.version) for rule in rules}
+
+    def _prune_backlog(self, live: set[tuple[str, int]], tally: _Tally) -> None:
+        """Drop deferred notifications of a rule (version) that is no longer live (disabled,
+        edited back to draft, deleted from the active set): they must not page after the fact.
+        Each is counted as skipped."""
+        kept = [e for e in self._backlog if (e.rule.id, e.rule.version) in live]
+        if len(kept) != len(self._backlog):
+            tally.add("notifications_skipped", len(self._backlog) - len(kept))
+            self._backlog = deque(kept)
 
     def _load(
         self, now: datetime, tally: _Tally
@@ -365,7 +394,9 @@ class EvaluationRunner:
     ) -> int:
         """Evaluate up to ``share`` observations, round-robin; returns how many were used."""
         tally.add("rules_evaluated")
-        observations = batch.observations
+        # A stable order, whatever order the source lists devices in: the round-robin cursor is a
+        # position, so a reshuffled list would skip some entities and repeat others.
+        observations = sorted(batch.observations, key=lambda o: o.entity)
         total = len(observations)
         cursor_key = (rule.id, rule.version)
         start = self._cursor.get(cursor_key, 0) % total if total else 0
@@ -437,6 +468,7 @@ class EvaluationRunner:
                     tally.truncated = True
                 else:
                     incident_budget -= 1
+                    self._fence()
                     self._ensure_incident(effect, correlation_id, tally)
             if effect.decision.notify:
                 due.append(effect)
@@ -448,6 +480,7 @@ class EvaluationRunner:
             self._recoveries.clear()
             return
         for key, effect in list(self._recoveries.items()):
+            self._fence()
             try:
                 self._incidents.note_recovery(rule=effect.rule, decision=effect.decision)
             except Exception as error:  # noqa: BLE001 - keep it pending and carry on
@@ -486,6 +519,7 @@ class EvaluationRunner:
             if position >= self._limits.max_notifications or out_of_time:
                 self._defer(due[position:], correlation_id, tally)
                 return
+            self._fence()  # the lease may have gone while earlier sends were in flight
             try:
                 result = self._notifier.notify(
                     rule=effect.rule,

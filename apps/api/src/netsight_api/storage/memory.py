@@ -9,7 +9,8 @@ from __future__ import annotations
 
 import threading
 import uuid
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
+from contextlib import contextmanager
 from datetime import datetime
 
 from netsight_api.schemas import (
@@ -57,6 +58,21 @@ class InMemoryIncidentRepository:
             self._incidents[incident.id] = incident
             self._events[incident.id] = []
             return incident.model_copy(deep=True)
+
+    @contextmanager
+    def _atomic(self) -> Iterator[None]:
+        """Hold the store lock across several calls (re-entrant), so readers never see a
+        half-done multi-step write; pair it with ``_discard`` to roll a creation back. Not part of the repository
+        interface: the underscore keeps it out of the interface surface, and ``InMemoryAlertIncidentStore``
+        (in ``alert_incidents.py``) calls it deliberately, as a test-only collaborator."""
+        with self._lock:
+            yield
+
+    def _discard(self, incident_id: str) -> None:
+        """Forget an incident and its timeline: only to undo a creation inside ``atomic``."""
+        with self._lock:
+            self._incidents.pop(incident_id, None)
+            self._events.pop(incident_id, None)
 
     def get_incident(self, incident_id: str) -> Incident | None:
         with self._lock:

@@ -188,9 +188,15 @@ channel setting. Status:
   undo the incident.
 - **Single evaluator (enforced).** A PostgreSQL advisory lock on a dedicated, keepalive-enabled connection gates the scheduler;
   others idle and retry, and losing the lock stops evaluation and drops engine state. A lock backend error means not leader.
-  **Residual:** the lock is per database, not per schema; a half-open TCP connection is noticed only at the next check or
-  keepalive timeout (about a minute), during which two evaluators could overlap; the incident-link compare-and-set still prevents
-  duplicate incidents, but a repeat page is then possible (the cooldown ledger limits it).
+  Review fix (S6 step 2/3 review): the lease is re-verified against `pg_locks` before every incident write, recovery note and
+  send (not once per cycle), under a 10 s timeout with a 30 s `tcp_user_timeout`, and an unlocked-but-alive session counts as lost.
+  **Residual:** the lock is per database, not per schema; an overlap is possible only between a lease loss and its next check (one
+  send or write); the incident-link compare-and-set still prevents duplicate incidents (an incident, its link and its note are one
+  transaction, so a losing racer stores nothing), but a repeat page is then possible (the cooldown ledger limits it).
+  `DATABASE_URL` must not point at a transaction-mode pooler (advisory locks are session-bound).
+- **Evaluator privilege (defence in depth).** The evaluator holds a three-operation adapter, not the incident repository, and the
+  storage layer refuses any `service:` actor for judgements and rule edits. **Residual / follow-up:** it still connects with the
+  application database role, so SQL injected by a bug would not be limited by the database; a separate evaluator role is open.
 - **Open.** Engine state is per process, so after a restart a repeat page is prevented only by a non-zero
   `cooldown_seconds` and the durable ledger; destinations come from the environment (managing them in the database, and keeping
   secrets in the secret store, is a follow-up); there is no operator-facing evaluator status endpoint yet (logs and audit only);
