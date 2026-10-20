@@ -2,11 +2,14 @@ import Link from 'next/link';
 import { AppContent, Card, InfoBox } from '@adminlte/react';
 
 import { DataFailure, FreshnessNotice } from '@/components/data-state';
+import { OverviewIncidentsCard } from '@/components/overview-incidents-card';
 import { OverviewInternetKpi } from '@/components/overview-internet-kpi';
 import { OverviewApplicationMix, OverviewTopDestinations } from '@/components/overview-traffic-cards';
 import { apiGet } from '@/lib/api';
 import { parseOverviewResponse, parseSessionInfo } from '@/lib/api-contracts';
 import { parseInternetResponse } from '@/lib/api-contracts-internet';
+import { parseIncidentListResponse, parseIncidentSummaryListResponse } from '@/lib/api-contracts-incident-api';
+import { incidentReadMode } from '@/lib/incident-view';
 import {
   parseTrafficApplicationsResponse,
   parseTrafficDestinationsResponse,
@@ -36,6 +39,13 @@ function UnavailableSurface({
   );
 }
 
+function fetchIncidents(mode: ReturnType<typeof incidentReadMode>) {
+  if (mode === 'none') return Promise.resolve(null);
+  return mode === 'summary'
+    ? apiGet('/api/v1/incidents/summary?limit=50', parseIncidentSummaryListResponse)
+    : apiGet('/api/v1/incidents?limit=50', parseIncidentListResponse);
+}
+
 export default async function OverviewPage() {
   const [state, internet, session] = await Promise.all([
     apiGet('/api/v1/overview', parseOverviewResponse),
@@ -47,7 +57,9 @@ export default async function OverviewPage() {
   // refusal also renders as Restricted). The API enforces the same rules on its own.
   const viewer = viewerFromSession(session.kind === 'ok' ? session.data : null);
   const sessionUnread = session.kind !== 'ok';
-  const [destinations, applications] = await Promise.all([
+  const incidentMode = incidentReadMode(session.kind === 'ok' ? session.data.permissions : null);
+  const [incidents, destinations, applications] = await Promise.all([
+    fetchIncidents(incidentMode),
     sessionUnread || canReadTraffic(viewer)
       ? apiGet('/api/v1/traffic/destinations?preset=24h&limit=5', parseTrafficDestinationsResponse)
       : null,
@@ -102,26 +114,26 @@ export default async function OverviewPage() {
           />
         </Link>
         <OverviewInternetKpi state={internet} />
-        <div className="overview-kpi--unknown">
+        <Link className="overview-kpi-link overview-kpi--unknown" href="/security" aria-label="Security: not summarised on the overview. Open security events.">
           <InfoBox
             icon="bi-shield-exclamation"
             text="Security"
-            title="Not connected"
+            title="Not summarised"
             theme="secondary"
             progress={0}
-            progressText="Security sources unavailable"
+            progressText="Open security events"
           />
-        </div>
-        <div className="overview-kpi--unknown">
+        </Link>
+        <Link className="overview-kpi-link overview-kpi--unknown" href="/users" aria-label="Users: not summarised on the overview. Open users.">
           <InfoBox
             icon="bi-people"
             text="Users"
-            title="Not connected"
+            title="Not summarised"
             theme="secondary"
             progress={0}
-            progressText="Identity telemetry unavailable"
+            progressText="Open users"
           />
-        </div>
+        </Link>
       </section>
 
       <div className="row g-3 mb-3">
@@ -133,7 +145,9 @@ export default async function OverviewPage() {
             variant="outline"
             theme="primary"
             tools={
-              <span className="badge topology-source-badge">Topology source required</span>
+              <Link className="btn btn-sm btn-outline-primary" href="/network/map">
+                Open network map
+              </Link>
             }
           >
             <UnavailableSurface
@@ -144,19 +158,7 @@ export default async function OverviewPage() {
           </Card>
         </div>
         <div className="col-xl-4 order-1 order-xl-2">
-          <Card
-            className="operational-card operational-card--primary"
-            title="Active incidents"
-            icon="bi bi-exclamation-triangle"
-            variant="outline"
-            theme="secondary"
-          >
-            <UnavailableSurface
-              icon="bi-inboxes"
-              title="Incident service not connected"
-              detail="No incident count is shown because the incident engine is not available in this slice."
-            />
-          </Card>
+          <OverviewIncidentsCard state={incidents} />
         </div>
       </div>
 
