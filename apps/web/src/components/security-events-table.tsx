@@ -35,7 +35,26 @@ function formatTime(value: string): string {
  * instruction. An event with no canonical device says so rather than
  * guessing from an address.
  */
-export function SecurityEventsTable({ events }: { events: SecurityEvent[] }) {
+/** Address of the Flow Explorer for one source address, or null when it may not be offered. */
+export type FlowsHref = (sourceIp: string) => string | null;
+
+function Address({ value, flowsHref }: { value: string; flowsHref: FlowsHref | undefined }) {
+  const href = flowsHref?.(value) ?? null;
+  if (href === null) return <>{value}</>;
+  return (
+    <Link href={href} title="Show the flows from this address">
+      {value}
+    </Link>
+  );
+}
+
+export function SecurityEventsTable({
+  events,
+  flowsHref,
+}: {
+  events: SecurityEvent[];
+  flowsHref?: FlowsHref;
+}) {
   return (
     <div className="table-responsive">
       <table className="table table-sm table-striped table-hover mb-0">
@@ -67,7 +86,13 @@ export function SecurityEventsTable({ events }: { events: SecurityEvent[] }) {
               </td>
               <td>{SOURCE_LABEL[event.source]}</td>
               <td>
-                <span>{event.source_ip ?? 'Not reported'}</span>
+                <span>
+                  {event.source_ip === null ? (
+                    'Not reported'
+                  ) : (
+                    <Address value={event.source_ip} flowsHref={flowsHref} />
+                  )}
+                </span>
                 {event.destination_ip ? (
                   <span className="d-block small text-body-secondary">
                     → {event.destination_ip}
