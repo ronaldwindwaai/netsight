@@ -147,7 +147,15 @@ describe('the rows', () => {
     const rows = within(screen.getByRole('table', { name: /flows/i })).getAllByRole('row');
     const link = within(rows[1]).getByRole('link', { name: /Alice Example/ });
     assert.equal(link.getAttribute('href'), '/users/person-3f1c2a9e-1b2c-4d3e-8f4a-5b6c7d8e9f01');
-    assert.equal(within(rows[2]).queryAllByRole('link').length, 0);
+    const unknownRowLinks = within(rows[2]).queryAllByRole('link').map((item) => item.getAttribute('href') ?? '');
+    assert.equal(unknownRowLinks.some((href) => href.startsWith('/users/')), false);
+  });
+
+  it('a device named by the identity service links to its inventory page', () => {
+    show(okState(flowsFixture({ flows: [flowFixture()] })));
+    const rows = within(screen.getByRole('table', { name: /flows/i })).getAllByRole('row');
+    const link = within(rows[1]).getByRole('link', { name: 'PC-001' });
+    assert.match(link.getAttribute('href') ?? '', /^\/devices\/device-/);
   });
 
   it('an inferred person is possibly that person, never stated as fact', () => {

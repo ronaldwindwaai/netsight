@@ -213,6 +213,7 @@ export function FlowTimeline({
           className="traffic-bars list-unstyled mb-0 overflow-auto"
           style={{ maxHeight: '18rem' }}
           tabIndex={0}
+          aria-label="Traffic per time bucket (scrollable list)"
         >
           {buckets.map((bucket) => (
             <li className="traffic-bars__row" key={bucket.start}>

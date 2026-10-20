@@ -3,6 +3,7 @@ import { AppContent } from '@adminlte/react';
 import { AppliedFilters } from '@/components/applied-filters';
 import { ExplorerFilterForm } from '@/components/explorer-filter-form';
 import { FlowExplorerBody } from '@/components/flow-explorer-body';
+import { RelatedViews } from '@/components/related-views';
 import { TimeRangePicker } from '@/components/time-range-picker';
 import { TrafficAccessDenied } from '@/components/traffic-access-denied';
 import { TrafficNav } from '@/components/traffic-nav';
@@ -77,6 +78,13 @@ export default async function FlowExplorerPage({ searchParams }: { searchParams:
         state={state}
         filtered={filtered}
         linkTo={(extra) => trafficHref('flows', window, { ...filters.values, ...extra })}
+      />
+      <RelatedViews
+        views={[
+          { label: 'Security events', href: '/security', hint: 'Detections from the connected security sources' },
+          { label: 'Internet / WAN', href: '/internet', hint: 'Link status, quality and availability' },
+          { label: 'Users & Identity', href: '/users', hint: 'Who is on the network, according to evidence' },
+        ]}
       />
     </AppContent>
   );

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { AppContent, Card } from '@adminlte/react';
 
+import { RelatedViews } from '@/components/related-views';
 import { SecurityBody } from '@/components/security-body';
 import { apiGet } from '@/lib/api';
 import { parseSessionInfo } from '@/lib/api-contracts';
@@ -88,6 +89,15 @@ export default async function SecurityPage({
           }
         />
       </Card>
+
+      <RelatedViews
+        views={[
+          { label: 'Alerts', href: '/alerts', hint: 'Alerts raised on the monitoring sources' },
+          { label: 'Incidents', href: '/incidents', hint: 'Correlated incidents and their timelines' },
+          { label: 'Flow Explorer', href: `/traffic/flows?preset=${preset}`, hint: 'Flow evidence for the same window' },
+          { label: 'Traffic anomalies', href: `/traffic/anomalies?preset=${preset}`, hint: 'Hours that differ from their baseline' },
+        ]}
+      />
     </AppContent>
   );
 }
