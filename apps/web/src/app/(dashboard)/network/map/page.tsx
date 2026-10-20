@@ -4,6 +4,7 @@ import { DataFailure, FreshnessNotice } from '@/components/data-state';
 import { TopologyGraph } from '@/components/topology-graph';
 import { apiGet } from '@/lib/api';
 import { parseTopologyResponse, type TopologyResponse } from '@/lib/api-contracts';
+import { resolveFocus } from '@/lib/topology-view';
 
 function EmptySurface({
   icon,
@@ -23,7 +24,7 @@ function EmptySurface({
   );
 }
 
-function GraphEvidence({ topology }: { topology: TopologyResponse }) {
+function GraphEvidence({ topology, focus }: { topology: TopologyResponse; focus: string | null }) {
   const labels = new Map(
     topology.nodes.map((node) => [node.device_id, node.name ?? node.device_id]),
   );
@@ -36,7 +37,7 @@ function GraphEvidence({ topology }: { topology: TopologyResponse }) {
   };
   return (
     <>
-      <TopologyGraph topology={topology} />
+      <TopologyGraph topology={topology} initialSelected={focus} />
       <div className="d-flex flex-wrap gap-2 mb-3" role="list" aria-label="Topology nodes">
         {topology.nodes.map((node) => (
           <span
@@ -127,9 +128,14 @@ function GraphEvidence({ topology }: { topology: TopologyResponse }) {
   );
 }
 
-export default async function MapPage() {
+export default async function MapPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ focus?: string | string[] }>;
+}) {
   const state = await apiGet('/api/v1/topology', parseTopologyResponse);
   const topology = state.kind === 'ok' ? state.data : null;
+  const focus = topology === null ? null : resolveFocus((await searchParams).focus, topology);
 
   return (
     <AppContent
@@ -177,7 +183,7 @@ export default async function MapPage() {
             detail="A topology source is configured but its current state could not be confirmed. No graph is drawn."
           />
         ) : (
-          <GraphEvidence topology={topology} />
+          <GraphEvidence topology={topology} focus={focus} />
         )}
       </Card>
     </AppContent>
