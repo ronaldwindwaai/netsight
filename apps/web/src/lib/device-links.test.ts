@@ -40,3 +40,15 @@ describe('relatedLinks', () => {
     }
   });
 });
+
+import { endpointLinks } from './device-links.ts';
+
+describe('endpointLinks', () => {
+  it('links only what the endpoint has', () => {
+    const none = endpointLinks({ ip: null, mac: null, hostname: null });
+    assert.deepEqual(none.map((l) => l.id), ['map']);
+    const full = endpointLinks({ ip: '10.0.0.9', mac: 'aa:bb:cc:00:11:22', hostname: 'h' });
+    assert.equal(full.find((l) => l.id === 'inventory')?.href, '/inventory?q=aa%3Abb%3Acc%3A00%3A11%3A22');
+    assert.equal(full.find((l) => l.id === 'flows')?.href, '/traffic/flows?source_ip=10.0.0.9');
+  });
+});

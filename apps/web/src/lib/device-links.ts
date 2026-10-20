@@ -61,3 +61,38 @@ export function relatedLinks(device: Device): RelatedLink[] {
   );
   return links;
 }
+
+export interface EndpointLike {
+  ip: string | null;
+  mac: string | null;
+  hostname: string | null;
+}
+
+/** Cross-links from an unknown endpoint; only values the endpoint really has produce a link. */
+export function endpointLinks(endpoint: EndpointLike): RelatedLink[] {
+  const search = endpoint.mac ?? endpoint.ip ?? endpoint.hostname;
+  const links: RelatedLink[] = [];
+  if (search !== null) {
+    links.push({
+      id: 'inventory',
+      label: `Search inventory for ${search.slice(0, MAX_QUERY)}`,
+      href: `/inventory?${query({ q: search.slice(0, MAX_QUERY) })}`,
+      scope: 'NetBox-merged inventory search; no match is expected for a genuinely unknown endpoint.',
+    });
+  }
+  if (endpoint.ip !== null) {
+    links.push({
+      id: 'flows',
+      label: `Flows from ${endpoint.ip}`,
+      href: `/traffic/flows?${query({ source_ip: endpoint.ip })}`,
+      scope: 'Flow Explorer filtered to this address; an address is not an identity.',
+    });
+  }
+  links.push({
+    id: 'map',
+    label: 'Network map',
+    href: '/network/map',
+    scope: 'Topology of known devices; an unknown endpoint is not drawn unless a source reports a link.',
+  });
+  return links;
+}

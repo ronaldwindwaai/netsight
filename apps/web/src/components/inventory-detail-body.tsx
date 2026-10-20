@@ -160,6 +160,30 @@ export function InventoryDetailBody({ state }: { state: FetchState<InventoryDeta
           </Card>
         </div>
       </div>
+      <Card title="Related views" icon="bi bi-link-45deg" variant="outline" theme="secondary">
+        <ul className="list-unstyled small mb-0">
+          <li className="mb-2">
+            <Link href={`/devices/${encodeURIComponent(item.id)}`}>Open the monitored device record</Link>
+            <span className="d-block text-body-secondary">Exists only where monitoring also knows this asset; otherwise it reports not found.</span>
+          </li>
+          <li className="mb-2">
+            <Link href={`/network/map?focus=${encodeURIComponent(item.id)}`}>Show on network map</Link>
+            <span className="d-block text-body-secondary">Selects the asset when the topology source reports it.</span>
+          </li>
+          {item.ip_address.value !== null ? (
+            <li className="mb-2">
+              <Link href={`/traffic/flows?source_ip=${encodeURIComponent(item.ip_address.value)}`}>
+                Flows from {item.ip_address.value}
+              </Link>
+              <span className="d-block text-body-secondary">Flow Explorer filtered to this address; an address is not an identity.</span>
+            </li>
+          ) : null}
+          <li>
+            <Link href="/ipam">IP address management</Link>
+            <span className="d-block text-body-secondary">Prefixes and address usage; not filtered to this asset.</span>
+          </li>
+        </ul>
+      </Card>
       <p className="mt-3">
         <Link href="/inventory">
           <i className="bi bi-arrow-left me-1" aria-hidden="true" />

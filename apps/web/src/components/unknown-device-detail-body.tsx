@@ -5,6 +5,7 @@
  * All endpoint values, labels, comments and actor identities are untrusted text rendered as text.
  * The workflow actions are a slot: the page passes the client panel when the viewer may act.
  */
+import Link from 'next/link';
 import { Badge, Card } from '@adminlte/react';
 import type { ComponentProps } from 'react';
 
@@ -19,6 +20,7 @@ import type {
   UnknownDeviceTimeline,
 } from '@/lib/api-contracts-unknown-devices';
 import type { FetchState } from '@/lib/api-response';
+import { endpointLinks } from '@/lib/device-links';
 import { formatUtcTimestamp } from '@/lib/format-time';
 import {
   checkPresentation,
@@ -229,6 +231,21 @@ function FindingBody({
           </Card>
         </div>
       </div>
+
+      <Card title="Related views" icon="bi bi-link-45deg" variant="outline" theme="secondary">
+        <ul className="list-unstyled mb-0">
+          {endpointLinks(item.endpoint).map((link) => (
+            <li className="mb-2" key={link.id}>
+              <Link href={link.href}>{link.label}</Link>
+              <span className="d-block small text-body-secondary">{link.scope}</span>
+            </li>
+          ))}
+          <li>
+            <Link href="/ipam">IP address management</Link>
+            <span className="d-block small text-body-secondary">Prefixes and address usage; not filtered to this endpoint.</span>
+          </li>
+        </ul>
+      </Card>
 
       {item.proposed_action !== null ? (
         <Card title="Proposed action" icon="bi bi-shield-exclamation" variant="outline" theme="warning">
