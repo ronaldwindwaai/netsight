@@ -7,6 +7,8 @@ import {
   decisionAvailability,
   describeDecisionOutcome,
   executionSummary,
+  nextStepGuidance,
+  decisionConsequence,
   listSurface,
   pageHrefs,
   parseActionsQuery,
@@ -318,4 +320,30 @@ test('the notice after a decision reports what actually happened', () => {
   assert.match(describeDecisionOutcome('reject', 'rejected', true).text, /rejected/i);
   assert.match(describeDecisionOutcome('cancel', 'cancelled', true).text, /cancelled/i);
   assert.match(describeDecisionOutcome('execute', undefined, true).text, /refresh/i);
+});
+
+test('next-step guidance says who must act and never claims a run that did not happen', () => {
+  const pending = nextStepGuidance(request({ state: 'pending-approval', approvals_required: 2, approvals: [] }), ADMIN, status());
+  assert.match(pending, /awaiting 2 approvals/i);
+  assert.match(pending, /different person/i);
+  const approved = nextStepGuidance(request({ state: 'approved' }), ADMIN, status());
+  assert.match(approved, /has not been run/i);
+  const killed = nextStepGuidance(
+    request({ state: 'approved' }),
+    ADMIN,
+    status({ kill_switch: { engaged: true, source: 'runtime', since: '2026-10-18T12:00:00Z' } }),
+  );
+  assert.match(killed, /kill switch/i);
+  for (const state of ['rejected', 'expired', 'cancelled'] as const) {
+    assert.match(nextStepGuidance(request({ state }), ADMIN, status()), /will not run/i);
+  }
+  assert.match(nextStepGuidance(request({ state: 'failed' }), ADMIN, status()), /check the result/i);
+});
+
+test('every decision names its consequence, and a dry run says nothing is changed', () => {
+  assert.match(decisionConsequence('approve', true), /does not run it/i);
+  assert.match(decisionConsequence('reject', true), /will not run/i);
+  assert.match(decisionConsequence('cancel', true), /withdr/i);
+  assert.match(decisionConsequence('execute', true), /nothing is changed/i);
+  assert.match(decisionConsequence('execute', false), /live|device/i);
 });

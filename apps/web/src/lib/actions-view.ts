@@ -260,6 +260,62 @@ export function decisionAvailability(
   ];
 }
 
+/**
+ * "What happens next" for the person reading a request: who has to act and what the next state means.
+ * Advisory wording only; the API decides. A request that was approved has not run, and a dry run
+ * never reads as a change.
+ */
+export function nextStepGuidance(request: ActionRequest, viewer: Viewer | null, status: ActionStatus | null): string {
+  const killed = status?.kill_switch.engaged === true;
+  const isRequester = viewer !== null && viewer.identityId === request.requester.id;
+  const remaining = Math.max(0, request.approvals_required - request.approvals.length);
+  switch (request.state) {
+    case 'proposed':
+      return 'The request is being checked against policy. Nothing has been approved or run.';
+    case 'pending-approval': {
+      const who = isRequester
+        ? 'You made this request, so a different person must approve it.'
+        : 'A different person from the requester must decide.';
+      const word = request.approvals_required === 1 ? 'approval' : 'approvals';
+      return `Awaiting ${request.approvals_required} ${word} (${remaining} still needed) before the approve-by deadline. ${who} Approving does not run it.`;
+    }
+    case 'approved':
+      return killed
+        ? 'Approved, but the kill switch is engaged: it has not been run and cannot be run until the switch is released.'
+        : 'Approved but it has not been run. A person with permission to run it, other than the requester, must run it before it expires.';
+    case 'executing':
+      return 'An executor is running it now. Refresh to see the result.';
+    case 'succeeded':
+      return request.execution?.mode === 'dry-run'
+        ? 'A dry run was recorded. Nothing was changed; a live change needs a live executor, which is not available here.'
+        : 'The run finished and was verified. Review the result and verification below.';
+    case 'failed':
+      return 'The run did not complete. Check the result before proposing it again.';
+    case 'rolled-back':
+      return 'The change failed verification and was reversed. Check the result before proposing it again.';
+    case 'rejected':
+    case 'expired':
+    case 'cancelled':
+      return 'It is closed and will not run. Propose it again if it is still needed.';
+  }
+}
+
+/** The consequence of each decision, shown in the confirmation before anything is sent. */
+export function decisionConsequence(verb: DecisionVerb, dryRun: boolean): string {
+  switch (verb) {
+    case 'approve':
+      return 'Approving records your approval of exactly this request. It does not run it; running is a separate step.';
+    case 'reject':
+      return 'Rejecting closes the request: it will not run. The reason is stored in its history.';
+    case 'cancel':
+      return 'Cancelling withdraws the request before it runs. The reason is stored in its history.';
+    case 'execute':
+      return dryRun
+        ? 'This records what would happen. Nothing is changed and no device or network system is contacted.'
+        : 'This runs the request live against the target, subject to its checks and verification.';
+  }
+}
+
 export interface DecisionOutcome {
   tone: 'success' | 'info' | 'warning' | 'danger';
   text: string;

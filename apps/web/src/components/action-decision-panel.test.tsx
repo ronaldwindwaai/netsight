@@ -192,6 +192,28 @@ describe('rejecting and cancelling', () => {
     });
   });
 
+  it('names the consequence and keeps the submit disabled, with the reason in words, until a reason is given', async () => {
+    const handler = install('decision', async () => ({ ok: true }));
+    renderPanel(ADMIN);
+    await userEvent.click(button('Reject'));
+    const dialog = screen.getByRole('dialog', { name: 'Reject this request' });
+    assert.match(dialog.textContent ?? '', /will not run/);
+    const submit = within(dialog).getByRole('button', { name: 'Reject' }) as HTMLButtonElement;
+    assert.equal(submit.disabled, true);
+    assert.match(describedText(submit), /at least 3 characters/i);
+    await userEvent.type(within(dialog).getByLabelText('Reason'), '  ab ');
+    assert.equal(submit.disabled, true);
+    await userEvent.type(within(dialog).getByLabelText('Reason'), 'c');
+    assert.equal(submit.disabled, false);
+    assert.equal(handler.mock.callCount(), 0);
+  });
+
+  it('approving states that it does not run the request', async () => {
+    renderPanel(ADMIN);
+    await userEvent.click(button(/^Approve/));
+    assert.match(screen.getByRole('dialog').textContent ?? '', /does not run it/);
+  });
+
   it('the requester can cancel their own request', async () => {
     const handler = install('decision', async () => ({ ok: true }));
     renderPanel(ENGINEER);

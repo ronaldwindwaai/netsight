@@ -9,7 +9,8 @@ import { Card } from '@adminlte/react';
 import { ActionStateBadge, ChecksList, DryRunNotice, RiskBadge } from '@/components/action-parts';
 import { DataFailure } from '@/components/data-state';
 import { StateSurface } from '@/components/state-surface';
-import { executionSummary } from '@/lib/actions-view';
+import { executionSummary, nextStepGuidance } from '@/lib/actions-view';
+import type { Viewer } from '@/lib/incident-actions';
 import type { ActionDetail, ActionStatus } from '@/lib/api-contracts-actions';
 import type { FetchState } from '@/lib/api-response';
 import { formatUtcTimestamp } from '@/lib/format-time';
@@ -156,10 +157,12 @@ export function ActionDetailBody({
   state,
   status,
   panel,
+  viewer = null,
 }: {
   state: FetchState<ActionDetail>;
   status: ActionStatus | null;
   panel: React.ReactNode;
+  viewer?: Viewer | null;
 }) {
   if (state.kind !== 'ok') {
     if (state.status === 503 && state.code === 'ACTIONS_NOT_ENABLED') {
@@ -183,6 +186,13 @@ export function ActionDetailBody({
         <RiskBadge risk={r.risk} />
         <span className="small text-body-secondary">as of {formatUtcTimestamp(detail.generated_at)}</span>
       </div>
+      <section className="alert alert-light border py-2" role="note" aria-labelledby="action-next-step">
+        <h2 className="h6 mb-1" id="action-next-step">
+          <i className="bi bi-signpost-split me-1" aria-hidden="true" />
+          What happens next
+        </h2>
+        <p className="small mb-0">{nextStepGuidance(r, viewer, status)}</p>
+      </section>
       {panel !== null ? (
         <Card title="Decide" icon="bi bi-check2-square" variant="outline" theme="primary">
           {panel}
