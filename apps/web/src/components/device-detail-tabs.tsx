@@ -4,6 +4,11 @@ import Link from 'next/link';
 import { Tabs } from '@adminlte/react';
 
 import { DataFailure } from '@/components/data-state';
+import {
+  DeviceIdentityFacts,
+  RelatedLinksCard,
+  RelatedTab,
+} from '@/components/device-related-panels';
 import { InterfaceTable } from '@/components/interface-table';
 import { FreshnessBadge, StatusBadge } from '@/components/status-badge';
 import type { Device, InterfaceListResponse } from '@/lib/api-contracts';
@@ -11,15 +16,6 @@ import type { FetchState } from '@/lib/api';
 
 function valueOrPending(value: string | null | undefined): string {
   return value || 'Not tracked yet';
-}
-
-function Pending({ label }: { label: string }) {
-  return (
-    <div className="py-4 text-body-secondary">
-      <i className="bi bi-plug me-2" aria-hidden="true" />
-      {label} is not yet connected for this device.
-    </div>
-  );
 }
 
 /**
@@ -68,7 +64,10 @@ function InterfacesPanel({ state }: { state: FetchState<InterfaceListResponse> }
       <>
         <DataFailure state={state} />
         <div className="py-3">
-          <Pending label="Interface telemetry" />
+          <div className="py-3 text-body-secondary">
+          <i className="bi bi-plug me-2" aria-hidden="true" />
+          Interface telemetry is not yet connected for this device.
+        </div>
         </div>
       </>
     );
@@ -99,6 +98,7 @@ export function DeviceDetailTabs({
         {
           label: 'Summary',
           children: (
+            <>
             <dl className="device-summary mb-0 py-3">
               <div>
                 <dt>Status</dt>
@@ -129,13 +129,28 @@ export function DeviceDetailTabs({
                 </dd>
               </div>
             </dl>
+            <DeviceIdentityFacts device={device} />
+            <RelatedLinksCard device={device} />
+            </>
           ),
         },
         { label: 'Interfaces', children: <InterfacesPanel state={interfaces} /> },
-        { label: 'Traffic', children: <Pending label="Traffic telemetry" /> },
-        { label: 'Security', children: <Pending label="Security evidence" /> },
-        { label: 'Config', children: <Pending label="Configuration history" /> },
-        { label: 'Incidents', children: <Pending label="Incident linkage" /> },
+        {
+          label: 'Traffic',
+          children: <RelatedTab device={device} ids={['flows', 'map']} missing="Per-device traffic telemetry" />,
+        },
+        {
+          label: 'Security',
+          children: <RelatedTab device={device} ids={['alerts', 'incidents']} missing="Per-device security evidence" />,
+        },
+        {
+          label: 'Config',
+          children: <RelatedTab device={device} ids={['config']} missing="Per-device configuration history" />,
+        },
+        {
+          label: 'Incidents',
+          children: <RelatedTab device={device} ids={['incidents', 'alerts']} missing="Per-device incident linkage" />,
+        },
         { label: 'Diagnostics', children: <DiagnosticsTab device={device} /> },
       ]}
     />
