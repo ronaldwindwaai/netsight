@@ -8,6 +8,7 @@ import {
   IncidentSummary,
   ResolutionBlock,
 } from '@/components/incident-detail-view';
+import { IncidentRelatedLinks } from '@/components/incident-related-links';
 import { IncidentActionsPanel } from '@/components/incident-actions-panel';
 import { IncidentTimeline } from '@/components/incident-timeline';
 import { StateSurface, StoreStateSurface } from '@/components/state-surface';
@@ -116,6 +117,9 @@ function DetailBody({
     <>
       <Card className="operational-card" title="Summary" variant="outline" theme="primary">
         <IncidentSummary incident={incident} />
+        <div className="mt-3">
+          <IncidentRelatedLinks />
+        </div>
         <div className="mt-3">
           <IncidentActionsPanel
             incident={{ id: incident.id, state: incident.state, assignee_id: incident.assignee_id }}

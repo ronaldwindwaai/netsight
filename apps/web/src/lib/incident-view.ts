@@ -238,3 +238,18 @@ export function timelineEventSummary(event: IncidentTimelineEvent): TimelineEven
   }
   return { label, detail: event.subject_id };
 }
+
+const ACTION_SUBJECT = /^action-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const DIAGNOSTIC_SUBJECT = /^diagnostic-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+/**
+ * Where a timeline event's subject lives, for the kinds that have a page. The subject id is untrusted
+ * text: it becomes a link only when it matches the strict id format, so it can never shape a path.
+ */
+export function timelineSubjectLink(event: IncidentTimelineEvent): { href: string; label: string } | null {
+  const id = event.subject_id;
+  if (id === null) return null;
+  if (event.kind.startsWith('action-') && ACTION_SUBJECT.test(id)) return { href: `/actions/${id}`, label: 'Open action request' };
+  if (event.kind === 'diagnostic' && DIAGNOSTIC_SUBJECT.test(id)) return { href: `/diagnostics/${id}`, label: 'Open diagnostic session' };
+  return null;
+}

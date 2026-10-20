@@ -264,6 +264,17 @@ describe('running', () => {
 });
 
 describe('the kill switch panel', () => {
+  it('keeps engage and release disabled, with the reason in words, until a reason is given', async () => {
+    render(<ActionKillSwitchPanel engaged={false} fromEnvironment={false} currentPath="/actions" />);
+    await userEvent.click(button(/Engage the kill switch/));
+    const dialog = screen.getByRole('dialog');
+    const submit = within(dialog).getByRole('button', { name: 'Engage' }) as HTMLButtonElement;
+    assert.equal(submit.disabled, true);
+    assert.match(describedText(submit), /at least 3 characters/i);
+    await userEvent.type(within(dialog).getByLabelText('Reason'), 'abc');
+    assert.equal(submit.disabled, false);
+  });
+
   it('engaging needs no step-up marker and sends the choice and the reason', async () => {
     const handler = install('killSwitch', async () => ({ ok: true }));
     render(<ActionKillSwitchPanel engaged={false} fromEnvironment={false} currentPath="/actions" />);
