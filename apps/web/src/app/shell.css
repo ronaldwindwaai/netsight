@@ -1,0 +1,79 @@
+/* App-shell polish: skip link, page finder, sidebar group headers. Kept apart from globals.css. */
+
+.skip-link {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: 0.5rem;
+  z-index: 2000;
+  padding: 0.5rem 0.9rem;
+  border-radius: 0 0 0.375rem 0.375rem;
+  background: var(--bs-primary);
+  color: #fff;
+  font-weight: 600;
+  transform: translateY(-120%);
+}
+
+.skip-link:focus {
+  transform: translateY(0);
+  color: #fff;
+}
+
+#main-content:focus {
+  outline: none;
+}
+
+/* Page finder (topbar) */
+.page-finder {
+  position: relative;
+  min-inline-size: 11rem;
+  max-inline-size: 22rem;
+  inline-size: 100%;
+}
+
+.page-finder__panel {
+  position: absolute;
+  inset-block-start: calc(100% + 0.25rem);
+  inset-inline: 0;
+  z-index: 1050;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--bs-border-color);
+  border-radius: 0.375rem;
+  background: var(--bs-body-bg);
+  box-shadow: 0 0.5rem 1rem rgb(0 0 0 / 15%);
+}
+
+.page-finder__list a {
+  display: block;
+  padding: 0.35rem 0.25rem;
+  border-radius: 0.25rem;
+  color: var(--bs-body-color);
+  text-decoration: none;
+}
+
+.page-finder__list a:hover,
+.page-finder__list a:focus-visible {
+  background: var(--bs-tertiary-bg);
+}
+
+@media (max-width: 575.98px) {
+  .page-finder {
+    min-inline-size: 0;
+    max-inline-size: 11rem;
+  }
+}
+
+/* Sidebar group headers: quiet, dense, clearly separate from entries. */
+.netsight-dashboard .sidebar-menu .nav-header {
+  padding-block: 0.6rem 0.25rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skip-link {
+    transition: none;
+  }
+}
