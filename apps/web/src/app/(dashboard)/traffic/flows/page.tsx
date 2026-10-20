@@ -1,5 +1,6 @@
 import { AppContent } from '@adminlte/react';
 
+import { AppliedFilters } from '@/components/applied-filters';
 import { ExplorerFilterForm } from '@/components/explorer-filter-form';
 import { FlowExplorerBody } from '@/components/flow-explorer-body';
 import { TimeRangePicker } from '@/components/time-range-picker';
@@ -70,6 +71,7 @@ export default async function FlowExplorerPage({ searchParams }: { searchParams:
         refused={filters.refused}
         detail={detail}
       />
+      <AppliedFilters window={window} values={filters.values} />
       <FlowExplorerBody state={state} filtered={filtered} />
     </AppContent>
   );
