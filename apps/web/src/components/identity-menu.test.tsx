@@ -34,7 +34,7 @@ describe('IdentityMenu', () => {
     render(<IdentityMenu session={session} />);
 
     const avatar = screen.getByRole('button', { name: BUTTON_NAME }).querySelector('.identity-avatar');
-    assert.equal(avatar?.getAttribute('data-initials'), 'LD');
+    assert.equal(avatar?.getAttribute('data-initials'), 'LA');
     assert.equal(avatar?.textContent, '');
   });
 
