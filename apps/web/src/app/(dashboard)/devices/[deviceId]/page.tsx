@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { AppCard } from '@/components/app-card';
 import { AppContent } from '@/components/app-content';
@@ -7,7 +8,22 @@ import { DeviceDetailTabs } from '@/components/device-detail-tabs';
 import { apiGet } from '@/lib/api';
 import { parseDeviceDetail, parseInterfaceList, parseSessionInfo } from '@/lib/api-contracts';
 
-export const metadata = { title: 'Device' };
+/**
+ * Names the tab after the device when the detail call succeeds (same GET as the page, so Next
+ * memoises it within the request); any failure falls back to the generic "Device" title.
+ */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ deviceId: string }>;
+}): Promise<Metadata> {
+  const { deviceId } = await params;
+  const state = await apiGet(
+    `/api/v1/devices/${encodeURIComponent(deviceId.slice(0, 256))}`,
+    parseDeviceDetail,
+  );
+  return { title: state.kind === 'ok' ? state.data.item.name : 'Device' };
+}
 
 export default async function DeviceDetailPage({
   params,

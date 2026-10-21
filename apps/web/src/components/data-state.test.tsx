@@ -22,7 +22,7 @@ describe('LoadingState', () => {
   it('is one polite status region with a screen-reader label and a visual skeleton', () => {
     render(<LoadingState label="Loading devices" />);
     const region = screen.getByRole('status');
-    assert.equal(region.getAttribute('aria-busy'), 'true');
+    assert.equal(region.getAttribute('aria-busy'), null);
     assert.match(region.textContent ?? '', /Loading devices/);
     assert.ok(document.querySelectorAll('.skeleton-line').length >= 3);
     assert.equal(document.querySelector('.skeleton-line')?.getAttribute('aria-hidden'), 'true');
@@ -70,6 +70,13 @@ describe('EmptyState next actions', () => {
 });
 
 describe('StoreStateSurface', () => {
+  it('keeps the retry button outside the status region', () => {
+    render(<StoreStateSurface state="unknown" noun="incidents" store="Incident store" />);
+    const region = screen.getByRole('status');
+    assert.equal(region.querySelector('button'), null);
+    assert.ok(screen.getByRole('button', { name: 'Try again' }));
+  });
+
   it('offers a retry when the store state is unknown', async () => {
     render(<StoreStateSurface state="unknown" noun="incidents" store="Incident store" />);
     await userEvent.click(screen.getByRole('button', { name: 'Try again' }));

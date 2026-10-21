@@ -192,7 +192,7 @@ const SKELETON_WIDTHS: readonly string[] = ['w-75', 'w-100', 'w-50', 'w-100'];
 export function LoadingState({ label = 'Loading device data' }: { label?: string }) {
   return (
     <AppCard bodyClass="py-4">
-      <div role="status" aria-live="polite" aria-busy="true">
+      <div role="status" aria-live="polite">
         <span className="visually-hidden">{label}…</span>
         {SKELETON_WIDTHS.map((width, index) => (
           <div key={index} className={`skeleton-line ${width}`} aria-hidden="true" />

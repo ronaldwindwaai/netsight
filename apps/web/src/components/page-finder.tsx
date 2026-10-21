@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { FocusEvent, FormEvent, KeyboardEvent } from 'react';
 
-import { isFocusSearchShortcut } from '@/lib/keyboard-shortcuts';
+import { areShortcutsEnabled, isFocusSearchShortcut } from '@/lib/keyboard-shortcuts';
 import { findPages } from '@/lib/page-finder';
 import type { PageMatches, PageTarget } from '@/lib/page-finder';
 
@@ -35,9 +35,10 @@ export function PageFinder({ pages }: { pages: readonly PageTarget[] }) {
 
   useEffect(() => {
     function onDocumentKeyDown(event: globalThis.KeyboardEvent) {
-      if (!isFocusSearchShortcut(event)) return;
+      if (!isFocusSearchShortcut(event) || !areShortcutsEnabled()) return;
       event.preventDefault();
       inputRef.current?.focus();
+      inputRef.current?.select();
     }
     document.addEventListener('keydown', onDocumentKeyDown);
     return () => document.removeEventListener('keydown', onDocumentKeyDown);

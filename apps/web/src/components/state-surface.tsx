@@ -15,14 +15,16 @@ export function StateSurface({
   icon: string;
   title: string;
   detail: string;
-  /** An optional next step (a link or button) shown under the explanation. */
+  /** An optional next step (a link or button) shown under the explanation, outside the live region. */
   action?: ReactNode;
 }) {
   return (
-    <div className="traffic-state text-center" role="status">
-      <i className={`${icon} fs-2 text-body-secondary`} aria-hidden="true" />
-      <p className="fw-semibold mb-1 mt-3">{title}</p>
-      <p className="small text-body-secondary mb-0">{detail}</p>
+    <div className="traffic-state text-center">
+      <div role="status">
+        <i className={`${icon} fs-2 text-body-secondary`} aria-hidden="true" />
+        <p className="fw-semibold mb-1 mt-3">{title}</p>
+        <p className="small text-body-secondary mb-0">{detail}</p>
+      </div>
       {action ? <div className="mt-3">{action}</div> : null}
     </div>
   );
