@@ -95,6 +95,22 @@ test('parseOverviewResponse accepts a canonical overview aggregate', () => {
   );
 });
 
+test('parseOverviewResponse accepts the optional netbox source the API reports', () => {
+  const parsed = parseOverviewResponse({
+    devices: {
+      total: 0,
+      by_status: [],
+      freshness: { state: 'fresh', observed_at: '2026-10-04T12:00:00Z', source: 'librenms' },
+    },
+    sources: {
+      librenms: { configured: true, status: 'success' },
+      netbox: { configured: false, status: 'not-configured' },
+    },
+  });
+  assert.notEqual(parsed, null);
+  assert.equal(parsed?.sources.librenms.status, 'success');
+});
+
 test('parseOverviewResponse rejects malformed aggregates', () => {
   assert.equal(parseOverviewResponse(null), null);
   assert.equal(parseOverviewResponse({}), null);
