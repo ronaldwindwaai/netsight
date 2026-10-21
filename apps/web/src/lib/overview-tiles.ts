@@ -33,6 +33,18 @@ export function overviewUsersRequest(permissions: readonly string[] | null): str
   return holds(permissions, 'users:read-summary') ? OVERVIEW_USERS_PATH : null;
 }
 
+export type OverviewUsersAccess = 'summary' | 'per-person' | 'none';
+
+/**
+ * How the viewer reaches users: the aggregate (users:read-summary, or an unread session so the API
+ * decides), per-person pages only (users:read or users:read-limited: link, no aggregate fetch), or not at all.
+ */
+export function overviewUsersAccess(permissions: readonly string[] | null): OverviewUsersAccess {
+  if (holds(permissions, 'users:read-summary')) return 'summary';
+  const perPerson = permissions?.some((p) => p === 'users:read' || p === 'users:read-limited') ?? false;
+  return perPerson ? 'per-person' : 'none';
+}
+
 function restricted(permission: string, what: string): OverviewTile {
   return {
     value: 'Restricted',
@@ -68,9 +80,12 @@ export function securityTile(state: FetchState<SecurityEventsResponse> | null): 
   }
   const capped = listed >= OVERVIEW_SECURITY_LIMIT;
   const counts = severityCounts(data.events);
-  const parts = [
+  const severe = [
     ...(counts.critical > 0 ? [`${counts.critical} critical`] : []),
     ...(counts.high > 0 ? [`${counts.high} high`] : []),
+  ];
+  const parts = [
+    ...(severe.length > 0 ? severe : ['none critical or high']),
     capped ? `of the ${listed} listed in 24 h; more may exist` : `of the ${listed} listed in the last 24 h`,
   ];
   const stale = data.freshness.state === 'fresh' ? '' : ` · data ${data.freshness.state}`;
@@ -81,8 +96,15 @@ export function securityTile(state: FetchState<SecurityEventsResponse> | null): 
 }
 
 /** Users tile: the aggregate people count (counts only; the API is the source of the total). */
-export function usersTile(state: FetchState<UsersAggregateResponse> | null): OverviewTile {
+export function usersTile(state: FetchState<UsersAggregateResponse> | 'per-person' | null): OverviewTile {
   const what = 'User counts';
+  if (state === 'per-person') {
+    return {
+      value: 'Not summarised',
+      detail: 'Your role reads people individually, not as counts; open Users',
+      theme: 'secondary',
+    };
+  }
   if (state === null) return restricted('users:read-summary', what);
   if (state.kind !== 'ok') return failed(state, 'users:read-summary', what);
   const { data } = state;

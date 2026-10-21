@@ -19,7 +19,13 @@ import {
   parseTrafficDestinationsResponse,
 } from '@/lib/api-contracts-traffic-explorer';
 import { deviceHealthSummary, sourceProvenance } from '@/lib/overview-summary';
-import { overviewSecurityRequest, overviewUsersRequest, securityTile, usersTile } from '@/lib/overview-tiles';
+import {
+  overviewSecurityRequest,
+  overviewUsersAccess,
+  overviewUsersRequest,
+  securityTile,
+  usersTile,
+} from '@/lib/overview-tiles';
 import { canReadTraffic, viewerFromSession } from '@/lib/viewer';
 
 function UnavailableSurface({
@@ -66,6 +72,7 @@ export default async function OverviewPage() {
   const permissions = session.kind === 'ok' ? session.data.permissions : null;
   const securityPath = overviewSecurityRequest(permissions);
   const usersPath = overviewUsersRequest(permissions);
+  const usersAccess = overviewUsersAccess(permissions);
   const [incidents, security, users, destinations, applications] = await Promise.all([
     fetchIncidents(permissions),
     securityPath === null ? null : apiGet(securityPath, parseSecurityEventsResponse),
@@ -126,10 +133,10 @@ export default async function OverviewPage() {
           {...securityTile(security)}
         />
         <OverviewKpiLink
-          href={users === null ? undefined : '/users'}
+          href={usersAccess === 'none' ? undefined : '/users'}
           icon="bi-people"
           label="Users"
-          {...usersTile(users)}
+          {...usersTile(usersAccess === 'per-person' ? 'per-person' : users)}
         />
       </section>
 

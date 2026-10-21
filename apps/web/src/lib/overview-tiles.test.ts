@@ -7,6 +7,7 @@ import type { FetchState } from './api-response.ts';
 import {
   OVERVIEW_SECURITY_LIMIT,
   overviewSecurityRequest,
+  overviewUsersAccess,
   overviewUsersRequest,
   securityTile,
   usersTile,
@@ -63,6 +64,8 @@ test('requests are made only for a role that holds the permission, and for an un
   assert.notEqual(overviewSecurityRequest(null), null);
   assert.equal(overviewUsersRequest(['security:read']), null);
   assert.equal(overviewUsersRequest(['users:read-summary']), '/api/v1/users/summary');
+  assert.equal(overviewUsersRequest(['users:read']), null);
+  assert.equal(overviewUsersRequest(['users:read-limited']), null);
 });
 
 test('security: restricted, failed, not-connected, unknown and empty are all distinct', () => {
@@ -80,6 +83,9 @@ test('security: counts are of the listed events and name the read cap when reach
   const few = securityTile(security('ok', [event('critical', 1), event('high', 2), event('low', 3)]));
   assert.equal(few.value, '3 events listed');
   assert.match(few.detail, /1 critical · 1 high · of the 3 listed/);
+  const calm = securityTile(security('ok', [event('low', 1), event('info', 2)]));
+  assert.match(calm.detail, /^none critical or high · of the 2 listed/);
+  assert.equal(calm.theme, 'info');
   assert.equal(few.theme, 'danger');
   const capped = securityTile(
     security('ok', Array.from({ length: OVERVIEW_SECURITY_LIMIT }, (_, i) => event('low', i))),
@@ -109,4 +115,19 @@ test('users: shows the aggregate count and flags a truncated source', () => {
   assert.equal(usersTile(users({ people_total: 1 })).value, '1 person known');
   const source = { source: 's', state: 'ok', record_count: 1, truncated: true, freshness: FRESH };
   assert.match(usersTile(users({ sources: [source] })).detail, /truncated/);
+});
+
+test('users access: summary, per-person only, none, and an unread session', () => {
+  assert.equal(overviewUsersAccess(['users:read-summary']), 'summary');
+  assert.equal(overviewUsersAccess(['users:read']), 'per-person');
+  assert.equal(overviewUsersAccess(['users:read-limited']), 'per-person');
+  assert.equal(overviewUsersAccess(['security:read']), 'none');
+  assert.equal(overviewUsersAccess(null), 'summary');
+  assert.equal(overviewUsersAccess(['users:read', 'users:read-summary']), 'summary');
+});
+
+test('users tile for a per-person role links without an aggregate and is not called Restricted', () => {
+  const tile = usersTile('per-person');
+  assert.equal(tile.value, 'Not summarised');
+  assert.match(tile.detail, /individually/);
 });
