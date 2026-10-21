@@ -3,12 +3,15 @@ import '@/test/dom-setup';
 import assert from 'node:assert/strict';
 import { afterEach, it } from 'node:test';
 
-import { cleanup, render } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 
 import { AlertTable } from '@/components/alert-table';
 import type { Alert } from '@/lib/api-contracts';
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  window.history.replaceState(null, '', '/');
+});
 
 const base = {
   id: 'alert-1',
@@ -38,4 +41,52 @@ it('says that a suppressed alert is not a resolved one', () => {
 it('puts the state meaning in text a screen reader reads, not only in a tooltip', () => {
   const { container } = render(<AlertTable alerts={[{ ...base, severity: 'low', state: 'suppressed' } as Alert]} total={1} />);
   assert.match(container.querySelector('tbody .visually-hidden')?.textContent ?? '', /not resolved/i);
+});
+
+const MIXED: Alert[] = [
+  { ...base, id: 'a1', title: 'Link down', severity: 'critical', state: 'open', observed_at: '2026-10-18T12:00:00Z' },
+  { ...base, id: 'a2', title: 'Port flap', severity: 'low', state: 'acknowledged', observed_at: '2026-10-18T10:00:00Z' },
+] as Alert[];
+
+function titles(container: HTMLElement): string[] {
+  return Array.from(container.querySelectorAll('tbody tr')).map(
+    (row) => row.querySelector('.fw-semibold')?.textContent ?? '',
+  );
+}
+
+it('filters by severity and writes it to the URL', () => {
+  const { container } = render(<AlertTable alerts={MIXED} total={2} />);
+  fireEvent.change(screen.getByLabelText('Severity'), { target: { value: 'low' } });
+  assert.deepEqual(titles(container), ['Port flap']);
+  assert.equal(new URLSearchParams(window.location.search).get('severity'), 'low');
+});
+
+it('restores filters, search and sort from the URL', () => {
+  window.history.replaceState(null, '', '/?state=open&sort=-observed');
+  const { container } = render(<AlertTable alerts={MIXED} total={2} />);
+  assert.deepEqual(titles(container), ['Link down']);
+  assert.equal((screen.getByLabelText('State') as HTMLSelectElement).value, 'open');
+  assert.equal((screen.getByLabelText('Sort') as HTMLSelectElement).value, '-observed');
+});
+
+it('sorts newest first from the Sort control', () => {
+  const { container } = render(<AlertTable alerts={MIXED} total={2} />);
+  fireEvent.change(screen.getByLabelText('Sort'), { target: { value: 'observed' } });
+  assert.deepEqual(titles(container), ['Port flap', 'Link down']);
+});
+
+it('offers Clear filters when nothing matches, and it restores every row', () => {
+  const { container } = render(<AlertTable alerts={MIXED} total={2} />);
+  fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'zzz' } });
+  assert.match(document.body.textContent ?? '', /No alerts match these filters/);
+  fireEvent.click(screen.getAllByRole('button', { name: 'Clear filters' })[1]);
+  assert.equal(window.location.search, '');
+  assert.equal(titles(container).length, 2);
+});
+
+it('shows the observed time relative, with the exact UTC value in the tooltip', () => {
+  const { container } = render(<AlertTable alerts={MIXED} total={2} />);
+  const time = container.querySelector('tbody time');
+  assert.equal(time?.getAttribute('title'), '2026-10-18 12:00:00 UTC');
+  assert.equal(time?.getAttribute('datetime'), '2026-10-18T12:00:00Z');
 });
