@@ -15,40 +15,94 @@ const PAGES = [
   { label: 'Incidents', href: '/incidents', group: 'Operations' },
 ];
 
+const MANY = Array.from({ length: 20 }, (_, i) => ({ label: `Report ${i}`, href: `/r${i}`, group: 'Analytics' }));
+
 afterEach(() => {
   cleanup();
   routerSpy.reset();
 });
 
+const input = () => screen.getByRole('searchbox', { name: 'Find a page' }) as HTMLInputElement;
+const status = () => screen.getByRole('status');
+
 describe('the page finder', () => {
-  it('is honestly labelled as a page finder, not a data search', () => {
+  it('is labelled as a page finder and its description says names only', () => {
     render(<PageFinder pages={PAGES} />);
-    const input = screen.getByRole('searchbox', { name: /find a page/i });
-    assert.match(input.getAttribute('placeholder') ?? '', /page/i);
-    assert.ok(screen.getByText(/pages only/i));
+    assert.equal(input().getAttribute('placeholder'), 'Find a page…');
+    const hint = document.getElementById(input().getAttribute('aria-describedby') ?? '');
+    assert.match(hint?.textContent ?? '', /page and section names only/);
   });
 
-  it('lists matching pages as links and announces the count', async () => {
+  it('has one persistent status region, empty until the user types', async () => {
     render(<PageFinder pages={PAGES} />);
-    await userEvent.type(screen.getByRole('searchbox'), 'net');
-    const links = screen.getAllByRole('link');
-    assert.deepEqual(links.map((l) => l.getAttribute('href')), ['/devices', '/network/map']);
-    assert.match(screen.getByRole('status').textContent ?? '', /2 pages/);
+    assert.equal(screen.getAllByRole('status').length, 1);
+    assert.equal(status().textContent, '');
+    await userEvent.type(input(), 'net');
+    assert.equal(screen.getAllByRole('status').length, 1);
+    assert.equal(status().textContent, '2 pages');
+  });
+
+  it('lists matching pages as links and only references the list while it exists', async () => {
+    render(<PageFinder pages={PAGES} />);
+    assert.equal(input().getAttribute('aria-controls'), null);
+    await userEvent.type(input(), 'net');
+    assert.deepEqual(screen.getAllByRole('link').map((l) => l.getAttribute('href')), ['/devices', '/network/map']);
+    assert.equal(input().getAttribute('aria-controls'), screen.getByRole('list').id);
+  });
+
+  it('says how many it is hiding when the list is truncated', async () => {
+    render(<PageFinder pages={MANY} />);
+    await userEvent.type(input(), 'report');
+    assert.equal(screen.getAllByRole('link').length, 8);
+    assert.equal(status().textContent, 'Showing 8 of 20 pages');
   });
 
   it('says plainly when nothing matches and never invents a result', async () => {
     render(<PageFinder pages={PAGES} />);
-    await userEvent.type(screen.getByRole('searchbox'), '10.0.0.1');
+    await userEvent.type(input(), '10.0.0.1');
     assert.equal(screen.queryAllByRole('link').length, 0);
-    assert.match(screen.getByRole('status').textContent ?? '', /no page matches/i);
+    assert.equal(input().getAttribute('aria-controls'), null);
+    assert.equal(status().textContent, 'No page matches. Search covers page and section names only.');
   });
 
-  it('opens the first match on Enter and clears on Escape', async () => {
+  it('opens the first match on Enter', async () => {
     render(<PageFinder pages={PAGES} />);
-    const input = screen.getByRole('searchbox');
-    await userEvent.type(input, 'incid{Enter}');
+    await userEvent.type(input(), 'incid{Enter}');
     assert.deepEqual(routerSpy.pushed, ['/incidents']);
-    await userEvent.type(input, 'abc{Escape}');
-    assert.equal((input as HTMLInputElement).value, '');
+    assert.equal(input().value, '');
+  });
+
+  it('closes on Escape from the input and from a result, returning focus to the input', async () => {
+    render(<PageFinder pages={PAGES} />);
+    await userEvent.type(input(), 'net{Escape}');
+    assert.equal(input().value, '');
+    assert.equal(screen.queryAllByRole('link').length, 0);
+    await userEvent.type(input(), 'net');
+    screen.getAllByRole('link')[0].focus();
+    await userEvent.keyboard('{Escape}');
+    assert.equal(input().value, '');
+    assert.equal(document.activeElement, input());
+  });
+
+  it('closes when focus leaves the form, but not when it moves to a result', async () => {
+    render(
+      <>
+        <PageFinder pages={PAGES} />
+        <button type="button">Elsewhere</button>
+      </>,
+    );
+    await userEvent.type(input(), 'net');
+    await userEvent.tab();
+    assert.equal(screen.getAllByRole('link').length, 2, 'focus on a result keeps the list open');
+    await userEvent.click(screen.getByRole('button', { name: 'Elsewhere' }));
+    assert.equal(input().value, '');
+    assert.equal(screen.queryAllByRole('link').length, 0);
+  });
+
+  it('clears the query when a result is clicked', async () => {
+    render(<PageFinder pages={PAGES} />);
+    await userEvent.type(input(), 'incid');
+    await userEvent.click(screen.getByRole('link', { name: /Incidents/ }));
+    assert.equal(input().value, '');
   });
 });

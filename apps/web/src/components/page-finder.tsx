@@ -2,11 +2,20 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useId, useMemo, useState } from 'react';
-import type { FormEvent, KeyboardEvent } from 'react';
+import { useId, useMemo, useRef, useState } from 'react';
+import type { FocusEvent, FormEvent, KeyboardEvent } from 'react';
 
 import { findPages } from '@/lib/page-finder';
-import type { PageTarget } from '@/lib/page-finder';
+import type { PageMatches, PageTarget } from '@/lib/page-finder';
+
+function statusText(query: string, matches: PageMatches): string {
+  if (query.trim().length === 0) return '';
+  if (matches.total === 0) return 'No page matches. Search covers page and section names only.';
+  if (matches.total > matches.items.length) {
+    return `Showing ${matches.items.length} of ${matches.total} pages`;
+  }
+  return `${matches.total} ${matches.total === 1 ? 'page' : 'pages'}`;
+}
 
 /**
  * Jump to a Netsight page by name. This is deliberately a page finder, not a global search: no
@@ -15,26 +24,38 @@ import type { PageTarget } from '@/lib/page-finder';
 export function PageFinder({ pages }: { pages: readonly PageTarget[] }) {
   const [query, setQuery] = useState('');
   const router = useRouter();
+  const inputRef = useRef<HTMLInputElement>(null);
   const hintId = useId();
   const listId = useId();
-  const results = useMemo(() => findPages(pages, query), [pages, query]);
-  const searching = query.trim().length > 0;
+  const inputId = useId();
+  const matches = useMemo(() => findPages(pages, query), [pages, query]);
+  const open = query.trim().length > 0;
+  const showList = open && matches.items.length > 0;
 
-  function open(event: FormEvent) {
+  function submit(event: FormEvent) {
     event.preventDefault();
-    const first = results[0];
+    const first = matches.items[0];
     if (first === undefined) return;
     setQuery('');
     router.push(first.href);
   }
 
-  function onKeyDown(event: KeyboardEvent<HTMLInputElement>) {
-    if (event.key === 'Escape') setQuery('');
+  function onKeyDown(event: KeyboardEvent<HTMLFormElement>) {
+    if (event.key !== 'Escape' || !open) return;
+    event.preventDefault();
+    setQuery('');
+    inputRef.current?.focus();
+  }
+
+  function onBlur(event: FocusEvent<HTMLFormElement>) {
+    const next = event.relatedTarget;
+    if (next instanceof Node && event.currentTarget.contains(next)) return;
+    setQuery('');
   }
 
   return (
-    <form className="page-finder" role="search" onSubmit={open}>
-      <label className="visually-hidden" htmlFor={`${listId}-input`}>
+    <form className="page-finder" role="search" onSubmit={submit} onKeyDown={onKeyDown} onBlur={onBlur}>
+      <label className="visually-hidden" htmlFor={inputId}>
         Find a page
       </label>
       <div className="input-group input-group-sm">
@@ -42,30 +63,29 @@ export function PageFinder({ pages }: { pages: readonly PageTarget[] }) {
           <i className="bi bi-search" />
         </span>
         <input
-          id={`${listId}-input`}
+          ref={inputRef}
+          id={inputId}
           type="search"
           className="form-control"
           placeholder="Find a page…"
           autoComplete="off"
           value={query}
           aria-describedby={hintId}
-          aria-controls={listId}
+          aria-controls={showList ? listId : undefined}
           onChange={(event) => setQuery(event.target.value)}
-          onKeyDown={onKeyDown}
         />
       </div>
       <span id={hintId} className="visually-hidden">
-        Searches page names only, not devices, users or incidents. Press Enter to open the first match.
+        Searches page and section names only, not devices, users or incidents. Press Enter to open the
+        first match, Escape to close.
       </span>
-      {searching ? (
-        <div className="page-finder__panel">
-          <p className="page-finder__status small text-body-secondary mb-1" role="status">
-            {results.length === 0
-              ? 'No page matches. Search covers page names only.'
-              : `${results.length} ${results.length === 1 ? 'page' : 'pages'} · page names only`}
-          </p>
+      <div className={open ? 'page-finder__panel' : 'visually-hidden'}>
+        <p className="page-finder__status small text-body-secondary mb-1" role="status">
+          {statusText(query, matches)}
+        </p>
+        {showList ? (
           <ul id={listId} className="page-finder__list list-unstyled mb-0">
-            {results.map((page) => (
+            {matches.items.map((page) => (
               <li key={page.href}>
                 <Link href={page.href} onClick={() => setQuery('')}>
                   {page.label}
@@ -74,12 +94,8 @@ export function PageFinder({ pages }: { pages: readonly PageTarget[] }) {
               </li>
             ))}
           </ul>
-        </div>
-      ) : (
-        <p className="visually-hidden" role="status">
-          Pages only
-        </p>
-      )}
+        ) : null}
+      </div>
     </form>
   );
 }
