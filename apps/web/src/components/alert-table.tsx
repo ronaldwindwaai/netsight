@@ -85,12 +85,13 @@ const columns: TableColumn<Alert>[] = [
     key: 'state',
     header: 'State',
     render: (alert) => (
-      <span title={STATE_VIEW[alert.state].meaning}>
+      <div>
         <Badge theme={STATE_THEME[alert.state]} pill>
           <i className={`bi ${STATE_VIEW[alert.state].icon} me-1`} aria-hidden="true" />
           {label(alert.state)}
         </Badge>
-      </span>
+        <span className="visually-hidden"> {STATE_VIEW[alert.state].meaning}</span>
+      </div>
     ),
   },
   {

@@ -118,7 +118,7 @@ function DetailBody({
       <Card className="operational-card" title="Summary" variant="outline" theme="primary">
         <IncidentSummary incident={incident} />
         <div className="mt-3">
-          <IncidentRelatedLinks />
+          <IncidentRelatedLinks permissions={viewer === null ? [] : viewer.permissions} />
         </div>
         <div className="mt-3">
           <IncidentActionsPanel

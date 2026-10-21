@@ -200,6 +200,7 @@ describe('rejecting and cancelling', () => {
     assert.match(dialog.textContent ?? '', /will not run/);
     const submit = within(dialog).getByRole('button', { name: 'Reject' }) as HTMLButtonElement;
     assert.equal(submit.disabled, true);
+    assert.ok(document.getElementById(submit.getAttribute('aria-describedby') ?? ''), 'describedby target exists');
     assert.match(describedText(submit), /at least 3 characters/i);
     await userEvent.type(within(dialog).getByLabelText('Reason'), '  ab ');
     assert.equal(submit.disabled, true);

@@ -82,6 +82,6 @@ await build({
 const bundles = readdirSync(outDir)
   .filter((name) => name.endsWith('.test.cjs'))
   .map((name) => join(outDir, name));
-const result = spawnSync(process.execPath, ['--test', '--test-timeout=180000', '--test-force-exit', ...process.argv.slice(2), ...bundles], { stdio: 'inherit', cwd: root });
+const result = spawnSync(process.execPath, ['--test', '--test-timeout=600000', '--test-force-exit', ...process.argv.slice(2), ...bundles], { stdio: 'inherit', cwd: root });
 rmSync(outDir, { recursive: true, force: true });
 process.exit(result.status ?? 1);

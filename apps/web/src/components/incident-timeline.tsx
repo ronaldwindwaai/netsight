@@ -35,6 +35,7 @@ export function IncidentTimeline({ events }: { events: readonly IncidentTimeline
               <div className="mt-1 d-flex flex-wrap align-items-center gap-2">
                 <StateBadge state={event.state_from} />
                 <i className="bi bi-arrow-right" aria-hidden="true" />
+                <span className="visually-hidden">changed to</span>
                 <StateBadge state={event.state_to} />
               </div>
             ) : summary.detail ? (

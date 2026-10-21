@@ -23,6 +23,8 @@ const FRESHNESS: Record<ConfigurationNode['backup_freshness'], BadgeView> = {
   unknown: { label: 'Freshness unknown', icon: 'bi-question-circle-fill', theme: 'secondary' },
 };
 /** A word and an icon, never colour alone; unknown and failed never read as healthy. */
+const UNKNOWN_BACKUP = BACKUP.unknown;
+const UNKNOWN_FRESHNESS = FRESHNESS.unknown;
 function ViewBadge({ view }: { view: BadgeView }) {
   return <Badge theme={view.theme} pill><i className={`bi ${view.icon} me-1`} aria-hidden="true" />{view.label}</Badge>;
 }
@@ -44,9 +46,9 @@ const nodeColumns: TableColumn<ConfigurationNode>[] = [
   { key: 'name', header: 'Device', render: item => <Link href={`/config/changes?node=${encodeURIComponent(item.id)}`}>{item.name}</Link> },
   { key: 'group', header: 'Group', render: item => item.group ?? 'Not reported' },
   { key: 'model', header: 'Model', render: item => item.model ?? 'Not reported' },
-  { key: 'backup_status', header: 'Last attempt', render: item => <ViewBadge view={BACKUP[item.backup_status]} /> },
+  { key: 'backup_status', header: 'Last attempt', render: item => <ViewBadge view={BACKUP[item.backup_status] ?? UNKNOWN_BACKUP} /> },
   { key: 'last_attempt_at', header: 'Attempt time', render: item => item.last_attempt_at ? formatUtcTimestamp(item.last_attempt_at) : 'Not reported' },
-  { key: 'backup_freshness', header: 'Backup freshness', render: item => <ViewBadge view={FRESHNESS[item.backup_freshness]} /> },
+  { key: 'backup_freshness', header: 'Backup freshness', render: item => <ViewBadge view={FRESHNESS[item.backup_freshness] ?? UNKNOWN_FRESHNESS} /> },
 ];
 const versionColumns: TableColumn<ConfigurationVersion>[] = [
   { key: 'id', header: 'Version', render: item => <code className="text-break">{item.id}</code> },
@@ -62,21 +64,21 @@ export function ConfigurationNodesBody({ state }: { state: FetchState<Configurat
           <Link href={`/config/changes?node=${encodeURIComponent(item.id)}`}>{item.name}</Link>
           <dl className="row small mt-2 mb-0">
             <dt className="col-5">Group / model</dt><dd className="col-7 text-break">{item.group ?? 'Not reported'} / {item.model ?? 'Not reported'}</dd>
-            <dt className="col-5">Last attempt</dt><dd className="col-7"><ViewBadge view={BACKUP[item.backup_status]} /></dd>
+            <dt className="col-5">Last attempt</dt><dd className="col-7"><ViewBadge view={BACKUP[item.backup_status] ?? UNKNOWN_BACKUP} /></dd>
             <dt className="col-5">Attempt time</dt><dd className="col-7">{item.last_attempt_at ? formatUtcTimestamp(item.last_attempt_at) : 'Not reported'}</dd>
-            <dt className="col-5">Freshness</dt><dd className="col-7"><ViewBadge view={FRESHNESS[item.backup_freshness]} /></dd>
+            <dt className="col-5">Freshness</dt><dd className="col-7"><ViewBadge view={FRESHNESS[item.backup_freshness] ?? UNKNOWN_FRESHNESS} /></dd>
           </dl>
         </li>)}
       </ul>
     </> : null}
   </ConfigurationSurface></Card>;
 }
-export function ConfigurationVersionsBody({ state, nodeId }: { state: FetchState<ConfigurationRead<ConfigurationVersion>>; nodeId: string }) {
+export function ConfigurationVersionsBody({ state, nodeId, permissions = [] }: { state: FetchState<ConfigurationRead<ConfigurationVersion>>; nodeId: string; permissions?: readonly string[] }) {
   return <Card title={`Saved versions for ${nodeId}`}>
     <nav className="d-flex flex-wrap gap-3 small mb-3" aria-label="Related views">
       <Link href="/config"><i className="bi bi-arrow-left me-1" aria-hidden="true" />All configuration backups</Link>
-      <Link href="/incidents"><i className="bi bi-exclamation-diamond me-1" aria-hidden="true" />Related incidents</Link>
-      <Link href="/diagnostics"><i className="bi bi-activity me-1" aria-hidden="true" />Diagnostics</Link>
+      <Link href="/incidents"><i className="bi bi-exclamation-diamond me-1" aria-hidden="true" />All incidents</Link>
+      {permissions.includes('diagnostics:read') ? <Link href="/diagnostics"><i className="bi bi-activity me-1" aria-hidden="true" />Diagnostics</Link> : null}
     </nav>
     <ConfigurationSurface state={state} baseHref={`/config/changes?node=${encodeURIComponent(nodeId)}`}>
     {state.kind === 'ok' ? <>

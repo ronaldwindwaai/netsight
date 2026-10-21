@@ -52,9 +52,19 @@ it('a failed or unknown backup is never described as healthy', () => {
   assert.match(document.body.textContent ?? '', /No backup yet/);
 });
 it('the version history says which backup record it is for and links back to every backup and the change context', () => {
-  render(<ConfigurationVersionsBody nodeId={node.id} state={{kind: 'ok', correlationId: 'ref', data: {...data, items: [{id: 'a'.repeat(40), saved_at: '2026-10-17T10:00:00Z'}]}}} />);
+  render(<ConfigurationVersionsBody nodeId={node.id} permissions={['diagnostics:read']} state={{kind: 'ok', correlationId: 'ref', data: {...data, items: [{id: 'a'.repeat(40), saved_at: '2026-10-17T10:00:00Z'}]}}} />);
   assert.match(screen.getByRole('heading', { name: /Saved versions for/ }).textContent ?? '', new RegExp(node.id));
   assert.equal(screen.getByRole('link', { name: /All configuration backups/ }).getAttribute('href'), '/config');
-  assert.ok(screen.getByRole('link', { name: /Related incidents/ }));
+  assert.ok(screen.getByRole('link', { name: /All incidents/ }));
   assert.ok(screen.getByRole('link', { name: /Diagnostics/ }));
+});
+it('hides the diagnostics link from a role without diagnostics:read', () => {
+  render(<ConfigurationVersionsBody nodeId={node.id} state={{kind: 'ok', correlationId: 'ref', data: {...data, items: [{id: 'a'.repeat(40), saved_at: '2026-10-17T10:00:00Z'}]}}} />);
+  assert.equal(screen.queryByRole('link', { name: /Diagnostics/ }), null);
+});
+it('an unexpected backup value degrades to unknown instead of breaking the table', () => {
+  const odd = { ...node, backup_status: 'weird', backup_freshness: 'odd' } as unknown as ConfigurationNode;
+  render(<ConfigurationNodesBody state={state({ ...data, items: [odd] })} />);
+  assert.match(document.body.textContent ?? '', /Backup state unknown/);
+  assert.match(document.body.textContent ?? '', /Freshness unknown/);
 });

@@ -268,6 +268,8 @@ export function decisionAvailability(
 export function nextStepGuidance(request: ActionRequest, viewer: Viewer | null, status: ActionStatus | null): string {
   const killed = status?.kill_switch.engaged === true;
   const isRequester = viewer !== null && viewer.identityId === request.requester.id;
+  const dryRunOnly = status === null || status.dry_run_only;
+  const selfExecute = status?.policy.self_execute_allowed === true;
   const remaining = Math.max(0, request.approvals_required - request.approvals.length);
   switch (request.state) {
     case 'proposed':
@@ -280,15 +282,23 @@ export function nextStepGuidance(request: ActionRequest, viewer: Viewer | null, 
       return `Awaiting ${request.approvals_required} ${word} (${remaining} still needed) before the approve-by deadline. ${who} Approving does not run it.`;
     }
     case 'approved':
-      return killed
-        ? 'Approved, but the kill switch is engaged: it has not been run and cannot be run until the switch is released.'
-        : 'Approved but it has not been run. A person with permission to run it, other than the requester, must run it before it expires.';
+      if (killed) {
+        return 'Approved, but the kill switch is engaged: it has not been run and cannot be run until the switch is released.';
+      }
+      return `Approved but it has not been run. ${
+        selfExecute
+          ? 'A person with permission to run it must do so before it expires.'
+          : 'A person with permission to run it, other than the requester, must do so before it expires.'
+      }${dryRunOnly ? ' Running it is recorded as a dry run: nothing is changed.' : ''}`;
     case 'executing':
       return 'An executor is running it now. Refresh to see the result.';
     case 'succeeded':
-      return request.execution?.mode === 'dry-run'
-        ? 'A dry run was recorded. Nothing was changed; a live change needs a live executor, which is not available here.'
-        : 'The run finished and was verified. Review the result and verification below.';
+      if (request.execution?.mode === 'dry-run') {
+        return dryRunOnly
+          ? 'A dry run was recorded. Nothing was changed; a live change needs a live executor, which is not available here.'
+          : 'A dry run was recorded. Nothing was changed by it.';
+      }
+      return 'The run finished and was verified. Review the result and verification below.';
     case 'failed':
       return 'The run did not complete. Check the result before proposing it again.';
     case 'rolled-back':

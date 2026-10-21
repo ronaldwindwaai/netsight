@@ -31,6 +31,11 @@ it('each severity and state has its own icon and word, so none depends on colour
 
 it('says that a suppressed alert is not a resolved one', () => {
   const { container } = render(<AlertTable alerts={[{ ...base, severity: 'low', state: 'suppressed' } as Alert]} total={1} />);
-  const badge = container.querySelector('tbody td:nth-child(4) [title]');
-  assert.match(badge?.getAttribute('title') ?? '', /not resolved/i);
+  const badge = container.querySelector('tbody td:nth-child(4) .visually-hidden');
+  assert.match(badge?.textContent ?? '', /not resolved/i);
+});
+
+it('puts the state meaning in text a screen reader reads, not only in a tooltip', () => {
+  const { container } = render(<AlertTable alerts={[{ ...base, severity: 'low', state: 'suppressed' } as Alert]} total={1} />);
+  assert.match(container.querySelector('tbody .visually-hidden')?.textContent ?? '', /not resolved/i);
 });

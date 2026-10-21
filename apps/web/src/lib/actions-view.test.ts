@@ -347,3 +347,31 @@ test('every decision names its consequence, and a dry run says nothing is change
   assert.match(decisionConsequence('execute', true), /nothing is changed/i);
   assert.match(decisionConsequence('execute', false), /live|device/i);
 });
+
+test('guidance for the requester, a running request and a live run is accurate', () => {
+  const REQUESTER: Viewer = { identityId: 'user-eng', permissions: ['actions:read', 'actions:propose'] };
+  const mine = request({ state: 'pending-approval', requester: { id: 'user-eng', kind: 'human' } });
+  assert.match(nextStepGuidance(mine, REQUESTER, status()), /You made this request/);
+  assert.match(nextStepGuidance(request({ state: 'executing' }), ADMIN, status()), /running it now/i);
+  const live = request({ state: 'succeeded', execution: { ...(request().execution as object), mode: 'live' } });
+  const liveText = nextStepGuidance(live, ADMIN, status({ dry_run_only: false }));
+  assert.match(liveText, /verified/i);
+  assert.doesNotMatch(liveText, /dry run/i);
+});
+
+test('who may run an approved request follows the self-execute policy', () => {
+  const approved = request({ state: 'approved' });
+  const strict = nextStepGuidance(approved, ADMIN, status({ policy: { self_execute_allowed: false } }));
+  assert.match(strict, /other than the requester/);
+  const lax = nextStepGuidance(approved, ADMIN, status({ policy: { self_execute_allowed: true } }));
+  assert.doesNotMatch(lax, /other than the requester/);
+  assert.match(lax, /has not been run/i);
+});
+
+test('dry-run wording depends on the engine being dry-run only', () => {
+  const dry = request({ state: 'succeeded', execution: { ...(request().execution as object), mode: 'dry-run' } });
+  assert.match(nextStepGuidance(dry, ADMIN, status({ dry_run_only: true })), /live executor, which is not available/);
+  assert.doesNotMatch(nextStepGuidance(dry, ADMIN, status({ dry_run_only: false })), /not available/);
+  assert.match(nextStepGuidance(request({ state: 'approved' }), ADMIN, status({ dry_run_only: true })), /recorded as a dry run/i);
+  assert.doesNotMatch(nextStepGuidance(request({ state: 'approved' }), ADMIN, status({ dry_run_only: false })), /dry run/i);
+});
