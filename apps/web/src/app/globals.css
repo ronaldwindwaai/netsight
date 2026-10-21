@@ -878,12 +878,12 @@ body {
 }
 
 /* devices: sticky header inside a bounded scroll area */
-.devices-sticky .table-responsive {
+.devices-scroll {
   max-height: 70vh;
   overflow: auto;
 }
 
-.devices-sticky thead th {
+.devices-scroll thead th {
   position: sticky;
   top: 0;
   z-index: 1;

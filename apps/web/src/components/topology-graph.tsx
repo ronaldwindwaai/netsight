@@ -11,6 +11,7 @@ import {
   bounds,
   centreOn,
   fitView,
+  isVisible,
   layout,
   zoomAround,
   VIEW_H,
@@ -85,6 +86,14 @@ function ZoomControls({
   );
 }
 
+/**
+ * The graph for a given `?focus=`. The focus is only the initial selection, so a change of focus on
+ * client navigation (same page, new query) must remount the graph or the new focus would be ignored.
+ */
+export function TopologyView({ topology, focus }: { topology: TopologyResponse; focus: string | null }) {
+  return <TopologyGraph key={focus ?? 'none'} topology={topology} initialSelected={focus} />;
+}
+
 export function TopologyGraph({
   topology,
   initialSelected = null,
@@ -104,6 +113,8 @@ export function TopologyGraph({
     return focus ? centreOn(focus, 1) : fitView(box);
   });
   const dragRef = useRef<Drag | null>(null);
+  // True once the current press has travelled past the drag threshold, so the click that follows a
+  // pan is not read as selecting the node under the pointer. Reset on every pointer-down.
   const movedRef = useRef(false);
 
   const matches = useMemo(() => new Set(matchNodes(topology.nodes, query).map((n) => n.device_id)), [topology, query]);
@@ -130,6 +141,12 @@ export function TopologyGraph({
   const onPointerMove = (event: PointerEvent<SVGSVGElement>) => {
     const drag = dragRef.current;
     if (!drag) return;
+    if (event.buttons === 0) {
+      // The button was released outside the canvas (or the pointer was cancelled) without a
+      // pointer-up reaching us; drop the stale drag instead of panning on hover.
+      dragRef.current = null;
+      return;
+    }
     const dx = event.clientX - drag.x;
     const dy = event.clientY - drag.y;
     if (!movedRef.current) {
@@ -167,6 +184,10 @@ export function TopologyGraph({
     if (!handler) return;
     event.preventDefault();
     handler();
+  };
+  // Keyboard focus must never leave the focused node off screen: bring it into view.
+  const onNodeFocus = (position: Positioned) => {
+    if (!isVisible(position, view)) setView((current) => centreOn(position, current.scale));
   };
   const onNodeKeyDown = (event: KeyboardEvent<SVGGElement>, deviceId: string) => {
     if (event.key !== 'Enter' && event.key !== ' ') return;
@@ -229,6 +250,7 @@ export function TopologyGraph({
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
+            onPointerCancel={onPointerUp}
             onWheel={onWheel}
             onKeyDown={onKeyDown}
           >
@@ -260,6 +282,7 @@ export function TopologyGraph({
                     toggle(position.id);
                   }}
                   onKeyDown={(event) => onNodeKeyDown(event, position.id)}
+                  onFocus={() => onNodeFocus(position)}
                 />
               ))}
             </g>
@@ -287,6 +310,7 @@ function NodeShape({
   match,
   onToggle,
   onKeyDown,
+  onFocus,
 }: {
   position: Positioned;
   node: TopologyResponse['nodes'][number] | undefined;
@@ -296,6 +320,7 @@ function NodeShape({
   match: boolean;
   onToggle: () => void;
   onKeyDown: (event: KeyboardEvent<SVGGElement>) => void;
+  onFocus: () => void;
 }) {
   const finding = node?.finding != null;
   const name = node ? nodeLabel(node) : position.name;
@@ -310,6 +335,7 @@ function NodeShape({
       className="topology-node-group"
       onClick={onToggle}
       onKeyDown={onKeyDown}
+      onFocus={onFocus}
       style={{ cursor: 'pointer' }}
     >
       <title>{`${position.id}\n${summary}`}</title>

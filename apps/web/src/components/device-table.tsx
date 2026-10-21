@@ -1,9 +1,9 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Card, Table } from '@adminlte/react';
-import type { TableColumn } from '@adminlte/react';
+import { Card } from '@adminlte/react';
+import type { ReactNode } from 'react';
 
 import { EmptyState } from '@/components/data-state';
 import { FreshnessBadge, StatusBadge } from '@/components/status-badge';
@@ -11,7 +11,7 @@ import { DEVICE_STATUSES } from '@/lib/api-contracts';
 import type { Device, DeviceStatus } from '@/lib/api-contracts';
 import { PERSON_ID } from '@/lib/api-contracts-identity-core';
 import { countByStatus, nextSort, sortDevices } from '@/lib/device-view';
-import type { DeviceSortKey, SortDirection } from '@/lib/device-view';
+import type { DeviceSortKey, SortState } from '@/lib/device-view';
 
 function observedAt(value: string | null): string {
   if (!value) return 'Not tracked yet';
@@ -25,9 +25,12 @@ function observedAt(value: string | null): string {
       }).format(date)} UTC`;
 }
 
-interface SortState {
-  key: DeviceSortKey;
-  direction: SortDirection;
+interface DeviceColumn {
+  key: string;
+  label: string;
+  /** Present for sortable columns: the header then carries a sort button and aria-sort. */
+  sortKey?: DeviceSortKey;
+  render: (device: Device) => ReactNode;
 }
 
 function OwnerCell({ device }: { device: Device }) {
@@ -44,7 +47,7 @@ function OwnerCell({ device }: { device: Device }) {
   );
 }
 
-function SortHeader({
+function SortButton({
   label,
   sortKey,
   sort,
@@ -72,50 +75,93 @@ function SortHeader({
   );
 }
 
-function buildColumns(
-  sort: SortState | null,
-  onSort: (key: DeviceSortKey) => void,
-): TableColumn<Device>[] {
-  const header = (label: string, key: DeviceSortKey) => (
-    <SortHeader label={label} onSort={onSort} sort={sort} sortKey={key} />
+function ariaSort(column: DeviceColumn, sort: SortState | null): 'ascending' | 'descending' | 'none' | undefined {
+  if (column.sortKey === undefined) return undefined;
+  if (sort === null || sort.key !== column.sortKey) return 'none';
+  return sort.direction === 'asc' ? 'ascending' : 'descending';
+}
+
+const COLUMNS: DeviceColumn[] = [
+  { key: 'status', label: 'Status', sortKey: 'status', render: (d) => <StatusBadge status={d.status} /> },
+  {
+    key: 'name',
+    label: 'Device',
+    sortKey: 'name',
+    render: (device) => (
+      <div>
+        <Link className="fw-semibold" href={`/devices/${encodeURIComponent(device.id)}`}>
+          {device.name}
+        </Link>
+        <span className="d-block small text-body-secondary">
+          {device.hostname ?? 'Hostname not tracked'}
+        </span>
+      </div>
+    ),
+  },
+  { key: 'ip', label: 'IP address', sortKey: 'ip', render: (d) => d.ip_addresses[0] ?? 'Not tracked yet' },
+  { key: 'type', label: 'Type', sortKey: 'type', render: (d) => d.type || 'Not tracked yet' },
+  { key: 'site', label: 'Site', sortKey: 'site', render: (d) => d.site_id ?? 'Not tracked yet' },
+  { key: 'owner', label: 'Owner', render: (d) => <OwnerCell device={d} /> },
+  {
+    key: 'freshness',
+    label: 'Freshness',
+    sortKey: 'freshness',
+    render: (device) => (
+      <div>
+        <FreshnessBadge state={device.freshness.state} />
+        <span className="d-block small text-body-secondary mt-1">
+          {observedAt(device.freshness.observed_at)}
+        </span>
+      </div>
+    ),
+  },
+];
+
+function DeviceRows({
+  rows,
+  sort,
+  onSort,
+}: {
+  rows: Device[];
+  sort: SortState | null;
+  onSort: (key: DeviceSortKey) => void;
+}) {
+  return (
+    <div
+      aria-label="Devices table (scrollable)"
+      className="devices-scroll"
+      role="region"
+      tabIndex={0}
+    >
+      <table className="table table-sm table-hover table-striped mb-0">
+        <caption className="visually-hidden">
+          Canonical devices. Sorting and filters cover the loaded page only.
+        </caption>
+        <thead>
+          <tr>
+            {COLUMNS.map((column) => (
+              <th aria-sort={ariaSort(column, sort)} key={column.key} scope="col">
+                {column.sortKey === undefined ? (
+                  column.label
+                ) : (
+                  <SortButton label={column.label} onSort={onSort} sort={sort} sortKey={column.sortKey} />
+                )}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((device) => (
+            <tr key={device.id}>
+              {COLUMNS.map((column) => (
+                <td key={column.key}>{column.render(device)}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
-  return [
-    { key: 'status', header: header('Status', 'status'), render: (d) => <StatusBadge status={d.status} /> },
-    {
-      key: 'name',
-      header: header('Device', 'name'),
-      render: (device) => (
-        <div>
-          <Link className="fw-semibold" href={`/devices/${encodeURIComponent(device.id)}`}>
-            {device.name}
-          </Link>
-          <span className="d-block small text-body-secondary">
-            {device.hostname ?? 'Hostname not tracked'}
-          </span>
-        </div>
-      ),
-    },
-    {
-      key: 'ip',
-      header: header('IP address', 'ip'),
-      render: (d) => d.ip_addresses[0] ?? 'Not tracked yet',
-    },
-    { key: 'type', header: header('Type', 'type'), render: (d) => d.type || 'Not tracked yet' },
-    { key: 'site', header: header('Site', 'site'), render: (d) => d.site_id ?? 'Not tracked yet' },
-    { key: 'owner', header: 'Owner', render: (d) => <OwnerCell device={d} /> },
-    {
-      key: 'freshness',
-      header: header('Freshness', 'freshness'),
-      render: (device) => (
-        <div>
-          <FreshnessBadge state={device.freshness.state} />
-          <span className="d-block small text-body-secondary mt-1">
-            {observedAt(device.freshness.observed_at)}
-          </span>
-        </div>
-      ),
-    },
-  ];
 }
 
 function StatusChips({
@@ -169,13 +215,7 @@ export function DeviceTable({ devices, total }: { devices: Device[]; total: numb
     );
     return sort === null ? matched : sortDevices(matched, sort.key, sort.direction);
   }, [devices, query, status, sort]);
-  const columns = useMemo(
-    () =>
-      buildColumns(sort, (key) =>
-        setSort((current) => nextSort(current ?? { key, direction: 'desc' }, key)),
-      ),
-    [sort],
-  );
+  const searchRef = useRef<HTMLInputElement>(null);
   const filtering = query.trim().length > 0 || status !== 'all';
 
   return (
@@ -200,6 +240,7 @@ export function DeviceTable({ devices, total }: { devices: Device[]; total: numb
           <input
             className="form-control form-control-sm"
             id="device-search"
+            ref={searchRef}
             maxLength={128}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Name, hostname, IP, type or site"
@@ -214,6 +255,8 @@ export function DeviceTable({ devices, total }: { devices: Device[]; total: numb
             onClick={() => {
               setQuery('');
               setStatus('all');
+              // The button disables itself once nothing is filtered; keep keyboard focus alive.
+              searchRef.current?.focus();
             }}
             type="button"
           >
@@ -231,18 +274,11 @@ export function DeviceTable({ devices, total }: { devices: Device[]; total: numb
           <EmptyState filtered />
         </div>
       ) : (
-        <div className="devices-sticky">
-          <Table
-            columns={columns}
-            data={rows}
-            emptyMessage="No devices"
-            hover
-            responsive
-            rowKey={(device) => device.id}
-            small
-            striped
-          />
-        </div>
+        <DeviceRows
+          onSort={(key) => setSort((current) => nextSort(current, key))}
+          rows={rows}
+          sort={sort}
+        />
       )}
     </Card>
   );

@@ -5,8 +5,15 @@ import { afterEach, describe, it } from 'node:test';
 
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 
-import { TopologyGraph } from '@/components/topology-graph';
+import { TopologyGraph, TopologyView } from '@/components/topology-graph';
 import type { TopologyResponse } from '@/lib/api-contracts';
+import { VIEW_W } from '@/lib/topology-layout';
+
+// jsdom has no pointer capture; a real browser does. Stub it so the handlers can run.
+const proto = globalThis.SVGElement.prototype as unknown as Record<string, unknown>;
+proto.setPointerCapture ??= () => undefined;
+proto.releasePointerCapture ??= () => undefined;
+proto.hasPointerCapture ??= () => false;
 
 afterEach(() => cleanup());
 
@@ -28,7 +35,8 @@ const TOPOLOGY = {
   ],
 } as TopologyResponse;
 
-const node = (name: RegExp) => screen.getByRole('button', { name });
+const node = (name: RegExp) =>
+  screen.getAllByRole('button', { name }).find((el) => el.hasAttribute('aria-pressed')) as HTMLElement;
 
 describe('TopologyGraph', () => {
   it('shows a legend and an empty selection prompt before anything is selected', () => {
@@ -88,5 +96,41 @@ describe('TopologyGraph', () => {
     assert.notEqual(before, after);
     fireEvent.keyDown(screen.getByRole('group', { name: /Topology graph/ }), { key: '0' });
     assert.equal(screen.getByLabelText(/^Zoom \d+ percent/).textContent, before);
+  });
+
+  it('re-applies a changed focus on client navigation instead of keeping the old selection', () => {
+    const { rerender } = render(<TopologyView topology={TOPOLOGY} focus={A} />);
+    assert.equal(node(/Core-1/).getAttribute('aria-pressed'), 'true');
+    rerender(<TopologyView topology={TOPOLOGY} focus={B} />);
+    assert.equal(node(/Access-2/).getAttribute('aria-pressed'), 'true');
+    assert.equal(node(/Core-1/).getAttribute('aria-pressed'), 'false');
+    rerender(<TopologyView topology={TOPOLOGY} focus={null} />);
+    assert.equal(node(/Access-2/).getAttribute('aria-pressed'), 'false');
+  });
+
+  it('ends a drag on pointer cancel and ignores moves once no button is held', () => {
+    render(<TopologyGraph topology={TOPOLOGY} />);
+    const svg = screen.getByRole('group', { name: /Topology graph/ });
+    const transform = () => svg.querySelector('g')?.getAttribute('transform');
+    const start = transform();
+    fireEvent.pointerDown(svg, { button: 0, buttons: 1, clientX: 10, clientY: 10, pointerId: 1 });
+    fireEvent.pointerCancel(svg, { pointerId: 1 });
+    fireEvent.pointerMove(svg, { buttons: 1, clientX: 200, clientY: 200, pointerId: 1 });
+    assert.equal(transform(), start, 'a cancelled drag must not keep panning');
+    fireEvent.pointerDown(svg, { button: 0, buttons: 1, clientX: 10, clientY: 10, pointerId: 2 });
+    fireEvent.pointerMove(svg, { buttons: 0, clientX: 300, clientY: 300, pointerId: 2 });
+    assert.equal(transform(), start, 'hovering with no button held must not pan');
+  });
+
+  it('brings a focused node that is off screen back into view', () => {
+    render(<TopologyGraph topology={TOPOLOGY} />);
+    const svg = screen.getByRole('group', { name: /Topology graph/ });
+    const transform = () => svg.querySelector('g')?.getAttribute('transform') ?? '';
+    for (let i = 0; i < 40; i += 1) fireEvent.keyDown(svg, { key: 'ArrowLeft' });
+    const panned = transform();
+    fireEvent.focus(node(/Core-1/));
+    assert.notEqual(transform(), panned);
+    const offsetX = Number(/translate\((-?[\d.]+)/.exec(transform())?.[1]);
+    assert.ok(offsetX < VIEW_W && offsetX > -VIEW_W);
   });
 });

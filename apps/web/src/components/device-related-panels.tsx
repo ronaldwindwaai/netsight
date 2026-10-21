@@ -3,9 +3,9 @@ import Link from 'next/link';
 import type { Device } from '@/lib/api-contracts';
 import { PERSON_ID } from '@/lib/api-contracts-identity-core';
 import { relatedLinks } from '@/lib/device-links';
-import type { RelatedLink } from '@/lib/device-links';
+import type { Permissions, RelatedLink } from '@/lib/device-links';
 
-function LinkList({ links }: { links: RelatedLink[] }) {
+export function LinkList({ links }: { links: RelatedLink[] }) {
   return (
     <ul className="list-unstyled mb-0">
       {links.map((link) => (
@@ -21,6 +21,16 @@ function LinkList({ links }: { links: RelatedLink[] }) {
   );
 }
 
+/** The one wording for a source that is not connected: never an empty or healthy-looking result. */
+export function NotConnected({ label }: { label: string }) {
+  return (
+    <p className="text-body-secondary">
+      <i className="bi bi-plug me-2" aria-hidden="true" />
+      {label} is not yet connected for this device. Nothing is estimated in its place.
+    </p>
+  );
+}
+
 /**
  * Tabs whose per-device telemetry is not connected stay honest about that, and still point at the
  * screens that can show related evidence, saying what each one does not filter.
@@ -29,19 +39,18 @@ export function RelatedTab({
   device,
   ids,
   missing,
+  permissions,
 }: {
   device: Device;
   ids: ReadonlyArray<RelatedLink['id']>;
   missing: string;
+  permissions: Permissions;
 }) {
-  const links = relatedLinks(device).filter((link) => ids.includes(link.id));
+  const links = relatedLinks(device, permissions).filter((link) => ids.includes(link.id));
   const flowsWanted = ids.includes('flows');
   return (
     <div className="py-3">
-      <p className="text-body-secondary">
-        <i className="bi bi-plug me-2" aria-hidden="true" />
-        {missing} is not yet connected for this device. Nothing is estimated in its place.
-      </p>
+      <NotConnected label={missing} />
       {flowsWanted && device.ip_addresses.length === 0 ? (
         <p className="small text-body-secondary">
           No address is recorded for this device, so there is no flow view to link to.
@@ -111,13 +120,13 @@ export function DeviceIdentityFacts({ device }: { device: Device }) {
   );
 }
 
-export function RelatedLinksCard({ device }: { device: Device }) {
+export function RelatedLinksCard({ device, permissions }: { device: Device; permissions: Permissions }) {
   return (
     <section aria-labelledby="device-related" className="border-top pt-3 px-3 pb-2">
       <h2 className="h6" id="device-related">
         Related views
       </h2>
-      <LinkList links={relatedLinks(device)} />
+      <LinkList links={relatedLinks(device, permissions)} />
     </section>
   );
 }

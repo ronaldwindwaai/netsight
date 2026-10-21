@@ -139,3 +139,19 @@ export function zoomAround(view: CanvasState, factor: number): CanvasState {
     offsetY: VIEW_H / 2 - (VIEW_H / 2 - view.offsetY) * ratio,
   };
 }
+
+const VISIBLE_MARGIN = 8;
+
+/** True when the whole node box is inside the canvas at this view (with a small margin). */
+export function isVisible(node: Positioned, view: CanvasState): boolean {
+  const left = view.offsetX + node.x * view.scale;
+  const top = view.offsetY + node.y * view.scale;
+  const right = left + NODE_W * view.scale;
+  const bottom = top + NODE_H * view.scale;
+  return (
+    left >= VISIBLE_MARGIN &&
+    top >= VISIBLE_MARGIN &&
+    right <= VIEW_W - VISIBLE_MARGIN &&
+    bottom <= VIEW_H - VISIBLE_MARGIN
+  );
+}

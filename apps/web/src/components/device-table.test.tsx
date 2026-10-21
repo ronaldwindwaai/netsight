@@ -84,4 +84,29 @@ describe('DeviceTable', () => {
     );
     assert.ok(screen.getByRole('link', { name: /Owner/ }).getAttribute('href')?.startsWith('/users/'));
   });
+
+  it('marks the sorted column with aria-sort and the others none; unsortable columns carry none', () => {
+    render(<DeviceTable devices={ROWS} total={3} />);
+    const header = (name: RegExp) => screen.getByRole('columnheader', { name });
+    assert.equal(header(/Device/).getAttribute('aria-sort'), 'none');
+    fireEvent.click(screen.getByRole('button', { name: /Sort by Device/ }));
+    assert.equal(header(/Device/).getAttribute('aria-sort'), 'ascending');
+    assert.equal(header(/Status/).getAttribute('aria-sort'), 'none');
+    fireEvent.click(screen.getByRole('button', { name: /Sort by Device/ }));
+    assert.equal(header(/Device/).getAttribute('aria-sort'), 'descending');
+    assert.equal(header(/Owner/).getAttribute('aria-sort'), null);
+  });
+
+  it('offers the scroll area as a labelled, focusable region', () => {
+    render(<DeviceTable devices={ROWS} total={3} />);
+    const region = screen.getByRole('region', { name: /Devices table/ });
+    assert.equal(region.getAttribute('tabindex'), '0');
+  });
+
+  it('moves focus to the search box when filters are cleared', () => {
+    render(<DeviceTable devices={ROWS} total={3} />);
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'bravo' } });
+    fireEvent.click(screen.getByRole('button', { name: /Clear filters/ }));
+    assert.equal(document.activeElement, screen.getByRole('searchbox'));
+  });
 });

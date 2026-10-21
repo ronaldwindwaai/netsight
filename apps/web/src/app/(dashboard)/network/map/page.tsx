@@ -1,7 +1,7 @@
 import { AppContent, Card } from '@adminlte/react';
 
 import { DataFailure, FreshnessNotice } from '@/components/data-state';
-import { TopologyGraph } from '@/components/topology-graph';
+import { TopologyView } from '@/components/topology-graph';
 import { apiGet } from '@/lib/api';
 import { parseTopologyResponse, type TopologyResponse } from '@/lib/api-contracts';
 import { resolveFocus } from '@/lib/topology-view';
@@ -37,7 +37,7 @@ function GraphEvidence({ topology, focus }: { topology: TopologyResponse; focus:
   };
   return (
     <>
-      <TopologyGraph topology={topology} initialSelected={focus} />
+      <TopologyView topology={topology} focus={focus} />
       <div className="d-flex flex-wrap gap-2 mb-3" role="list" aria-label="Topology nodes">
         {topology.nodes.map((node) => (
           <span

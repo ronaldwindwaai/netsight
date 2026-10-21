@@ -47,6 +47,11 @@ describe('topology view helpers', () => {
     assert.equal(resolveFocus(undefined, TOPOLOGY), null);
   });
 
+  it('ignores a focus that is not a device id, such as an inventory-only asset id', () => {
+    assert.equal(resolveFocus('asset-6f1c2a9e-0b1d-5c3e-8f4a-123456789aaa', TOPOLOGY), null);
+    assert.equal(resolveFocus('', TOPOLOGY), null);
+  });
+
   it('never calls an unchecked node clean', () => {
     assert.match(reconciliationText(TOPOLOGY.nodes[1]), /Not checked/);
     assert.match(reconciliationText(TOPOLOGY.nodes[0]), /no findings/);

@@ -67,6 +67,16 @@ describe('countByStatus and nextSort', () => {
     assert.equal(counts.healthy, 0);
   });
 
+  it('starts ascending from no sort at all', () => {
+    assert.deepEqual(nextSort(null, 'site'), { key: 'site', direction: 'asc' });
+  });
+
+  it('treats an empty type as missing, last in both directions', () => {
+    const rows = [device({ id: 'e', type: '' }), device({ id: 'a', type: 'ap' })];
+    assert.deepEqual(sortDevices(rows, 'type', 'asc').map((d) => d.id), ['a', 'e']);
+    assert.deepEqual(sortDevices(rows, 'type', 'desc').map((d) => d.id), ['a', 'e']);
+  });
+
   it('toggles direction on the same column and resets on a new one', () => {
     assert.deepEqual(nextSort({ key: 'name', direction: 'asc' }, 'name'), { key: 'name', direction: 'desc' });
     assert.deepEqual(nextSort({ key: 'name', direction: 'desc' }, 'site'), { key: 'site', direction: 'asc' });

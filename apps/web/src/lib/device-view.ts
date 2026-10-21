@@ -44,7 +44,7 @@ function compareBy(key: DeviceSortKey, direction: SortDirection) {
       case 'ip':
         return compareText(a.ip_addresses[0] ?? null, b.ip_addresses[0] ?? null, direction);
       case 'type':
-        return compareText(a.type, b.type, direction);
+        return compareText(a.type || null, b.type || null, direction);
       case 'site':
         return compareText(a.site_id, b.site_id, direction);
       default:
@@ -73,10 +73,13 @@ export function countByStatus(devices: readonly Device[]): Record<DeviceStatus, 
   return counts;
 }
 
-export function nextSort(
-  current: { key: DeviceSortKey; direction: SortDirection },
-  key: DeviceSortKey,
-): { key: DeviceSortKey; direction: SortDirection } {
-  if (current.key !== key) return { key, direction: 'asc' };
+export interface SortState {
+  key: DeviceSortKey;
+  direction: SortDirection;
+}
+
+/** First click on a column sorts ascending; clicking the sorted column again flips it. */
+export function nextSort(current: SortState | null, key: DeviceSortKey): SortState {
+  if (current === null || current.key !== key) return { key, direction: 'asc' };
   return { key, direction: current.direction === 'asc' ? 'desc' : 'asc' };
 }
