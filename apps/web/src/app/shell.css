@@ -8,6 +8,19 @@
   inline-size: 100%;
 }
 
+/* The "/" shortcut hint: a keycap, hidden where there is no physical keyboard to press it on. */
+.page-finder__key {
+  font-family: var(--bs-font-monospace);
+  font-size: 0.75rem;
+  color: var(--bs-secondary-color);
+}
+
+@media (pointer: coarse), (max-width: 575.98px) {
+  .page-finder__key {
+    display: none;
+  }
+}
+
 .page-finder__panel {
   position: absolute;
   inset-block-start: calc(100% + 0.25rem);

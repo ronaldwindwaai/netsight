@@ -105,4 +105,58 @@ describe('the page finder', () => {
     await userEvent.click(screen.getByRole('link', { name: /Incidents/ }));
     assert.equal(input().value, '');
   });
+
+  describe('the "/" shortcut', () => {
+    it('focuses the search box from anywhere outside a text field', async () => {
+      render(
+        <>
+          <PageFinder pages={PAGES} />
+          <button type="button">Elsewhere</button>
+        </>,
+      );
+      screen.getByRole('button', { name: 'Elsewhere' }).focus();
+      await userEvent.keyboard('/');
+      assert.equal(document.activeElement, input());
+      assert.equal(input().value, '', 'the slash itself is not typed into the box');
+    });
+
+    it('does not steal a slash typed into another field', async () => {
+      render(
+        <>
+          <PageFinder pages={PAGES} />
+          <textarea aria-label="Note" />
+        </>,
+      );
+      const note = screen.getByLabelText('Note') as HTMLTextAreaElement;
+      note.focus();
+      await userEvent.keyboard('a/b');
+      assert.equal(note.value, 'a/b');
+      assert.notEqual(document.activeElement, input());
+    });
+
+    it('lets a slash through when it is part of the query', async () => {
+      render(<PageFinder pages={PAGES} />);
+      await userEvent.type(input(), 'a/b');
+      assert.equal(input().value, 'a/b');
+    });
+
+    it('ignores modified slashes', async () => {
+      render(<PageFinder pages={PAGES} />);
+      await userEvent.keyboard('{Control>}/{/Control}');
+      assert.notEqual(document.activeElement, input());
+    });
+
+    it('advertises itself with a visible hint and aria-keyshortcuts, and stops listening on unmount', async () => {
+      const { unmount } = render(<PageFinder pages={PAGES} />);
+      assert.equal(input().getAttribute('aria-keyshortcuts'), '/');
+      const hint = document.querySelector('kbd.page-finder__key');
+      assert.equal(hint?.textContent, '/');
+      assert.equal(hint?.getAttribute('aria-hidden'), 'true');
+      const hidden = document.getElementById(input().getAttribute('aria-describedby') ?? '');
+      assert.match(hidden?.textContent ?? '', /Press \/ to focus/);
+      unmount();
+      await userEvent.keyboard('/');
+      assert.equal(document.activeElement, document.body);
+    });
+  });
 });
