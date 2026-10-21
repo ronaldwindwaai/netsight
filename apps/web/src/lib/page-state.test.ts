@@ -59,6 +59,16 @@ describe('pageHref', () => {
     );
   });
 
+  it('keeps page_size explicit when a non-default size is preferred, so an explicit default size wins over it', () => {
+    const current = new URLSearchParams('q=core');
+    assert.equal(pageHref('/devices', current, { page: 1, pageSize: 100 }, 100), '/devices?q=core&page_size=100');
+    assert.equal(
+      pageHref('/devices', current, { page: 1, pageSize: DEFAULT_PAGE_SIZE }, 100),
+      `/devices?q=core&page_size=${DEFAULT_PAGE_SIZE}`,
+    );
+    assert.equal(pageHref('/devices', current, { page: 1, pageSize: 100 }, DEFAULT_PAGE_SIZE), '/devices?q=core&page_size=100');
+  });
+
   it('returns the bare path when nothing remains', () => {
     assert.equal(pageHref('/alerts', new URLSearchParams(), { page: 1, pageSize: DEFAULT_PAGE_SIZE }), '/alerts');
   });

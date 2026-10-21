@@ -11,7 +11,7 @@ export default async function ReportsPage() {
   if (session.kind !== 'ok') return <AppContent title="Reports"><DataFailure state={session} /></AppContent>;
   return <AppContent title="Reports" breadcrumbs={[{label:'Overview',href:'/overview'},{label:'Reports'}]}>
     {!session.data.permissions.includes('reports:read') ? <Step8AccessDenied surface="Reports" permission="reports:read" /> : <>
-      <p className="text-body-secondary">Review bounded source evidence by reporting period. Results and downloads follow your current permissions.</p>
+      <div className="page-intro"><p className="text-body-secondary mb-0">Review bounded source evidence by reporting period. Results and downloads follow your current permissions.</p></div>
       <ReportCatalog permissions={session.data.permissions} />
     </>}
   </AppContent>;

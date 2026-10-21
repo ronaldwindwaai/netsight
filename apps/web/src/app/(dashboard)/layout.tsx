@@ -1,7 +1,9 @@
 import { DashboardLayout } from '@adminlte/react';
 
 import { ConnectivityBanner } from '@/components/connectivity-banner';
+import { DisplayPreferences } from '@/components/display-preferences';
 import { IdentityMenu } from '@/components/identity-menu';
+import { MobileDrawer } from '@/components/mobile-drawer';
 import { PwaInstall } from '@/components/pwa-install';
 import { MobileNav } from '@/components/mobile-nav';
 import { PageFinder } from '@/components/page-finder';
@@ -50,6 +52,8 @@ export default async function Layout({ children }: { children: React.ReactNode }
         </li>
       }
     >
+      <DisplayPreferences />
+      <MobileDrawer />
       <ConnectivityBanner />
       {children}
       <MobileNav permissions={session === null ? null : session.permissions} />

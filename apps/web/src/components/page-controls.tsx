@@ -1,9 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useSearchParams } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useEffect } from 'react';
 
-import { PAGE_SIZES, describeRange, pageHref } from '@/lib/page-state';
+import { usePreferences } from '@/components/use-preferences';
+
+import { DEFAULT_PAGE_SIZE, PAGE_SIZES, describeRange, pageHref } from '@/lib/page-state';
 
 interface PageControlsProps {
   /** What the rows are, plural: "devices". */
@@ -40,12 +43,24 @@ function Step({ href, disabled, children }: { href: string; disabled: boolean; c
 export function PageControls({ noun, page, pageSize, total, count, label }: PageControlsProps) {
   const pathname = usePathname();
   const params = useSearchParams();
+  const router = useRouter();
+  const { preferences } = usePreferences();
+  const preferredSize = preferences.pageSize;
   const range = describeRange({ page, pageSize, total, count });
   // Past the end, "Previous" must land on the last page that exists, not on another empty page.
   const pastTheEnd = count === 0 && total > 0 && page > range.pages;
   const previousPage = pastTheEnd ? range.pages : Math.max(1, page - 1);
   const hrefFor = (nextPage: number, nextSize = pageSize) =>
-    pageHref(pathname, params, { page: nextPage, pageSize: nextSize });
+    pageHref(pathname, params, { page: nextPage, pageSize: nextSize }, preferredSize);
+
+  // The reader's default size applies only when the address does not say. Arriving without a
+  // page_size at a different preferred size swaps it in once (replace, so Back is not trapped);
+  // any page_size already in the address, including an explicit default one, is left alone.
+  const hasSizeInUrl = params.has('page_size');
+  useEffect(() => {
+    if (hasSizeInUrl || preferredSize === DEFAULT_PAGE_SIZE) return;
+    router.replace(pageHref(pathname, new URLSearchParams(window.location.search), { page: 1, pageSize: preferredSize }, preferredSize));
+  }, [hasSizeInUrl, preferredSize, pathname, router]);
 
   return (
     <nav className="page-controls d-flex flex-wrap align-items-center justify-content-between gap-2 mt-3" aria-label={label}>

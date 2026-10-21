@@ -65,13 +65,23 @@ export function describeRange({ page, pageSize, total, count }: RangeInput): Ran
   };
 }
 
-/** The URL for `next`, keeping every other parameter; default page and size are left out. */
-export function pageHref(pathname: string, current: URLSearchParams, next: PageParams): string {
+/**
+ * The URL for `next`, keeping every other parameter; default page and size are left out.
+ * `preferredSize` is the reader's stored default size: while it differs from the built-in default,
+ * `page_size` stays in the URL even at the built-in size, because a URL without it means "use my
+ * preference" and an explicit choice must win over that.
+ */
+export function pageHref(
+  pathname: string,
+  current: URLSearchParams,
+  next: PageParams,
+  preferredSize: number = DEFAULT_PAGE_SIZE,
+): string {
   const params = new URLSearchParams(current);
   params.delete('page');
   params.delete('page_size');
   if (next.page > 1) params.set('page', String(next.page));
-  if (next.pageSize !== DEFAULT_PAGE_SIZE) params.set('page_size', String(next.pageSize));
+  if (next.pageSize !== DEFAULT_PAGE_SIZE || preferredSize !== DEFAULT_PAGE_SIZE) params.set('page_size', String(next.pageSize));
   const text = params.toString();
   return text.length === 0 ? pathname : `${pathname}?${text}`;
 }

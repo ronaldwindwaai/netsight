@@ -36,9 +36,11 @@ export default async function ConfigurationChangesPage({ searchParams }: { searc
   const valid = typeof id === 'string' && CONFIG_NODE_ID.test(id);
   const nodeName = valid ? await lookupNodeName(id) : null;
   const state = valid ? await apiGet(`/api/v1/config/nodes/${encodeURIComponent(id)}/versions?page=${page}&page_size=50`, parseConfigurationVersions) : null;
-  return <AppContent title="Change history" breadcrumbs={[{ label: 'Configuration', href: '/config' }, { label: 'Change history' }]}>
-    <p><Link href="/config">Choose a configuration backup</Link></p>
-    <p className="text-body-secondary">Saved revisions reported by Oxidized. Author identities and commit messages are withheld. No change is classified as a cause of an incident from timing alone.</p>
+  return <AppContent title="Change history" breadcrumbs={[{ label: 'Overview', href: '/overview' }, { label: 'Configuration', href: '/config' }, { label: 'Change history' }]}>
+    <div className="page-intro">
+      <p className="text-body-secondary mb-1">Saved revisions reported by Oxidized. Author identities and commit messages are withheld. No change is classified as a cause of an incident from timing alone.</p>
+      <p className="mb-0"><Link href="/config">Choose a configuration backup</Link></p>
+    </div>
     {state ? <ConfigurationVersionsBody state={state} nodeId={typeof id === "string" ? id : ""} nodeName={nodeName} permissions={session.data.permissions} /> : <StateSurface icon="bi bi-clock-history" title="Choose a device" detail="Open a device from Configuration to see its saved versions." />}
   </AppContent>;
 }
