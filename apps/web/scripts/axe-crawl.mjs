@@ -50,7 +50,13 @@ function loadTools() {
 
 /** RFC 6238 TOTP (SHA-1, 6 digits, 30 s) so no extra dependency is needed. */
 function totp(secret, nowMs = Date.now()) {
-  const bits = [...secret.replace(/[\s=]/g, '').toUpperCase()].map((c) => BASE32.indexOf(c).toString(2).padStart(5, '0')).join('');
+  const bits = [...secret.replace(/[\s=]/g, '').toUpperCase()]
+    .map((c) => {
+      const index = BASE32.indexOf(c);
+      if (index < 0) throw new Error('NETSIGHT_AXE_TOTP_SECRET is not valid base32');
+      return index.toString(2).padStart(5, '0');
+    })
+    .join('');
   const key = Buffer.from(bits.match(/.{8}/g).map((byte) => parseInt(byte, 2)));
   const counter = Buffer.alloc(8);
   counter.writeBigUInt64BE(BigInt(Math.floor(nowMs / 30000)));
@@ -71,9 +77,18 @@ async function signIn(page, base, user, password, secret) {
   await page.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 15000 });
 }
 
+/** Credentials are typed into the target, so a non-loopback host deserves a loud warning. */
+function warnIfNotLoopback(base) {
+  const host = new URL(base).hostname;
+  if (!['localhost', '127.0.0.1', '[::1]', '::1'].includes(host)) {
+    console.error(`WARNING: NETSIGHT_AXE_BASE host "${host}" is not loopback; this script is for the local demo stack only.`);
+  }
+}
+
 async function main() {
   const { playwright, axe } = loadTools();
   const base = (process.env.NETSIGHT_AXE_BASE ?? 'http://localhost:3000').replace(/\/$/, '');
+  warnIfNotLoopback(base);
   const user = process.env.NETSIGHT_AXE_USER;
   const password = process.env.NETSIGHT_AXE_PASSWORD;
   const secret = process.env.NETSIGHT_AXE_TOTP_SECRET;
