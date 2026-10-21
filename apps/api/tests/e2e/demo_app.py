@@ -6,15 +6,20 @@ overrides exactly one dependency, `get_optional_incident_store`, with an in-memo
 with fixture incidents (every lifecycle state, long text, an old and a fresh timeline). Nothing here
 is imported by production code, no credentials are involved, and the data is lost on restart.
 
-    cd apps/api && python -m uvicorn tests.e2e.demo_app:app --port 8000   # normally via demo-local.py
+    cd apps/api && NETSIGHT_DEMO=1 python -m uvicorn demo_app:build_app --factory --app-dir tests/e2e
+
+Normally started by `scripts/demo-local.py`. Importing this module changes nothing: the override is
+installed only by `build_app()` / `install()`, which refuse to run unless `NETSIGHT_DEMO=1`.
 """
 
 from __future__ import annotations
 
+import os
 from datetime import UTC, datetime, timedelta
 
+from fastapi import FastAPI
+
 from netsight_api.incident_deps import get_optional_incident_store
-from netsight_api.main import app
 from netsight_api.schemas import IncidentResolutionInput
 from netsight_api.storage.memory import InMemoryIncidentRepository
 
@@ -105,7 +110,31 @@ def seed(repo: InMemoryIncidentRepository, clock: _Clock, now: datetime) -> None
     clock.moment = None
 
 
-_clock = _Clock()
-_repo = InMemoryIncidentRepository(clock=_clock)
-seed(_repo, _clock, datetime.now(UTC))
-app.dependency_overrides[get_optional_incident_store] = lambda: _repo
+DEMO_ENV = "NETSIGHT_DEMO"
+
+
+def _require_demo() -> None:
+    if os.environ.get(DEMO_ENV) != "1":
+        raise RuntimeError(f"demo_app is demo-only; refusing to run without {DEMO_ENV}=1")
+
+
+def install(app: FastAPI) -> FastAPI:
+    """Seed an in-memory store and override the incident dependency on `app`; returns the app."""
+    _require_demo()
+    clock = _Clock()
+    repo = InMemoryIncidentRepository(clock=clock)
+    seed(repo, clock, datetime.now(UTC))
+    app.dependency_overrides[get_optional_incident_store] = lambda: repo
+    return app
+
+
+def uninstall(app: FastAPI) -> None:
+    app.dependency_overrides.pop(get_optional_incident_store, None)
+
+
+def build_app() -> FastAPI:
+    """ASGI factory for uvicorn (`--factory`): the real application with the demo store installed."""
+    from netsight_api.main import app
+
+    install(app)
+    return app

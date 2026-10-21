@@ -37,8 +37,24 @@ describe('PageControls', () => {
     assert.equal(screen.getByRole('link', { name: '50 per page' }).getAttribute('aria-current'), 'true');
   });
 
-  it('disables Next on the last page', () => {
+  it('disables Next on the last page, still present and announced as disabled', () => {
     render(<PageControls {...props} page={5} pageSize={50} total={230} count={30} />);
-    assert.equal(screen.queryByRole('link', { name: /Next/ }), null);
+    const next = screen.getByRole('link', { name: /Next/ });
+    assert.equal(next.getAttribute('aria-disabled'), 'true');
+    assert.equal(next.getAttribute('href'), null);
+    assert.equal(screen.getByRole('link', { name: /Previous/ }).getAttribute('aria-disabled'), null);
+  });
+
+  it('disables Previous on the first page, still present and announced as disabled', () => {
+    render(<PageControls {...props} page={1} pageSize={50} total={230} count={50} />);
+    const previous = screen.getByRole('link', { name: /Previous/ });
+    assert.equal(previous.getAttribute('aria-disabled'), 'true');
+    assert.equal(previous.getAttribute('href'), null);
+  });
+
+  it('sends Previous to the last real page when the page is past the end', () => {
+    render(<PageControls {...props} page={9} pageSize={50} total={230} count={0} />);
+    assert.match(screen.getByRole('status').textContent ?? '', /past the end: 230 devices in 5 pages/);
+    assert.equal(screen.getByRole('link', { name: /Previous/ }).getAttribute('href'), '/devices?q=core&page=5');
   });
 });

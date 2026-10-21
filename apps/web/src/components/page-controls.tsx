@@ -20,7 +20,7 @@ interface PageControlsProps {
 function Step({ href, disabled, children }: { href: string; disabled: boolean; children: React.ReactNode }) {
   if (disabled) {
     return (
-      <span className="btn btn-outline-secondary btn-sm disabled" aria-disabled="true">
+      <span className="btn btn-outline-secondary btn-sm disabled" role="link" aria-disabled="true">
         {children}
       </span>
     );
@@ -41,6 +41,9 @@ export function PageControls({ noun, page, pageSize, total, count, label }: Page
   const pathname = usePathname();
   const params = useSearchParams();
   const range = describeRange({ page, pageSize, total, count });
+  // Past the end, "Previous" must land on the last page that exists, not on another empty page.
+  const pastTheEnd = count === 0 && total > 0 && page > range.pages;
+  const previousPage = pastTheEnd ? range.pages : Math.max(1, page - 1);
   const hrefFor = (nextPage: number, nextSize = pageSize) =>
     pageHref(pathname, params, { page: nextPage, pageSize: nextSize });
 
@@ -68,7 +71,7 @@ export function PageControls({ noun, page, pageSize, total, count, label }: Page
             </Link>
           ))}
         </div>
-        <Step disabled={!range.hasPrevious} href={hrefFor(Math.max(1, page - 1))}>
+        <Step disabled={!range.hasPrevious} href={hrefFor(previousPage)}>
           <i className="bi bi-chevron-left me-1" aria-hidden="true" />
           Previous
         </Step>

@@ -120,14 +120,18 @@ def main() -> int:
     env = {
         **os.environ,
         "NETSIGHT_ENV": "development",
+        # Required by tests/e2e/demo_app.py, which refuses to install its fixtures without it.
+        "NETSIGHT_DEMO": "1",
         "NETSIGHT_SESSION_SECRET": _session_secret(),
         "NETSIGHT_LOCAL_ACCOUNT_FILE": str(ACCOUNT_FILE),
-        # Plain http on loopback, so the browser must be allowed to keep the cookie.
+        # DEMO ONLY: plain http on loopback, so the browser must be allowed to keep the cookie.
+        # Never set NETSIGHT_SESSION_COOKIE_SECURE=false outside this demo.
         "NETSIGHT_SESSION_COOKIE_SECURE": "false",
         "LIBRENMS_BASE_URL": f"http://{HOST}:{STUB_PORT}",
         "LIBRENMS_TIMEZONE": "UTC",
         # Fixture configuration backups (loopback Oxidized stub) and a volatile action store.
         "OXIDIZED_BASE_URL": f"http://{HOST}:{OXIDIZED_PORT}",
+        # DEMO ONLY: turns the action workflow on against a throwaway store; keep off in production.
         "NETSIGHT_ACTIONS_ENABLED": "1",
         # The adapter needs a non-empty token to count as configured; the stub never checks it.
         "LIBRENMS_TOKEN": secrets.token_urlsafe(24),
@@ -150,7 +154,8 @@ def main() -> int:
             sys.executable,
             "-m",
             "uvicorn",
-            "demo_app:app",
+            "demo_app:build_app",
+            "--factory",
             "--app-dir",
             str(E2E_DIR),
             "--host",

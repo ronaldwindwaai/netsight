@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import asyncio
 import threading
+from collections.abc import Iterator
 from datetime import UTC, datetime
 from http.server import ThreadingHTTPServer
 
+import pytest
+from fastapi import FastAPI
 from stub_oxidized import _Handler
 
 from netsight_api.adapters.oxidized import OxidizedClient
@@ -49,3 +52,43 @@ def test_seeded_incident_fixture_is_valid_and_covers_the_lifecycle() -> None:
     assert {i.state for i in incidents} >= {"open", "investigating", "mitigated", "closed"}
     assert {i.severity for i in incidents} >= {"low", "medium", "high", "critical"}
     assert sum(1 for i in incidents if repo.list_timeline(i.id)) >= 3
+
+
+@pytest.fixture
+def demo_app_installed(monkeypatch: pytest.MonkeyPatch) -> Iterator[FastAPI]:
+    import demo_app
+
+    from netsight_api.main import app
+
+    monkeypatch.setenv("NETSIGHT_DEMO", "1")
+    before = dict(app.dependency_overrides)
+    demo_app.install(app)
+    try:
+        yield app
+    finally:
+        demo_app.uninstall(app)
+        assert app.dependency_overrides == before
+
+
+def test_demo_override_is_not_installed_by_import_and_is_removed_after_use() -> None:
+    import demo_app  # noqa: F401
+
+    from netsight_api.incident_deps import get_optional_incident_store
+    from netsight_api.main import app
+
+    assert get_optional_incident_store not in app.dependency_overrides
+
+
+def test_demo_app_installs_seeded_store(demo_app_installed: FastAPI) -> None:
+    from netsight_api.incident_deps import get_optional_incident_store
+
+    store = demo_app_installed.dependency_overrides[get_optional_incident_store]()
+    assert len(store.list_incidents(limit=100)) >= 5
+
+
+def test_demo_app_refuses_without_the_demo_flag(monkeypatch: pytest.MonkeyPatch) -> None:
+    import demo_app
+
+    monkeypatch.delenv("NETSIGHT_DEMO", raising=False)
+    with pytest.raises(RuntimeError, match="NETSIGHT_DEMO=1"):
+        demo_app.build_app()

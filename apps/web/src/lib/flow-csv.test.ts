@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
+import { toCsv } from './csv.ts';
 import { FLOW_CSV_HEADERS, flowCsvRows } from './flow-csv.ts';
 import type { TrafficFlow } from './api-contracts-traffic-flows.ts';
 
@@ -47,5 +48,13 @@ describe('flowCsvRows', () => {
     assert.equal(open[FLOW_CSV_HEADERS.indexOf('Person')], 'Alice');
     assert.equal(closed[FLOW_CSV_HEADERS.indexOf('Person')], '');
     assert.equal(closed[FLOW_CSV_HEADERS.indexOf('Attributed device')], '');
+  });
+
+  it('writes a hostile source value with a leading quote through toCsv', () => {
+    const rows = flowCsvRows([flow({ application: '=HYPERLINK("http://evil.test")', destination_host: '@evil' })], ALL);
+    const lines = toCsv(FLOW_CSV_HEADERS, rows).split('\r\n');
+    assert.ok(lines[1].includes(`"'=HYPERLINK(""http://evil.test"")"`));
+    assert.ok(lines[1].includes(",'@evil,"));
+    assert.ok(!lines[1].includes(',=HYPERLINK'));
   });
 });

@@ -3,8 +3,11 @@ import type { TrafficFlow } from './api-contracts-traffic-flows.ts';
 
 /*
  * CSV rows for the Flow Explorer table: exactly the flows the page lists, in the same order.
- * Person and device labels follow the same entitlement as the on-screen table, so the export never
- * reveals what the viewer's role cannot open. Values the source did not report are empty cells.
+ * The API already withholds people and devices the role may not see (RBAC-MATRIX, traffic
+ * permissions), so the table shows whatever labels it returned, as plain text when the viewer cannot
+ * open the entity page. The export is deliberately stricter than the screen: it also needs the
+ * entity-page permission (`users:read`, `inventory:read`) before a label is written, so a file never
+ * holds more than the viewer sees. Values the source did not report are empty cells.
  */
 
 export const FLOW_CSV_HEADERS = [

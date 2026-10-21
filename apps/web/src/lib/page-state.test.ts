@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { DEFAULT_PAGE_SIZE, PAGE_SIZES, describeRange, pageHref, parsePageParams } from './page-state.ts';
+import { DEFAULT_PAGE_SIZE, MAX_PAGE, PAGE_SIZES, describeRange, pageHref, parsePageParams } from './page-state.ts';
 
 describe('parsePageParams', () => {
   it('defaults to page 1 and the default size', () => {
@@ -13,6 +13,12 @@ describe('parsePageParams', () => {
     assert.deepEqual(parsePageParams({ page: '0', page_size: '7' }), { page: 1, pageSize: DEFAULT_PAGE_SIZE });
     assert.deepEqual(parsePageParams({ page: '2.5' }), { page: 1, pageSize: DEFAULT_PAGE_SIZE });
     assert.deepEqual(parsePageParams({ page: ['4', '5'] }), { page: 4, pageSize: DEFAULT_PAGE_SIZE });
+  });
+
+  it('falls back to page 1 beyond the highest page the API accepts', () => {
+    assert.equal(parsePageParams({ page: String(MAX_PAGE) }).page, MAX_PAGE);
+    assert.equal(parsePageParams({ page: String(MAX_PAGE + 1) }).page, 1);
+    assert.equal(parsePageParams({ page: '999999999' }).page, 1);
   });
 
   it('only offers sizes the API accepts (max 100)', () => {

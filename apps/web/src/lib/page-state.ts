@@ -6,6 +6,12 @@
 
 export const PAGE_SIZES = [25, 50, 100] as const;
 export const DEFAULT_PAGE_SIZE = 50;
+/**
+ * Highest page the web app will request. The API caps `page` at 1000 on the users and actions lists
+ * and does not cap it on devices and alerts (only `ge=1`); one shared ceiling keeps every list
+ * inside the strictest limit. At 100 rows a page that is 100,000 rows, far beyond any inventory.
+ */
+export const MAX_PAGE = 1000;
 
 export interface PageParams {
   readonly page: number;
@@ -20,7 +26,8 @@ function first(value: Raw): string | undefined {
 
 export function parsePageParams(query: { page?: Raw; page_size?: Raw }): PageParams {
   const rawPage = first(query.page);
-  const page = rawPage !== undefined && /^\d{1,9}$/.test(rawPage) && Number(rawPage) >= 1 ? Number(rawPage) : 1;
+  const parsed = rawPage !== undefined && /^\d{1,9}$/.test(rawPage) ? Number(rawPage) : 1;
+  const page = parsed >= 1 && parsed <= MAX_PAGE ? parsed : 1;
   const rawSize = first(query.page_size);
   const size = rawSize !== undefined && /^\d+$/.test(rawSize) ? Number(rawSize) : DEFAULT_PAGE_SIZE;
   const pageSize = (PAGE_SIZES as readonly number[]).includes(size) ? size : DEFAULT_PAGE_SIZE;
