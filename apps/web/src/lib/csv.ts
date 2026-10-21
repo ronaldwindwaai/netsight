@@ -2,10 +2,11 @@
 
 export type CsvValue = string | number | boolean | null | undefined;
 
-const FORMULA_LEAD = /^[=+\-@\t\r]/;
+/** A formula trigger: also after leading whitespace or line breaks, and in fullwidth form. */
+const FORMULA_LEAD = /^(?:[\t\r]|\s*[=+\-@＝＋－＠])/;
 const NEEDS_QUOTES = /[",\r\n]/;
 
-/** One RFC 4180 cell, with a leading quote added to anything starting = + - @ (or tab/CR). */
+/** One RFC 4180 cell, with a leading quote added to anything that starts, after optional whitespace, with = + - @ (or their fullwidth forms). */
 export function csvCell(value: CsvValue): string {
   if (value === null || value === undefined) return '';
   if (typeof value === 'number') return Number.isFinite(value) ? String(value) : '';

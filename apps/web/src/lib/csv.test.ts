@@ -26,6 +26,27 @@ describe('csvCell', () => {
     assert.equal(csvCell('\r=1+1'), `"'\r=1+1"`);
   });
 
+  it('neutralises formulas hidden behind leading whitespace or line breaks', () => {
+    assert.equal(csvCell(' =1+1'), "' =1+1");
+    assert.equal(csvCell('\n=1'), `"'\n=1"`);
+    assert.equal(csvCell('  \t+SUM(A1)'), "'  \t+SUM(A1)");
+  });
+
+  it('neutralises fullwidth formula triggers', () => {
+    for (const lead of ['＝', '＋', '－', '＠']) {
+      assert.equal(csvCell(`${lead}1`), `'${lead}1`);
+    }
+  });
+
+  it('does not touch text that merely contains a trigger', () => {
+    assert.equal(csvCell('a=1'), 'a=1');
+    assert.equal(csvCell(' plain'), ' plain');
+  });
+
+  it('keeps toCsv free of a byte order mark', () => {
+    assert.ok(!toCsv(['a'], [['b']]).startsWith('﻿'));
+  });
+
   it('escapes the formula prefix before quoting', () => {
     assert.equal(csvCell('=HYPERLINK("x","y")'), `"'=HYPERLINK(""x"",""y"")"`);
   });
