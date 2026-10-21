@@ -1,5 +1,6 @@
 import { SeverityBadge, StateBadge } from '@/components/incident-badges';
 import type { Incident, IncidentResolution } from '@/lib/api-contracts-incident';
+import { RelativeTime } from '@/components/relative-time';
 import { formatUtcTimestamp } from '@/lib/format-time';
 
 /** Hard-wrapped, preserved-newline text node: untrusted text, never markup. */
@@ -29,8 +30,8 @@ export function IncidentSummary({ incident }: { incident: Incident }) {
       <Fact term="Incident id">
         <code>{incident.id}</code>
       </Fact>
-      <Fact term="Created">{formatUtcTimestamp(incident.created_at)}</Fact>
-      <Fact term="Last updated">{formatUtcTimestamp(incident.updated_at)}</Fact>
+      <Fact term="Created"><RelativeTime value={incident.created_at} /></Fact>
+      <Fact term="Last updated"><RelativeTime value={incident.updated_at} /></Fact>
     </dl>
   );
 }

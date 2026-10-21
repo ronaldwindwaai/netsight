@@ -189,3 +189,31 @@
 :root:not([data-bs-theme='dark']) code {
   color: #b02a6f;
 }
+
+/* Outline-danger buttons (e.g. the kill switch) sit on a tinted page: stock #dc3545 is 4.3:1 on the
+   light page and 2.9:1 on the dark card. These keep the red but pass 4.5:1 in both themes. */
+:root:not([data-bs-theme='dark']) .btn-outline-danger {
+  --bs-btn-color: #b02a37;
+  --bs-btn-border-color: #b02a37;
+}
+
+[data-bs-theme='dark'] .btn-outline-danger {
+  --bs-btn-color: #ea868f;
+  --bs-btn-border-color: #ea868f;
+}
+
+/* The Alert widget renders its title as <strong> directly followed by the body text; keep a space
+   between them (a second space collapses where a call site already adds one). */
+.alert > strong::after {
+  content: ' ';
+}
+
+/* Assignee ids are long operator ids: wrap them, but never into one-character columns. */
+.incident-assignee {
+  min-width: 9rem;
+}
+
+/* On a phone the title keeps a readable width and the table scrolls sideways inside its wrapper. */
+.incident-title {
+  min-width: 14rem;
+}
