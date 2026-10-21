@@ -239,3 +239,70 @@ html {
     min-block-size: 44px;
   }
 }
+
+/* Drawer close button: the open drawer covers the top-bar toggle, so it carries its own. */
+.mobile-drawer-slot {
+  display: none;
+}
+
+@media (max-width: 991.98px) {
+  .mobile-drawer-slot {
+    display: block;
+    position: absolute;
+    inset-block-start: 0.5rem;
+    inset-inline-end: 0.5rem;
+    z-index: 1;
+  }
+
+  .mobile-drawer-close {
+    min-inline-size: 44px;
+    min-block-size: 44px;
+    color: #fff;
+    border: 1px solid rgb(255 255 255 / 35%);
+  }
+
+  .mobile-drawer-close:focus-visible {
+    outline: 2px solid #fff;
+    outline-offset: 2px;
+    box-shadow: none;
+  }
+
+  /* Dim the page behind the open drawer so it reads as modal. */
+  body.sidebar-open .sidebar-overlay {
+    background: rgb(0 0 0 / 45%);
+  }
+}
+
+/* Touch: checkboxes, radios and switches sit in a 44px-high row whose label is part of the target. */
+@media (pointer: coarse) {
+  .netsight-dashboard .form-check {
+    display: flex;
+    align-items: center;
+    min-block-size: 44px;
+  }
+
+  .netsight-dashboard .form-check:not(.form-switch) {
+    padding-inline-start: 0;
+    gap: 0.5rem;
+  }
+
+  .netsight-dashboard .form-check:not(.form-switch) .form-check-input {
+    float: none;
+    margin: 0;
+    flex: none;
+    inline-size: 1.5rem;
+    block-size: 1.5rem;
+  }
+
+  .netsight-dashboard .form-check-label {
+    flex: 1;
+    padding-block: 0.5rem;
+  }
+
+  /* Breadcrumb links are the only way up a level on a phone. */
+  .app-content-header .breadcrumb-item a {
+    display: inline-flex;
+    align-items: center;
+    min-block-size: 44px;
+  }
+}

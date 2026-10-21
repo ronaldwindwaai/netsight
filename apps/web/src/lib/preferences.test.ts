@@ -4,6 +4,7 @@ import { describe, it } from 'node:test';
 import {
   DEFAULT_PREFERENCES,
   deserializePreferences,
+  isStoragePersistent,
   PREFERENCE_KEYS,
   readPreferences,
   serializePreferences,
@@ -94,5 +95,11 @@ describe('serializePreferences', () => {
     assert.deepEqual(deserializePreferences(serializePreferences(value)), value);
     assert.deepEqual(deserializePreferences('nonsense'), DEFAULT_PREFERENCES);
     assert.deepEqual(deserializePreferences(''), DEFAULT_PREFERENCES);
+  });
+
+  it('knows when storage cannot persist', () => {
+    assert.equal(isStoragePersistent(memoryStore()), true);
+    assert.equal(isStoragePersistent({ ...memoryStore(), memory: true }), false);
+    assert.equal(isStoragePersistent(undefined), false);
   });
 });

@@ -70,17 +70,21 @@ describe('MobileDrawer on a phone', () => {
     await settle();
     assert.equal(toggle.getAttribute('aria-expanded'), 'true');
     assert.equal(toggle.getAttribute('aria-label'), 'Close navigation menu');
-    assert.equal(document.activeElement?.id, 'a');
+    assert.equal(document.activeElement?.getAttribute('aria-label'), 'Close navigation menu');
     assert.equal((document.querySelector('.app-main') as HTMLElement).inert, true);
     assert.equal((document.querySelector('.app-sidebar') as HTMLElement).inert, false);
 
     (document.getElementById('b') as HTMLElement).focus();
     await press('Tab');
-    assert.equal(document.activeElement?.id, 'toggle', 'Tab from the last link wraps to the toggle, not the page');
+    assert.equal(
+      document.activeElement?.getAttribute('aria-label'),
+      'Close navigation menu',
+      'Tab from the last link wraps to the drawer close button, not the page',
+    );
     await press('Tab');
     assert.equal(document.activeElement?.id, 'a');
     await press('Tab', true);
-    assert.equal(document.activeElement?.id, 'toggle');
+    assert.equal(document.activeElement?.getAttribute('aria-label'), 'Close navigation menu');
   });
 
   it('closes on Escape and returns focus to the toggle', async () => {
@@ -107,6 +111,33 @@ describe('MobileDrawer on a phone', () => {
     document.body.classList.remove('sidebar-open');
     await settle();
     assert.equal(document.activeElement, toggle);
+  });
+});
+
+describe('MobileDrawer controls', () => {
+  it('closes from its own close button and returns focus to the toggle', async () => {
+    const toggle = mountShell();
+    render(<MobileDrawer />);
+    await settle();
+    toggle.click();
+    await settle();
+    (document.querySelector('.app-sidebar [aria-label="Close navigation menu"]') as HTMLElement).click();
+    await settle();
+    assert.equal(document.body.classList.contains('sidebar-open'), false);
+    assert.equal(document.activeElement, toggle);
+  });
+
+  it('opens the drawer for the "Skip to navigation" link instead of jumping into the inert menu', async () => {
+    const toggle = mountShell();
+    const skip = document.createElement('a');
+    skip.setAttribute('href', '#navigation');
+    document.body.prepend(skip);
+    render(<MobileDrawer />);
+    await settle();
+    skip.click();
+    await settle();
+    assert.equal(document.body.classList.contains('sidebar-open'), true);
+    assert.equal(toggle.getAttribute('aria-expanded'), 'true');
   });
 });
 

@@ -5,8 +5,7 @@ import './globals.css';
 import './shell.css';
 import './preferences.css';
 
-const DENSITY_SCRIPT =
-  "try{if(localStorage.getItem('netsight.density')==='compact')document.documentElement.dataset.density='compact'}catch(e){}";
+import { EARLY_SCRIPT } from '@/lib/early-script';
 
 export const metadata = {
   title: { default: 'Netsight', template: '%s · Netsight' },
@@ -21,9 +20,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     // suppressHydrationWarning: the script below sets data-density before React hydrates.
     <html lang="en" suppressHydrationWarning>
       <body>
-        {/* Applies the stored table density before first paint so rows do not jump on load. */}
-        <Script id="netsight-density" strategy="beforeInteractive">
-          {DENSITY_SCRIPT}
+        {/* Density and blocked-storage handling that must run before hydration (see lib/early-script.ts). */}
+        <Script id="netsight-early" strategy="beforeInteractive">
+          {EARLY_SCRIPT}
         </Script>
         {children}
       </body>

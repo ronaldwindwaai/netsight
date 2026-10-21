@@ -1,9 +1,9 @@
 'use client';
 
-import { useId, useState } from 'react';
+import { useId, useState, useSyncExternalStore } from 'react';
 
 import { usePreferences } from '@/components/use-preferences';
-import { DENSITIES } from '@/lib/preferences';
+import { DENSITIES, isStoragePersistent } from '@/lib/preferences';
 import type { Density, Preferences } from '@/lib/preferences';
 import { PAGE_SIZES } from '@/lib/page-state';
 
@@ -15,14 +15,21 @@ const DENSITY_LABEL: Record<Density, string> = { comfortable: 'Comfortable', com
  */
 export function PreferencesPanel() {
   const { preferences, set } = usePreferences();
-  const [storageFailed, setStorageFailed] = useState(false);
+  const [saveFailed, setSaveFailed] = useState(false);
+  // Server and first client render assume storage works; the real answer applies right after hydration.
+  const storageBlocked = useSyncExternalStore(
+    () => () => undefined,
+    () => !isStoragePersistent(),
+    () => false,
+  );
+  const storageFailed = saveFailed || storageBlocked;
   const shortcutsId = useId();
   const shortcutsHint = useId();
   const sizeId = useId();
   const sizeHint = useId();
 
   function save<K extends keyof Preferences>(name: K, value: Preferences[K]) {
-    setStorageFailed(!set(name, value));
+    setSaveFailed(!set(name, value));
   }
 
   return (

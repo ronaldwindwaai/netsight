@@ -41,6 +41,14 @@ export function browserStore(): PreferenceStore | undefined {
   }
 }
 
+/**
+ * False when choices cannot outlive the page: storage is missing, throws, or is the in-memory stand-in
+ * the early script installs when the browser blocks storage (see early-script.ts).
+ */
+export function isStoragePersistent(store: (PreferenceStore & { memory?: boolean }) | undefined = browserStore()): boolean {
+  return store !== undefined && store.memory !== true;
+}
+
 export function readPreferences(store: PreferenceStore | undefined = browserStore()): Preferences {
   if (store === undefined) return DEFAULT_PREFERENCES;
   try {

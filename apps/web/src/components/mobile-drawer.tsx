@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useSyncExternalStore } from 'react';
+import { createPortal } from 'react-dom';
 import { usePathname } from 'next/navigation';
 
 import { trapIndex } from '@/lib/focus-trap';
@@ -12,6 +13,22 @@ const TOGGLE = '.app-header button[title="Toggle sidebar"]';
 const SIDEBAR_ID = 'app-sidebar';
 /** Page regions that must not be reachable while the drawer covers them. */
 const BACKGROUND = ['.app-main', '.app-footer'];
+
+/**
+ * The library draws the open drawer over the menu toggle, so the drawer needs a close button of its own.
+ * This is the (lazily created, cached) element at the top of the sidebar that button is rendered into.
+ */
+let closeSlot: HTMLElement | null = null;
+function getCloseSlot(): HTMLElement | null {
+  if (closeSlot !== null && closeSlot.isConnected) return closeSlot;
+  const sidebar = document.querySelector<HTMLElement>('.app-sidebar');
+  if (sidebar === null) return null;
+  closeSlot = document.createElement('div');
+  closeSlot.className = 'mobile-drawer-slot';
+  sidebar.prepend(closeSlot);
+  return closeSlot;
+}
+const noSubscription = () => () => undefined;
 
 function drawerElements() {
   return {
@@ -37,6 +54,7 @@ function setBackgroundInert(inert: boolean) {
  */
 export function MobileDrawer() {
   const pathname = usePathname();
+  const slot = useSyncExternalStore(noSubscription, getCloseSlot, () => null);
 
   useEffect(() => {
     const media = window.matchMedia(DRAWER_QUERY);
@@ -86,7 +104,8 @@ export function MobileDrawer() {
         return;
       }
       if (event.key !== 'Tab') return;
-      const stops = [toggle, ...sidebar.querySelectorAll<HTMLElement>(FOCUSABLE)];
+      // The toggle sits under the open drawer, so it is not a stop; the drawer's own close button is.
+      const stops = [...sidebar.querySelectorAll<HTMLElement>(FOCUSABLE)];
       const index = trapIndex(stops.length, stops.indexOf(document.activeElement as HTMLElement), event.shiftKey);
       if (index < 0) return;
       event.preventDefault();
@@ -113,5 +132,29 @@ export function MobileDrawer() {
     }
   }, [pathname]);
 
-  return null;
+  // On "Skip to navigation": below the breakpoint the menu is a drawer that is closed (and inert).
+  useEffect(() => {
+    function openForSkipLink(event: MouseEvent) {
+      const link = (event.target as Element | null)?.closest('a[href="#navigation"]');
+      if (link === null || link === undefined) return;
+      if (!window.matchMedia(DRAWER_QUERY).matches || document.body.classList.contains('sidebar-open')) return;
+      event.preventDefault();
+      drawerElements().toggle?.click();
+    }
+    document.addEventListener('click', openForSkipLink);
+    return () => document.removeEventListener('click', openForSkipLink);
+  }, []);
+
+  if (slot === null) return null;
+  return createPortal(
+    <button
+      aria-label="Close navigation menu"
+      className="mobile-drawer-close btn btn-sm"
+      onClick={() => drawerElements().toggle?.click()}
+      type="button"
+    >
+      <i aria-hidden="true" className="bi bi-x-lg" />
+    </button>,
+    slot,
+  );
 }
