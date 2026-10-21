@@ -1,7 +1,8 @@
+import { Suspense } from 'react';
 import Link from 'next/link';
 import { AppContent } from '@/components/app-content';
 
-import { DataFailure, EmptyState, FreshnessNotice } from '@/components/data-state';
+import { DataFailure, EmptyState, FreshnessNotice, LoadingState } from '@/components/data-state';
 import { DeviceTable } from '@/components/device-table';
 import { SourceHealth } from '@/components/source-health';
 import { apiGet } from '@/lib/api';
@@ -50,7 +51,9 @@ export default async function DevicesPage({
             <EmptyState />
           ) : (
             <>
-              <DeviceTable devices={devicesState.data.items} total={devicesState.data.total} />
+              <Suspense fallback={<LoadingState label="Loading devices" />}>
+                <DeviceTable devices={devicesState.data.items} total={devicesState.data.total} />
+              </Suspense>
               <nav className="d-flex align-items-center justify-content-between mt-3" aria-label="Device pages">
                 <Link
                   aria-disabled={devicesState.data.page <= 1}

@@ -1,11 +1,11 @@
 import { ALERT_SEVERITIES, ALERT_STATES } from './api-contracts.ts';
 import type { Alert, AlertSeverity, AlertState } from './api-contracts.ts';
-import type { ListSort } from './list-url-state.ts';
+import type { ListSort, ListSpec } from './list-url-state.ts';
 
 export const ALERT_LIST_SPEC = {
   filters: { severity: ALERT_SEVERITIES, state: ALERT_STATES },
   sortKeys: ['severity', 'state', 'observed', 'title'],
-} as const;
+} as const satisfies ListSpec;
 
 export const ALERT_CSV_HEADERS = ['Severity', 'State', 'Alert', 'Device', 'Alert ID', 'Observed at (UTC)'] as const;
 

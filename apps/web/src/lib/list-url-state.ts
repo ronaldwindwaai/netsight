@@ -70,6 +70,11 @@ export function listStateToSearch(current: URLSearchParams, state: ListState, sp
   return text.length === 0 ? '' : `?${text}`;
 }
 
+/** `value` when it is one of `allowed`, else null: narrows a URL string without a cast. */
+export function pickAllowed<T extends string>(allowed: readonly T[], value: string | null | undefined): T | null {
+  return allowed.find((candidate) => candidate === value) ?? null;
+}
+
 /** First click on a column sorts ascending; clicking the sorted column again flips it. */
 export function toggleSort(current: ListSort | null, key: string): ListSort {
   if (current === null || current.key !== key) return { key, direction: 'asc' };

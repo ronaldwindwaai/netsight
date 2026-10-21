@@ -51,7 +51,9 @@ function findTests(directory) {
   });
 }
 
-const tests = findTests(srcDir);
+// Optional filename filters (`npm run test:components -- alert-table`) for a quick local run.
+const filters = process.argv.slice(2);
+const tests = findTests(srcDir).filter((path) => filters.length === 0 || filters.some((f) => path.includes(f)));
 if (tests.length === 0) {
   console.error('No component tests found.');
   process.exit(1);

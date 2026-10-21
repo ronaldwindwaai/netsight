@@ -3,10 +3,11 @@ import '@/test/dom-setup';
 import assert from 'node:assert/strict';
 import { afterEach, it } from 'node:test';
 
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import { AlertTable } from '@/components/alert-table';
 import type { Alert } from '@/lib/api-contracts';
+import { ALERT_LIST_SPEC } from '@/lib/alert-list-view';
 
 afterEach(() => {
   cleanup();
@@ -82,6 +83,61 @@ it('offers Clear filters when nothing matches, and it restores every row', () =>
   fireEvent.click(screen.getAllByRole('button', { name: 'Clear filters' })[1]);
   assert.equal(window.location.search, '');
   assert.equal(titles(container).length, 2);
+});
+
+it('offers every sort the URL spec accepts, in both directions, so the select never misreports', () => {
+  render(<AlertTable alerts={MIXED} total={2} />);
+  const offered = Array.from((screen.getByLabelText('Sort') as HTMLSelectElement).options).map((o) => o.value);
+  for (const key of ALERT_LIST_SPEC.sortKeys) {
+    assert.ok(offered.includes(key), `${key} ascending`);
+    assert.ok(offered.includes(`-${key}`), `${key} descending`);
+  }
+});
+
+it('shows a reverse sort from the URL as that exact option', () => {
+  window.history.replaceState(null, '', '/?sort=-title');
+  const { container } = render(<AlertTable alerts={MIXED} total={2} />);
+  assert.equal((screen.getByLabelText('Sort') as HTMLSelectElement).value, '-title');
+  assert.deepEqual(titles(container), ['Port flap', 'Link down']);
+});
+
+it('ignores invalid URL parameters at component level', () => {
+  window.history.replaceState(null, '', '/?severity=bogus&state=nope&sort=-bogus');
+  const { container } = render(<AlertTable alerts={MIXED} total={2} />);
+  assert.equal(titles(container).length, 2);
+  assert.equal((screen.getByLabelText('Severity') as HTMLSelectElement).value, '');
+  assert.equal((screen.getByLabelText('State') as HTMLSelectElement).value, '');
+  assert.equal((screen.getByLabelText('Sort') as HTMLSelectElement).value, '');
+});
+
+it('pushes history for a filter choice so Back undoes it', () => {
+  const before = window.history.length;
+  render(<AlertTable alerts={MIXED} total={2} />);
+  fireEvent.change(screen.getByLabelText('Severity'), { target: { value: 'low' } });
+  assert.equal(window.history.length, before + 1);
+});
+
+it('neutralises a hostile alert title in the export', async () => {
+  const hostile = '=HYPERLINK("http://evil.example","x")';
+  let exported = '';
+  const original = URL.createObjectURL;
+  URL.createObjectURL = (blob: Blob | MediaSource) => {
+    void (blob as Blob).text().then((text) => (exported = text));
+    return 'blob:test';
+  };
+  URL.revokeObjectURL = () => undefined;
+  window.HTMLAnchorElement.prototype.click = () => undefined;
+  try {
+    const alerts = [{ ...base, id: 'h1', title: hostile, severity: 'low', state: 'open' } as Alert];
+    render(<AlertTable alerts={alerts} total={1} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Export CSV, 1 alerts' }));
+    await waitFor(() => assert.ok(exported.length > 0));
+    const dataRow = exported.split('\r\n')[1];
+    assert.ok(dataRow.includes(`"'=HYPERLINK(""http://evil.example"",""x"")"`), dataRow);
+    assert.ok(!/(^|,)=/.test(dataRow));
+  } finally {
+    URL.createObjectURL = original;
+  }
 });
 
 it('shows the observed time relative, with the exact UTC value in the tooltip', () => {

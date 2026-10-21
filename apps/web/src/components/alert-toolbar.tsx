@@ -8,8 +8,10 @@ const SORT_OPTIONS: readonly { value: string; label: string }[] = [
   { value: 'observed', label: 'Oldest first' },
   { value: 'severity', label: 'Severity, most severe first' },
   { value: '-severity', label: 'Severity, least severe first' },
-  { value: 'state', label: 'State' },
+  { value: 'state', label: 'State A to Z' },
+  { value: '-state', label: 'State Z to A' },
   { value: 'title', label: 'Title A to Z' },
+  { value: '-title', label: 'Title Z to A' },
 ];
 
 function titleCase(value: string): string {

@@ -14,9 +14,10 @@ import { DEVICE_STATUSES } from '@/lib/api-contracts';
 import type { Device, DeviceStatus } from '@/lib/api-contracts';
 import { PERSON_ID } from '@/lib/api-contracts-identity-core';
 import { countByStatus, pageScopeNote, sortDevices } from '@/lib/device-view';
+import { DEVICE_SORT_KEYS } from '@/lib/device-view';
 import type { DeviceSortKey, SortState } from '@/lib/device-view';
-import { toggleSort } from '@/lib/list-url-state';
-import type { ListSpec } from '@/lib/list-url-state';
+import { pickAllowed, toggleSort } from '@/lib/list-url-state';
+import type { ListSort, ListSpec } from '@/lib/list-url-state';
 
 interface DeviceColumn {
   key: string;
@@ -192,6 +193,12 @@ function StatusChips({
   );
 }
 
+/** The URL parser already limits sort keys to the spec; this narrows the type without a cast. */
+function deviceSort(sort: ListSort | null): SortState | null {
+  const key = pickAllowed(DEVICE_SORT_KEYS, sort?.key);
+  return sort === null || key === null ? null : { key, direction: sort.direction };
+}
+
 function matchesQuery(device: Device, needle: string): boolean {
   if (needle.length === 0) return true;
   return [device.name, device.hostname, device.type, device.site_id, ...device.ip_addresses]
@@ -199,10 +206,10 @@ function matchesQuery(device: Device, needle: string): boolean {
     .some((value) => value.toLocaleLowerCase().includes(needle));
 }
 
-const LIST_SPEC: ListSpec = {
+const LIST_SPEC = {
   filters: { status: DEVICE_STATUSES },
-  sortKeys: ['status', 'name', 'ip', 'type', 'site', 'freshness'],
-};
+  sortKeys: DEVICE_SORT_KEYS,
+} as const satisfies ListSpec;
 
 const CSV_HEADERS = ['Status', 'Device', 'Hostname', 'IP addresses', 'Type', 'Site', 'Freshness', 'Observed at (UTC)'];
 
@@ -222,8 +229,8 @@ function csvRow(device: Device): string[] {
 export function DeviceTable({ devices, total }: { devices: Device[]; total: number }) {
   const { state, update, clear, isFiltering } = useListUrlState(LIST_SPEC);
   const query = state.q;
-  const status = (state.filters.status ?? 'all') as DeviceStatus | 'all';
-  const sort = state.sort as SortState | null;
+  const status: DeviceStatus | 'all' = pickAllowed(DEVICE_STATUSES, state.filters.status) ?? 'all';
+  const sort = useMemo(() => deviceSort(state.sort), [state.sort]);
 
   const counts = useMemo(() => countByStatus(devices), [devices]);
   const rows = useMemo(() => {

@@ -17,7 +17,9 @@ import {
   filterAlerts,
   sortAlerts,
 } from '@/lib/alert-list-view';
+import { ALERT_SEVERITIES, ALERT_STATES } from '@/lib/api-contracts';
 import type { Alert, AlertSeverity, AlertState } from '@/lib/api-contracts';
+import { pickAllowed } from '@/lib/list-url-state';
 import type { ListSort } from '@/lib/list-url-state';
 
 const SEVERITY_THEME: Record<AlertSeverity, BootstrapTheme> = {
@@ -120,8 +122,8 @@ function valueToSort(value: string): ListSort | null {
 
 export function AlertTable({ alerts, total }: { alerts: Alert[]; total: number }) {
   const { state, update, clear, isFiltering } = useListUrlState(ALERT_LIST_SPEC);
-  const severity = (state.filters.severity ?? null) as AlertSeverity | null;
-  const alertState = (state.filters.state ?? null) as AlertState | null;
+  const severity = pickAllowed(ALERT_SEVERITIES, state.filters.severity);
+  const alertState = pickAllowed(ALERT_STATES, state.filters.state);
   const rows = useMemo(
     () => sortAlerts(filterAlerts(alerts, { q: state.q, severity, state: alertState }), state.sort),
     [alerts, state.q, severity, alertState, state.sort],
