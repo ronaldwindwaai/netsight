@@ -40,6 +40,7 @@ export default async function ActionPage({ params }: { params: Promise<{ actionI
       <ActionDetailBody
         state={detail}
         status={statusData}
+        viewer={viewer}
         panel={
           detail.kind === 'ok' ? (
             <ActionDecisionPanel
