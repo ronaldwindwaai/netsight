@@ -162,7 +162,15 @@ export function FreshnessNotice({ freshness }: { freshness: Freshness }) {
   );
 }
 
-export function EmptyState({ filtered = false }: { filtered?: boolean }) {
+interface EmptyStateProps {
+  filtered?: boolean;
+  /** Filtered only: where "Clear filters" goes, for a screen whose filters live in the URL. */
+  clearHref?: string;
+  /** Filtered only: called by "Clear filters", for a screen that holds its filters in the page. */
+  onClear?: () => void;
+}
+
+export function EmptyState({ filtered = false, clearHref, onClear }: EmptyStateProps) {
   return (
     <AppCard className="text-center" bodyClass="py-5">
       <i className="bi bi-hdd-network fs-2 text-body-secondary" aria-hidden="true" />
@@ -173,9 +181,15 @@ export function EmptyState({ filtered = false }: { filtered?: boolean }) {
           : 'The source returned a valid empty device inventory.'}
       </p>
       {filtered ? (
-        <Link className="btn btn-sm btn-outline-primary" href="/devices">
-          Clear filters
-        </Link>
+        onClear ? (
+          <button className="btn btn-sm btn-outline-primary" onClick={onClear} type="button">
+            Clear filters
+          </button>
+        ) : clearHref ? (
+          <Link className="btn btn-sm btn-outline-primary" href={clearHref}>
+            Clear filters
+          </Link>
+        ) : null
       ) : (
         <RetryButton label="Refresh" />
       )}

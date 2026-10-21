@@ -1,17 +1,21 @@
 'use client';
 
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { AppCard } from '@/components/app-card';
 import type { ReactNode } from 'react';
 
 import { EmptyState } from '@/components/data-state';
+import { ExportCsvButton } from '@/components/export-csv-button';
+import { useListUrlState } from '@/components/use-list-url-state';
 import { FreshnessBadge, StatusBadge } from '@/components/status-badge';
 import { DEVICE_STATUSES } from '@/lib/api-contracts';
 import type { Device, DeviceStatus } from '@/lib/api-contracts';
 import { PERSON_ID } from '@/lib/api-contracts-identity-core';
-import { countByStatus, nextSort, pageScopeNote, sortDevices } from '@/lib/device-view';
+import { countByStatus, pageScopeNote, sortDevices } from '@/lib/device-view';
 import type { DeviceSortKey, SortState } from '@/lib/device-view';
+import { toggleSort } from '@/lib/list-url-state';
+import type { ListSpec } from '@/lib/list-url-state';
 
 function observedAt(value: string | null): string {
   if (!value) return 'Not tracked yet';
@@ -202,10 +206,31 @@ function matchesQuery(device: Device, needle: string): boolean {
     .some((value) => value.toLocaleLowerCase().includes(needle));
 }
 
+const LIST_SPEC: ListSpec = {
+  filters: { status: DEVICE_STATUSES },
+  sortKeys: ['status', 'name', 'ip', 'type', 'site', 'freshness'],
+};
+
+const CSV_HEADERS = ['Status', 'Device', 'Hostname', 'IP addresses', 'Type', 'Site', 'Freshness', 'Observed at (UTC)'];
+
+function csvRow(device: Device): string[] {
+  return [
+    device.status,
+    device.name,
+    device.hostname ?? '',
+    device.ip_addresses.join(' '),
+    device.type,
+    device.site_id ?? '',
+    device.freshness.state,
+    device.freshness.observed_at ?? '',
+  ];
+}
+
 export function DeviceTable({ devices, total }: { devices: Device[]; total: number }) {
-  const [query, setQuery] = useState('');
-  const [status, setStatus] = useState<DeviceStatus | 'all'>('all');
-  const [sort, setSort] = useState<SortState | null>(null);
+  const { state, update, clear, isFiltering } = useListUrlState(LIST_SPEC);
+  const query = state.q;
+  const status = (state.filters.status ?? 'all') as DeviceStatus | 'all';
+  const sort = state.sort as SortState | null;
 
   const counts = useMemo(() => countByStatus(devices), [devices]);
   const rows = useMemo(() => {
@@ -216,7 +241,7 @@ export function DeviceTable({ devices, total }: { devices: Device[]; total: numb
     return sort === null ? matched : sortDevices(matched, sort.key, sort.direction);
   }, [devices, query, status, sort]);
   const searchRef = useRef<HTMLInputElement>(null);
-  const filtering = query.trim().length > 0 || status !== 'all';
+  const csvRows = useMemo(() => rows.map(csvRow), [rows]);
 
   return (
     <AppCard
@@ -226,12 +251,21 @@ export function DeviceTable({ devices, total }: { devices: Device[]; total: numb
       theme="primary"
       bodyClass="p-0"
       tools={
-        <span className="small text-body-secondary" aria-live="polite">
-          {rows.length} shown / {total} total
+        <span className="d-inline-flex align-items-center gap-2">
+          <span className="small text-body-secondary" aria-live="polite">
+            {rows.length} shown / {total} total
+          </span>
+          <ExportCsvButton headers={CSV_HEADERS} label="devices" rows={csvRows} />
         </span>
       }
     >
-      <StatusChips active={status} counts={counts} onSelect={setStatus} />
+      <StatusChips
+        active={status}
+        counts={counts}
+        onSelect={(next) =>
+          update({ filters: next === 'all' ? {} : { status: next } })
+        }
+      />
       <div className="device-filters border-bottom p-3">
         <div>
           <label className="form-label" htmlFor="device-search">
@@ -242,7 +276,7 @@ export function DeviceTable({ devices, total }: { devices: Device[]; total: numb
             id="device-search"
             ref={searchRef}
             maxLength={128}
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => update({ q: event.target.value }, 'replace')}
             placeholder="Name, hostname, IP, type or site"
             type="search"
             value={query}
@@ -251,10 +285,9 @@ export function DeviceTable({ devices, total }: { devices: Device[]; total: numb
         <div className="d-flex align-items-end">
           <button
             className="btn btn-sm btn-outline-secondary"
-            disabled={!filtering}
+            disabled={!isFiltering}
             onClick={() => {
-              setQuery('');
-              setStatus('all');
+              clear();
               // The button disables itself once nothing is filtered; keep keyboard focus alive.
               searchRef.current?.focus();
             }}
@@ -270,11 +303,11 @@ export function DeviceTable({ devices, total }: { devices: Device[]; total: numb
       </p>
       {rows.length === 0 ? (
         <div className="p-3">
-          <EmptyState filtered />
+          <EmptyState filtered onClear={clear} />
         </div>
       ) : (
         <DeviceRows
-          onSort={(key) => setSort((current) => nextSort(current, key))}
+          onSort={(key) => update({ sort: toggleSort(sort, key) })}
           rows={rows}
           sort={sort}
         />

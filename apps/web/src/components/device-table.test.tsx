@@ -8,7 +8,10 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { DeviceTable } from '@/components/device-table';
 import type { Device } from '@/lib/api-contracts';
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  window.history.replaceState(null, '', '/');
+});
 
 function device(id: string, over: Partial<Device> = {}): Device {
   return {
@@ -71,7 +74,7 @@ describe('DeviceTable', () => {
     assert.deepEqual(names(), ['bravo', 'charlie']);
     fireEvent.change(screen.getByRole("searchbox"), { target: { value: 'zzz' } });
     assert.match(document.body.textContent ?? '', /No devices match/);
-    fireEvent.click(screen.getByRole('button', { name: /Clear filters/ }));
+    fireEvent.click(screen.getAllByRole('button', { name: /Clear filters/ })[0]);
     assert.equal(names().length, 3);
   });
 
@@ -114,5 +117,63 @@ describe('DeviceTable', () => {
     fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'bravo' } });
     fireEvent.click(screen.getByRole('button', { name: /Clear filters/ }));
     assert.equal(document.activeElement, screen.getByRole('searchbox'));
+  });
+
+  it('keeps search, status and sort in the URL and reads them back on load', () => {
+    window.history.replaceState(null, '', '/?q=bravo&status=critical&sort=-name');
+    render(<DeviceTable devices={ROWS} total={3} />);
+    assert.deepEqual(names(), ['bravo']);
+    assert.equal((screen.getByRole('searchbox') as HTMLInputElement).value, 'bravo');
+    assert.equal(screen.getByRole('columnheader', { name: /Device/ }).getAttribute('aria-sort'), 'descending');
+  });
+
+  it('writes filter changes to the URL, keeping unrelated parameters', () => {
+    window.history.replaceState(null, '', '/?page=2');
+    render(<DeviceTable devices={ROWS} total={3} />);
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'alp ha' } });
+    fireEvent.click(screen.getByRole('button', { name: /critical \(2\)/ }));
+    const params = new URLSearchParams(window.location.search);
+    assert.equal(params.get('q'), 'alp ha');
+    assert.equal(params.get('status'), 'critical');
+    assert.equal(params.get('page'), '2');
+  });
+
+  it('filters to zero results, then Clear filters resets the URL and restores the rows', () => {
+    render(<DeviceTable devices={ROWS} total={3} />);
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'nothing-matches' } });
+    assert.match(window.location.search, /q=nothing-matches/);
+    assert.ok(screen.getByText('No devices match these filters'));
+    const empty = screen.getByText('No devices match these filters').closest('.card') as HTMLElement;
+    fireEvent.click(within(empty).getByRole('button', { name: 'Clear filters' }));
+    assert.equal(window.location.search, '');
+    assert.deepEqual(names(), ['alpha', 'bravo', 'charlie']);
+    assert.equal((screen.getByRole('searchbox') as HTMLInputElement).value, '');
+  });
+
+  it('exports exactly the rows in view, with formula-looking cells neutralised', async () => {
+    let exported = '';
+    const original = URL.createObjectURL;
+    URL.createObjectURL = (blob: Blob | MediaSource) => {
+      void (blob as Blob).text().then((text) => (exported = text));
+      return 'blob:test';
+    };
+    URL.revokeObjectURL = () => undefined;
+    window.HTMLAnchorElement.prototype.click = () => undefined;
+    try {
+      render(
+        <DeviceTable
+          devices={[device('1', { name: '=cmd()', status: 'critical' }), device('2', { name: 'plain' })]}
+          total={2}
+        />,
+      );
+      fireEvent.click(screen.getByRole('button', { name: /critical \(1\)/ }));
+      fireEvent.click(screen.getByRole('button', { name: /Export CSV/ }));
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      const lines = exported.trim().split(/\r?\n/);
+      assert.equal(lines.length, 2);
+      assert.match(lines[1], /^critical,'=cmd\(\)/);
+    } finally {
+      URL.createObjectURL = original;
+    }
   });
 });
