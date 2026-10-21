@@ -37,4 +37,44 @@ describe('AppContent', () => {
     assert.equal(container.querySelector('.app-content-header'), null);
     assert.ok(screen.getByText('body'));
   });
+
+  it('renders exactly one h1 when there is a title and breadcrumbs', () => {
+    render(
+      <AppContent title="Devices" breadcrumbs={[{ label: 'Overview', href: '/overview' }, { label: 'Devices' }]}>
+        body
+      </AppContent>,
+    );
+
+    assert.equal(screen.getAllByRole('heading', { level: 1 }).length, 1);
+  });
+
+  it('renders a breadcrumb-only header without any heading', () => {
+    const { container } = render(
+      <AppContent breadcrumbs={[{ label: 'Overview', href: '/overview' }, { label: 'Devices' }]}>body</AppContent>,
+    );
+
+    assert.ok(container.querySelector('.app-content-header'));
+    assert.equal(screen.queryAllByRole('heading').length, 0);
+  });
+
+  it('treats empty breadcrumbs as none', () => {
+    const { container } = render(<AppContent breadcrumbs={[]}>body</AppContent>);
+
+    assert.equal(container.querySelector('.app-content-header'), null);
+    assert.equal(screen.queryByRole('navigation', { name: 'Breadcrumb' }), null);
+  });
+
+  it('uses the narrow container only when fluid is false', () => {
+    const fluid = render(<AppContent title="A">body</AppContent>);
+    assert.equal(fluid.container.querySelectorAll('.container-fluid').length, 2);
+    cleanup();
+
+    const narrow = render(
+      <AppContent title="A" fluid={false}>
+        body
+      </AppContent>,
+    );
+    assert.equal(narrow.container.querySelectorAll('.container-lg').length, 2);
+    assert.equal(narrow.container.querySelector('.container-fluid'), null);
+  });
 });

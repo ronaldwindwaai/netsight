@@ -82,7 +82,10 @@
     max-inline-size: none;
   }
 
-  /* The finder is the mobile entry point; the library's duplicate search pill only crowds it. */
+  /* The finder is the mobile entry point; the library's duplicate search pill and the fullscreen
+     toggle only crowd it. @adminlte/react 0.7.0 exposes no prop to omit either (DashboardLayout
+     does not forward `search` or `fullscreen` to Topbar), so they are matched by their title
+     attributes from dist/layout/topbar.js. Re-check this selector when upgrading the library. */
   .app-header .navbar-nav > li:has(> button[title^='Search']),
   .app-header .navbar-nav > li:has(> button[title$='ullscreen']) {
     display: none !important;

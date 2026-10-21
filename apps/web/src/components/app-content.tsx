@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import type { ReactNode } from 'react';
 
 export interface Breadcrumb {
@@ -38,7 +39,7 @@ export function AppContent({ title, breadcrumbs, fluid = true, children }: AppCo
                             className={`breadcrumb-item${current ? ' active' : ''}`}
                             aria-current={current ? 'page' : undefined}
                           >
-                            {crumb.href && !current ? <a href={crumb.href}>{crumb.label}</a> : crumb.label}
+                            {crumb.href && !current ? <Link href={crumb.href}>{crumb.label}</Link> : crumb.label}
                           </li>
                         );
                       })}
