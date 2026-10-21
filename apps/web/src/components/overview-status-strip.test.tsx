@@ -22,9 +22,9 @@ const SUMMARY: DeviceHealthSummary = {
 describe('OverviewStatusStrip', () => {
   it('links each non-empty status to the device list filtered to it', () => {
     render(<OverviewStatusStrip summary={SUMMARY} />);
-    const critical = screen.getByRole('link', { name: /1 critical/ });
+    const critical = screen.getByRole('link', { name: /critical 1/ });
     assert.equal(critical.getAttribute('href'), '/devices?status=critical');
-    assert.equal(screen.getByRole('link', { name: /2 healthy/ }).getAttribute('href'), '/devices?status=healthy');
+    assert.equal(screen.getByRole('link', { name: /healthy 2/ }).getAttribute('href'), '/devices?status=healthy');
   });
 
   it('shows empty statuses as plain text, not dead links', () => {

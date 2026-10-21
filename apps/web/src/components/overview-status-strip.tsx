@@ -22,13 +22,12 @@ export function OverviewStatusStrip({ summary }: { summary: DeviceHealthSummary 
           </span>
         ) : (
           <Link
-            aria-label={`${row.count} ${row.status}, open the device list filtered to ${row.status}`}
-            className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-2"
+            aria-label={`${row.status} ${row.count}, open the device list filtered to ${row.status}`}
+            className="btn btn-sm btn-outline-secondary"
             href={row.href}
             key={row.status}
           >
-            <StatusBadge status={row.status} />
-            <span className="fw-semibold">{row.count}</span>
+            <StatusBadge status={row.status} /> <span className="fw-semibold">{row.count}</span>
           </Link>
         ),
       )}
