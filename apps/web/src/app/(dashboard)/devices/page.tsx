@@ -7,6 +7,8 @@ import { SourceHealth } from '@/components/source-health';
 import { apiGet } from '@/lib/api';
 import { parseDeviceList, parseSourceHealth } from '@/lib/api-contracts';
 
+export const metadata = { title: 'Devices' };
+
 const PAGE_SIZE = 50;
 
 function requestedPage(raw: string | string[] | undefined): number {

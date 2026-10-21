@@ -28,6 +28,8 @@ import {
 } from '@/lib/overview-tiles';
 import { canReadTraffic, viewerFromSession } from '@/lib/viewer';
 
+export const metadata = { title: 'Network overview' };
+
 function UnavailableSurface({
   icon,
   title,

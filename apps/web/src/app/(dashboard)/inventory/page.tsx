@@ -10,6 +10,8 @@ import { parseInventoryList, parseInventorySummaryResponse } from '@/lib/api-con
 import { inventoryPath, parseInventoryQuery } from '@/lib/inventory-view';
 import { canReadInventory, canReadInventorySummary, viewerFromSession } from '@/lib/viewer';
 
+export const metadata = { title: 'Inventory' };
+
 type Params = Record<string, string | string[] | undefined>;
 
 export default async function InventoryPage({ searchParams }: { searchParams: Promise<Params> }) {

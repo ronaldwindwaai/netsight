@@ -10,6 +10,8 @@ import { parseSlaResponse } from '@/lib/api-contracts-internet';
 import { monthOptions, requestedMonth, slaPath } from '@/lib/internet-view';
 import { reportTemplate, visibleReports } from '@/lib/report-catalog';
 
+export const metadata = { title: 'WAN SLA report' };
+
 export default async function ReportPage({searchParams}: {
   searchParams: Promise<{month?: string | string[]}>;
 }) {

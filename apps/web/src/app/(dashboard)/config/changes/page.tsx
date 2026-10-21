@@ -8,6 +8,8 @@ import { apiGet } from '@/lib/api';
 import { parseSessionInfo } from '@/lib/api-contracts';
 import { CONFIG_NODE_ID, parseConfigurationVersions } from '@/lib/api-contracts-configuration';
 
+export const metadata = { title: 'Change history' };
+
 type Params = Record<string, string | string[] | undefined>;
 export default async function ConfigurationChangesPage({ searchParams }: { searchParams: Promise<Params> }) {
   const session = await apiGet('/api/v1/auth/session', parseSessionInfo);

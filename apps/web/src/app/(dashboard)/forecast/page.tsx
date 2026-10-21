@@ -8,6 +8,8 @@ import { parseForecastResponse } from '@/lib/api-contracts-forecast';
 import { forecastPath, parseForecastQuery } from '@/lib/forecast-view';
 import { canExportForecast, canReadForecast, viewerFromSession } from '@/lib/viewer';
 
+export const metadata = { title: 'Capacity forecast' };
+
 type Params = Record<string, string | string[] | undefined>;
 
 export default async function ForecastPage({ searchParams }: { searchParams: Promise<Params> }) {

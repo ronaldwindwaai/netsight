@@ -35,6 +35,8 @@ import {
 import type { Viewer } from '@/lib/incident-actions';
 import { viewerFromSession } from '@/lib/viewer';
 
+export const metadata = { title: 'Incident' };
+
 function TimelineBody({
   state,
   incidentId,

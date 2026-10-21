@@ -9,6 +9,8 @@ import { parseInternetResponse, parseSlaResponse } from '@/lib/api-contracts-int
 import { monthOptions, requestedMonth, slaPath } from '@/lib/internet-view';
 import { canExportInternet, viewerFromSession } from '@/lib/viewer';
 
+export const metadata = { title: 'Internet / WAN' };
+
 export default async function InternetPage({
   searchParams,
 }: {

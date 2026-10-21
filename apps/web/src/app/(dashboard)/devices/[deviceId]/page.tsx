@@ -7,6 +7,8 @@ import { DeviceDetailTabs } from '@/components/device-detail-tabs';
 import { apiGet } from '@/lib/api';
 import { parseDeviceDetail, parseInterfaceList, parseSessionInfo } from '@/lib/api-contracts';
 
+export const metadata = { title: 'Device' };
+
 export default async function DeviceDetailPage({
   params,
 }: {

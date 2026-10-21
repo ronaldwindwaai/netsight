@@ -14,6 +14,8 @@ import {
 import { addressesPath, parseIpamQuery, prefixesPath, vlansPath } from '@/lib/ipam-view';
 import { canReadIpam, canReadIpamSummary, viewerFromSession } from '@/lib/viewer';
 
+export const metadata = { title: 'IPAM' };
+
 type Params = Record<string, string | string[] | undefined>;
 
 export default async function IpamPage({ searchParams }: { searchParams: Promise<Params> }) {

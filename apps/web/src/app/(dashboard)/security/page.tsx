@@ -11,6 +11,8 @@ import { parseSecurityEventsResponse } from '@/lib/api-contracts-security';
 import { aroundInstantFlowsHref } from '@/lib/traffic-view';
 import { canReadTrafficDetail, viewerFromSession } from '@/lib/viewer';
 
+export const metadata = { title: 'Security centre' };
+
 const PRESETS: ReadonlyArray<{ id: TrafficPreset; label: string }> = [
   { id: '1h', label: 'Last hour' },
   { id: '6h', label: 'Last 6 hours' },

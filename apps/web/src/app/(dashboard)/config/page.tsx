@@ -6,6 +6,8 @@ import { apiGet } from '@/lib/api';
 import { parseSessionInfo } from '@/lib/api-contracts';
 import { parseConfigurationNodes } from '@/lib/api-contracts-configuration';
 
+export const metadata = { title: 'Configuration' };
+
 export default async function ConfigurationPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = await searchParams;
   const page = typeof params.page === 'string' && /^[1-9][0-9]{0,3}$/.test(params.page) && Number(params.page) <= 2000 ? Number(params.page) : 1;

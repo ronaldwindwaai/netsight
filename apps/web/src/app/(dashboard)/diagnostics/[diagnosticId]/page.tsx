@@ -8,6 +8,8 @@ import { parseDiagnosticSessionResponse } from '@/lib/api-contracts-diagnostic-s
 import { sessionApiPath } from '@/lib/diagnostic-session-view';
 import { canUseDiagnostics, viewerFromSession } from '@/lib/viewer';
 
+export const metadata = { title: 'Diagnostic session' };
+
 /**
  * A stored diagnostic session, read-only. The identifier from the address is checked against the
  * exact session id format before any request is made, and the API response must satisfy the

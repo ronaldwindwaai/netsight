@@ -15,6 +15,8 @@ import {
   viewerFromSession,
 } from '@/lib/viewer';
 
+export const metadata = { title: 'Person' };
+
 export default async function UserDetailPage({ params }: { params: Promise<{ userId: string }> }) {
   const { userId } = await params;
   // A malformed id never reaches the API path: it is a 404 here.

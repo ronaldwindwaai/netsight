@@ -9,6 +9,8 @@ import { parseInventoryDetail } from '@/lib/api-contracts-inventory';
 import { isInventoryId } from '@/lib/inventory-view';
 import { canReadInventory, canReadInventorySummary, viewerFromSession } from '@/lib/viewer';
 
+export const metadata = { title: 'Asset' };
+
 export default async function InventoryItemPage({ params }: { params: Promise<{ deviceId: string }> }) {
   const { deviceId } = await params;
   // A malformed id never reaches the API path: it is a 404 here.
