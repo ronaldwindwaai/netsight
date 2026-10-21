@@ -28,6 +28,8 @@ function cardClassName(theme: CardTheme | undefined, variant: AppCardProps['vari
  * Same markup and classes as the library `Card`, except the title is a level-two heading. The library
  * renders it as an h3, which sits directly under the page's h1 (AppContent) and breaks heading order.
  * Cards here are never collapsible, removable or maximisable, so none of that widget state is needed.
+ * The widget props (collapsible, defaultCollapsed, removable, onRemove, maximizable) and the deprecated
+ * `outline` prop are intentionally unsupported; use variant="outline" instead of `outline`.
  */
 export function AppCard({
   title,
