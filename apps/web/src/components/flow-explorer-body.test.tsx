@@ -302,3 +302,16 @@ describe('the aggregations', () => {
     assert.match(text(), /No traffic in the timeline/);
   });
 });
+
+describe('CSV export', () => {
+  it('offers an export for the listed flows', () => {
+    show(okState(flowsFixture({ flows: [flowFixture()] })));
+    const button = screen.getByRole('button', { name: /Export CSV/ });
+    assert.equal((button as HTMLButtonElement).disabled, false);
+  });
+
+  it('offers no export when there are no rows to export', () => {
+    show(okState(flowsFixture({ flows: [] })));
+    assert.equal(screen.queryAllByRole('button', { name: /Export CSV/ }).length, 0);
+  });
+});

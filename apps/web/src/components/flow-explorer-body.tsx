@@ -1,5 +1,6 @@
 import { Alert } from '@adminlte/react';
 
+import { ExportCsvButton } from '@/components/export-csv-button';
 import { FreshnessNotice } from '@/components/data-state';
 import { CohortNotice } from '@/components/cohort-notice';
 import { Aggregations, FlowRowsTable } from '@/components/flow-explorer-parts';
@@ -7,8 +8,10 @@ import type { FlowLinker } from '@/components/flow-explorer-parts';
 import { StateSurface } from '@/components/state-surface';
 import { TrafficGate } from '@/components/traffic-surface';
 import type { TrafficFlowsResponse } from '@/lib/api-contracts-traffic-explorer';
+import { NO_ENTITY_ACCESS } from '@/lib/identity-view';
 import type { EntityAccess } from '@/lib/identity-view';
 import type { FetchState } from '@/lib/api-response';
+import { FLOW_CSV_HEADERS, flowCsvRows } from '@/lib/flow-csv';
 import { attributionNotice } from '@/lib/traffic-view';
 
 function unsupportedDetail(
@@ -69,11 +72,18 @@ export function FlowExplorerBody({
                 aria-label="Flows"
                 className="card card-outline card-primary operational-card"
               >
-                <div className="card-header">
+                <div className="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
                   <h2 className="card-title h6 mb-0">
                     <i className="bi bi-list-columns me-1" aria-hidden="true" />
                     Flows (largest first)
                   </h2>
+                  {data.flows.length > 0 ? (
+                    <ExportCsvButton
+                      headers={FLOW_CSV_HEADERS}
+                      label="traffic-flows"
+                      rows={flowCsvRows(data.flows, access ?? NO_ENTITY_ACCESS)}
+                    />
+                  ) : null}
                 </div>
                 {notice !== '' ? (
                   <p className="small text-body-secondary px-3 pt-2 mb-0">{notice}</p>
