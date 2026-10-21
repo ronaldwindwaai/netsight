@@ -111,6 +111,26 @@ test('parseOverviewResponse accepts the optional netbox source the API reports',
   assert.equal(parsed?.sources.librenms.status, 'success');
 });
 
+function overviewWith(sources: Record<string, unknown>): unknown {
+  return {
+    devices: {
+      total: 0,
+      by_status: [],
+      freshness: { state: 'fresh', observed_at: '2026-10-04T12:00:00Z', source: 'librenms' },
+    },
+    sources: { librenms: { configured: true, status: 'success' }, ...sources },
+  };
+}
+
+test('parseOverviewResponse rejects a malformed netbox source or an unknown sibling source', () => {
+  const netbox = { configured: false, status: 'not-configured' };
+  assert.notEqual(parseOverviewResponse(overviewWith({ netbox })), null);
+  assert.equal(parseOverviewResponse(overviewWith({ netbox: { ...netbox, extra: 1 } })), null);
+  assert.equal(parseOverviewResponse(overviewWith({ netbox: { ...netbox, status: 'bogus' } })), null);
+  assert.equal(parseOverviewResponse(overviewWith({ netbox: { ...netbox, configured: 'no' } })), null);
+  assert.equal(parseOverviewResponse(overviewWith({ netbox, zabbix: netbox })), null);
+});
+
 test('parseOverviewResponse rejects malformed aggregates', () => {
   assert.equal(parseOverviewResponse(null), null);
   assert.equal(parseOverviewResponse({}), null);
