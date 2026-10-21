@@ -83,8 +83,9 @@
   }
 
   /* The finder is the mobile entry point; the library's duplicate search pill only crowds it. */
-  .app-header .navbar-nav > li:has(> button[title^='Search']) {
-    display: none;
+  .app-header .navbar-nav > li:has(> button[title^='Search']),
+  .app-header .navbar-nav > li:has(> button[title$='ullscreen']) {
+    display: none !important;
   }
 }
 
@@ -110,4 +111,49 @@
 
 :root:not([data-bs-theme='dark']) .app-header .text-secondary {
   color: #495057 !important;
+}
+
+/* Plain and sortable column headers read at one size (the sort button is a small button). */
+.devices-scroll thead th {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+/* Keyboard focus on the dark sidebar needs a ring that reads against it. */
+.app-sidebar .nav-link:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: -2px;
+  box-shadow: none;
+}
+
+/* Dark mode: Bootstrap's outline buttons keep their light-mode tints; lift them to 4.5:1 on dark surfaces. */
+[data-bs-theme='dark'] .btn-outline-primary {
+  --bs-btn-color: #6ea8fe;
+  --bs-btn-border-color: #6ea8fe;
+  --bs-btn-hover-color: #000;
+  --bs-btn-hover-bg: #6ea8fe;
+  --bs-btn-hover-border-color: #6ea8fe;
+  --bs-btn-active-color: #000;
+  --bs-btn-active-bg: #8bb9fe;
+  --bs-btn-active-border-color: #8bb9fe;
+}
+
+[data-bs-theme='dark'] .btn-outline-secondary {
+  --bs-btn-color: #adb5bd;
+  --bs-btn-border-color: #adb5bd;
+  --bs-btn-hover-color: #000;
+  --bs-btn-hover-bg: #adb5bd;
+  --bs-btn-hover-border-color: #adb5bd;
+  --bs-btn-active-color: #000;
+  --bs-btn-active-bg: #ced4da;
+  --bs-btn-active-border-color: #ced4da;
+}
+
+[data-bs-theme='dark'] .nav-pills .nav-link:not(.active),
+[data-bs-theme='dark'] .mobile-nav__link.is-active {
+  color: #6ea8fe;
+}
+
+[data-bs-theme='dark'] .app-header .text-secondary {
+  color: #ced4da !important;
 }

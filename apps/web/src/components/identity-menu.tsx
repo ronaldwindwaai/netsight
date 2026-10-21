@@ -69,14 +69,15 @@ export function IdentityMenu({ session }: { session: SessionInfo | null }) {
         type="button"
         className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-2"
         aria-haspopup="true"
-        aria-label={`Account menu for ${session.email ?? session.identity_id}`}
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
       >
         <span className="identity-avatar" aria-hidden="true">
           {initials(session.email, session.identity_id)}
         </span>
+        <span className="visually-hidden">Account menu: </span>
         <span className="d-none d-md-inline">{session.email ?? session.identity_id}</span>
+        <span className="visually-hidden d-md-none">{session.email ?? session.identity_id}</span>
         <i className="bi bi-chevron-down fs-7" aria-hidden="true" />
       </button>
       {open ? (

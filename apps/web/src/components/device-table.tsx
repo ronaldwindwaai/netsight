@@ -266,8 +266,8 @@ export function DeviceTable({ devices, total }: { devices: Device[]; total: numb
         </div>
       </div>
       <p className="small text-body-secondary px-3 pt-2 mb-0">
-        Sorting and filters apply to the {devices.length} devices loaded on this page only; use the
-        page controls below for the other {Math.max(0, total - devices.length)}.
+        Sorting and filters apply to the {devices.length} {devices.length === 1 ? 'device' : 'devices'} loaded on this
+        page{total > devices.length ? `; use the page controls below for the other ${total - devices.length}.` : ' (all of them).'}
       </p>
       {rows.length === 0 ? (
         <div className="p-3">

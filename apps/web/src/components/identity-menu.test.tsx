@@ -21,6 +21,7 @@ const session: SessionInfo = {
 };
 
 const router = {
+  bfcacheId: 'test',
   back() {},
   forward() {},
   prefetch() {},
@@ -37,7 +38,7 @@ describe('IdentityMenu', () => {
       </AppRouterContext.Provider>,
     );
 
-    const button = screen.getByRole('button', { name: 'Account menu for local:demo.admin' });
+    const button = screen.getByRole('button', { name: /^Account menu:\s*local:demo\.admin/ });
     assert.equal(button.getAttribute('aria-expanded'), 'false');
   });
 });
