@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Card } from '@adminlte/react';
+import { AppCard } from '@/components/app-card';
 
 import { AlertRulesTable } from '@/components/alert-rules-table';
 import { DataFailure } from '@/components/data-state';
@@ -142,7 +142,7 @@ export function AlertRulesCard(props: {
   viewer: Viewer | null;
 }) {
   return (
-    <Card
+    <AppCard
       className="operational-card"
       title="Alert rules"
       icon="bi bi-sliders"
@@ -159,7 +159,7 @@ export function AlertRulesCard(props: {
         retrievedAt={props.retrievedAt}
         viewer={props.viewer}
       />
-    </Card>
+    </AppCard>
   );
 }
 
@@ -171,7 +171,7 @@ export function MaintenanceWindowsCard(props: {
   viewer: Viewer | null;
 }) {
   return (
-    <Card
+    <AppCard
       className="operational-card"
       title="Maintenance windows"
       icon="bi bi-tools"
@@ -189,6 +189,6 @@ export function MaintenanceWindowsCard(props: {
         retrievedAt={props.retrievedAt}
         viewer={props.viewer}
       />
-    </Card>
+    </AppCard>
   );
 }

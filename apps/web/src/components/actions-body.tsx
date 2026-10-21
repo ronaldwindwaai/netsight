@@ -5,7 +5,8 @@
  * only when its state says so, and a dry run is labelled as one.
  */
 import Link from 'next/link';
-import { Card, Table } from '@adminlte/react';
+import { Table } from '@adminlte/react';
+import { AppCard } from '@/components/app-card';
 import type { TableColumn } from '@adminlte/react';
 
 import { ActionStateBadge, RiskBadge } from '@/components/action-parts';
@@ -140,7 +141,7 @@ export function ActionsBody({ state, query }: { state: FetchState<ActionList>; q
     );
   }
   return (
-    <Card
+    <AppCard
       title="Requests"
       icon="bi bi-shield-check"
       variant="outline"
@@ -154,6 +155,6 @@ export function ActionsBody({ state, query }: { state: FetchState<ActionList>; q
     >
       <Table columns={columns} data={data.items} emptyMessage="No requests" hover responsive rowKey={(item) => item.id} small striped />
       <Pager label="Action request pages" hrefs={pageHrefs(query, data.total, data.page_size)} />
-    </Card>
+    </AppCard>
   );
 }

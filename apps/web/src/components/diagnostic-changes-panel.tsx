@@ -5,7 +5,7 @@
  * An incident is shown as a reference (kind, severity, time): its title is not stored with the
  * session and is revealed only to a caller holding incidents:read, so a withheld title is said so.
  */
-import { Card } from '@adminlte/react';
+import { AppCard } from '@/components/app-card';
 
 import { StateSurface } from '@/components/state-surface';
 import type { DiagnosticRecentChanges } from '@/lib/api-contracts-diagnostic-session';
@@ -95,7 +95,7 @@ function Body({ changes }: { changes: DiagnosticRecentChanges }) {
 export function RecentChangesPanel({ changes }: { changes: DiagnosticRecentChanges }) {
   return (
     <section aria-label="Recent changes" className="mb-3">
-      <Card
+      <AppCard
         className="operational-card"
         title="Recent changes"
         icon="bi bi-clock-history"
@@ -110,7 +110,7 @@ export function RecentChangesPanel({ changes }: { changes: DiagnosticRecentChang
           Temporal correlation is not causation: a change listed here may correlate with the failure
           and is not shown as its cause.
         </p>
-      </Card>
+      </AppCard>
     </section>
   );
 }

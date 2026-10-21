@@ -6,7 +6,8 @@
  * readable. All names, descriptions and addresses are untrusted source text rendered as text.
  */
 import Link from 'next/link';
-import { Badge, Card, Table } from '@adminlte/react';
+import { Badge, Table } from '@adminlte/react';
+import { AppCard } from '@/components/app-card';
 import type { TableColumn } from '@adminlte/react';
 import type { ReactNode } from 'react';
 
@@ -166,7 +167,7 @@ export function IpamPrefixesCard({ state, query }: { state: FetchState<IpamPrefi
           ) : (
             <>
               <SourceNotices sources={data.sources} />
-              <Card variant="outline" theme="primary" bodyClass="p-0">
+              <AppCard variant="outline" theme="primary" bodyClass="p-0">
                 <div className="d-flex flex-wrap gap-2 p-3 pb-0" role="group" aria-label="Address family">
                   <Link aria-current={query.family === null ? 'true' : undefined} className={`btn btn-sm ${query.family === null ? 'btn-primary' : 'btn-outline-secondary'}`} href={ipamHref(query, { family: null, prefixesPage: 1 })}>
                     All
@@ -180,7 +181,7 @@ export function IpamPrefixesCard({ state, query }: { state: FetchState<IpamPrefi
                 </div>
                 <Table columns={prefixColumns} data={data.items} emptyMessage="No prefixes" hover responsive rowKey={(p) => p.id} small />
                 <Pager label="Prefix pages" hrefs={pageLinks(data.total, query.prefixesPage, (page) => ipamHref(query, { prefixesPage: page }))} />
-              </Card>
+              </AppCard>
             </>
           )
         }
@@ -216,10 +217,10 @@ export function IpamVlansCard({ state, query }: { state: FetchState<IpamVlanList
           data.total === 0 ? (
             <StateSurface icon="bi bi-ethernet" title="NetBox lists no VLANs" detail="The read succeeded and returned nothing." />
           ) : (
-            <Card variant="outline" theme="primary" bodyClass="p-0">
+            <AppCard variant="outline" theme="primary" bodyClass="p-0">
               <Table columns={vlanColumns} data={data.items} emptyMessage="No VLANs" hover responsive rowKey={(v) => v.id} small striped />
               <Pager label="VLAN pages" hrefs={pageLinks(data.total, query.vlansPage, (page) => ipamHref(query, { vlansPage: page }))} />
-            </Card>
+            </AppCard>
           )
         }
       </FailureOrSurface>
@@ -302,10 +303,10 @@ export function IpamAddressesCard({ state, query }: { state: FetchState<IpamAddr
                   detail="The read succeeded and returned nothing for this view."
                 />
               ) : (
-                <Card variant="outline" theme="primary" bodyClass="p-0">
+                <AppCard variant="outline" theme="primary" bodyClass="p-0">
                   <Table columns={addressColumns} data={data.items} emptyMessage="No addresses" hover responsive rowKey={(a) => a.id} small striped />
                   <Pager label="Address pages" hrefs={pageLinks(data.total, query.addressesPage, (page) => ipamHref(query, { addressesPage: page }))} />
-                </Card>
+                </AppCard>
               )}
             </>
           );

@@ -1,4 +1,5 @@
-import { Alert, Badge, Card, Table } from '@adminlte/react';
+import { Alert, Badge, Table } from '@adminlte/react';
+import { AppCard } from '@/components/app-card';
 import type { BootstrapTheme } from '@adminlte/react';
 import type { TableColumn } from '@adminlte/react';
 import Link from 'next/link';
@@ -55,7 +56,7 @@ const versionColumns: TableColumn<ConfigurationVersion>[] = [
   { key: 'saved_at', header: 'Saved at', render: item => formatUtcTimestamp(item.saved_at) },
 ];
 export function ConfigurationNodesBody({ state }: { state: FetchState<ConfigurationRead<ConfigurationNode>> }) {
-  return <Card title="Configuration backups"><ConfigurationSurface state={state}>
+  return <AppCard title="Configuration backups"><ConfigurationSurface state={state}>
     {state.kind === 'ok' ? <>
       {state.data.items.some(i => i.backup_freshness === 'stale') ? <Alert theme="warning" title="Stale backups">At least one successful backup is older than 24 hours. Live configuration may differ.</Alert> : null}
       <div className="d-none d-md-block"><Table columns={nodeColumns} data={state.data.items} rowKey={item => item.id} /></div>
@@ -71,10 +72,10 @@ export function ConfigurationNodesBody({ state }: { state: FetchState<Configurat
         </li>)}
       </ul>
     </> : null}
-  </ConfigurationSurface></Card>;
+  </ConfigurationSurface></AppCard>;
 }
 export function ConfigurationVersionsBody({ state, nodeId, permissions = [] }: { state: FetchState<ConfigurationRead<ConfigurationVersion>>; nodeId: string; permissions?: readonly string[] }) {
-  return <Card title={`Saved versions for ${nodeId}`}>
+  return <AppCard title={`Saved versions for ${nodeId}`}>
     <nav className="d-flex flex-wrap gap-3 small mb-3" aria-label="Related views">
       <Link href="/config"><i className="bi bi-arrow-left me-1" aria-hidden="true" />All configuration backups</Link>
       <Link href="/incidents"><i className="bi bi-exclamation-diamond me-1" aria-hidden="true" />All incidents</Link>
@@ -90,5 +91,5 @@ export function ConfigurationVersionsBody({ state, nodeId, permissions = [] }: {
         </li>)}
       </ol>
     </> : null}
-  </ConfigurationSurface></Card>;
+  </ConfigurationSurface></AppCard>;
 }

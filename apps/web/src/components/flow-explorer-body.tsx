@@ -70,10 +70,10 @@ export function FlowExplorerBody({
                 className="card card-outline card-primary operational-card"
               >
                 <div className="card-header">
-                  <h3 className="card-title h6 mb-0">
+                  <h2 className="card-title h6 mb-0">
                     <i className="bi bi-list-columns me-1" aria-hidden="true" />
                     Flows (largest first)
-                  </h3>
+                  </h2>
                 </div>
                 {notice !== '' ? (
                   <p className="small text-body-secondary px-3 pt-2 mb-0">{notice}</p>

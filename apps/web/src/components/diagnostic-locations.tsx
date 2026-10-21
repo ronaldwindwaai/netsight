@@ -2,7 +2,7 @@
  * Per-location results of a stored diagnostic session (S7 Step 4b). All six locations are always
  * listed; one without a configured probe source is "Not connected" and is never shown as passing.
  */
-import { Card } from '@adminlte/react';
+import { AppCard } from '@/components/app-card';
 
 import type { DiagnosticLocationResult } from '@/lib/api-contracts-diagnostic-session';
 import { LOCATION_LABELS, locationOutcome } from '@/lib/diagnostic-session-view';
@@ -25,7 +25,7 @@ export function LocationResults({
 }) {
   return (
     <section aria-label="Probe locations" className="mb-3">
-      <Card
+      <AppCard
         className="operational-card"
         title="Results by location"
         icon="bi bi-geo-alt"
@@ -68,7 +68,7 @@ export function LocationResults({
             under Checks.
           </p>
         ) : null}
-      </Card>
+      </AppCard>
     </section>
   );
 }

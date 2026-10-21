@@ -5,7 +5,7 @@
  * forecast is never drawn or listed as a measurement, and recommendations are advice with their
  * evidence and no control. Series names and advice text are untrusted data rendered as text.
  */
-import { Card } from '@adminlte/react';
+import { AppCard } from '@/components/app-card';
 
 import { DataFailure } from '@/components/data-state';
 import { ForecastSeriesCard } from '@/components/forecast-series-card';
@@ -110,7 +110,7 @@ const OVERALL: Record<'not-connected' | 'unknown' | 'insufficient-data', { icon:
 function Recommendations({ data }: { data: ForecastResponse }) {
   return (
     <section aria-labelledby="forecast-recommendations" className="mt-3">
-      <Card title="Recommendations" icon="bi bi-lightbulb" variant="outline" theme="secondary">
+      <AppCard title="Recommendations" icon="bi bi-lightbulb" variant="outline" theme="secondary">
         <h2 id="forecast-recommendations" className="visually-hidden">
           Recommendations
         </h2>
@@ -143,7 +143,7 @@ function Recommendations({ data }: { data: ForecastResponse }) {
             ))}
           </ul>
         )}
-      </Card>
+      </AppCard>
     </section>
   );
 }

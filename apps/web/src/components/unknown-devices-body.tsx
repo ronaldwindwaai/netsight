@@ -5,7 +5,8 @@
  * a recommendation that was not executed.
  */
 import Link from 'next/link';
-import { Card, Table } from '@adminlte/react';
+import { Table } from '@adminlte/react';
+import { AppCard } from '@/components/app-card';
 import type { TableColumn } from '@adminlte/react';
 
 import { DataFailure } from '@/components/data-state';
@@ -197,7 +198,7 @@ export function UnknownDevicesBody({
     );
   }
   return (
-    <Card
+    <AppCard
       title="Findings"
       icon="bi bi-question-diamond"
       variant="outline"
@@ -220,6 +221,6 @@ export function UnknownDevicesBody({
         striped
       />
       <Pager label="Finding pages" hrefs={pageHrefs(query, data.total)} />
-    </Card>
+    </AppCard>
   );
 }

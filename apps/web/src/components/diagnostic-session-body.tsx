@@ -4,7 +4,7 @@
  * form or input, only data. Untrusted values (target, symptom, probe details, names, titles) are
  * React text nodes, never injected HTML. A stored session is a snapshot and says so when it is old.
  */
-import { Card } from '@adminlte/react';
+import { AppCard } from '@/components/app-card';
 
 import { ProbableCausePanel } from '@/components/diagnostic-cause-panel';
 import { RecentChangesPanel } from '@/components/diagnostic-changes-panel';
@@ -22,7 +22,7 @@ function Checks({ session }: { session: DiagnosticSession }) {
   const summary = runCheckSummary(run);
   return (
     <section aria-label="Checks" className="mb-3">
-      <Card
+      <AppCard
         className="operational-card"
         title="Automated check results"
         icon="bi bi-list-ul"
@@ -48,7 +48,7 @@ function Checks({ session }: { session: DiagnosticSession }) {
             </ol>
           </>
         )}
-      </Card>
+      </AppCard>
     </section>
   );
 }

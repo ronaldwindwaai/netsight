@@ -4,7 +4,7 @@
  * parameter) is untrusted and rendered as text. A history whose hash chain does not verify is said so.
  */
 import Link from 'next/link';
-import { Card } from '@adminlte/react';
+import { AppCard } from '@/components/app-card';
 
 import { ActionStateBadge, ChecksList, DryRunNotice, RiskBadge } from '@/components/action-parts';
 import { DataFailure } from '@/components/data-state';
@@ -194,25 +194,25 @@ export function ActionDetailBody({
         <p className="small mb-0">{nextStepGuidance(r, viewer, status)}</p>
       </section>
       {panel !== null ? (
-        <Card title="Decide" icon="bi bi-check2-square" variant="outline" theme="primary">
+        <AppCard title="Decide" icon="bi bi-check2-square" variant="outline" theme="primary">
           {panel}
-        </Card>
+        </AppCard>
       ) : null}
-      <Card title="Request" icon="bi bi-card-text" variant="outline" theme="secondary">
+      <AppCard title="Request" icon="bi bi-card-text" variant="outline" theme="secondary">
         <Facts detail={detail} />
-      </Card>
-      <Card title="Checks" icon="bi bi-list-check" variant="outline" theme="secondary">
+      </AppCard>
+      <AppCard title="Checks" icon="bi bi-list-check" variant="outline" theme="secondary">
         <p className="small fw-semibold mb-1">At proposal</p>
         <ChecksList checks={r.policy_checks} empty="No policy checks were recorded." />
         <p className="small fw-semibold mb-1 mt-3">Before the run</p>
         <ChecksList checks={r.pre_checks} empty="No pre-run checks yet: they run when the request is run." />
-      </Card>
-      <Card title="Result" icon="bi bi-clipboard-check" variant="outline" theme="secondary">
+      </AppCard>
+      <AppCard title="Result" icon="bi bi-clipboard-check" variant="outline" theme="secondary">
         <Result detail={detail} />
-      </Card>
-      <Card title="History" icon="bi bi-clock-history" variant="outline" theme="secondary">
+      </AppCard>
+      <AppCard title="History" icon="bi bi-clock-history" variant="outline" theme="secondary">
         <History detail={detail} />
-      </Card>
+      </AppCard>
     </>
   );
 }

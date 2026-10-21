@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Card } from '@adminlte/react';
+import { AppCard } from '@/components/app-card';
 
 import type { FetchState } from '@/lib/api-response';
 import type {
@@ -87,7 +87,7 @@ function Body({ state }: { state: IncidentsState }) {
 export function OverviewIncidentsCard({ state }: { state: IncidentsState }) {
   return (
     <section aria-label="Active incidents">
-      <Card
+      <AppCard
         className="operational-card operational-card--primary"
         title="Active incidents"
         icon="bi bi-exclamation-triangle"
@@ -96,7 +96,7 @@ export function OverviewIncidentsCard({ state }: { state: IncidentsState }) {
         tools={<OpenLink />}
       >
         <Body state={state} />
-      </Card>
+      </AppCard>
     </section>
   );
 }

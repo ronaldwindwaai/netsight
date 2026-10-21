@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Card } from '@adminlte/react';
+import { AppCard } from '@/components/app-card';
 import { AppContent } from '@/components/app-content';
 
 import { DataFailure, FreshnessNotice } from '@/components/data-state';
@@ -131,7 +131,7 @@ export default async function OverviewPage() {
 
       <div className="row g-3 mb-3">
         <div className="col-xl-8 order-2 order-xl-1">
-          <Card
+          <AppCard
             className="operational-card operational-card--primary"
             title="Live network map"
             icon="bi bi-diagram-3"
@@ -148,7 +148,7 @@ export default async function OverviewPage() {
               title="Topology is not yet connected"
               detail="Connect and reconcile a topology source before Netsight can draw network relationships."
             />
-          </Card>
+          </AppCard>
         </div>
         <div className="col-xl-4 order-1 order-xl-2">
           <OverviewIncidentsCard state={incidents} />

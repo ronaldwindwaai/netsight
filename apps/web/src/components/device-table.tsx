@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Card } from '@adminlte/react';
+import { AppCard } from '@/components/app-card';
 import type { ReactNode } from 'react';
 
 import { EmptyState } from '@/components/data-state';
@@ -219,7 +219,7 @@ export function DeviceTable({ devices, total }: { devices: Device[]; total: numb
   const filtering = query.trim().length > 0 || status !== 'all';
 
   return (
-    <Card
+    <AppCard
       title="Canonical devices"
       icon="bi bi-hdd-network"
       variant="outline"
@@ -279,6 +279,6 @@ export function DeviceTable({ devices, total }: { devices: Device[]; total: numb
           sort={sort}
         />
       )}
-    </Card>
+    </AppCard>
   );
 }
