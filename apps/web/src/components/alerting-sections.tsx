@@ -12,7 +12,7 @@ import type {
   AlertRuleListResponse,
   MaintenanceWindowListResponse,
 } from '@/lib/api-contracts-alert-rule-api';
-import { alertingPageHrefs, windowCounts } from '@/lib/alerting-view';
+import { alertingPageHrefs, storeWriteBlock, windowCounts } from '@/lib/alerting-view';
 import type { AlertingOffsets } from '@/lib/alerting-view';
 import { formatUtcTimestamp } from '@/lib/format-time';
 import type { Viewer } from '@/lib/incident-actions';
@@ -151,7 +151,10 @@ export function AlertRulesCard(props: {
       bodyClass="p-0"
     >
       <div className="p-3 border-bottom">
-        <NewRuleButton viewer={props.viewer} />
+        <NewRuleButton
+          viewer={props.viewer}
+          unavailableReason={storeWriteBlock(props.state, 'alert rule store')}
+        />
       </div>
       <RulesBody
         state={props.state}
@@ -180,7 +183,10 @@ export function MaintenanceWindowsCard(props: {
       bodyClass="p-0"
     >
       <div className="p-3 border-bottom">
-        <NewWindowButton viewer={props.viewer} />
+        <NewWindowButton
+          viewer={props.viewer}
+          unavailableReason={storeWriteBlock(props.state, 'maintenance window store')}
+        />
       </div>
       <WindowsBody
         state={props.state}
