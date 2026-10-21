@@ -4,6 +4,8 @@ import { AppContent } from '@/components/app-content';
 
 import { DataFailure, FreshnessNotice } from '@/components/data-state';
 import { OverviewKpiLink } from '@/components/overview-kpi-link';
+import { OverviewRefresh } from '@/components/overview-refresh';
+import { OverviewStatusStrip } from '@/components/overview-status-strip';
 import { OverviewIncidentsCard } from '@/components/overview-incidents-card';
 import { OverviewInternetKpi } from '@/components/overview-internet-kpi';
 import { OverviewApplicationMix, OverviewTopDestinations } from '@/components/overview-traffic-cards';
@@ -61,6 +63,7 @@ function fetchIncidents(permissions: readonly string[] | null) {
 }
 
 export default async function OverviewPage() {
+  const updatedAt = new Date().toISOString();
   const [state, internet, session] = await Promise.all([
     apiGet('/api/v1/overview', parseOverviewResponse),
     apiGet('/api/v1/internet', parseInternetResponse),
@@ -103,13 +106,16 @@ export default async function OverviewPage() {
             Live operational evidence where sources are connected; unknown states stay visible.
           </p>
         </div>
-        <span className="source-provenance">
-          <span
-            className={`source-provenance__dot ${provenance.tone}`}
-            aria-hidden="true"
-          />
-          {provenance.label}
-        </span>
+        <div className="d-flex flex-wrap align-items-center gap-3">
+          <OverviewRefresh updatedAt={updatedAt} />
+          <span className="source-provenance">
+            <span
+              className={`source-provenance__dot ${provenance.tone}`}
+              aria-hidden="true"
+            />
+            {provenance.label}
+          </span>
+        </div>
       </div>
 
       {state.kind !== 'ok' ? <DataFailure state={state} /> : null}
@@ -141,6 +147,8 @@ export default async function OverviewPage() {
           {...usersTile(usersAccess === 'per-person' ? 'per-person' : users)}
         />
       </section>
+
+      <OverviewStatusStrip summary={overview ? overview.devices : null} />
 
       <div className="row g-3 mb-3">
         <div className="col-xl-8 order-2 order-xl-1">

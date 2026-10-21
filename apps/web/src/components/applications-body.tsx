@@ -1,6 +1,7 @@
 import Link from 'next/link';
 
 import { CohortNotice } from '@/components/cohort-notice';
+import { ExportCsvButton } from '@/components/export-csv-button';
 import { FreshnessNotice } from '@/components/data-state';
 import { StateSurface } from '@/components/state-surface';
 import { StatusWord } from '@/components/traffic-status';
@@ -10,6 +11,7 @@ import type {
   CohortStatus,
   TrafficApplicationsResponse,
 } from '@/lib/api-contracts-traffic-explorer';
+import { APPLICATION_CSV_HEADERS, applicationCsvRows } from '@/lib/traffic-csv';
 import type { FetchState } from '@/lib/api-response';
 import type { TrafficWindow } from '@/lib/traffic-view';
 import { formatBytes, formatShare } from '@/lib/format-bytes';
@@ -143,6 +145,13 @@ export function ApplicationsBody({
                 aria-label="Applications"
                 className="card card-outline card-primary operational-card"
               >
+                <div className="d-flex justify-content-end p-2 border-bottom">
+                  <ExportCsvButton
+                    headers={APPLICATION_CSV_HEADERS}
+                    label="traffic-applications"
+                    rows={applicationCsvRows(data.items)}
+                  />
+                </div>
                 <div className="table-responsive">
                   <table className="table table-sm table-striped table-hover mb-0">
                     <caption className="visually-hidden">

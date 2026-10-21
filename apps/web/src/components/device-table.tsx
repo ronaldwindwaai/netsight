@@ -7,6 +7,7 @@ import type { ReactNode } from 'react';
 
 import { EmptyState } from '@/components/data-state';
 import { ExportCsvButton } from '@/components/export-csv-button';
+import { RelativeTime } from '@/components/relative-time';
 import { useListUrlState } from '@/components/use-list-url-state';
 import { FreshnessBadge, StatusBadge } from '@/components/status-badge';
 import { DEVICE_STATUSES } from '@/lib/api-contracts';
@@ -16,18 +17,6 @@ import { countByStatus, pageScopeNote, sortDevices } from '@/lib/device-view';
 import type { DeviceSortKey, SortState } from '@/lib/device-view';
 import { toggleSort } from '@/lib/list-url-state';
 import type { ListSpec } from '@/lib/list-url-state';
-
-function observedAt(value: string | null): string {
-  if (!value) return 'Not tracked yet';
-  const date = new Date(value);
-  return Number.isNaN(date.valueOf())
-    ? 'Unknown'
-    : `${new Intl.DateTimeFormat('en-GB', {
-        dateStyle: 'medium',
-        timeStyle: 'short',
-        timeZone: 'UTC',
-      }).format(date)} UTC`;
-}
 
 interface DeviceColumn {
   key: string;
@@ -114,7 +103,11 @@ const COLUMNS: DeviceColumn[] = [
       <div>
         <FreshnessBadge state={device.freshness.state} />
         <span className="d-block small text-body-secondary mt-1">
-          {observedAt(device.freshness.observed_at)}
+          {device.freshness.observed_at ? (
+            <RelativeTime value={device.freshness.observed_at} />
+          ) : (
+            'Not tracked yet'
+          )}
         </span>
       </div>
     ),

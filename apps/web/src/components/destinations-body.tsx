@@ -1,6 +1,7 @@
 import Link from 'next/link';
 
 import { CohortNotice } from '@/components/cohort-notice';
+import { ExportCsvButton } from '@/components/export-csv-button';
 import { FreshnessNotice } from '@/components/data-state';
 import { StateSurface } from '@/components/state-surface';
 import { StatusWord } from '@/components/traffic-status';
@@ -10,6 +11,7 @@ import type {
   DestinationRow,
   TrafficDestinationsResponse,
 } from '@/lib/api-contracts-traffic-explorer';
+import { DESTINATION_CSV_HEADERS, destinationCsvRows } from '@/lib/traffic-csv';
 import type { FetchState } from '@/lib/api-response';
 import type { FilterValues, TrafficWindow } from '@/lib/traffic-view';
 import { formatBytes, formatShare } from '@/lib/format-bytes';
@@ -180,6 +182,13 @@ export function DestinationsBody({
                 aria-label="Destinations"
                 className="card card-outline card-primary operational-card"
               >
+                <div className="d-flex justify-content-end p-2 border-bottom">
+                  <ExportCsvButton
+                    headers={DESTINATION_CSV_HEADERS}
+                    label="traffic-destinations"
+                    rows={destinationCsvRows(data.items)}
+                  />
+                </div>
                 <div className="table-responsive">
                   <table className="table table-sm table-striped table-hover mb-0">
                     <caption className="visually-hidden">
