@@ -1,7 +1,7 @@
 import '@/test/dom-setup';
 
 import assert from 'node:assert/strict';
-import { afterEach, describe, it } from 'node:test';
+import { afterEach, beforeEach, describe, it } from 'node:test';
 
 import { DashboardLayout } from '@adminlte/react';
 import { cleanup, render } from '@testing-library/react';
@@ -11,7 +11,27 @@ import { PageFinder } from '@/components/page-finder';
 import { menuItemsFor } from '@/lib/menu';
 import { pageTargetsFrom } from '@/lib/page-finder';
 
-afterEach(() => cleanup());
+// jsdom has no matchMedia; the shell reads prefers-reduced-motion and the colour scheme through it.
+beforeEach(() => {
+  Object.defineProperty(window, 'matchMedia', {
+    configurable: true,
+    value: (query: string) => ({
+      matches: false,
+      media: query,
+      addEventListener() {},
+      removeEventListener() {},
+      addListener() {},
+      removeListener() {},
+      dispatchEvent: () => false,
+      onchange: null,
+    }),
+  });
+});
+
+afterEach(() => {
+  cleanup();
+  document.querySelectorAll('.skip-links, #live-region').forEach((node) => node.remove());
+});
 
 function renderShell() {
   const items = menuItemsFor([]);
