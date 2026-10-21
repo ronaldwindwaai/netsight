@@ -9,7 +9,7 @@ import { apiGet } from '@/lib/api';
 import { parseOverviewResponse, parseSessionInfo } from '@/lib/api-contracts';
 import { parseInternetResponse } from '@/lib/api-contracts-internet';
 import { parseIncidentListResponse, parseIncidentSummaryListResponse } from '@/lib/api-contracts-incident-api';
-import { incidentReadMode } from '@/lib/incident-view';
+import { overviewIncidentRequest } from '@/lib/overview-incidents';
 import {
   parseTrafficApplicationsResponse,
   parseTrafficDestinationsResponse,
@@ -39,11 +39,12 @@ function UnavailableSurface({
   );
 }
 
-function fetchIncidents(mode: ReturnType<typeof incidentReadMode>) {
-  if (mode === 'none') return Promise.resolve(null);
-  return mode === 'summary'
-    ? apiGet('/api/v1/incidents/summary?limit=50', parseIncidentSummaryListResponse)
-    : apiGet('/api/v1/incidents?limit=50', parseIncidentListResponse);
+function fetchIncidents(permissions: readonly string[] | null) {
+  const request = overviewIncidentRequest(permissions);
+  if (request === null) return Promise.resolve(null);
+  return request.kind === 'summary'
+    ? apiGet(request.path, parseIncidentSummaryListResponse)
+    : apiGet(request.path, parseIncidentListResponse);
 }
 
 export default async function OverviewPage() {
@@ -57,9 +58,8 @@ export default async function OverviewPage() {
   // refusal also renders as Restricted). The API enforces the same rules on its own.
   const viewer = viewerFromSession(session.kind === 'ok' ? session.data : null);
   const sessionUnread = session.kind !== 'ok';
-  const incidentMode = incidentReadMode(session.kind === 'ok' ? session.data.permissions : null);
   const [incidents, destinations, applications] = await Promise.all([
-    fetchIncidents(incidentMode),
+    fetchIncidents(session.kind === 'ok' ? session.data.permissions : null),
     sessionUnread || canReadTraffic(viewer)
       ? apiGet('/api/v1/traffic/destinations?preset=24h&limit=5', parseTrafficDestinationsResponse)
       : null,

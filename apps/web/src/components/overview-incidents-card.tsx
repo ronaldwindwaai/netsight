@@ -6,13 +6,19 @@ import type {
   IncidentListResponse,
   IncidentSummaryListResponse,
 } from '@/lib/api-contracts-incident-api';
+import type { IncidentState } from '@/lib/api-contracts-incident';
 import { SEVERITY_DISPLAY_ORDER, incidentCounts } from '@/lib/incident-view';
 
 import { StateSurface, StoreStateSurface } from './state-surface';
 
 type IncidentsState = FetchState<IncidentListResponse | IncidentSummaryListResponse> | null;
 
-const ACTIVE_STATES = new Set(['open', 'acknowledged', 'investigating', 'mitigated']);
+const ACTIVE_STATES: ReadonlySet<IncidentState> = new Set<IncidentState>([
+  'open',
+  'acknowledged',
+  'investigating',
+  'mitigated',
+]);
 
 function OpenLink() {
   return (
@@ -60,13 +66,15 @@ function Body({ state }: { state: IncidentsState }) {
   const severities = SEVERITY_DISPLAY_ORDER.filter((severity) => counts.bySeverity[severity] > 0);
   return (
     <div>
-      <p className="h3 mb-1">{active.length} active</p>
+      <p className="h3 mb-1">
+        {active.length}
+        {response.next_offset === null ? '' : '+'} active listed
+      </p>
       <p className="small text-body-secondary mb-2">
         of the {response.incidents.length} listed
         {response.next_offset === null
-          ? ''
-          : '; more incidents exist beyond this page, so this is not a total'}
-        .
+          ? '.'
+          : '; more incidents exist beyond this page, so this is not a total.'}
       </p>
       {severities.length > 0 ? (
         <p className="small mb-0">{severities.map((s) => `${counts.bySeverity[s]} ${s}`).join(' · ')}</p>

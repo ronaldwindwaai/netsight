@@ -37,7 +37,7 @@ describe('the overview incidents card', () => {
   it('counts active incidents among the listed ones and labels it so', () => {
     const incidents = [row('critical', 'open', 1), row('high', 'investigating', 2), row('low', 'resolved', 3), row('low', 'closed', 4)];
     render(<OverviewIncidentsCard state={okState(list({ incidents }))} />);
-    assert.match(card().textContent ?? '', /2 active/);
+    assert.match(card().textContent ?? '', /2 active listed/);
     assert.match(card().textContent ?? '', /of the 4 listed/);
     assert.match(card().textContent ?? '', /1 critical/);
     assert.ok(screen.getByRole('link', { name: /open incidents/i }));
@@ -45,6 +45,7 @@ describe('the overview incidents card', () => {
 
   it('says more exist beyond the listed page instead of presenting a total', () => {
     render(<OverviewIncidentsCard state={okState(list({ incidents: [row('low', 'open', 1)], next_offset: 50 }))} />);
+    assert.match(card().textContent ?? '', /1\+ active listed/);
     assert.match(card().textContent ?? '', /more incidents exist beyond/i);
   });
 
@@ -57,7 +58,7 @@ describe('the overview incidents card', () => {
   it('shows not-connected and unknown store states explicitly, with no count', () => {
     render(<OverviewIncidentsCard state={okState(list({ state: 'not-connected' }))} />);
     assert.match(card().textContent ?? '', /not connected/i);
-    assert.doesNotMatch(card().textContent ?? '', /\d+ active/);
+    assert.doesNotMatch(card().textContent ?? '', /\d+\+? active listed/);
     cleanup();
     render(<OverviewIncidentsCard state={okState(list({ state: 'unknown' }))} />);
     assert.match(card().textContent ?? '', /unknown/i);
