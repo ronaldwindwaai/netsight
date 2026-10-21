@@ -18,6 +18,7 @@ function Harness() {
     <div>
       <input aria-label="search" onChange={(e) => update({ q: e.target.value }, 'replace')} value={state.q} />
       <button onClick={() => update({ filters: { status: 'bad' } })} type="button">bad</button>
+      <button onClick={() => update({ sort: { key: 'name', direction: 'asc' } })} type="button">sort</button>
       <button onClick={clear} type="button">clear</button>
       <output>{`${state.filters.status ?? 'all'}|${state.sort?.key ?? '-'}`}</output>
     </div>
@@ -89,5 +90,41 @@ describe('useListUrlState', () => {
     window.history.replaceState(null, '', `/?q=${'x'.repeat(300)}`);
     render(<Harness />);
     assert.equal(input().value.length, 128);
+  });
+
+  describe('paging', () => {
+    const params = () => new URLSearchParams(window.location.search);
+
+    it('a search resets to page 1 through the router and keeps page_size, filters and sort', async () => {
+      window.history.replaceState(null, '', '/?page=3&page_size=100&status=bad&sort=name');
+      render(<Harness />);
+      await userEvent.type(input(), 'ab');
+      await settle();
+      assert.equal(params().get('page'), null);
+      assert.equal(params().get('page_size'), '100');
+      assert.equal(params().get('q'), 'ab');
+      assert.equal(params().get('status'), 'bad');
+      assert.equal(params().get('sort'), 'name');
+    });
+
+    it('a filter change and Clear filters reset to page 1', async () => {
+      window.history.replaceState(null, '', '/?page=2&page_size=25');
+      render(<Harness />);
+      await userEvent.click(screen.getByRole('button', { name: 'bad' }));
+      assert.equal(params().get('page'), null);
+      assert.equal(params().get('page_size'), '25');
+      window.history.replaceState(null, '', '/?page=4&q=x&status=bad');
+      await userEvent.click(screen.getByRole('button', { name: 'clear' }));
+      assert.equal(params().get('page'), null);
+      assert.equal(params().get('status'), null);
+    });
+
+    it('sorting keeps the current page', async () => {
+      window.history.replaceState(null, '', '/?page=2');
+      render(<Harness />);
+      await userEvent.click(screen.getByRole('button', { name: 'sort' }));
+      assert.equal(params().get('page'), '2');
+      assert.equal(params().get('sort'), 'name');
+    });
   });
 });

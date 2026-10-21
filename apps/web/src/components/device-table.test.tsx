@@ -149,15 +149,16 @@ describe('DeviceTable', () => {
     assert.equal(screen.getByRole('columnheader', { name: /Device/ }).getAttribute('aria-sort'), 'descending');
   });
 
-  it('writes filter changes to the URL, keeping unrelated parameters', () => {
-    window.history.replaceState(null, '', '/?page=2');
+  it('writes filter changes to the URL, keeping page_size and returning to page 1', () => {
+    window.history.replaceState(null, '', '/?page=2&page_size=25');
     render(<DeviceTable devices={ROWS} total={3} />);
     fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'alp ha' } });
     fireEvent.click(screen.getByRole('button', { name: /critical \(2\)/ }));
     const params = new URLSearchParams(window.location.search);
     assert.equal(params.get('q'), 'alp ha');
     assert.equal(params.get('status'), 'critical');
-    assert.equal(params.get('page'), '2');
+    assert.equal(params.get('page'), null);
+    assert.equal(params.get('page_size'), '25');
   });
 
   it('filters to zero results, then Clear filters resets the URL and restores the rows', async () => {
