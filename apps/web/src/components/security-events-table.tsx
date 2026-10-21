@@ -28,6 +28,30 @@ function formatTime(value: string): string {
 }
 
 /**
+ * The Flow Explorer address for one event's source address around the event time, or null when it
+ * may not be offered.
+ */
+export type FlowsHref = (sourceIp: string, observedAt: string) => string | null;
+
+function Address({
+  value,
+  observedAt,
+  flowsHref,
+}: {
+  value: string;
+  observedAt: string;
+  flowsHref: FlowsHref | undefined;
+}) {
+  const href = flowsHref?.(value, observedAt) ?? null;
+  if (href === null) return <>{value}</>;
+  return (
+    <Link href={href} title="Show the flows from this address in the 30 minutes either side of the event">
+      {value}
+    </Link>
+  );
+}
+
+/**
  * Security events from the connected sources.
  *
  * Signature, category and address text is source-reported, untrusted
@@ -35,19 +59,6 @@ function formatTime(value: string): string {
  * instruction. An event with no canonical device says so rather than
  * guessing from an address.
  */
-/** Address of the Flow Explorer for one source address, or null when it may not be offered. */
-export type FlowsHref = (sourceIp: string) => string | null;
-
-function Address({ value, flowsHref }: { value: string; flowsHref: FlowsHref | undefined }) {
-  const href = flowsHref?.(value) ?? null;
-  if (href === null) return <>{value}</>;
-  return (
-    <Link href={href} title="Show the flows from this address">
-      {value}
-    </Link>
-  );
-}
-
 export function SecurityEventsTable({
   events,
   flowsHref,
@@ -90,7 +101,7 @@ export function SecurityEventsTable({
                   {event.source_ip === null ? (
                     'Not reported'
                   ) : (
-                    <Address value={event.source_ip} flowsHref={flowsHref} />
+                    <Address value={event.source_ip} observedAt={event.observed_at} flowsHref={flowsHref} />
                   )}
                 </span>
                 {event.destination_ip ? (

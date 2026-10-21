@@ -1,13 +1,13 @@
 import Link from 'next/link';
 import { AppContent, Card } from '@adminlte/react';
 
-import { RelatedViews } from '@/components/related-views';
+import { ALERTS_VIEW, RelatedViews } from '@/components/related-views';
 import { SecurityBody } from '@/components/security-body';
 import { apiGet } from '@/lib/api';
 import { parseSessionInfo } from '@/lib/api-contracts';
 import type { TrafficPreset } from '@/lib/api-contracts';
 import { parseSecurityEventsResponse } from '@/lib/api-contracts-security';
-import { flowsDrillHref, resolveTrafficWindow } from '@/lib/traffic-view';
+import { aroundInstantFlowsHref } from '@/lib/traffic-view';
 import { canReadTrafficDetail, viewerFromSession } from '@/lib/viewer';
 
 const PRESETS: ReadonlyArray<{ id: TrafficPreset; label: string }> = [
@@ -19,6 +19,8 @@ const PRESETS: ReadonlyArray<{ id: TrafficPreset; label: string }> = [
 
 const PRESET_IDS = PRESETS.map((preset) => preset.id);
 const EVENT_LIMIT = 100;
+/** Flows are shown this many minutes either side of an event, not for the page's window. */
+const EVENT_FLOW_MINUTES = 30;
 
 function requestedPreset(raw: string | string[] | undefined): TrafficPreset {
   const value = Array.isArray(raw) ? raw[0] : raw;
@@ -54,7 +56,6 @@ export default async function SecurityPage({
   const sessionState = await apiGet('/api/v1/auth/session', parseSessionInfo);
   const viewer = viewerFromSession(sessionState.kind === 'ok' ? sessionState.data : null);
   const detail = canReadTrafficDetail(viewer);
-  const flowsWindow = resolveTrafficWindow({ preset }, new Date(), 31);
   const state = await apiGet(
     `/api/v1/security/events?preset=${preset}&limit=${EVENT_LIMIT}`,
     parseSecurityEventsResponse,
@@ -85,14 +86,16 @@ export default async function SecurityPage({
           state={state}
           limit={EVENT_LIMIT}
           flowsHref={
-            detail ? (ip) => flowsDrillHref(flowsWindow, { source_ip: ip }, { detail }) : undefined
+            detail
+              ? (ip, at) => aroundInstantFlowsHref(at, EVENT_FLOW_MINUTES, { source_ip: ip }, { detail })
+              : undefined
           }
         />
       </Card>
 
       <RelatedViews
         views={[
-          { label: 'Alerts', href: '/alerts', hint: 'Alerts raised on the monitoring sources' },
+          ALERTS_VIEW,
           { label: 'Incidents', href: '/incidents', hint: 'Correlated incidents and their timelines' },
           { label: 'Flow Explorer', href: `/traffic/flows?preset=${preset}`, hint: 'Flow evidence for the same window' },
           { label: 'Traffic anomalies', href: `/traffic/anomalies?preset=${preset}`, hint: 'Hours that differ from their baseline' },

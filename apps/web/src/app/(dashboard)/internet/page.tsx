@@ -1,6 +1,6 @@
 import { AppContent } from '@adminlte/react';
 
-import { RelatedViews } from '@/components/related-views';
+import { ALERTS_VIEW, RelatedViews } from '@/components/related-views';
 import { InternetSlaPanel } from '@/components/internet-sla-panel';
 import { InternetStatusBody } from '@/components/internet-status-body';
 import { apiGet } from '@/lib/api';
@@ -50,7 +50,7 @@ export default async function InternetPage({
       <RelatedViews
         views={[
           { label: 'Traffic overview', href: '/traffic', hint: 'Top destinations and applications' },
-          { label: 'Alerts', href: '/alerts', hint: 'Alerts raised on the monitoring sources' },
+          ALERTS_VIEW,
           { label: 'Diagnostics', href: '/diagnostics', hint: 'Run read-only checks to explain a problem' },
         ]}
       />

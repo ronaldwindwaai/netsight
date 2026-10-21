@@ -7,6 +7,13 @@ export interface RelatedView {
   hint: string;
 }
 
+/** Shared by the WAN and security pages, which both lead on to the raised alerts. */
+export const ALERTS_VIEW: RelatedView = {
+  label: 'Alerts',
+  href: '/alerts',
+  hint: 'Alerts raised on the monitoring sources',
+};
+
 /**
  * Cross-links from a dashboard to the views that answer the next question, so no surface is a
  * dead end. Each page access is still checked by the API; a role without access sees that view's

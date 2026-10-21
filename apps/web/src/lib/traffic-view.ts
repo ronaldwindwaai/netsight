@@ -259,8 +259,11 @@ export function flowsDrillHref(
   return trafficHref('flows', window, parsed.values);
 }
 
-function canonicalInstant(value: string): string {
-  return `${value.slice(0, 19)}Z`;
+/** A valid instant as `YYYY-MM-DDTHH:MM:SSZ` in UTC (offsets are honoured), else null. */
+function canonicalInstant(value: string): string | null {
+  const moment = new Date(value);
+  if (Number.isNaN(moment.getTime())) return null;
+  return `${moment.toISOString().slice(0, 19)}Z`;
 }
 
 /** The Flow Explorer for exactly one anomalous hour (UTC), optionally narrowed by a filter. */
@@ -272,9 +275,30 @@ export function hourFlowsHref(
 ): string | null {
   const parsed = parseExplorerFilters(filters, options);
   if (parsed.refused.length > 0) return null;
-  const range = new URLSearchParams({ from: canonicalInstant(start), to: canonicalInstant(end) });
+  const from = canonicalInstant(start);
+  const to = canonicalInstant(end);
+  if (from === null || to === null || from >= to) return null;
+  const range = new URLSearchParams({ from, to });
   for (const [name, value] of Object.entries(parsed.values)) range.set(name, value);
   return `/traffic/flows?${range.toString()}`;
+}
+
+/** The Flow Explorer for the minutes either side of one instant (an event time), or null. */
+export function aroundInstantFlowsHref(
+  instant: string,
+  minutes: number,
+  filters: FilterValues,
+  options: { detail: boolean },
+): string | null {
+  const centre = new Date(instant).getTime();
+  if (Number.isNaN(centre)) return null;
+  const spread = minutes * 60_000;
+  return hourFlowsHref(
+    new Date(centre - spread).toISOString(),
+    new Date(centre + spread).toISOString(),
+    filters,
+    options,
+  );
 }
 
 export type TrafficSection = 'overview' | 'flows' | 'applications' | 'destinations' | 'anomalies';

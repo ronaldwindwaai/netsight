@@ -80,7 +80,11 @@ function Context({ context, direction }: { context: AnomalyContext; direction: A
 }
 
 function AnomalyFlowsLink({ item, detail }: { item: Anomaly; detail: boolean }) {
-  const filters = item.subject.kind === 'application' ? { application: item.subject.label ?? '' } : {};
+  const forApplication = item.subject.kind === 'application';
+  // An application anomaly without a name cannot be narrowed, so it offers no link rather than
+  // a link that opens every flow in the hour.
+  if (forApplication && item.subject.label === null) return null;
+  const filters = forApplication ? { application: item.subject.label ?? '' } : {};
   const href = hourFlowsHref(item.bucket_start, item.bucket_end, filters, { detail });
   if (href === null) return null;
   return (
@@ -135,12 +139,12 @@ function FirstSeenSubject({
   window: TrafficWindow | undefined;
   detail: boolean;
 }) {
-  const filter =
-    row.kind === 'first-seen-asn'
-      ? { asn: String(row.asn ?? '') }
-      : { destination_ip: row.address ?? '' };
-  const href = window === undefined ? null : flowsDrillHref(window, filter, { detail });
-  const label = row.kind === 'first-seen-asn' ? `AS${row.asn}` : (row.address ?? '');
+  const isAsn = row.kind === 'first-seen-asn';
+  const value = isAsn ? row.asn : row.address;
+  const label = isAsn ? `AS${row.asn}` : (row.address ?? 'Address not reported');
+  const filter = isAsn ? { asn: String(row.asn) } : { destination_ip: row.address ?? '' };
+  const href =
+    window === undefined || value === null ? null : flowsDrillHref(window, filter, { detail });
   return href === null ? (
     <span className="fw-semibold">{label}</span>
   ) : (

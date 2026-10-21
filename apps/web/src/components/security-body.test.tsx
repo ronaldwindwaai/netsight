@@ -46,8 +46,15 @@ describe('the security events body', () => {
   it('states the window and that counts cover only the listed events', () => {
     render(<SecurityBody state={ok(response())} limit={100} />);
     assert.match(text(), /Window .* to .* \(UTC\)/);
-    assert.match(text(), /1 events listed\./);
-    assert.match(text(), /cover exactly the events listed/);
+    assert.match(text(), /1 events listed/);
+    assert.match(text(), /cover only the events listed/);
+  });
+
+  it('does not claim the source has no more events when fewer than the limit came back', () => {
+    render(<SecurityBody state={ok(response())} limit={100} />);
+    assert.match(text(), /fewer than the read limit of 100/);
+    assert.doesNotMatch(text(), /source reported no more/);
+    assert.doesNotMatch(text(), /exactly the events listed/);
   });
 
   it('warns that counts are not totals when the list hit the read limit', () => {
@@ -77,12 +84,12 @@ describe('the security events body', () => {
       <SecurityBody
         state={ok(response())}
         limit={100}
-        flowsHref={(ip) => `/traffic/flows?preset=24h&source_ip=${ip}`}
+        flowsHref={(ip, at) => `/traffic/flows?at=${at}&source_ip=${ip}`}
       />,
     );
     assert.equal(
       screen.getByRole('link', { name: '10.0.0.10' }).getAttribute('href'),
-      '/traffic/flows?preset=24h&source_ip=10.0.0.10',
+      '/traffic/flows?at=2026-10-11T11:00:00Z&source_ip=10.0.0.10',
     );
   });
 

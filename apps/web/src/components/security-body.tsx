@@ -32,18 +32,18 @@ function SeverityStrip({ response }: { response: SecurityEventsResponse }) {
 /** States the exact UTC window and whether the list is cut off, so counts are never read as totals. */
 function WindowSummary({ response, limit }: { response: SecurityEventsResponse; limit: number }) {
   const { from, to } = response.time_range;
-  const capped = response.events.length >= limit;
+  const atLimit = response.events.length >= limit;
   return (
     <div className="small text-body-secondary mb-2">
       <p className="mb-1">
         Window {formatUtcTimestamp(from)} to {formatUtcTimestamp(to)} (UTC).{' '}
         {response.events.length.toLocaleString('en-GB')} events listed
-        {capped ? `, the most the page reads (${limit}).` : '.'}
+        {atLimit ? `, as many as the page reads (${limit}).` : `, fewer than the read limit of ${limit}.`}
       </p>
       <p className="mb-0">
-        {capped
+        {atLimit
           ? 'The window may hold more events than are listed, so the severity counts are not totals for the window.'
-          : 'Severity counts cover exactly the events listed below; the source reported no more in this window.'}
+          : 'Severity counts cover only the events listed below. Fewer than the read limit were returned, which does not by itself prove the source holds no others.'}
       </p>
     </div>
   );

@@ -38,7 +38,7 @@ function volumeText(item: UserTrafficItem, topN: number): string {
 /** An attributed address, linked to its flows in the evidence window when the viewer may filter by address. */
 function AddressCell({ address, window, inspectFlows }: { address: string; window: { from: string; to: string }; inspectFlows: boolean }) {
   const href = inspectFlows
-    ? hourFlowsHref(window.from, window.to, { source_ip: address }, { detail: true })
+    ? hourFlowsHref(window.from, window.to, { source_ip: address }, { detail: inspectFlows })
     : null;
   if (href === null) return <>{address}</>;
   return (
