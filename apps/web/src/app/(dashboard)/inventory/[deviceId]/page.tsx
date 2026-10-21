@@ -28,6 +28,7 @@ export default async function InventoryItemPage({ params }: { params: Promise<{ 
         {canReadInventorySummary(viewer) ? (
           <InventoryDetailBody
             state={{ kind: 'forbidden', code: 'FORBIDDEN', message: '', correlationId: 'n/a', status: 403 }}
+            permissions={viewer?.permissions ?? null}
           />
         ) : (
           <Step8AccessDenied surface="Inventory" permission="inventory:read-summary" />
@@ -38,7 +39,7 @@ export default async function InventoryItemPage({ params }: { params: Promise<{ 
   const detail = await apiGet(`/api/v1/inventory/${encodeURIComponent(deviceId)}`, parseInventoryDetail);
   return (
     <AppContent title="Asset" breadcrumbs={crumbs}>
-      <InventoryDetailBody state={detail} />
+      <InventoryDetailBody state={detail} permissions={viewer?.permissions ?? null} />
     </AppContent>
   );
 }

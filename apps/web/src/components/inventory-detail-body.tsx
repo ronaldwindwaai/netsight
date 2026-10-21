@@ -7,12 +7,15 @@ import Link from 'next/link';
 import { Card } from '@adminlte/react';
 
 import { DataFailure } from '@/components/data-state';
+import { LinkList } from '@/components/device-related-panels';
 import { ClassBadge, ProvenanceBadge, ReconcileBadge } from '@/components/inventory-parts';
 import { SourceLine, SourceNotices } from '@/components/source-notices';
 import { StateSurface, StoreStateSurface } from '@/components/state-surface';
 import { StatusBadge } from '@/components/status-badge';
 import type { InventoryDetail, InventoryField } from '@/lib/api-contracts-inventory';
 import type { FetchState } from '@/lib/api-response';
+import { assetLinks } from '@/lib/device-links';
+import type { Permissions } from '@/lib/device-links';
 import { formatUtcTimestamp } from '@/lib/format-time';
 import { NOT_REPORTED, classBasisText, classLabel, sourceLabel } from '@/lib/inventory-view';
 
@@ -66,7 +69,13 @@ function FieldTable({ fields }: { fields: Record<string, InventoryField> }) {
   );
 }
 
-export function InventoryDetailBody({ state }: { state: FetchState<InventoryDetail> }) {
+export function InventoryDetailBody({
+  state,
+  permissions,
+}: {
+  state: FetchState<InventoryDetail>;
+  permissions: Permissions;
+}) {
   if (state.kind !== 'ok') {
     if (state.kind === 'forbidden') {
       return (
@@ -160,6 +169,11 @@ export function InventoryDetailBody({ state }: { state: FetchState<InventoryDeta
           </Card>
         </div>
       </div>
+      <Card title="Related views" icon="bi bi-link-45deg" variant="outline" theme="secondary">
+        <div className="small">
+          <LinkList links={assetLinks({ id: item.id, ip: item.ip_address.value }, permissions)} />
+        </div>
+      </Card>
       <p className="mt-3">
         <Link href="/inventory">
           <i className="bi bi-arrow-left me-1" aria-hidden="true" />

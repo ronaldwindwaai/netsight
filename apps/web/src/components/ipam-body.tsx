@@ -167,14 +167,14 @@ export function IpamPrefixesCard({ state, query }: { state: FetchState<IpamPrefi
             <>
               <SourceNotices sources={data.sources} />
               <Card variant="outline" theme="primary" bodyClass="p-0">
-                <div className="d-flex flex-wrap gap-2 p-3 pb-0" aria-label="Address family">
-                  <Link className={`btn btn-sm ${query.family === null ? 'btn-primary' : 'btn-outline-secondary'}`} href={ipamHref(query, { family: null, prefixesPage: 1 })}>
+                <div className="d-flex flex-wrap gap-2 p-3 pb-0" role="group" aria-label="Address family">
+                  <Link aria-current={query.family === null ? 'true' : undefined} className={`btn btn-sm ${query.family === null ? 'btn-primary' : 'btn-outline-secondary'}`} href={ipamHref(query, { family: null, prefixesPage: 1 })}>
                     All
                   </Link>
-                  <Link className={`btn btn-sm ${query.family === '4' ? 'btn-primary' : 'btn-outline-secondary'}`} href={ipamHref(query, { family: '4', prefixesPage: 1 })}>
+                  <Link aria-current={query.family === '4' ? 'true' : undefined} className={`btn btn-sm ${query.family === '4' ? 'btn-primary' : 'btn-outline-secondary'}`} href={ipamHref(query, { family: '4', prefixesPage: 1 })}>
                     IPv4
                   </Link>
-                  <Link className={`btn btn-sm ${query.family === '6' ? 'btn-primary' : 'btn-outline-secondary'}`} href={ipamHref(query, { family: '6', prefixesPage: 1 })}>
+                  <Link aria-current={query.family === '6' ? 'true' : undefined} className={`btn btn-sm ${query.family === '6' ? 'btn-primary' : 'btn-outline-secondary'}`} href={ipamHref(query, { family: '6', prefixesPage: 1 })}>
                     IPv6
                   </Link>
                 </div>
@@ -279,13 +279,14 @@ export function IpamAddressesCard({ state, query }: { state: FetchState<IpamAddr
                 <i className="bi bi-info-circle me-1" aria-hidden="true" />
                 {notice.text}
               </div>
-              <div className="d-flex flex-wrap gap-2 mb-2" aria-label="Filter by activity">
-                <Link className={`btn btn-sm ${query.activity === null ? 'btn-primary' : 'btn-outline-secondary'}`} href={ipamHref(query, { activity: null, addressesPage: 1 })}>
+              <div className="d-flex flex-wrap gap-2 mb-2" role="group" aria-label="Filter by activity">
+                <Link aria-current={query.activity === null ? 'true' : undefined} className={`btn btn-sm ${query.activity === null ? 'btn-primary' : 'btn-outline-secondary'}`} href={ipamHref(query, { activity: null, addressesPage: 1 })}>
                   All
                 </Link>
                 {ACTIVITIES.map((activity) => (
                   <Link
                     key={activity}
+                    aria-current={query.activity === activity ? 'true' : undefined}
                     className={`btn btn-sm ${query.activity === activity ? 'btn-primary' : 'btn-outline-secondary'}`}
                     href={ipamHref(query, { activity, addressesPage: 1 })}
                   >

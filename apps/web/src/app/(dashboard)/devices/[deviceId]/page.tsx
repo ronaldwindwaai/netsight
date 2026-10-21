@@ -4,7 +4,7 @@ import { AppContent, Card } from '@adminlte/react';
 import { DataFailure, FreshnessNotice } from '@/components/data-state';
 import { DeviceDetailTabs } from '@/components/device-detail-tabs';
 import { apiGet } from '@/lib/api';
-import { parseDeviceDetail, parseInterfaceList } from '@/lib/api-contracts';
+import { parseDeviceDetail, parseInterfaceList, parseSessionInfo } from '@/lib/api-contracts';
 
 export default async function DeviceDetailPage({
   params,
@@ -13,13 +13,15 @@ export default async function DeviceDetailPage({
 }) {
   const { deviceId } = await params;
   const boundedDeviceId = deviceId.slice(0, 256);
-  const [state, interfaces] = await Promise.all([
+  const [state, interfaces, session] = await Promise.all([
     apiGet(`/api/v1/devices/${encodeURIComponent(boundedDeviceId)}`, parseDeviceDetail),
     apiGet(
       `/api/v1/devices/${encodeURIComponent(boundedDeviceId)}/interfaces`,
       parseInterfaceList,
     ),
+    apiGet('/api/v1/auth/session', parseSessionInfo),
   ]);
+  const permissions = session.kind === 'ok' ? session.data.permissions : null;
 
   return (
     <AppContent
@@ -51,7 +53,11 @@ export default async function DeviceDetailPage({
             variant="outline"
             theme="primary"
           >
-            <DeviceDetailTabs device={state.data.item} interfaces={interfaces} />
+            <DeviceDetailTabs
+              device={state.data.item}
+              interfaces={interfaces}
+              permissions={permissions}
+            />
           </Card>
         </>
       )}

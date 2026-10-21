@@ -9,6 +9,7 @@ import { Badge, Card } from '@adminlte/react';
 import type { ComponentProps } from 'react';
 
 import { DataFailure } from '@/components/data-state';
+import { LinkList } from '@/components/device-related-panels';
 import { StateSurface, StoreStateSurface } from '@/components/state-surface';
 import { FindingStateBadge, ProposedBadge, SeverityBadge } from '@/components/unknown-device-parts';
 import type {
@@ -19,6 +20,8 @@ import type {
   UnknownDeviceTimeline,
 } from '@/lib/api-contracts-unknown-devices';
 import type { FetchState } from '@/lib/api-response';
+import { endpointLinks } from '@/lib/device-links';
+import type { Permissions } from '@/lib/device-links';
 import { formatUtcTimestamp } from '@/lib/format-time';
 import {
   checkPresentation,
@@ -159,10 +162,12 @@ function FindingBody({
   item,
   actions,
   timeline,
+  permissions,
 }: {
   item: UnknownDeviceFinding;
   actions: React.ReactNode;
   timeline: FetchState<UnknownDeviceTimeline> | null;
+  permissions: Permissions;
 }) {
   return (
     <>
@@ -230,6 +235,10 @@ function FindingBody({
         </div>
       </div>
 
+      <Card title="Related views" icon="bi bi-link-45deg" variant="outline" theme="secondary">
+        <LinkList links={endpointLinks(item.endpoint, permissions)} />
+      </Card>
+
       {item.proposed_action !== null ? (
         <Card title="Proposed action" icon="bi bi-shield-exclamation" variant="outline" theme="warning">
           <p className="mb-1">
@@ -255,10 +264,12 @@ export function UnknownDeviceDetailBody({
   state,
   actions,
   timeline,
+  permissions,
 }: {
   state: FetchState<UnknownDeviceDetail>;
   actions: React.ReactNode;
   timeline: FetchState<UnknownDeviceTimeline> | null;
+  permissions: Permissions;
 }) {
   if (state.kind !== 'ok') {
     if (state.kind === 'forbidden') {
@@ -285,5 +296,5 @@ export function UnknownDeviceDetailBody({
   if (data.state !== 'ok' || data.item === null) {
     return <StoreStateSurface state={data.state === 'unknown' ? 'unknown' : 'not-connected'} noun="the finding" store="Finding store" />;
   }
-  return <FindingBody item={data.item} actions={actions} timeline={timeline} />;
+  return <FindingBody item={data.item} actions={actions} timeline={timeline} permissions={permissions} />;
 }
