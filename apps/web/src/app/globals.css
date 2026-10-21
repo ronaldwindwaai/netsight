@@ -374,36 +374,6 @@ body {
   text-transform: uppercase;
 }
 
-.login-sidebar__nav {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.login-sidebar__item {
-  display: flex;
-  align-items: center;
-  gap: 0.7rem;
-  padding: 0.6rem 0.75rem;
-  border-radius: 0.5rem;
-  color: #b8c7dc;
-  font-size: 0.9rem;
-  font-weight: 500;
-  text-decoration: none;
-  transition: background 150ms ease, color 150ms ease;
-}
-
-.login-sidebar__item:hover,
-.login-sidebar__item:focus-visible {
-  background: rgb(255 255 255 / 6%);
-  color: #fff;
-}
-
-.login-sidebar__item--active {
-  background: var(--netsight-signal);
-  color: #fff;
-}
-
 .login-sidebar__footer {
   display: flex;
   flex-direction: column;
@@ -644,15 +614,6 @@ body {
   .login-sidebar__brand small,
   .login-sidebar__footer {
     display: none;
-  }
-
-  .login-sidebar__nav {
-    flex-direction: row;
-  }
-
-  .login-sidebar__item {
-    padding: 0.45rem 0.6rem;
-    font-size: 0.8rem;
   }
 }
 

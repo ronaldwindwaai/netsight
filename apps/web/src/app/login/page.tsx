@@ -31,8 +31,8 @@ function LoginSidebar() {
         </span>
       </div>
       <div className="login-sidebar__footer">
-        <span>Access is enforced by the Netsight API.</span>
-        <span>Every page needs a signed-in session.</span>
+        <span>Sign in to continue.</span>
+        <span>Data access is enforced by the Netsight API.</span>
       </div>
     </aside>
   );
