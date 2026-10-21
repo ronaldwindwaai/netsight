@@ -35,6 +35,20 @@ describe('the applied-filter chips', () => {
     assert.equal(clear.getAttribute('href'), '/traffic/flows?preset=24h');
   });
 
+  it('offers a reset link for a custom window with no filters, and none for a preset', () => {
+    const custom = resolveTrafficWindow({ from: '2026-10-10T08:30', to: '2026-10-11T08:30' }, NOW, 31);
+    const first = render(<AppliedFilters window={custom} values={{}} />);
+    assert.equal(screen.getByRole('link', { name: 'Reset time range' }).getAttribute('href'), '/traffic/flows');
+    first.unmount();
+    render(<AppliedFilters window={window24h} values={{}} />);
+    assert.equal(screen.queryByRole('link', { name: 'Reset time range' }), null);
+  });
+
+  it('does not announce a chip twice: the visible text is hidden from assistive technology', () => {
+    render(<AppliedFilters window={window24h} values={{ application: 'Zoom' }} />);
+    assert.equal(screen.getByText('Application: Zoom').getAttribute('aria-hidden'), 'true');
+  });
+
   it('renders untrusted filter text as text', () => {
     render(<AppliedFilters window={window24h} values={{ application: '<img src=x onerror=alert(1)>' }} />);
     assert.equal(document.querySelector('img'), null);

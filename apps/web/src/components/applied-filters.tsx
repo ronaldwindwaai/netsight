@@ -40,7 +40,7 @@ export function AppliedFilters({
           return (
             <li className="list-inline-item m-0" key={name}>
               <span className="badge text-bg-primary d-inline-flex align-items-center gap-1">
-                <span>{text}</span>
+                <span aria-hidden="true">{text}</span>
                 <Link
                   className="text-reset text-decoration-none"
                   href={trafficHref('flows', window, without(values, name))}
@@ -57,7 +57,13 @@ export function AppliedFilters({
           <li className="list-inline-item m-0 small text-body-secondary">
             No other filters applied
           </li>
-        ) : (
+        ) : null}
+        {names.length === 0 && window.preset === null ? (
+          <li className="list-inline-item m-0 small">
+            <Link href="/traffic/flows">Reset time range</Link>
+          </li>
+        ) : null}
+        {names.length === 0 ? null : (
           <li className="list-inline-item m-0 small">
             <Link href={trafficHref('flows', window)}>Clear all filters</Link>
           </li>
