@@ -157,3 +157,8 @@
 [data-bs-theme='dark'] .app-header .text-secondary {
   color: #ced4da !important;
 }
+
+/* Inline code inside a tinted alert inherits the alert's text colour (stock pink fails 4.5:1 there). */
+.alert code {
+  color: inherit;
+}
