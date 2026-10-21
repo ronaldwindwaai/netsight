@@ -83,3 +83,12 @@ export function nextSort(current: SortState | null, key: DeviceSortKey): SortSta
   if (current === null || current.key !== key) return { key, direction: 'asc' };
   return { key, direction: current.direction === 'asc' ? 'desc' : 'asc' };
 }
+
+/** What sorting and filtering cover, given how many devices this page holds of the total. */
+export function pageScopeNote(loaded: number, total: number): string {
+  if (loaded === 0) return 'No devices are loaded on this page.';
+  const noun = loaded === 1 ? 'device' : 'devices';
+  const lead = `Sorting and filters apply to the ${loaded} ${noun} loaded on this page`;
+  if (total > loaded) return `${lead}; use the page controls below for the other ${total - loaded}.`;
+  return `${lead}, which is all of them.`;
+}

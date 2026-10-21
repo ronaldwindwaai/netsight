@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { countByStatus, nextSort, sortDevices } from './device-view.ts';
+import { countByStatus, nextSort, pageScopeNote, sortDevices } from './device-view.ts';
 import type { Device } from './api-contracts.ts';
 
 function device(over: Partial<Device> & { id: string }): Device {
@@ -80,5 +80,26 @@ describe('countByStatus and nextSort', () => {
   it('toggles direction on the same column and resets on a new one', () => {
     assert.deepEqual(nextSort({ key: 'name', direction: 'asc' }, 'name'), { key: 'name', direction: 'desc' });
     assert.deepEqual(nextSort({ key: 'name', direction: 'desc' }, 'site'), { key: 'site', direction: 'asc' });
+  });
+});
+
+describe('pageScopeNote', () => {
+  it('says nothing is loaded when the page is empty', () => {
+    assert.equal(pageScopeNote(0, 0), 'No devices are loaded on this page.');
+  });
+
+  it('says the page is everything when no other devices exist', () => {
+    assert.equal(
+      pageScopeNote(2, 2),
+      'Sorting and filters apply to the 2 devices loaded on this page, which is all of them.',
+    );
+    assert.match(pageScopeNote(1, 1), /the 1 device loaded/);
+  });
+
+  it('points to the page controls for the rest', () => {
+    assert.equal(
+      pageScopeNote(3, 120),
+      'Sorting and filters apply to the 3 devices loaded on this page; use the page controls below for the other 117.',
+    );
   });
 });

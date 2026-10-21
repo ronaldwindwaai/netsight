@@ -10,7 +10,7 @@ import { FreshnessBadge, StatusBadge } from '@/components/status-badge';
 import { DEVICE_STATUSES } from '@/lib/api-contracts';
 import type { Device, DeviceStatus } from '@/lib/api-contracts';
 import { PERSON_ID } from '@/lib/api-contracts-identity-core';
-import { countByStatus, nextSort, sortDevices } from '@/lib/device-view';
+import { countByStatus, nextSort, pageScopeNote, sortDevices } from '@/lib/device-view';
 import type { DeviceSortKey, SortState } from '@/lib/device-view';
 
 function observedAt(value: string | null): string {
@@ -266,8 +266,7 @@ export function DeviceTable({ devices, total }: { devices: Device[]; total: numb
         </div>
       </div>
       <p className="small text-body-secondary px-3 pt-2 mb-0">
-        Sorting and filters apply to the {devices.length} {devices.length === 1 ? 'device' : 'devices'} loaded on this
-        page{total > devices.length ? `; use the page controls below for the other ${total - devices.length}.` : ' (all of them).'}
+        {pageScopeNote(devices.length, total)}
       </p>
       {rows.length === 0 ? (
         <div className="p-3">

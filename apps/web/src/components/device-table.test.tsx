@@ -47,6 +47,12 @@ describe('DeviceTable', () => {
     assert.match(document.body.textContent ?? '', /this page/i);
   });
 
+  it('does not call an empty page "all of them"', () => {
+    render(<DeviceTable devices={[]} total={0} />);
+    assert.match(document.body.textContent ?? '', /No devices are loaded on this page\./);
+    assert.doesNotMatch(document.body.textContent ?? '', /all of them/);
+  });
+
   it('sorts by a column and announces the direction', () => {
     render(<DeviceTable devices={ROWS} total={3} />);
     const button = screen.getByRole('button', { name: /Sort by Device/ });
