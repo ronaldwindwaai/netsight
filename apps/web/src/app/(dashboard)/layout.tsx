@@ -46,13 +46,8 @@ export default async function Layout({ children }: { children: React.ReactNode }
         </>
       }
     >
-      <a className="skip-link" href="#main-content">
-        Skip to main content
-      </a>
       <ConnectivityBanner />
-      <div id="main-content" tabIndex={-1}>
-        {children}
-      </div>
+      {children}
       <MobileNav permissions={session === null ? null : session.permissions} />
     </DashboardLayout>
   );
