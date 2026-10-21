@@ -102,7 +102,6 @@ export default async function OverviewPage() {
         <Link
           className={`overview-kpi-link ${health.progress === undefined ? 'overview-kpi--unknown' : ''}`}
           href="/devices"
-          aria-label={`Network health: ${health.title}. ${health.detail}. Open device inventory.`}
         >
           <InfoBox
             icon="bi-heart-pulse"
@@ -114,7 +113,7 @@ export default async function OverviewPage() {
           />
         </Link>
         <OverviewInternetKpi state={internet} />
-        <Link className="overview-kpi-link overview-kpi--unknown" href="/security" aria-label="Security: not summarised on the overview. Open security events.">
+        <Link className="overview-kpi-link overview-kpi--unknown" href="/security">
           <InfoBox
             icon="bi-shield-exclamation"
             text="Security"
@@ -124,7 +123,7 @@ export default async function OverviewPage() {
             progressText="Open security events"
           />
         </Link>
-        <Link className="overview-kpi-link overview-kpi--unknown" href="/users" aria-label="Users: not summarised on the overview. Open users.">
+        <Link className="overview-kpi-link overview-kpi--unknown" href="/users">
           <InfoBox
             icon="bi-people"
             text="Users"

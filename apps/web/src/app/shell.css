@@ -3,7 +3,7 @@
 /* Page finder (topbar) */
 .page-finder {
   position: relative;
-  min-inline-size: 11rem;
+  min-inline-size: 0;
   max-inline-size: 22rem;
   inline-size: 100%;
 }
@@ -47,5 +47,67 @@
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  opacity: 0.7;
+  color: #c4cad0;
+}
+
+/* Top bar: the finder and the account controls sit in their own list items. */
+.app-header .navbar-nav:first-child {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+}
+
+.topbar-finder,
+.topbar-actions {
+  display: flex;
+  align-items: center;
+}
+
+.topbar-finder {
+  flex: 0 1 22rem;
+  min-inline-size: 0;
+  margin-inline-start: 0.25rem;
+}
+
+.topbar-actions {
+  gap: 0.5rem;
+  margin-inline-end: 0.5rem;
+}
+
+@media (max-width: 575.98px) {
+  .topbar-finder {
+    flex-basis: 100%;
+  }
+
+  .page-finder {
+    max-inline-size: none;
+  }
+
+  /* The finder is the mobile entry point; the library's duplicate search pill only crowds it. */
+  .app-header .navbar-nav > li:has(> button[title^='Search']) {
+    display: none;
+  }
+}
+
+/* Light mode: Bootstrap's stock link, primary and secondary tints miss 4.5:1 on the grey page. */
+:root:not([data-bs-theme='dark']) {
+  --bs-link-color: #0a58ca;
+  --bs-link-color-rgb: 10, 88, 202;
+}
+
+:root:not([data-bs-theme='dark']) .btn-outline-primary {
+  --bs-btn-color: #0a58ca;
+  --bs-btn-border-color: #0a58ca;
+}
+
+:root:not([data-bs-theme='dark']) .btn-outline-secondary {
+  --bs-btn-color: #565e64;
+  --bs-btn-border-color: #565e64;
+}
+
+:root:not([data-bs-theme='dark']) .nav-pills .nav-link:not(.active) {
+  color: #0a58ca;
+}
+
+:root:not([data-bs-theme='dark']) .app-header .text-secondary {
+  color: #495057 !important;
 }

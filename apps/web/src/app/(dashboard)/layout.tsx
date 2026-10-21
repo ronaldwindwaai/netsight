@@ -32,9 +32,13 @@ export default async function Layout({ children }: { children: React.ReactNode }
       menuItems={menuItems}
       sidebarMini
       sidebarTheme="dark"
-      topbarStart={<PageFinder pages={pageTargetsFrom(menuItems)} />}
+      topbarStart={
+        <li className="nav-item topbar-finder">
+          <PageFinder pages={pageTargetsFrom(menuItems)} />
+        </li>
+      }
       topbarEnd={
-        <>
+        <li className="nav-item topbar-actions">
           {readOnly ? (
             <span className="badge text-bg-secondary me-2">
               <i className="bi bi-eye me-1" aria-hidden="true" />
@@ -43,7 +47,7 @@ export default async function Layout({ children }: { children: React.ReactNode }
           ) : null}
           <PwaInstall />
           <IdentityMenu session={session} />
-        </>
+        </li>
       }
     >
       <ConnectivityBanner />

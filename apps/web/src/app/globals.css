@@ -692,7 +692,7 @@ body {
 }
 
 .mobile-nav__link.is-active {
-  color: var(--netsight-signal);
+  color: #0a58ca;
 }
 
 @media (max-width: 991.98px) {
