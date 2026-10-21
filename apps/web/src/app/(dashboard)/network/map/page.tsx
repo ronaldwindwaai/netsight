@@ -1,4 +1,5 @@
-import { AppContent, Card } from '@adminlte/react';
+import { Card } from '@adminlte/react';
+import { AppContent } from '@/components/app-content';
 
 import { DataFailure, FreshnessNotice } from '@/components/data-state';
 import { TopologyView } from '@/components/topology-graph';

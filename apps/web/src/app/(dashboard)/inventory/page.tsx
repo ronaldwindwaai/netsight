@@ -1,4 +1,4 @@
-import { AppContent } from '@adminlte/react';
+import { AppContent } from '@/components/app-content';
 
 import { InventoryBody } from '@/components/inventory-body';
 import { InventoryFilters } from '@/components/inventory-filters';

@@ -1,4 +1,4 @@
-import { AppContent } from '@adminlte/react';
+import { AppContent } from '@/components/app-content';
 
 import { ResolvePanel } from '@/components/resolve-panel';
 import { UsersAccessDenied } from '@/components/users-access-denied';

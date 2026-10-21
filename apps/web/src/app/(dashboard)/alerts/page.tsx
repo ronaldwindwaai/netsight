@@ -1,5 +1,6 @@
 import Link from 'next/link';
-import { AppContent, Card } from '@adminlte/react';
+import { Card } from '@adminlte/react';
+import { AppContent } from '@/components/app-content';
 
 import { AlertTable } from '@/components/alert-table';
 import { AlertRulesCard, MaintenanceWindowsCard } from '@/components/alerting-sections';

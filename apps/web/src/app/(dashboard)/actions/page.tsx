@@ -1,4 +1,4 @@
-import { AppContent } from '@adminlte/react';
+import { AppContent } from '@/components/app-content';
 
 import { ActionKillSwitchPanel } from '@/components/action-kill-switch-panel';
 import { ActionsBody, ActionsFilters } from '@/components/actions-body';

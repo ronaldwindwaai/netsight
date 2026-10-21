@@ -1,4 +1,4 @@
-import { AppContent } from '@adminlte/react';
+import { AppContent } from '@/components/app-content';
 
 import { AppliedFilters } from '@/components/applied-filters';
 import { ExplorerFilterForm } from '@/components/explorer-filter-form';

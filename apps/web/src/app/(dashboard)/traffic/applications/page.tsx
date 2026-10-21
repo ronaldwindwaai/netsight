@@ -1,4 +1,4 @@
-import { AppContent } from '@adminlte/react';
+import { AppContent } from '@/components/app-content';
 
 import { ApplicationsBody } from '@/components/applications-body';
 import { TimeRangePicker } from '@/components/time-range-picker';

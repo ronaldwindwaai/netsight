@@ -1,4 +1,4 @@
-import { AppContent } from '@adminlte/react';
+import { AppContent } from '@/components/app-content';
 import Link from 'next/link';
 import { ConfigurationVersionsBody } from '@/components/configuration-read';
 import { DataFailure } from '@/components/data-state';

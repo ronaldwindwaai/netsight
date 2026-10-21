@@ -1,4 +1,4 @@
-import { AppContent } from '@adminlte/react';
+import { AppContent } from '@/components/app-content';
 import { notFound } from 'next/navigation';
 import { DataFailure } from '@/components/data-state';
 import { InternetSlaPanel } from '@/components/internet-sla-panel';

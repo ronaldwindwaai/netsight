@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { AppContent } from '@adminlte/react';
+import { AppContent } from '@/components/app-content';
 
 import { DataFailure, EmptyState, FreshnessNotice } from '@/components/data-state';
 import { DeviceTable } from '@/components/device-table';
