@@ -14,7 +14,9 @@ import { StateSurface } from '@/components/state-surface';
 import type { IdentitySession, UserDetailResponse } from '@/lib/api-contracts-identity';
 import type { FetchState } from '@/lib/api-response';
 import { formatUtcTimestamp } from '@/lib/format-time';
+import type { EntityAccess } from '@/lib/identity-view';
 import {
+  NO_ENTITY_ACCESS,
   confidenceText,
   entityText,
   sessionKindLabel,
@@ -35,7 +37,7 @@ function Section({ id, title, children }: { id: string; title: string; children:
   );
 }
 
-function SessionCard({ session }: { session: IdentitySession }) {
+function SessionCard({ session, access }: { session: IdentitySession; access: EntityAccess }) {
   return (
     <div className="mb-3">
       <div className="d-flex flex-wrap align-items-center gap-2">
@@ -45,7 +47,7 @@ function SessionCard({ session }: { session: IdentitySession }) {
           confidence {confidenceText(session.confidence)} · {validityText(session)}
         </span>
       </div>
-      <LinkList label={`${sessionKindLabel(session.kind)} session links`} links={session.links} />
+      <LinkList label={`${sessionKindLabel(session.kind)} session links`} links={session.links} access={access} />
     </div>
   );
 }
@@ -53,10 +55,13 @@ function SessionCard({ session }: { session: IdentitySession }) {
 export function UserDetailBody({
   state,
   inspectFlows = false,
+  access = NO_ENTITY_ACCESS,
 }: {
   state: FetchState<UserDetailResponse>;
   /** True when the viewer holds traffic:read-detail, so addresses can link to their flows. */
   inspectFlows?: boolean;
+  /** Which entity pages the viewer may open (users:read, inventory:read). */
+  access?: EntityAccess;
 }) {
   const surface = stateSurface(state);
   if (state.kind !== 'ok') {
@@ -104,7 +109,7 @@ export function UserDetailBody({
         {user.accounts.length === 0 ? (
           <p className="mb-0">No account is linked to this person in the evidence.</p>
         ) : (
-          <LinkList label="Accounts" links={user.accounts} />
+          <LinkList label="Accounts" links={user.accounts} access={access} />
         )}
       </Section>
       <Section id="sessions-heading" title="Current sessions">
@@ -115,7 +120,7 @@ export function UserDetailBody({
           </p>
         ) : (
           user.sessions.map((session, index) => (
-            <SessionCard key={`${session.kind}:${index}`} session={session} />
+            <SessionCard key={`${session.kind}:${index}`} session={session} access={access} />
           ))
         )}
       </Section>
@@ -125,7 +130,7 @@ export function UserDetailBody({
             An assignment is a declaration in the asset register, not proof the person uses the
             device.
           </p>
-          <LinkList label="Assigned devices" links={user.assigned_devices} />
+          <LinkList label="Assigned devices" links={user.assigned_devices} access={access} />
         </Section>
       ) : null}
       {traffic !== null ? (

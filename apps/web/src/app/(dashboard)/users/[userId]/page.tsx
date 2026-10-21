@@ -8,6 +8,7 @@ import { parseSessionInfo } from '@/lib/api-contracts';
 import { parseUserDetailResponse } from '@/lib/api-contracts-identity';
 import { detailPath } from '@/lib/identity-view';
 import {
+  canReadInventory,
   canReadPeople,
   canReadTrafficDetail,
   canReadUsersSummary,
@@ -42,7 +43,11 @@ export default async function UserDetailPage({ params }: { params: Promise<{ use
   const detail = await apiGet(path, parseUserDetailResponse);
   return (
     <AppContent title="Person" breadcrumbs={crumbs}>
-      <UserDetailBody state={detail} inspectFlows={canReadTrafficDetail(viewer)} />
+      <UserDetailBody
+        state={detail}
+        inspectFlows={canReadTrafficDetail(viewer)}
+        access={{ people: true, devices: canReadInventory(viewer) }}
+      />
     </AppContent>
   );
 }

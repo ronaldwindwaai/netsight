@@ -13,6 +13,8 @@ import type {
   Volume,
 } from '@/lib/api-contracts-traffic-explorer';
 import { formatBytes, formatShare } from '@/lib/format-bytes';
+import { NO_ENTITY_ACCESS } from '@/lib/identity-view';
+import type { EntityAccess } from '@/lib/identity-view';
 import type { FilterValues } from '@/lib/traffic-view';
 import { formatUtcTimestamp } from '@/lib/format-time';
 import {
@@ -37,15 +39,18 @@ function reported(value: string | null): string {
 export function AttributionCell({
   flow,
   status,
+  access = NO_ENTITY_ACCESS,
 }: {
   flow: TrafficFlow;
   status: AttributionStatus;
+  /** Which entity pages the viewer may open; without the permission the name is plain text. */
+  access?: EntityAccess;
 }) {
   const view = attributionPresentation(flow.attribution, status);
   return (
     <div className="flow-attribution">
       <span className={view.kind === 'person' ? 'fw-semibold' : 'fst-italic'}>
-        {view.personId !== null ? (
+        {view.personId !== null && access.people ? (
           <Link href={`/users/${encodeURIComponent(view.personId)}`}>{view.headline}</Link>
         ) : (
           view.headline
@@ -63,7 +68,7 @@ export function AttributionCell({
       {view.device !== null ? (
         <span className="d-block small text-body-secondary">
           Device{' '}
-          {view.deviceId !== null ? (
+          {view.deviceId !== null && access.devices ? (
             <Link href={`/devices/${encodeURIComponent(view.deviceId)}`}>{view.device}</Link>
           ) : (
             view.device
@@ -77,8 +82,8 @@ export function AttributionCell({
   );
 }
 
-/** Builds the Flow Explorer address for the current view narrowed by one more filter. */
-export type FlowLinker = (extra: FilterValues) => string;
+/** The Flow Explorer address for the view narrowed by one more filter, or null when not offered. */
+export type FlowLinker = (extra: FilterValues) => string | null;
 
 /** An address that, when a linker is given, drills into the flows to or from it. */
 function Endpoint({
@@ -90,12 +95,13 @@ function Endpoint({
   filter: 'source_ip' | 'destination_ip';
   linkTo: FlowLinker | undefined;
 }) {
-  if (linkTo === undefined) return <span className="fw-semibold">{address}</span>;
+  const href = linkTo?.({ [filter]: address }) ?? null;
+  if (href === null) return <span className="fw-semibold">{address}</span>;
   const verb = filter === 'source_ip' ? 'from' : 'to';
   return (
     <Link
       className="fw-semibold"
-      href={linkTo({ [filter]: address })}
+      href={href}
       title={`Show only flows ${verb} ${address}`}
     >
       {address}
@@ -107,10 +113,12 @@ export function FlowRowsTable({
   flows,
   status,
   linkTo,
+  access = NO_ENTITY_ACCESS,
 }: {
   flows: readonly TrafficFlow[];
   status: AttributionStatus;
   linkTo?: FlowLinker;
+  access?: EntityAccess;
 }) {
   return (
     <div className="table-responsive">
@@ -141,7 +149,7 @@ export function FlowRowsTable({
                 <Endpoint address={flow.source_ip} filter="source_ip" linkTo={linkTo} />
               </td>
               <td>
-                <AttributionCell flow={flow} status={status} />
+                <AttributionCell flow={flow} status={status} access={access} />
               </td>
               <td>{reported(flow.application)}</td>
               <td>
@@ -209,12 +217,14 @@ export function FlowTimeline({
           No traffic in the timeline for this window and filters.
         </p>
       ) : (
-        <ol
-          className="traffic-bars list-unstyled mb-0 overflow-auto"
+        <div
+          role="region"
+          aria-label="Traffic per time bucket (scrollable)"
+          className="overflow-auto"
           style={{ maxHeight: '18rem' }}
           tabIndex={0}
-          aria-label="Traffic per time bucket (scrollable list)"
         >
+        <ol className="traffic-bars list-unstyled mb-0">
           {buckets.map((bucket) => (
             <li className="traffic-bars__row" key={bucket.start}>
               <div className="traffic-bars__meta">
@@ -231,6 +241,7 @@ export function FlowTimeline({
             </li>
           ))}
         </ol>
+        </div>
       )}
     </TrafficPanel>
   );

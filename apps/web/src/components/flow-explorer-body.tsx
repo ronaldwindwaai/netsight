@@ -7,6 +7,7 @@ import type { FlowLinker } from '@/components/flow-explorer-parts';
 import { StateSurface } from '@/components/state-surface';
 import { TrafficGate } from '@/components/traffic-surface';
 import type { TrafficFlowsResponse } from '@/lib/api-contracts-traffic-explorer';
+import type { EntityAccess } from '@/lib/identity-view';
 import type { FetchState } from '@/lib/api-response';
 import { attributionNotice } from '@/lib/traffic-view';
 
@@ -29,12 +30,15 @@ export function FlowExplorerBody({
   state,
   filtered,
   linkTo,
+  access,
 }: {
   state: FetchState<TrafficFlowsResponse>;
   /** True when at least one filter is applied (changes the wording of an empty result). */
   filtered: boolean;
   /** When given, addresses in the rows link to the view narrowed by that address. */
   linkTo?: FlowLinker;
+  /** Which entity pages the viewer may open (users:read, inventory:read). */
+  access?: EntityAccess;
 }) {
   return (
     <TrafficGate
@@ -85,7 +89,7 @@ export function FlowExplorerBody({
                     }
                   />
                 ) : (
-                  <FlowRowsTable flows={data.flows} status={data.attribution} linkTo={linkTo} />
+                  <FlowRowsTable flows={data.flows} status={data.attribution} linkTo={linkTo} access={access} />
                 )}
               </section>
             )}

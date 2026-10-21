@@ -9,7 +9,7 @@ import { AnomaliesBody } from '@/components/anomalies-body';
 import { ApplicationsBody } from '@/components/applications-body';
 import { DestinationsBody } from '@/components/destinations-body';
 import { FlowExplorerBody } from '@/components/flow-explorer-body';
-import { resolveTrafficWindow, trafficHref } from '@/lib/traffic-view';
+import { flowsDrillHref, resolveTrafficWindow } from '@/lib/traffic-view';
 import {
   anomaliesFixture,
   anomalyFixture,
@@ -17,6 +17,7 @@ import {
   applicationsFixture,
   destinationFixture,
   destinationsFixture,
+  firstSeenFixture,
   flowFixture,
   flowsFixture,
   okState,
@@ -29,15 +30,24 @@ const window24h = resolveTrafficWindow({}, NOW, 31);
 const hrefOf = (name: string | RegExp) => screen.getByRole('link', { name }).getAttribute('href');
 
 describe('flow rows drill into related views', () => {
-  const linkTo = (extra: Record<string, string>) => trafficHref('flows', window24h, extra);
+  const linkTo = (extra: Record<string, string>) =>
+    flowsDrillHref(window24h, extra, { detail: true });
+  const access = { people: true, devices: true };
 
   it('links the source and destination addresses to the narrowed flows and the device to inventory', () => {
     render(
-      <FlowExplorerBody state={okState(flowsFixture({ flows: [flowFixture()] }))} filtered={false} linkTo={linkTo} />,
+      <FlowExplorerBody state={okState(flowsFixture({ flows: [flowFixture()] }))} filtered={false} linkTo={linkTo} access={access} />,
     );
     assert.equal(hrefOf('10.0.0.10'), '/traffic/flows?preset=24h&source_ip=10.0.0.10');
     assert.equal(hrefOf('203.0.113.9'), '/traffic/flows?preset=24h&destination_ip=203.0.113.9');
     assert.match(hrefOf('PC-001') ?? '', /^\/devices\/device-/);
+  });
+
+  it('renders plain text for an address the linker refuses (invalid text)', () => {
+    const state = okState(flowsFixture({ flows: [flowFixture({ source_ip: 'not an ip' })] }));
+    render(<FlowExplorerBody state={state} filtered={false} linkTo={linkTo} />);
+    assert.equal(screen.queryByRole('link', { name: 'not an ip' }), null);
+    assert.ok(screen.getByText('not an ip'));
   });
 
   it('renders plain addresses when no linker is given', () => {
@@ -86,6 +96,19 @@ describe('destinations link to their flows', () => {
 });
 
 describe('anomalies link to the flows of the hour', () => {
+  it('offers no link for an application anomaly with no application name', () => {
+    const item = anomalyFixture({ subject: { kind: 'application', label: null } });
+    render(<AnomaliesBody state={okState(anomaliesFixture({ anomalies: [item] }))} window={window24h} detail />);
+    assert.equal(screen.queryByRole('link', { name: /Inspect the flows/ }), null);
+  });
+
+  it('shows a first-seen row without an address as plain text', () => {
+    const row = firstSeenFixture({ address: null });
+    render(<AnomaliesBody state={okState(anomaliesFixture({ first_seen: [row] }))} window={window24h} detail />);
+    assert.ok(screen.getByText('Address not reported'));
+    assert.equal(screen.queryByRole('link', { name: 'Address not reported' }), null);
+  });
+
   it('links a total-traffic anomaly to exactly that UTC hour', () => {
     render(<AnomaliesBody state={okState(anomaliesFixture())} window={window24h} detail />);
     assert.equal(

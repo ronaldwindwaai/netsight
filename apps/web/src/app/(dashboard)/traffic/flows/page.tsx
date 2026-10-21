@@ -16,9 +16,15 @@ import {
   flowsPath,
   parseExplorerFilters,
   resolveTrafficWindow,
-  trafficHref,
+  flowsDrillHref,
 } from '@/lib/traffic-view';
-import { canReadTraffic, canReadTrafficDetail, viewerFromSession } from '@/lib/viewer';
+import {
+  canReadInventory,
+  canReadPeople,
+  canReadTraffic,
+  canReadTrafficDetail,
+  viewerFromSession,
+} from '@/lib/viewer';
 
 type Params = Record<string, string | string[] | undefined>;
 
@@ -77,7 +83,12 @@ export default async function FlowExplorerPage({ searchParams }: { searchParams:
       <FlowExplorerBody
         state={state}
         filtered={filtered}
-        linkTo={(extra) => trafficHref('flows', window, { ...filters.values, ...extra })}
+        linkTo={
+          detail
+            ? (extra) => flowsDrillHref(window, { ...filters.values, ...extra }, { detail })
+            : undefined
+        }
+        access={{ people: canReadPeople(viewer), devices: canReadInventory(viewer) }}
       />
       <RelatedViews
         views={[
