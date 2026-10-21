@@ -95,9 +95,9 @@ export function UserDetailBody({
   return (
     <>
       <div className="mb-3">
-        <h1 className="h3 mb-1">
+        <h2 className="h3 mb-1">
           {entityText({ type: 'person', id: user.id, label: user.display_name })}
-        </h1>
+        </h2>
         <p className="small text-body-secondary mb-0">
           Person <code>{user.id}</code> · evidence as of {formatUtcTimestamp(data.as_of)} (window{' '}
           {formatUtcTimestamp(data.window.from)} to {formatUtcTimestamp(data.window.to)}). Identity

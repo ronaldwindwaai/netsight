@@ -259,3 +259,12 @@ describe('accessibility', () => {
     }
   });
 });
+
+describe('page structure', () => {
+  it('renders no h1 of its own: the page title belongs to AppContent', () => {
+    render(body(okState(detailFixture())));
+
+    assert.equal(screen.queryAllByRole('heading', { level: 1 }).length, 0);
+    assert.ok(screen.getAllByRole('heading', { level: 2 }).length > 0);
+  });
+});
