@@ -165,3 +165,14 @@
 .alert code {
   color: inherit;
 }
+
+/* The avatar initials are drawn from a data attribute, so they are not part of the button's text
+   and the visible text (the identity) is contained in its accessible name. */
+.identity-avatar::before {
+  content: attr(data-initials);
+}
+
+/* Stock inline-code pink is 4.3:1 on the light page; this is 5.5:1. */
+:root:not([data-bs-theme='dark']) code {
+  color: #b02a6f;
+}

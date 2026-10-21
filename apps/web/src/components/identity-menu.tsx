@@ -86,9 +86,11 @@ export function IdentityMenu({ session }: { session: SessionInfo | null }) {
         aria-label={`Account menu: ${label}`}
         onClick={() => setOpen((value) => !value)}
       >
-        <span className="identity-avatar" aria-hidden="true">
-          {initials(session.email, session.identity_id)}
-        </span>
+        <span
+          className="identity-avatar"
+          aria-hidden="true"
+          data-initials={initials(session.email, session.identity_id)}
+        />
         <span className="d-none d-md-inline" aria-hidden="true">
           {label}
         </span>

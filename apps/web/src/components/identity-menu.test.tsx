@@ -30,6 +30,14 @@ describe('IdentityMenu', () => {
     assert.equal(button.getAttribute('aria-expanded'), 'false');
   });
 
+  it('keeps the avatar initials out of the button text so the visible text matches the name', () => {
+    render(<IdentityMenu session={session} />);
+
+    const avatar = screen.getByRole('button', { name: BUTTON_NAME }).querySelector('.identity-avatar');
+    assert.equal(avatar?.getAttribute('data-initials'), 'LD');
+    assert.equal(avatar?.textContent, '');
+  });
+
   it('opens a plain disclosure, not an ARIA menu, and closes on Escape with focus back on the button', async () => {
     const user = userEvent.setup();
     render(<IdentityMenu session={session} />);
