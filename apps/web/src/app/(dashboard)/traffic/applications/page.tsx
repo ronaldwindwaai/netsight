@@ -49,7 +49,7 @@ export default async function ApplicationsPage({ searchParams }: { searchParams:
         <TimeRangePicker section="applications" window={window} maxDays={MAX_WINDOW_DAYS} />
       </div>
       <TrafficNav active="applications" window={window} />
-      <ApplicationsBody state={state} />
+      <ApplicationsBody state={state} window={window} />
     </AppContent>
   );
 }

@@ -1,7 +1,9 @@
 import { AppContent } from '@adminlte/react';
 
+import { AppliedFilters } from '@/components/applied-filters';
 import { ExplorerFilterForm } from '@/components/explorer-filter-form';
 import { FlowExplorerBody } from '@/components/flow-explorer-body';
+import { RelatedViews } from '@/components/related-views';
 import { TimeRangePicker } from '@/components/time-range-picker';
 import { TrafficAccessDenied } from '@/components/traffic-access-denied';
 import { TrafficNav } from '@/components/traffic-nav';
@@ -14,8 +16,15 @@ import {
   flowsPath,
   parseExplorerFilters,
   resolveTrafficWindow,
+  flowsDrillHref,
 } from '@/lib/traffic-view';
-import { canReadTraffic, canReadTrafficDetail, viewerFromSession } from '@/lib/viewer';
+import {
+  canReadInventory,
+  canReadPeople,
+  canReadTraffic,
+  canReadTrafficDetail,
+  viewerFromSession,
+} from '@/lib/viewer';
 
 type Params = Record<string, string | string[] | undefined>;
 
@@ -70,7 +79,24 @@ export default async function FlowExplorerPage({ searchParams }: { searchParams:
         refused={filters.refused}
         detail={detail}
       />
-      <FlowExplorerBody state={state} filtered={filtered} />
+      <AppliedFilters window={window} values={filters.values} />
+      <FlowExplorerBody
+        state={state}
+        filtered={filtered}
+        linkTo={
+          detail
+            ? (extra) => flowsDrillHref(window, { ...filters.values, ...extra }, { detail })
+            : undefined
+        }
+        access={{ people: canReadPeople(viewer), devices: canReadInventory(viewer) }}
+      />
+      <RelatedViews
+        views={[
+          { label: 'Security events', href: '/security', hint: 'Detections from the connected security sources' },
+          { label: 'Internet / WAN', href: '/internet', hint: 'Link status, quality and availability' },
+          { label: 'Users & Identity', href: '/users', hint: 'Who is on the network, according to evidence' },
+        ]}
+      />
     </AppContent>
   );
 }
