@@ -1,8 +1,9 @@
 import Link from 'next/link';
-import { Card, InfoBox } from '@adminlte/react';
+import { Card } from '@adminlte/react';
 import { AppContent } from '@/components/app-content';
 
 import { DataFailure, FreshnessNotice } from '@/components/data-state';
+import { OverviewKpiLink } from '@/components/overview-kpi-link';
 import { OverviewIncidentsCard } from '@/components/overview-incidents-card';
 import { OverviewInternetKpi } from '@/components/overview-internet-kpi';
 import { OverviewApplicationMix, OverviewTopDestinations } from '@/components/overview-traffic-cards';
@@ -100,40 +101,32 @@ export default async function OverviewPage() {
       ) : null}
 
       <section className="overview-kpi-grid" aria-label="Operational summary">
-        <Link
-          className={`overview-kpi-link ${health.progress === undefined ? 'overview-kpi--unknown' : ''}`}
+        <OverviewKpiLink
           href="/devices"
-        >
-          <InfoBox
-            icon="bi-heart-pulse"
-            text="Network health"
-            title={health.title}
-            theme={health.theme}
-            progress={health.progress ?? 0}
-            progressText={health.detail}
-          />
-        </Link>
+          icon="bi-heart-pulse"
+          label="Network health"
+          value={health.title}
+          detail={health.detail}
+          theme={health.theme}
+          progress={health.progress}
+        />
         <OverviewInternetKpi state={internet} />
-        <Link className="overview-kpi-link overview-kpi--unknown" href="/security">
-          <InfoBox
-            icon="bi-shield-exclamation"
-            text="Security"
-            title="Not summarised"
-            theme="secondary"
-            progress={0}
-            progressText="Open security events"
-          />
-        </Link>
-        <Link className="overview-kpi-link overview-kpi--unknown" href="/users">
-          <InfoBox
-            icon="bi-people"
-            text="Users"
-            title="Not summarised"
-            theme="secondary"
-            progress={0}
-            progressText="Open users"
-          />
-        </Link>
+        <OverviewKpiLink
+          href="/security"
+          icon="bi-shield-exclamation"
+          label="Security"
+          value="Not summarised"
+          detail="Open security events"
+          theme="secondary"
+        />
+        <OverviewKpiLink
+          href="/users"
+          icon="bi-people"
+          label="Users"
+          value="Not summarised"
+          detail="Open users"
+          theme="secondary"
+        />
       </section>
 
       <div className="row g-3 mb-3">
