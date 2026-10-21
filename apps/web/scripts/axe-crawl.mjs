@@ -12,7 +12,7 @@
 //   NETSIGHT_AXE_USER=demo.admin NETSIGHT_AXE_PASSWORD=... NETSIGHT_AXE_TOTP_SECRET=... \
 //   node apps/web/scripts/axe-crawl.mjs
 //
-// Optional: NETSIGHT_AXE_BASE (default http://localhost:3000), NETSIGHT_AXE_ROUTES (comma-separated
+// Optional: NETSIGHT_AXE_CHROMIUM (path to a chromium executable when the bundled one is not installed), NETSIGHT_AXE_BASE (default http://localhost:3000), NETSIGHT_AXE_ROUTES (comma-separated
 // paths), NETSIGHT_AXE_SHOTS (directory for 1440 and 390 px screenshots, light and dark). Credentials
 // come from the environment only and are never printed or written. Exit code is 1 when any
 // violation is found, 2 when a prerequisite is missing, 0 otherwise.
@@ -82,7 +82,7 @@ async function main() {
   const shots = process.env.NETSIGHT_AXE_SHOTS;
   if (shots) mkdirSync(shots, { recursive: true });
 
-  const browser = await playwright.chromium.launch();
+  const browser = await playwright.chromium.launch({ executablePath: process.env.NETSIGHT_AXE_CHROMIUM || undefined });
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page = await context.newPage();
   await signIn(page, base, user, password, secret);
