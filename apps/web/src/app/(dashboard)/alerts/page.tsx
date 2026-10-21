@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { AppCard } from '@/components/app-card';
 import { AppContent } from '@/components/app-content';
+import { RetryButton } from '@/components/retry-button';
 
 import { AlertTable } from '@/components/alert-table';
 import { AlertRulesCard, MaintenanceWindowsCard } from '@/components/alerting-sections';
@@ -12,6 +13,8 @@ import { alertingListPath, parseAlertingOffsets } from '@/lib/alerting-view';
 import { formatUtcTimestamp } from '@/lib/format-time';
 import type { RawQuery } from '@/lib/incident-view';
 import { viewerFromSession } from '@/lib/viewer';
+
+export const metadata = { title: 'Alerts' };
 
 const PAGE_SIZE = 50;
 
@@ -64,9 +67,10 @@ export default async function AlertsPage({
             <AppCard className="text-center" bodyClass="py-5">
               <i className="bi bi-bell-slash fs-2 text-body-secondary" aria-hidden="true" />
               <h2 className="h5 mt-3">No active source alerts</h2>
-              <p className="mb-0 text-body-secondary">
+              <p className="text-body-secondary">
                 LibreNMS returned a valid empty alert collection.
               </p>
+              <RetryButton label="Refresh" />
             </AppCard>
           ) : (
             <>
