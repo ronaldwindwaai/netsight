@@ -14,18 +14,24 @@ export function OverviewRefresh({ updatedAt }: { updatedAt: string }) {
   const [pending, startTransition] = useTransition();
   return (
     <div className="d-flex align-items-center gap-2 small text-body-secondary">
-      <span aria-live="polite">
-        {pending ? 'Refreshing…' : (
+      {/* One live node for the lifetime of the component, so changes to its text are announced. */}
+      <span aria-live="polite" role="status">
+        {pending ? (
+          'Refreshing…'
+        ) : (
           <>
             Updated <RelativeTime value={updatedAt} />
           </>
         )}
       </span>
+      {/* aria-disabled, not disabled: a disabled button drops keyboard focus mid-refresh. */}
       <button
-        aria-busy={pending}
+        aria-disabled={pending}
         className="btn btn-sm btn-outline-secondary"
-        disabled={pending}
-        onClick={() => startTransition(() => router.refresh())}
+        onClick={() => {
+          if (pending) return;
+          startTransition(() => router.refresh());
+        }}
         type="button"
       >
         <i className="bi bi-arrow-clockwise me-1" aria-hidden="true" />
