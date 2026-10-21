@@ -9,6 +9,8 @@ import { OverviewInternetKpi } from '@/components/overview-internet-kpi';
 import { OverviewApplicationMix, OverviewTopDestinations } from '@/components/overview-traffic-cards';
 import { apiGet } from '@/lib/api';
 import { parseOverviewResponse, parseSessionInfo } from '@/lib/api-contracts';
+import { parseSecurityEventsResponse } from '@/lib/api-contracts-security';
+import { parseUsersAggregateResponse } from '@/lib/api-contracts-users';
 import { parseInternetResponse } from '@/lib/api-contracts-internet';
 import { parseIncidentListResponse, parseIncidentSummaryListResponse } from '@/lib/api-contracts-incident-api';
 import { overviewIncidentRequest } from '@/lib/overview-incidents';
@@ -17,6 +19,7 @@ import {
   parseTrafficDestinationsResponse,
 } from '@/lib/api-contracts-traffic-explorer';
 import { deviceHealthSummary, sourceProvenance } from '@/lib/overview-summary';
+import { overviewSecurityRequest, overviewUsersRequest, securityTile, usersTile } from '@/lib/overview-tiles';
 import { canReadTraffic, viewerFromSession } from '@/lib/viewer';
 
 function UnavailableSurface({
@@ -60,8 +63,13 @@ export default async function OverviewPage() {
   // refusal also renders as Restricted). The API enforces the same rules on its own.
   const viewer = viewerFromSession(session.kind === 'ok' ? session.data : null);
   const sessionUnread = session.kind !== 'ok';
-  const [incidents, destinations, applications] = await Promise.all([
-    fetchIncidents(session.kind === 'ok' ? session.data.permissions : null),
+  const permissions = session.kind === 'ok' ? session.data.permissions : null;
+  const securityPath = overviewSecurityRequest(permissions);
+  const usersPath = overviewUsersRequest(permissions);
+  const [incidents, security, users, destinations, applications] = await Promise.all([
+    fetchIncidents(permissions),
+    securityPath === null ? null : apiGet(securityPath, parseSecurityEventsResponse),
+    usersPath === null ? null : apiGet(usersPath, parseUsersAggregateResponse),
     sessionUnread || canReadTraffic(viewer)
       ? apiGet('/api/v1/traffic/destinations?preset=24h&limit=5', parseTrafficDestinationsResponse)
       : null,
@@ -112,20 +120,16 @@ export default async function OverviewPage() {
         />
         <OverviewInternetKpi state={internet} />
         <OverviewKpiLink
-          href="/security"
+          href={security === null ? undefined : '/security'}
           icon="bi-shield-exclamation"
           label="Security"
-          value="Not summarised"
-          detail="Open security events"
-          theme="secondary"
+          {...securityTile(security)}
         />
         <OverviewKpiLink
-          href="/users"
+          href={users === null ? undefined : '/users'}
           icon="bi-people"
           label="Users"
-          value="Not summarised"
-          detail="Open users"
-          theme="secondary"
+          {...usersTile(users)}
         />
       </section>
 

@@ -46,4 +46,13 @@ describe('OverviewKpiLink', () => {
     assert.match(link.textContent ?? '', /50%/);
     assert.equal(link.className.includes('overview-kpi--unknown'), false);
   });
+
+  it('renders a tile without an href as text, not a link', () => {
+    render(
+      <OverviewKpiLink icon="bi-people" label="Users" value="Restricted" detail="needs a permission" theme="secondary" />,
+    );
+
+    assert.equal(screen.queryByRole('link'), null);
+    assert.match(screen.getByText('Restricted').textContent ?? '', /Restricted/);
+  });
 });
