@@ -8,6 +8,7 @@ import { SourceHealth } from '@/components/source-health';
 import { apiGet } from '@/lib/api';
 import { parseDeviceList, parseSourceHealth } from '@/lib/api-contracts';
 import { parsePageParams } from '@/lib/page-state';
+import { preferredPageSize } from '@/lib/preferred-page-size';
 
 export const metadata = { title: 'Devices' };
 
@@ -16,7 +17,7 @@ export default async function DevicesPage({
 }: {
   searchParams: Promise<{ page?: string | string[]; page_size?: string | string[] }>;
 }) {
-  const { page, pageSize } = parsePageParams(await searchParams);
+  const { page, pageSize } = parsePageParams(await searchParams, await preferredPageSize());
   const [sourceHealthState, devicesState] = await Promise.all([
     apiGet('/api/v1/sources/librenms/health', parseSourceHealth),
     apiGet(`/api/v1/devices?page=${page}&page_size=${pageSize}`, parseDeviceList),

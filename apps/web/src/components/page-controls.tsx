@@ -1,9 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useSearchParams } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useRef } from 'react';
+
+import { usePreferences } from '@/components/use-preferences';
 
 import { PAGE_SIZES, describeRange, pageHref } from '@/lib/page-state';
+import { writePageSizeCookie } from '@/lib/preferences';
 
 interface PageControlsProps {
   /** What the rows are, plural: "devices". */
@@ -40,12 +44,30 @@ function Step({ href, disabled, children }: { href: string; disabled: boolean; c
 export function PageControls({ noun, page, pageSize, total, count, label }: PageControlsProps) {
   const pathname = usePathname();
   const params = useSearchParams();
+  const router = useRouter();
+  const { preferences, live } = usePreferences();
+  const preferredSize = preferences.pageSize;
   const range = describeRange({ page, pageSize, total, count });
   // Past the end, "Previous" must land on the last page that exists, not on another empty page.
   const pastTheEnd = count === 0 && total > 0 && page > range.pages;
   const previousPage = pastTheEnd ? range.pages : Math.max(1, page - 1);
   const hrefFor = (nextPage: number, nextSize = pageSize) =>
-    pageHref(pathname, params, { page: nextPage, pageSize: nextSize });
+    pageHref(pathname, params, { page: nextPage, pageSize: nextSize }, preferredSize);
+
+  // The server reads the mirror cookie and normally renders the preferred size already. Only when it
+  // could not (first visit after the cookie was introduced, cookies blocked) is the size added to the
+  // address: once, keeping `page` and every filter, with replace so Back is not trapped. Any
+  // page_size already in the address, including an explicit default one, is left alone.
+  const hasSizeInUrl = params.has('page_size');
+  const replaced = useRef(false);
+  useEffect(() => {
+    // Not before the stored value is live: hydration sees the defaults, which would undo the cookie's size.
+    if (!live || replaced.current || hasSizeInUrl || preferredSize === pageSize) return;
+    replaced.current = true;
+    writePageSizeCookie(preferredSize);
+    const current = new URLSearchParams(window.location.search);
+    router.replace(pageHref(pathname, current, { page, pageSize: preferredSize }, preferredSize));
+  }, [live, hasSizeInUrl, preferredSize, pageSize, page, pathname, router]);
 
   return (
     <nav className="page-controls d-flex flex-wrap align-items-center justify-content-between gap-2 mt-3" aria-label={label}>

@@ -25,8 +25,8 @@ Requirements:
   it, so it relies on the "can be turned off" route. Setting `localStorage['netsight.shortcuts']`
   to `off` disables it (read in a try/catch; blocked storage leaves it on). It is also inactive in
   text fields (including `role=textbox|combobox|searchbox`), dialogs, with modifier keys and during
-  IME composition, so it cannot fire while someone is dictating or typing. Known gap: there is no
-  settings UI for the toggle yet; until one exists the key is set through browser storage.
+  IME composition, so it cannot fire while someone is dictating or typing. The toggle is the "Keyboard shortcuts" switch on the Preferences page
+  (account menu > Preferences), which writes the same key.
 - Every dashboard screen sets a static page name through Next.js metadata
   (`export const metadata = { title: '...' }`), rendered as `Page · Netsight`
   (WCAG 2.4.2). `src/lib/page-titles.test.ts` fails when a page omits it.
@@ -35,3 +35,26 @@ Requirements:
 - Loading states are a single polite status region over a skeleton (`LoadingState`); failures
   that may clear (source unavailable, rate limited, maintenance, invalid response) offer
   "Try again", which re-renders the screen in place.
+
+## Preferences, mobile drawer and first run
+
+- **Preferences** (`/preferences`, from the account menu) are client-only and stored in `localStorage`
+  (`netsight.shortcuts`, `netsight.density`, `netsight.page_size`) inside try/catch; with storage blocked the
+  controls still work for the page view and the panel says so. Nothing is sent to the API. Defaults are removed
+  from storage. Table density is applied to `<html data-density>` by a tiny `beforeInteractive` script so rows do not
+  jump on load. The default list size is mirrored into a
+  non-secret cookie (`netsight_page_size`, `SameSite=Lax`, `Path=/`, one year, only 25/50/100, expired for the
+  default) written by the page, and the devices and alerts pages read it server-side, so lists render at the
+  preferred size with no second fetch. A `page_size` in the URL always wins, and while a non-default size is
+  preferred the size links keep `page_size` explicit so choosing the built-in 50 is respected. Fallback: when the
+  cookie is missing or stale (first visit after upgrade, cookies blocked) the list controls add the size once with
+  `router.replace`, keeping `page` and filters. Display preferences never write `<html data-density>` before the
+  stored values are live, so the early script's value is not flickered over during hydration.
+- **Navigation drawer (below 992px):** `MobileDrawer` names the toggle ("Open/Close navigation menu",
+  `aria-expanded`, `aria-controls`), moves focus into the drawer on open and back to the toggle on close, keeps Tab
+  inside the drawer, closes on Escape and after navigation, and makes the closed drawer and (while open) the page
+  behind it `inert`. Top-bar controls are 44 x 44 on touch devices, and `scroll-padding` keeps anchors and focused
+  controls clear of the fixed header and the phone tab bar.
+- **First run:** when the device source answers "not configured", the overview shows a checklist of read-only
+  sources (LibreNMS first) with status as text, the API settings to set (names only), the integration guide path and
+  the in-app page, instead of an error alert.

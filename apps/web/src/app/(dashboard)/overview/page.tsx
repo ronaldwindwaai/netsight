@@ -3,6 +3,7 @@ import { AppCard } from '@/components/app-card';
 import { AppContent } from '@/components/app-content';
 
 import { DataFailure, FreshnessNotice } from '@/components/data-state';
+import { FirstRunChecklist } from '@/components/first-run-checklist';
 import { OverviewKpiLink } from '@/components/overview-kpi-link';
 import { OverviewRefresh } from '@/components/overview-refresh';
 import { OverviewStatusStrip } from '@/components/overview-status-strip';
@@ -15,6 +16,7 @@ import { parseSecurityEventsResponse } from '@/lib/api-contracts-security';
 import { parseUsersAggregateResponse } from '@/lib/api-contracts-users';
 import { parseInternetResponse } from '@/lib/api-contracts-internet';
 import { parseIncidentListResponse, parseIncidentSummaryListResponse } from '@/lib/api-contracts-incident-api';
+import { firstRunChecklist } from '@/lib/first-run';
 import { overviewIncidentRequest } from '@/lib/overview-incidents';
 import {
   parseTrafficApplicationsResponse,
@@ -90,9 +92,17 @@ export default async function OverviewPage() {
       : null,
   ]);
   const overview = state.kind === 'ok' ? state.data : null;
+  const firstRun = firstRunChecklist({
+    devices: state,
+    security,
+    traffic: destinations,
+    internet,
+  });
   const health = overview
     ? deviceHealthSummary(overview.devices)
-    : deviceHealthSummary(null);
+    : firstRun.show
+      ? { ...deviceHealthSummary(null), title: 'Not connected', detail: 'Connect LibreNMS (see the checklist)' }
+      : deviceHealthSummary(null);
   const provenance = sourceProvenance(
     state.kind,
     state.kind === 'ok' ? state.data.devices.freshness.state : undefined,
@@ -118,7 +128,8 @@ export default async function OverviewPage() {
         </div>
       </div>
 
-      {state.kind !== 'ok' ? <DataFailure state={state} /> : null}
+      <FirstRunChecklist checklist={firstRun} />
+      {state.kind !== 'ok' && !firstRun.show ? <DataFailure state={state} /> : null}
       {state.kind === 'ok' ? (
         <FreshnessNotice freshness={state.data.devices.freshness} />
       ) : null}

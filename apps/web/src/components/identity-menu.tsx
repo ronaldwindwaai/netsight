@@ -2,6 +2,7 @@
 
 import { useId, useRef, useState, useTransition } from 'react';
 import type { KeyboardEvent } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 import type { SessionInfo } from '@/lib/api-contracts';
@@ -113,6 +114,10 @@ export function IdentityMenu({ session }: { session: SessionInfo | null }) {
             </p>
           ) : null}
           <hr className="dropdown-divider" />
+          <Link className="dropdown-item" href="/preferences" onClick={() => setOpen(false)}>
+            <i className="bi bi-sliders me-2" aria-hidden="true" />
+            Preferences
+          </Link>
           <button type="button" className="dropdown-item text-danger" disabled={signingOut} onClick={signOut}>
             <i className="bi bi-box-arrow-right me-2" aria-hidden="true" />
             {signingOut ? 'Signing out…' : 'Sign out'}

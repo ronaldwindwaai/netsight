@@ -1,7 +1,11 @@
+import Script from 'next/script';
 import '@adminlte/react/css';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import './globals.css';
 import './shell.css';
+import './preferences.css';
+
+import { EARLY_SCRIPT } from '@/lib/early-script';
 
 export const metadata = {
   title: { default: 'Netsight', template: '%s · Netsight' },
@@ -13,8 +17,20 @@ export const metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
-      <body>{children}</body>
+    // suppressHydrationWarning: the script below sets data-density before React hydrates.
+    <html lang="en" suppressHydrationWarning>
+      <body>
+        {/*
+          Density and blocked-storage handling that must run before hydration (see lib/early-script.ts).
+          This is an inline beforeInteractive script: once a strict script-src Content-Security-Policy is
+          adopted it needs a per-request nonce (pass `nonce` here, from the middleware-set header) or a hash
+          of EARLY_SCRIPT, otherwise the browser will block it.
+        */}
+        <Script id="netsight-early" strategy="beforeInteractive">
+          {EARLY_SCRIPT}
+        </Script>
+        {children}
+      </body>
     </html>
   );
 }

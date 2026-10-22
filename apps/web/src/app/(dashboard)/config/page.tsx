@@ -16,7 +16,7 @@ export default async function ConfigurationPage({ searchParams }: { searchParams
   if (!session.data.permissions.includes('configuration:read')) return <AppContent title="Configuration"><Step8AccessDenied surface="Configuration" permission="configuration:read" /></AppContent>;
   const state = await apiGet(`/api/v1/config/nodes?page=${page}&page_size=50`, parseConfigurationNodes);
   return <AppContent title="Configuration" breadcrumbs={[{ label: 'Overview', href: '/overview' }, { label: 'Configuration' }]}>
-    <p className="text-body-secondary">Read-only backup status and saved version history. Configuration contents and source credentials are withheld. A saved version is evidence of a backup, not proof that the current device configuration matches it.</p>
+    <div className="page-intro"><p className="text-body-secondary mb-0">Read-only backup status and saved version history. Configuration contents and source credentials are withheld. A saved version is evidence of a backup, not proof that the current device configuration matches it.</p></div>
     <ConfigurationNodesBody state={state} />
   </AppContent>;
 }
