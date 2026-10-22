@@ -6,7 +6,8 @@
  * and site is untrusted source text rendered as text.
  */
 import Link from 'next/link';
-import { Card, Table } from '@adminlte/react';
+import { Table } from '@adminlte/react';
+import { AppCard } from '@/components/app-card';
 import type { TableColumn } from '@adminlte/react';
 
 import { DataFailure } from '@/components/data-state';
@@ -139,7 +140,7 @@ export function InventoryBody({
   return (
     <>
       <SourceNotices sources={data.sources} />
-      <Card
+      <AppCard
         title="Assets"
         icon="bi bi-boxes"
         variant="outline"
@@ -168,7 +169,7 @@ export function InventoryBody({
         <div className="px-3 pb-2">
           <SourceLine sources={data.sources} formatTime={formatUtcTimestamp} />
         </div>
-      </Card>
+      </AppCard>
     </>
   );
 }

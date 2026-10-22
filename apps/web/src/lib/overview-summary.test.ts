@@ -4,6 +4,7 @@ import test from 'node:test';
 import { parseOverviewResponse, type DeviceHealthSummary, type DeviceStatus } from './api-contracts.ts';
 import {
   deviceHealthSummary,
+  deviceStatusBreakdown,
   sourceProvenance,
   type OverviewFetchKind,
 } from './overview-summary.ts';
@@ -93,6 +94,42 @@ test('parseOverviewResponse accepts a canonical overview aggregate', () => {
       sources: { librenms: { configured: true, status: 'success' } },
     },
   );
+});
+
+test('parseOverviewResponse accepts the optional netbox source the API reports', () => {
+  const parsed = parseOverviewResponse({
+    devices: {
+      total: 0,
+      by_status: [],
+      freshness: { state: 'fresh', observed_at: '2026-10-04T12:00:00Z', source: 'librenms' },
+    },
+    sources: {
+      librenms: { configured: true, status: 'success' },
+      netbox: { configured: false, status: 'not-configured' },
+    },
+  });
+  assert.notEqual(parsed, null);
+  assert.equal(parsed?.sources.librenms.status, 'success');
+});
+
+function overviewWith(sources: Record<string, unknown>): unknown {
+  return {
+    devices: {
+      total: 0,
+      by_status: [],
+      freshness: { state: 'fresh', observed_at: '2026-10-04T12:00:00Z', source: 'librenms' },
+    },
+    sources: { librenms: { configured: true, status: 'success' }, ...sources },
+  };
+}
+
+test('parseOverviewResponse rejects a malformed netbox source or an unknown sibling source', () => {
+  const netbox = { configured: false, status: 'not-configured' };
+  assert.notEqual(parseOverviewResponse(overviewWith({ netbox })), null);
+  assert.equal(parseOverviewResponse(overviewWith({ netbox: { ...netbox, extra: 1 } })), null);
+  assert.equal(parseOverviewResponse(overviewWith({ netbox: { ...netbox, status: 'bogus' } })), null);
+  assert.equal(parseOverviewResponse(overviewWith({ netbox: { ...netbox, configured: 'no' } })), null);
+  assert.equal(parseOverviewResponse(overviewWith({ netbox, zabbix: netbox })), null);
 });
 
 test('parseOverviewResponse rejects malformed aggregates', () => {
@@ -186,4 +223,25 @@ test('does not infer a LibreNMS outage from auth or API failures', () => {
     label: 'LibreNMS unknown',
     tone: 'is-caution',
   });
+});
+
+test('deviceStatusBreakdown lists every status, most urgent first, linking only the non-empty ones', () => {
+  const rows = deviceStatusBreakdown(summary(['healthy', 'healthy', 'critical', 'offline']));
+  assert.deepEqual(
+    rows.map((row) => [row.status, row.count, row.href]),
+    [
+      ['critical', 1, '/devices?status=critical'],
+      ['offline', 1, '/devices?status=offline'],
+      ['degraded', 0, null],
+      ['warning', 0, null],
+      ['unknown', 0, null],
+      ['maintenance', 0, null],
+      ['healthy', 2, '/devices?status=healthy'],
+    ],
+  );
+});
+
+test('deviceStatusBreakdown is empty when the summary is unavailable, never a row of zeros', () => {
+  assert.deepEqual(deviceStatusBreakdown(null), []);
+  assert.deepEqual(deviceStatusBreakdown(summary([])), []);
 });

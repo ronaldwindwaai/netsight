@@ -1,4 +1,4 @@
-import { AppContent } from '@adminlte/react';
+import { AppContent } from '@/components/app-content';
 
 import { CopilotBody } from '@/components/copilot-body';
 import { Step8AccessDenied } from '@/components/step8-access-denied';
@@ -6,6 +6,8 @@ import { apiGet } from '@/lib/api';
 import { parseSessionInfo } from '@/lib/api-contracts';
 import { parseCopilotStatus } from '@/lib/api-contracts-copilot';
 import { canAskCopilot, viewerFromSession } from '@/lib/viewer';
+
+export const metadata = { title: 'Ask Netsight' };
 
 export default async function CopilotPage() {
   const sessionState = await apiGet('/api/v1/auth/session', parseSessionInfo);

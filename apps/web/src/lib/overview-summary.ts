@@ -1,4 +1,4 @@
-import type { DeviceHealthSummary, FreshnessState } from '@/lib/api-contracts';
+import type { DeviceHealthSummary, DeviceStatus, FreshnessState } from '@/lib/api-contracts';
 
 export type OverviewFetchKind =
   | 'ok'
@@ -81,4 +81,31 @@ export function sourceProvenance(
     error: 'Source status unknown · Netsight API unavailable',
   } as const;
   return { label: labels[kind], tone: '' };
+}
+
+export interface StatusBreakdownRow {
+  status: DeviceStatus;
+  count: number;
+  /** The device list filtered to this status; absent for a status with no devices. */
+  href: string | null;
+}
+
+/** Most urgent first, matching the device table's status sort. */
+const BREAKDOWN_ORDER: readonly DeviceStatus[] = [
+  'critical',
+  'offline',
+  'degraded',
+  'warning',
+  'unknown',
+  'maintenance',
+  'healthy',
+];
+
+export function deviceStatusBreakdown(data: DeviceHealthSummary | null): StatusBreakdownRow[] {
+  if (data === null || data.total === 0) return [];
+  const counts = new Map(data.by_status.map((entry) => [entry.status, entry.count]));
+  return BREAKDOWN_ORDER.map((status) => {
+    const count = counts.get(status) ?? 0;
+    return { status, count, href: count > 0 ? `/devices?status=${status}` : null };
+  });
 }

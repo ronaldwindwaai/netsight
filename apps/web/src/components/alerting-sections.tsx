@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Card } from '@adminlte/react';
+import { AppCard } from '@/components/app-card';
 
 import { AlertRulesTable } from '@/components/alert-rules-table';
 import { DataFailure } from '@/components/data-state';
@@ -12,7 +12,7 @@ import type {
   AlertRuleListResponse,
   MaintenanceWindowListResponse,
 } from '@/lib/api-contracts-alert-rule-api';
-import { alertingPageHrefs, windowCounts } from '@/lib/alerting-view';
+import { alertingPageHrefs, storeWriteBlock, windowCounts } from '@/lib/alerting-view';
 import type { AlertingOffsets } from '@/lib/alerting-view';
 import { formatUtcTimestamp } from '@/lib/format-time';
 import type { Viewer } from '@/lib/incident-actions';
@@ -142,7 +142,7 @@ export function AlertRulesCard(props: {
   viewer: Viewer | null;
 }) {
   return (
-    <Card
+    <AppCard
       className="operational-card"
       title="Alert rules"
       icon="bi bi-sliders"
@@ -151,7 +151,10 @@ export function AlertRulesCard(props: {
       bodyClass="p-0"
     >
       <div className="p-3 border-bottom">
-        <NewRuleButton viewer={props.viewer} />
+        <NewRuleButton
+          viewer={props.viewer}
+          unavailableReason={storeWriteBlock(props.state, 'alert rule store')}
+        />
       </div>
       <RulesBody
         state={props.state}
@@ -159,7 +162,7 @@ export function AlertRulesCard(props: {
         retrievedAt={props.retrievedAt}
         viewer={props.viewer}
       />
-    </Card>
+    </AppCard>
   );
 }
 
@@ -171,7 +174,7 @@ export function MaintenanceWindowsCard(props: {
   viewer: Viewer | null;
 }) {
   return (
-    <Card
+    <AppCard
       className="operational-card"
       title="Maintenance windows"
       icon="bi bi-tools"
@@ -180,7 +183,10 @@ export function MaintenanceWindowsCard(props: {
       bodyClass="p-0"
     >
       <div className="p-3 border-bottom">
-        <NewWindowButton viewer={props.viewer} />
+        <NewWindowButton
+          viewer={props.viewer}
+          unavailableReason={storeWriteBlock(props.state, 'maintenance window store')}
+        />
       </div>
       <WindowsBody
         state={props.state}
@@ -189,6 +195,6 @@ export function MaintenanceWindowsCard(props: {
         retrievedAt={props.retrievedAt}
         viewer={props.viewer}
       />
-    </Card>
+    </AppCard>
   );
 }

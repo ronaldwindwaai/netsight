@@ -1,4 +1,4 @@
-import { AppContent } from '@adminlte/react';
+import { AppContent } from '@/components/app-content';
 
 import { AnomaliesBody } from '@/components/anomalies-body';
 import { TimeRangePicker } from '@/components/time-range-picker';
@@ -12,7 +12,9 @@ import {
   anomaliesPath,
   resolveTrafficWindow,
 } from '@/lib/traffic-view';
-import { canReadTraffic, viewerFromSession } from '@/lib/viewer';
+import { canReadTraffic, canReadTrafficDetail, viewerFromSession } from '@/lib/viewer';
+
+export const metadata = { title: 'Traffic anomalies' };
 
 type Params = { preset?: string | string[]; from?: string | string[]; to?: string | string[] };
 
@@ -49,7 +51,7 @@ export default async function AnomaliesPage({ searchParams }: { searchParams: Pr
         <TimeRangePicker section="anomalies" window={window} maxDays={MAX_BASELINE_WINDOW_DAYS} />
       </div>
       <TrafficNav active="anomalies" window={window} />
-      <AnomaliesBody state={state} />
+      <AnomaliesBody state={state} window={window} detail={canReadTrafficDetail(viewer)} />
     </AppContent>
   );
 }

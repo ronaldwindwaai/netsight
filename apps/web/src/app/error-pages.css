@@ -1,0 +1,67 @@
+/* Standalone pages rendered outside the dashboard shell (404, global error). They cannot rely on the
+   AdminLTE colour mode, so they follow the operating-system preference with explicit colours. */
+.standalone-page {
+  --standalone-bg: #f4f7fa;
+  --standalone-fg: #1b2535;
+  --standalone-muted: #4a5568;
+  --standalone-link: #0b5cad;
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 1.5rem;
+  background: var(--standalone-bg);
+  color: var(--standalone-fg);
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+.standalone-page__panel {
+  max-width: 34rem;
+}
+
+.standalone-page__code {
+  margin: 0 0 0.25rem;
+  color: var(--standalone-muted);
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.standalone-page h1 {
+  margin: 0 0 0.75rem;
+  font-size: 1.75rem;
+  font-weight: 600;
+}
+
+.standalone-page p {
+  margin: 0 0 1rem;
+  color: var(--standalone-muted);
+  line-height: 1.5;
+}
+
+.standalone-page a,
+.standalone-page button {
+  color: var(--standalone-link);
+  font: inherit;
+  text-decoration: underline;
+}
+
+.standalone-page button {
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.standalone-page__actions {
+  display: flex;
+  gap: 1.25rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  .standalone-page {
+    --standalone-bg: #111827;
+    --standalone-fg: #e6ebf2;
+    --standalone-muted: #b4bfce;
+    --standalone-link: #7cb8ff;
+  }
+}

@@ -37,3 +37,56 @@ it('version history renders only revision identity and source timestamp', () => 
   assert.equal(screen.getAllByText('a'.repeat(40)).length, 2);
   assert.equal(screen.queryByRole('button', {name: /restore|restart/i}), null);
 });
+it('backup state and freshness are words with icons, never plain colour or bare text', () => {
+  const { container } = render(<ConfigurationNodesBody state={state({ ...data, items: [node, { ...node, id: 'config-node-22222222-2222-2222-2222-222222222222', name: 'edge', backup_status: 'failed', last_attempt_at: null, backup_freshness: 'unknown' }] })} />);
+  const table = container.querySelector('table')!;
+  assert.match(table.textContent ?? '', /Backup succeeded/);
+  assert.match(table.textContent ?? '', /Backup failed/);
+  assert.match(table.textContent ?? '', /Stale \(older than 24 hours\)/);
+  assert.match(table.textContent ?? '', /Not assessed/);
+  assert.ok(table.querySelectorAll('.badge i.bi[aria-hidden="true"]').length >= 4);
+});
+it('a failed or unknown backup is never described as healthy', () => {
+  render(<ConfigurationNodesBody state={state({ ...data, items: [{ ...node, backup_status: 'never', last_attempt_at: null, backup_freshness: 'unknown' }] })} />);
+  assert.doesNotMatch(document.body.textContent ?? '', /succeeded|Fresh\b/);
+  assert.match(document.body.textContent ?? '', /No backup yet/);
+});
+it('the version history says which backup record it is for and links back to every backup and the change context', () => {
+  render(<ConfigurationVersionsBody nodeId={node.id} permissions={['diagnostics:read']} state={{kind: 'ok', correlationId: 'ref', data: {...data, items: [{id: 'a'.repeat(40), saved_at: '2026-10-17T10:00:00Z'}]}}} />);
+  assert.match(screen.getByRole('heading', { name: /Saved versions for/ }).textContent ?? '', new RegExp(node.id));
+  assert.equal(screen.getByRole('link', { name: /All configuration backups/ }).getAttribute('href'), '/config');
+  assert.ok(screen.getByRole('link', { name: /All incidents/ }));
+  assert.ok(screen.getByRole('link', { name: /Diagnostics/ }));
+});
+it('hides the diagnostics link from a role without diagnostics:read', () => {
+  render(<ConfigurationVersionsBody nodeId={node.id} state={{kind: 'ok', correlationId: 'ref', data: {...data, items: [{id: 'a'.repeat(40), saved_at: '2026-10-17T10:00:00Z'}]}}} />);
+  assert.equal(screen.queryByRole('link', { name: /Diagnostics/ }), null);
+});
+it('an unexpected backup value degrades to unknown instead of breaking the table', () => {
+  const odd = { ...node, backup_status: 'weird', backup_freshness: 'odd' } as unknown as ConfigurationNode;
+  render(<ConfigurationNodesBody state={state({ ...data, items: [odd] })} />);
+  assert.match(document.body.textContent ?? '', /Backup state unknown/);
+  assert.match(document.body.textContent ?? '', /Freshness unknown/);
+});
+const versionsState = (n: number): FetchState<ConfigurationRead<{ id: string; saved_at: string }>> => ({
+  kind: 'ok', correlationId: 'ref',
+  data: { ...data, items: Array.from({ length: n }, (_, i) => ({ id: String(i).repeat(40), saved_at: `2026-10-${17 - i}T10:00:00Z` })) } as never,
+});
+it('names the device when known, marks the newest version and says contents are not shown', () => {
+  render(<ConfigurationVersionsBody nodeId={node.id} nodeName="core-sw-01" state={versionsState(2) as never} />);
+  assert.match(screen.getByRole('heading', { name: /Saved versions for/ }).textContent ?? '', /core-sw-01/);
+  assert.equal(screen.getAllByText('Latest').length, 2);
+  assert.match(document.body.textContent ?? '', /contents and differences are not shown/i);
+});
+it('shows exact UTC time in the tooltip of a relative saved-at time', () => {
+  const { container } = render(<ConfigurationVersionsBody nodeId={node.id} state={versionsState(1) as never} />);
+  const time = container.querySelector('time');
+  assert.equal(time?.getAttribute('datetime'), '2026-10-17T10:00:00Z');
+  assert.match(time?.getAttribute('title') ?? '', /2026-10-17 10:00:00 UTC/);
+});
+it('does not call a failed or never-run backup "freshness unknown"', () => {
+  const failed = { ...node, backup_status: 'failed', backup_freshness: 'unknown' } as ConfigurationNode;
+  render(<ConfigurationNodesBody state={state({ ...data, items: [failed] })} />);
+  assert.match(document.body.textContent ?? '', /Not assessed/);
+  assert.doesNotMatch(document.body.textContent ?? '', /Freshness unknown/);
+});

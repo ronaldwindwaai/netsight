@@ -4,12 +4,13 @@
  * parameter) is untrusted and rendered as text. A history whose hash chain does not verify is said so.
  */
 import Link from 'next/link';
-import { Card } from '@adminlte/react';
+import { AppCard } from '@/components/app-card';
 
 import { ActionStateBadge, ChecksList, DryRunNotice, RiskBadge } from '@/components/action-parts';
 import { DataFailure } from '@/components/data-state';
 import { StateSurface } from '@/components/state-surface';
-import { executionSummary } from '@/lib/actions-view';
+import { executionSummary, nextStepGuidance } from '@/lib/actions-view';
+import type { Viewer } from '@/lib/incident-actions';
 import type { ActionDetail, ActionStatus } from '@/lib/api-contracts-actions';
 import type { FetchState } from '@/lib/api-response';
 import { formatUtcTimestamp } from '@/lib/format-time';
@@ -156,10 +157,12 @@ export function ActionDetailBody({
   state,
   status,
   panel,
+  viewer = null,
 }: {
   state: FetchState<ActionDetail>;
   status: ActionStatus | null;
   panel: React.ReactNode;
+  viewer?: Viewer | null;
 }) {
   if (state.kind !== 'ok') {
     if (state.status === 503 && state.code === 'ACTIONS_NOT_ENABLED') {
@@ -183,26 +186,33 @@ export function ActionDetailBody({
         <RiskBadge risk={r.risk} />
         <span className="small text-body-secondary">as of {formatUtcTimestamp(detail.generated_at)}</span>
       </div>
+      <section className="alert alert-light border py-2" role="note" aria-labelledby="action-next-step">
+        <h2 className="h6 mb-1" id="action-next-step">
+          <i className="bi bi-signpost-split me-1" aria-hidden="true" />
+          What happens next
+        </h2>
+        <p className="small mb-0">{nextStepGuidance(r, viewer, status)}</p>
+      </section>
       {panel !== null ? (
-        <Card title="Decide" icon="bi bi-check2-square" variant="outline" theme="primary">
+        <AppCard title="Decide" icon="bi bi-check2-square" variant="outline" theme="primary">
           {panel}
-        </Card>
+        </AppCard>
       ) : null}
-      <Card title="Request" icon="bi bi-card-text" variant="outline" theme="secondary">
+      <AppCard title="Request" icon="bi bi-card-text" variant="outline" theme="secondary">
         <Facts detail={detail} />
-      </Card>
-      <Card title="Checks" icon="bi bi-list-check" variant="outline" theme="secondary">
+      </AppCard>
+      <AppCard title="Checks" icon="bi bi-list-check" variant="outline" theme="secondary">
         <p className="small fw-semibold mb-1">At proposal</p>
         <ChecksList checks={r.policy_checks} empty="No policy checks were recorded." />
         <p className="small fw-semibold mb-1 mt-3">Before the run</p>
         <ChecksList checks={r.pre_checks} empty="No pre-run checks yet: they run when the request is run." />
-      </Card>
-      <Card title="Result" icon="bi bi-clipboard-check" variant="outline" theme="secondary">
+      </AppCard>
+      <AppCard title="Result" icon="bi bi-clipboard-check" variant="outline" theme="secondary">
         <Result detail={detail} />
-      </Card>
-      <Card title="History" icon="bi bi-clock-history" variant="outline" theme="secondary">
+      </AppCard>
+      <AppCard title="History" icon="bi bi-clock-history" variant="outline" theme="secondary">
         <History detail={detail} />
-      </Card>
+      </AppCard>
     </>
   );
 }

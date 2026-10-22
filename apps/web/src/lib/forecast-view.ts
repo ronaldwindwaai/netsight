@@ -122,6 +122,16 @@ export function reasonText(reason: Reason): string {
   return REASONS[reason];
 }
 
+/** Non-blank notes with verbatim repeats removed, in their original order. */
+export function uniqueNotes(notes: readonly (string | null)[]): string[] {
+  const seen = new Set<string>();
+  for (const note of notes) {
+    const text = note?.trim();
+    if (text) seen.add(text);
+  }
+  return [...seen];
+}
+
 const BYTE_UNITS = [
   [1e3, 'kB'],
   [1e6, 'MB'],

@@ -10,6 +10,7 @@ import {
   formatAmount,
   parseForecastQuery,
   reasonText,
+  uniqueNotes,
   statePresentation,
   tableRows,
 } from './forecast-view.ts';
@@ -181,4 +182,12 @@ test('an amount never rounds up to 1000 of a smaller unit', () => {
   assert.equal(formatAmount(999_950, 'bytes-per-day'), '1.0 MB/day');
   assert.equal(formatAmount(999_950_000_000, 'bytes-per-day'), '1.0 TB/day');
   assert.equal(formatAmount(999, 'bytes-per-day'), '999 B/day');
+});
+
+test('a note the source repeats verbatim is shown once', () => {
+  assert.deepEqual(
+    uniqueNotes(['No flow source is configured.', null, 'No flow source is configured.', ' ']),
+    ['No flow source is configured.'],
+  );
+  assert.deepEqual(uniqueNotes(['A', 'B']), ['A', 'B']);
 });

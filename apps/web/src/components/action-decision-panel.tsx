@@ -5,8 +5,8 @@ import { useId, useMemo, useState } from 'react';
 import { performActionDecision } from '@/app/(dashboard)/actions/actions';
 import { Footer, TextAreaField } from '@/components/incident-form-parts';
 import { ActionDialog, DisabledReason, StepUpMarker, WriteFeedback, useServerWrite } from '@/components/write-ui';
-import { decisionAvailability, describeDecisionOutcome, type DecisionVerb } from '@/lib/actions-view';
-import type { ActionRequest, ActionStatus } from '@/lib/api-contracts-actions';
+import { decisionAvailability, decisionConsequence, describeDecisionOutcome, type DecisionVerb } from '@/lib/actions-view';
+import { MIN_REASON, type ActionRequest, type ActionStatus } from '@/lib/api-contracts-actions';
 import type { Viewer } from '@/lib/incident-actions';
 
 const THEME: Record<DecisionVerb, string> = {
@@ -89,6 +89,7 @@ export function ActionDecisionPanel({
       ? describeDecisionOutcome(lastVerb, runner.result.state, dryRun)
       : null;
   const needsReason = open === 'reject' || open === 'cancel';
+  const reasonMissing = needsReason && reason.trim().length < MIN_REASON;
   return (
     <div>
       <div className="d-flex flex-wrap gap-2" role="group" aria-label="Request decisions">
@@ -150,6 +151,10 @@ export function ActionDecisionPanel({
                 has changed since you opened this page, the decision is refused.
               </dd>
             </dl>
+            <p className="small mb-2">
+              <i className="bi bi-info-circle me-1" aria-hidden="true" />
+              <strong>What this does:</strong> {decisionConsequence(open, dryRun)}
+            </p>
             {open === 'execute' && dryRun ? (
               <p className="small">
                 This is a <strong>dry run</strong>: it records what would happen. It does not contact or change any
@@ -176,9 +181,16 @@ export function ActionDecisionPanel({
                 onChange={setReason}
               />
             ) : null}
+            {reasonMissing ? (
+              <p id={`${noteId}-reason`} className="form-text">
+                <i className="bi bi-lock me-1" aria-hidden="true" />
+                {SUBMIT[open]} is unavailable until you give a reason of at least {MIN_REASON} characters.
+              </p>
+            ) : null}
             <Footer
               disabled={runner.pending}
-              locked={runner.unconfirmed}
+              locked={runner.unconfirmed || reasonMissing}
+              blockedBy={reasonMissing ? `${noteId}-reason` : undefined}
               onCancel={close}
               submitLabel={open === 'execute' && dryRun ? 'Record dry run' : SUBMIT[open]}
               theme={open === 'approve' ? 'success' : open === 'reject' ? 'danger' : 'primary'}

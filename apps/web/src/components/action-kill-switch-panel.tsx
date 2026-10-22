@@ -4,6 +4,7 @@ import { useState } from 'react';
 
 import { performKillSwitch } from '@/app/(dashboard)/actions/actions';
 import { Footer, TextAreaField } from '@/components/incident-form-parts';
+import { MIN_REASON } from '@/lib/api-contracts-actions';
 import { ActionDialog, StepUpMarker, WriteFeedback, useServerWrite } from '@/components/write-ui';
 
 /**
@@ -41,6 +42,7 @@ export function ActionKillSwitchPanel({
   }
 
   const blocked = engaged && fromEnvironment;
+  const reasonMissing = reason.trim().length < MIN_REASON;
   return (
     <div className="mb-3">
       <button
@@ -87,9 +89,16 @@ export function ActionKillSwitchPanel({
                 : 'Engaging stops every request from being proposed, approved or run, in this service process. Reading, rejecting and cancelling still work. Releasing it needs a recent multi-factor sign-in. For a stop across all workers, set it in the environment and restart.'}
             </p>
             <TextAreaField id="kill-switch-reason" label="Reason" rows={3} maxLength={500} value={reason} disabled={runner.pending} onChange={setReason} />
+            {reasonMissing ? (
+              <p id="kill-switch-reason-note" className="form-text">
+                <i className="bi bi-lock me-1" aria-hidden="true" />
+                {engaged ? 'Release' : 'Engage'} is unavailable until you give a reason of at least {MIN_REASON} characters.
+              </p>
+            ) : null}
             <Footer
               disabled={runner.pending}
-              locked={runner.unconfirmed}
+              locked={runner.unconfirmed || reasonMissing}
+              blockedBy={reasonMissing ? 'kill-switch-reason-note' : undefined}
               onCancel={close}
               submitLabel={engaged ? 'Release' : 'Engage'}
               theme={engaged ? 'primary' : 'danger'}

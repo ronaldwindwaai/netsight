@@ -4,7 +4,7 @@
  * read-only evidence export (a link: GET only, nothing is changed). A gap in sampling is
  * "Unknown", never up and never down; a missing value is "Not reported".
  */
-import { Card } from '@adminlte/react';
+import { AppCard } from '@/components/app-card';
 
 import { DataFailure } from '@/components/data-state';
 import { StateSurface } from '@/components/state-surface';
@@ -238,7 +238,7 @@ function SlaBody({ state }: { state: FetchState<SlaResponse> }) {
 export function InternetSlaPanel({ state, month, months, adjusted, canExport, monthAction = "/internet" }: SlaPanelProps) {
   const exportable = state.kind === 'ok' && state.data.state === 'ok' && state.data.links.length > 0;
   return (
-    <Card
+    <AppCard
       className="operational-card"
       title="Monthly SLA and provider evidence"
       icon="bi bi-file-earmark-bar-graph"
@@ -258,6 +258,6 @@ export function InternetSlaPanel({ state, month, months, adjusted, canExport, mo
         </p>
       ) : null}
       <SlaBody state={state} />
-    </Card>
+    </AppCard>
   );
 }

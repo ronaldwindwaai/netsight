@@ -196,10 +196,21 @@ function RuleSummary({ rule }: { rule: AlertRule }) {
 
 type Notify = (message: string) => void;
 
-export function NewRuleButton({ viewer }: { viewer: Viewer | null }) {
+export function NewRuleButton({
+  viewer,
+  unavailableReason = null,
+}: {
+  viewer: Viewer | null;
+  /** Set when the backing store cannot take a write; shown after the permission reason. */
+  unavailableReason?: string | null;
+}) {
   const [open, setOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
-  const gate = canCreateRule(viewer);
+  const permission = canCreateRule(viewer);
+  const gate =
+    permission.enabled && unavailableReason !== null
+      ? { ...permission, enabled: false, reason: unavailableReason }
+      : permission;
   const noteId = useId();
   return (
     <div>
@@ -379,10 +390,21 @@ function WindowEditorDialog({
   );
 }
 
-export function NewWindowButton({ viewer }: { viewer: Viewer | null }) {
+export function NewWindowButton({
+  viewer,
+  unavailableReason = null,
+}: {
+  viewer: Viewer | null;
+  /** Set when the backing store cannot take a write; shown after the permission reason. */
+  unavailableReason?: string | null;
+}) {
   const [open, setOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
-  const gate = canCreateWindow(viewer);
+  const permission = canCreateWindow(viewer);
+  const gate =
+    permission.enabled && unavailableReason !== null
+      ? { ...permission, enabled: false, reason: unavailableReason }
+      : permission;
   const noteId = useId();
   return (
     <div>
