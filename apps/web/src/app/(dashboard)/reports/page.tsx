@@ -4,6 +4,8 @@ import { DataFailure } from '@/components/data-state';
 import { Step8AccessDenied } from '@/components/step8-access-denied';
 import { apiGet } from '@/lib/api';
 import { parseSessionInfo } from '@/lib/api-contracts';
+
+export const metadata = { title: 'Reports' };
 export default async function ReportsPage() {
   const session = await apiGet('/api/v1/auth/session', parseSessionInfo);
   if (session.kind !== 'ok') return <AppContent title="Reports"><DataFailure state={session} /></AppContent>;

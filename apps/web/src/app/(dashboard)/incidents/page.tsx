@@ -34,6 +34,8 @@ import {
 } from '@/lib/incident-view';
 import type { IncidentFilters, RawQuery } from '@/lib/incident-view';
 
+export const metadata = { title: 'Incidents' };
+
 function CountsStrip({ response }: { response: IncidentListResponse | IncidentSummaryListResponse }) {
   const counts = incidentCounts(response.incidents);
   return (

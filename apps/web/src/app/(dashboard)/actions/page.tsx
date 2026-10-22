@@ -10,6 +10,8 @@ import { parseSessionInfo } from '@/lib/api-contracts';
 import { parseActionList, parseActionStatus } from '@/lib/api-contracts-actions';
 import { canReadActions, canUseActionKillSwitch, viewerFromSession } from '@/lib/viewer';
 
+export const metadata = { title: 'Action requests' };
+
 type Params = Record<string, string | string[] | undefined>;
 
 export default async function ActionsPage({ searchParams }: { searchParams: Promise<Params> }) {

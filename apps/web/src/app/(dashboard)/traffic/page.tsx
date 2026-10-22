@@ -19,6 +19,8 @@ import {
 } from '@/lib/traffic-view';
 import { canReadTraffic, viewerFromSession } from '@/lib/viewer';
 
+export const metadata = { title: 'Traffic intelligence' };
+
 type Params = { preset?: string | string[]; from?: string | string[]; to?: string | string[] };
 
 export default async function TrafficPage({ searchParams }: { searchParams: Promise<Params> }) {

@@ -6,6 +6,13 @@
   --netsight-warning: #e7a11a;
   --netsight-critical: #d64545;
   --netsight-cloud: #f4f7fa;
+  /* Focus ring: well above 3:1 on white, so it clears the 3:1 non-text minimum on light surfaces. */
+  --netsight-focus: #0b5ed7;
+}
+
+/* ...and a lighter blue that is also well above 3:1 on the dark body background. */
+[data-bs-theme='dark'] {
+  --netsight-focus: #6ea8fe;
 }
 
 body {
@@ -40,8 +47,37 @@ body {
 }
 
 :focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--netsight-signal) 70%, white);
+  outline: 3px solid var(--netsight-focus);
   outline-offset: 2px;
+}
+
+/*
+ * Bootstrap removes the outline on these controls and substitutes a 25%-alpha blue box-shadow, which
+ * is under the 3:1 non-text contrast (WCAG 1.4.11 / 2.4.11) on both light and dark surfaces. Keep the
+ * solid ring above for them too.
+ */
+.btn:focus-visible,
+.btn-check:focus-visible + .btn,
+.btn-close:focus-visible,
+.page-link:focus-visible,
+.nav-link:focus-visible,
+.dropdown-item:focus-visible,
+.form-control:focus-visible,
+.form-select:focus-visible,
+.form-check-input:focus-visible {
+  outline: 3px solid var(--netsight-focus);
+  outline-offset: 2px;
+  box-shadow: none;
+}
+
+/*
+ * The ring is only 1.3:1 (light) / 1.9:1 (dark) against a filled primary button, so the 2px gap
+ * between button and ring is filled with the page background: a two-tone ring where the inner tone
+ * (body background, 4.5:1 on the button) separates the button and the outer blue (5.8:1 / 7.4:1 on
+ * the page) is the visible indicator.
+ */
+.btn-primary:focus-visible {
+  box-shadow: 0 0 0 2px var(--bs-body-bg);
 }
 
 .page-intro {
@@ -894,4 +930,35 @@ body {
 
 .topology-panel {
   background: var(--bs-body-bg);
+}
+
+/* Loading skeletons: grey bars that hint at content shape; static under reduced motion. */
+.skeleton-line {
+  block-size: 1rem;
+  margin-block: 0.75rem;
+  border-radius: 0.25rem;
+  background: linear-gradient(
+    90deg,
+    var(--bs-tertiary-bg) 25%,
+    var(--bs-secondary-bg) 50%,
+    var(--bs-tertiary-bg) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes skeleton-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-line {
+    animation: none;
+  }
 }

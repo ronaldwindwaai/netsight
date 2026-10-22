@@ -26,6 +26,8 @@ import {
   viewerFromSession,
 } from '@/lib/viewer';
 
+export const metadata = { title: 'Flow Explorer' };
+
 type Params = Record<string, string | string[] | undefined>;
 
 export default async function FlowExplorerPage({ searchParams }: { searchParams: Promise<Params> }) {

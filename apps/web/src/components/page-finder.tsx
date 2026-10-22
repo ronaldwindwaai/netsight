@@ -2,9 +2,10 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useId, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { FocusEvent, FormEvent, KeyboardEvent } from 'react';
 
+import { areShortcutsEnabled, isFocusSearchShortcut } from '@/lib/keyboard-shortcuts';
 import { findPages } from '@/lib/page-finder';
 import type { PageMatches, PageTarget } from '@/lib/page-finder';
 
@@ -31,6 +32,17 @@ export function PageFinder({ pages }: { pages: readonly PageTarget[] }) {
   const matches = useMemo(() => findPages(pages, query), [pages, query]);
   const open = query.trim().length > 0;
   const showList = open && matches.items.length > 0;
+
+  useEffect(() => {
+    function onDocumentKeyDown(event: globalThis.KeyboardEvent) {
+      if (!isFocusSearchShortcut(event) || !areShortcutsEnabled()) return;
+      event.preventDefault();
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    }
+    document.addEventListener('keydown', onDocumentKeyDown);
+    return () => document.removeEventListener('keydown', onDocumentKeyDown);
+  }, []);
 
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -71,13 +83,17 @@ export function PageFinder({ pages }: { pages: readonly PageTarget[] }) {
           autoComplete="off"
           value={query}
           aria-describedby={hintId}
+          aria-keyshortcuts="/"
           aria-controls={showList ? listId : undefined}
           onChange={(event) => setQuery(event.target.value)}
         />
+        <kbd className="input-group-text page-finder__key" aria-hidden="true">
+          /
+        </kbd>
       </div>
       <span id={hintId} className="visually-hidden">
-        Searches page and section names only, not devices, users or incidents. Press Enter to open the
-        first match, Escape to close.
+        Searches page and section names only, not devices, users or incidents. Press / to focus this box from
+        anywhere, Enter to open the first match, Escape to close.
       </span>
       <div className={open ? 'page-finder__panel' : 'visually-hidden'}>
         <p className="page-finder__status small text-body-secondary mb-1" role="status">

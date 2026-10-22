@@ -4,7 +4,7 @@ import './globals.css';
 import './shell.css';
 
 export const metadata = {
-  title: 'Netsight',
+  title: { default: 'Netsight', template: '%s · Netsight' },
   manifest: '/manifest.webmanifest',
   appleWebApp: { capable: true, title: 'Netsight', statusBarStyle: 'default' },
   icons: { apple: '/icons/apple-touch-icon.png' },

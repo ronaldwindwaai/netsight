@@ -10,6 +10,8 @@ import { parseSessionInfo } from '@/lib/api-contracts';
 import { ACTION_ID, parseActionDetail, parseActionStatus } from '@/lib/api-contracts-actions';
 import { canReadActions, viewerFromSession } from '@/lib/viewer';
 
+export const metadata = { title: 'Action request' };
+
 export default async function ActionPage({ params }: { params: Promise<{ actionId: string }> }) {
   const { actionId } = await params;
   // A malformed id never reaches the API path: it is a 404 here.

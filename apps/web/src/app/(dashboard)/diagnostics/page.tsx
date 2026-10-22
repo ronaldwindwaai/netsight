@@ -9,6 +9,8 @@ import { parseDiagnosticSessionListResponse } from '@/lib/api-contracts-diagnost
 import { parseListOffset, sessionListPath } from '@/lib/diagnostic-session-view';
 import { canUseDiagnostics, viewerFromSession } from '@/lib/viewer';
 
+export const metadata = { title: 'Root cause analysis' };
+
 const TARGET_LIMIT = 255;
 
 export default async function DiagnosticsPage({

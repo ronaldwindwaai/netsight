@@ -26,6 +26,8 @@ import {
   viewerFromSession,
 } from '@/lib/viewer';
 
+export const metadata = { title: 'Users & Identity' };
+
 type Params = {
   page?: string | string[];
   kind?: string | string[];

@@ -20,6 +20,8 @@ import {
   viewerFromSession,
 } from '@/lib/viewer';
 
+export const metadata = { title: 'Unknown device' };
+
 export default async function UnknownDevicePage({ params }: { params: Promise<{ findingId: string }> }) {
   const { findingId } = await params;
   // A malformed id never reaches the API path: it is a 404 here.

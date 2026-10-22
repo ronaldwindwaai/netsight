@@ -15,6 +15,8 @@ import {
 } from '@/lib/traffic-view';
 import { canReadTraffic, viewerFromSession } from '@/lib/viewer';
 
+export const metadata = { title: 'Applications' };
+
 type Params = { preset?: string | string[]; from?: string | string[]; to?: string | string[] };
 
 export default async function ApplicationsPage({ searchParams }: { searchParams: Promise<Params> }) {

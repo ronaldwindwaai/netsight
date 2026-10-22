@@ -7,6 +7,8 @@ import { apiGet } from '@/lib/api';
 import { parseTopologyResponse, type TopologyResponse } from '@/lib/api-contracts';
 import { resolveFocus } from '@/lib/topology-view';
 
+export const metadata = { title: 'Network map' };
+
 function EmptySurface({
   icon,
   title,

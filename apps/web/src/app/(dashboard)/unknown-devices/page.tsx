@@ -15,6 +15,8 @@ import {
   viewerFromSession,
 } from '@/lib/viewer';
 
+export const metadata = { title: 'Unknown devices' };
+
 type Params = Record<string, string | string[] | undefined>;
 
 export default async function UnknownDevicesPage({ searchParams }: { searchParams: Promise<Params> }) {

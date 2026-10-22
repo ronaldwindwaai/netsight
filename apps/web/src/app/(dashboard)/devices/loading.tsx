@@ -5,9 +5,7 @@ import { LoadingState } from '@/components/data-state';
 export default function DevicesLoading() {
   return (
     <AppContent title="Devices">
-      <div role="status" aria-live="polite">
-        <LoadingState label="Loading devices" />
-      </div>
+      <LoadingState label="Loading devices" />
     </AppContent>
   );
 }

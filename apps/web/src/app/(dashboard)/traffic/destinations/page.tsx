@@ -15,6 +15,8 @@ import {
 } from '@/lib/traffic-view';
 import { canReadTraffic, canReadTrafficDetail, viewerFromSession } from '@/lib/viewer';
 
+export const metadata = { title: 'Destinations' };
+
 type Params = { preset?: string | string[]; from?: string | string[]; to?: string | string[] };
 
 export default async function DestinationsPage({ searchParams }: { searchParams: Promise<Params> }) {

@@ -5,9 +5,7 @@ import { LoadingState } from '@/components/data-state';
 export default function IpamLoading() {
   return (
     <AppContent title="IPAM">
-      <div role="status" aria-live="polite">
-        <LoadingState label="Loading IPAM" />
-      </div>
+      <LoadingState label="Loading IPAM" />
     </AppContent>
   );
 }
