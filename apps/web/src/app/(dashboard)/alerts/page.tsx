@@ -14,6 +14,7 @@ import { alertingListPath, parseAlertingOffsets } from '@/lib/alerting-view';
 import { formatUtcTimestamp } from '@/lib/format-time';
 import type { RawQuery } from '@/lib/incident-view';
 import { parsePageParams } from '@/lib/page-state';
+import { preferredPageSize } from '@/lib/preferred-page-size';
 import { viewerFromSession } from '@/lib/viewer';
 
 export const metadata = { title: 'Alerts' };
@@ -24,7 +25,7 @@ export default async function AlertsPage({
   searchParams: Promise<RawQuery>;
 }) {
   const query = await searchParams;
-  const { page, pageSize } = parsePageParams(query);
+  const { page, pageSize } = parsePageParams(query, await preferredPageSize());
   const offsets = parseAlertingOffsets(query);
   const nowMs = new Date().getTime();
   const [rules, windows, sessionState] = await Promise.all([

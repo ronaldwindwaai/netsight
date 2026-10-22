@@ -20,7 +20,12 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     // suppressHydrationWarning: the script below sets data-density before React hydrates.
     <html lang="en" suppressHydrationWarning>
       <body>
-        {/* Density and blocked-storage handling that must run before hydration (see lib/early-script.ts). */}
+        {/*
+          Density and blocked-storage handling that must run before hydration (see lib/early-script.ts).
+          This is an inline beforeInteractive script: once a strict script-src Content-Security-Policy is
+          adopted it needs a per-request nonce (pass `nonce` here, from the middleware-set header) or a hash
+          of EARLY_SCRIPT, otherwise the browser will block it.
+        */}
         <Script id="netsight-early" strategy="beforeInteractive">
           {EARLY_SCRIPT}
         </Script>

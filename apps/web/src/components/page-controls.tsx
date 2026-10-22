@@ -2,11 +2,12 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 import { usePreferences } from '@/components/use-preferences';
 
-import { DEFAULT_PAGE_SIZE, PAGE_SIZES, describeRange, pageHref } from '@/lib/page-state';
+import { PAGE_SIZES, describeRange, pageHref } from '@/lib/page-state';
+import { writePageSizeCookie } from '@/lib/preferences';
 
 interface PageControlsProps {
   /** What the rows are, plural: "devices". */
@@ -44,7 +45,7 @@ export function PageControls({ noun, page, pageSize, total, count, label }: Page
   const pathname = usePathname();
   const params = useSearchParams();
   const router = useRouter();
-  const { preferences } = usePreferences();
+  const { preferences, live } = usePreferences();
   const preferredSize = preferences.pageSize;
   const range = describeRange({ page, pageSize, total, count });
   // Past the end, "Previous" must land on the last page that exists, not on another empty page.
@@ -53,14 +54,20 @@ export function PageControls({ noun, page, pageSize, total, count, label }: Page
   const hrefFor = (nextPage: number, nextSize = pageSize) =>
     pageHref(pathname, params, { page: nextPage, pageSize: nextSize }, preferredSize);
 
-  // The reader's default size applies only when the address does not say. Arriving without a
-  // page_size at a different preferred size swaps it in once (replace, so Back is not trapped);
-  // any page_size already in the address, including an explicit default one, is left alone.
+  // The server reads the mirror cookie and normally renders the preferred size already. Only when it
+  // could not (first visit after the cookie was introduced, cookies blocked) is the size added to the
+  // address: once, keeping `page` and every filter, with replace so Back is not trapped. Any
+  // page_size already in the address, including an explicit default one, is left alone.
   const hasSizeInUrl = params.has('page_size');
+  const replaced = useRef(false);
   useEffect(() => {
-    if (hasSizeInUrl || preferredSize === DEFAULT_PAGE_SIZE) return;
-    router.replace(pageHref(pathname, new URLSearchParams(window.location.search), { page: 1, pageSize: preferredSize }, preferredSize));
-  }, [hasSizeInUrl, preferredSize, pathname, router]);
+    // Not before the stored value is live: hydration sees the defaults, which would undo the cookie's size.
+    if (!live || replaced.current || hasSizeInUrl || preferredSize === pageSize) return;
+    replaced.current = true;
+    writePageSizeCookie(preferredSize);
+    const current = new URLSearchParams(window.location.search);
+    router.replace(pageHref(pathname, current, { page, pageSize: preferredSize }, preferredSize));
+  }, [live, hasSizeInUrl, preferredSize, pageSize, page, pathname, router]);
 
   return (
     <nav className="page-controls d-flex flex-wrap align-items-center justify-content-between gap-2 mt-3" aria-label={label}>

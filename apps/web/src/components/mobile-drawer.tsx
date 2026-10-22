@@ -11,24 +11,41 @@ const DRAWER_QUERY = '(max-width: 991.98px)';
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled])';
 const TOGGLE = '.app-header button[title="Toggle sidebar"]';
 const SIDEBAR_ID = 'app-sidebar';
-/** Page regions that must not be reachable while the drawer covers them. */
-const BACKGROUND = ['.app-main', '.app-footer'];
+/** Page regions that must not be reachable while the drawer covers them (the header is handled separately). */
+const BACKGROUND = ['.app-main', '.app-footer', '.mobile-nav'];
+const HEADER = '.app-header';
+/** Anything inside one of these is another overlay that owns Escape. */
+const OVERLAY = '[role=dialog],[aria-modal=true],dialog[open],[popover]';
+const SLOT_CLASS = 'mobile-drawer-slot';
+
+/**
+ * The close button's mount point is a DOM node the library does not render, so it is made when the
+ * component subscribes (after mount, never while rendering) and removed when it unsubscribes.
+ */
+let closeSlot: HTMLElement | null = null;
+function subscribeToCloseSlot(onChange: () => void): () => void {
+  const created = createCloseSlot();
+  closeSlot = created;
+  onChange();
+  return () => {
+    created?.remove();
+    if (closeSlot === created) closeSlot = null;
+  };
+}
+const readCloseSlot = () => closeSlot;
 
 /**
  * The library draws the open drawer over the menu toggle, so the drawer needs a close button of its own.
- * This is the (lazily created, cached) element at the top of the sidebar that button is rendered into.
+ * This creates (once the sidebar exists) the element at the top of the sidebar that button is rendered into.
  */
-let closeSlot: HTMLElement | null = null;
-function getCloseSlot(): HTMLElement | null {
-  if (closeSlot !== null && closeSlot.isConnected) return closeSlot;
+function createCloseSlot(): HTMLElement | null {
   const sidebar = document.querySelector<HTMLElement>('.app-sidebar');
   if (sidebar === null) return null;
-  closeSlot = document.createElement('div');
-  closeSlot.className = 'mobile-drawer-slot';
-  sidebar.prepend(closeSlot);
-  return closeSlot;
+  const slot = document.createElement('div');
+  slot.className = SLOT_CLASS;
+  sidebar.prepend(slot);
+  return slot;
 }
-const noSubscription = () => () => undefined;
 
 function drawerElements() {
   return {
@@ -37,10 +54,44 @@ function drawerElements() {
   };
 }
 
+const inerted = new Set<HTMLElement>();
+
+/** Makes every part of `container` inert except `keep` and the path of ancestors leading to it. */
+function inertAround(container: HTMLElement, keep: HTMLElement | null) {
+  for (const child of Array.from(container.children) as HTMLElement[]) {
+    if (child === keep) continue;
+    if (keep !== null && child.contains(keep)) inertAround(child, keep);
+    else {
+      child.inert = true;
+      inerted.add(child);
+    }
+  }
+}
+
+/** Removes the page behind the open drawer (content, footer, bottom tab bar, header but for the toggle) from view. */
 function setBackgroundInert(inert: boolean) {
+  for (const element of inerted) element.inert = false;
+  inerted.clear();
   for (const selector of BACKGROUND) {
     const region = document.querySelector<HTMLElement>(selector);
-    if (region !== null) region.inert = inert;
+    if (region === null) continue;
+    region.inert = inert;
+    if (inert) inerted.add(region);
+  }
+  if (!inert) return;
+  const header = document.querySelector<HTMLElement>(HEADER);
+  if (header !== null) inertAround(header, drawerElements().toggle);
+}
+
+/** Scroll lock for the page behind the open drawer; remembers the inline value it replaced. */
+let savedOverflow: string | null = null;
+function setScrollLock(locked: boolean) {
+  if (locked && savedOverflow === null) {
+    savedOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+  } else if (!locked && savedOverflow !== null) {
+    document.body.style.overflow = savedOverflow;
+    savedOverflow = null;
   }
 }
 
@@ -54,7 +105,7 @@ function setBackgroundInert(inert: boolean) {
  */
 export function MobileDrawer() {
   const pathname = usePathname();
-  const slot = useSyncExternalStore(noSubscription, getCloseSlot, () => null);
+  const slot = useSyncExternalStore(subscribeToCloseSlot, readCloseSlot, () => null);
 
   useEffect(() => {
     const media = window.matchMedia(DRAWER_QUERY);
@@ -71,6 +122,7 @@ export function MobileDrawer() {
         toggle.removeAttribute('aria-expanded');
         sidebar.inert = false;
         setBackgroundInert(false);
+        setScrollLock(false);
         wasOpen = false;
         return;
       }
@@ -80,12 +132,14 @@ export function MobileDrawer() {
       toggle.setAttribute('aria-expanded', String(open));
       if (open && !wasOpen) {
         setBackgroundInert(true);
+        setScrollLock(true);
         sidebar.inert = false;
         sidebar.querySelector<HTMLElement>(FOCUSABLE)?.focus();
       } else if (!open && wasOpen) {
         const active = document.activeElement;
         const focusWasInDrawer = active === null || active === document.body || sidebar.contains(active);
         setBackgroundInert(false);
+        setScrollLock(false);
         sidebar.inert = true;
         if (focusWasInDrawer) toggle.focus();
       } else if (!open) {
@@ -95,7 +149,9 @@ export function MobileDrawer() {
     }
 
     function onKeyDown(event: KeyboardEvent) {
-      if (!wasOpen) return;
+      if (!wasOpen || event.defaultPrevented) return;
+      // Escape belongs to whichever overlay (page finder, modal, menu) is on top, not to the drawer under it.
+      if ((event.target as Element | null)?.closest?.(OVERLAY)) return;
       const { toggle, sidebar } = drawerElements();
       if (toggle === null || sidebar === null) return;
       if (event.key === 'Escape') {
@@ -122,6 +178,7 @@ export function MobileDrawer() {
       media.removeEventListener('change', sync);
       document.removeEventListener('keydown', onKeyDown);
       setBackgroundInert(false);
+      setScrollLock(false);
     };
   }, []);
 

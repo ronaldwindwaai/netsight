@@ -1,4 +1,4 @@
-import { DEFAULT_PAGE_SIZE, PAGE_SIZES } from './page-state.ts';
+import { DEFAULT_PAGE_SIZE, PAGE_SIZES, pageSizeCookie } from './page-state.ts';
 import { SHORTCUTS_STORAGE_KEY } from './keyboard-shortcuts.ts';
 
 /**
@@ -53,7 +53,8 @@ export function readPreferences(store: PreferenceStore | undefined = browserStor
   if (store === undefined) return DEFAULT_PREFERENCES;
   try {
     const density = store.getItem(PREFERENCE_KEYS.density);
-    const size = Number(store.getItem(PREFERENCE_KEYS.pageSize));
+    const rawSize = store.getItem(PREFERENCE_KEYS.pageSize);
+    const size = rawSize === null ? Number.NaN : Number(rawSize);
     return {
       shortcuts: store.getItem(PREFERENCE_KEYS.shortcuts) !== 'off',
       density: density === 'compact' ? 'compact' : 'comfortable',
@@ -95,5 +96,14 @@ export function writePreference<K extends keyof Preferences>(
     return true;
   } catch {
     return false;
+  }
+}
+
+/** Mirrors the preferred list size into a cookie the server can read; failures (cookies blocked) are ignored. */
+export function writePageSizeCookie(size: number): void {
+  try {
+    document.cookie = pageSizeCookie(size, window.location.protocol === 'https:');
+  } catch {
+    // The preference still works from the address; only the server-side default is lost.
   }
 }

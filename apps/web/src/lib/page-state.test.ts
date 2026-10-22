@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { DEFAULT_PAGE_SIZE, MAX_PAGE, PAGE_SIZES, describeRange, pageHref, parsePageParams } from './page-state.ts';
+import { DEFAULT_PAGE_SIZE, MAX_PAGE, PAGE_SIZES, describeRange, pageHref, pageSizeCookie, parsePageParams, parsePageSizeCookie } from './page-state.ts';
 
 describe('parsePageParams', () => {
   it('defaults to page 1 and the default size', () => {
@@ -71,5 +71,46 @@ describe('pageHref', () => {
 
   it('returns the bare path when nothing remains', () => {
     assert.equal(pageHref('/alerts', new URLSearchParams(), { page: 1, pageSize: DEFAULT_PAGE_SIZE }), '/alerts');
+  });
+});
+
+describe('parsePageParams with the stored preferred size', () => {
+  it('uses the preferred size when the address names none', () => {
+    assert.deepEqual(parsePageParams({ page: '3' }, 25), { page: 3, pageSize: 25 });
+  });
+
+  it('lets a page_size in the address win over the preference', () => {
+    assert.equal(parsePageParams({ page_size: '100' }, 25).pageSize, 100);
+    assert.equal(parsePageParams({ page_size: '50' }, 25).pageSize, 50);
+  });
+
+  it('ignores a preference that is not an offered size', () => {
+    assert.equal(parsePageParams({}, 7).pageSize, DEFAULT_PAGE_SIZE);
+  });
+
+  it('falls back to the built-in default, not the preference, for an invalid address size', () => {
+    assert.equal(parsePageParams({ page_size: '7' }, 25).pageSize, DEFAULT_PAGE_SIZE);
+  });
+});
+
+describe('page size cookie', () => {
+  it('reads only offered sizes', () => {
+    assert.equal(parsePageSizeCookie('25'), 25);
+    assert.equal(parsePageSizeCookie('100'), 100);
+    for (const bad of ['7', '', 'abc', '25; Path=/', '1e2', undefined]) assert.equal(parsePageSizeCookie(bad), DEFAULT_PAGE_SIZE);
+  });
+
+  it('is set for a year, lax, site-wide and holds no secret', () => {
+    const text = pageSizeCookie(25, false);
+    assert.match(text, /^netsight_page_size=25;/);
+    assert.match(text, /Path=\//);
+    assert.match(text, /SameSite=Lax/);
+    assert.match(text, /Max-Age=31536000/);
+    assert.doesNotMatch(text, /Secure/);
+    assert.match(pageSizeCookie(25, true), /; Secure/);
+  });
+
+  it('is expired for the default size', () => {
+    assert.match(pageSizeCookie(DEFAULT_PAGE_SIZE, false), /Max-Age=0/);
   });
 });

@@ -24,9 +24,10 @@ function el<K extends keyof HTMLElementTagNameMap>(
 function mountShell() {
   const toggle = el('button', { type: 'button', title: 'Toggle sidebar', id: 'toggle' }, 'menu');
   document.body.replaceChildren(
-    el('header', { class: 'app-header' }, '', [toggle, el('input', { id: 'finder' })]),
+    el('header', { class: 'app-header' }, '', [el('div', { class: 'left' }, '', [toggle]), el('input', { id: 'finder' })]),
     el('aside', { class: 'app-sidebar' }, '', [el('a', { href: '/a', id: 'a' }, 'A'), el('a', { href: '/b', id: 'b' }, 'B')]),
     el('main', { class: 'app-main' }, '', [el('button', { id: 'content' }, 'content')]),
+    el('nav', { class: 'mobile-nav' }, '', [el('a', { href: '/x', id: 'tab' }, 'tab')]),
   );
   // The library flips a body class from the toggle; reproduce that.
   toggle.addEventListener('click', () => document.body.classList.toggle('sidebar-open'));
@@ -49,6 +50,7 @@ afterEach(() => {
   cleanup();
   document.body.replaceChildren();
   document.body.className = '';
+  document.body.style.overflow = '';
 });
 
 describe('MobileDrawer on a phone', () => {
@@ -111,6 +113,104 @@ describe('MobileDrawer on a phone', () => {
     document.body.classList.remove('sidebar-open');
     await settle();
     assert.equal(document.activeElement, toggle);
+  });
+});
+
+describe('MobileDrawer with another overlay open', () => {
+  async function openDrawer() {
+    const toggle = mountShell();
+    render(<MobileDrawer />);
+    await settle();
+    toggle.click();
+    await settle();
+    return toggle;
+  }
+
+  it('leaves the drawer open when Escape was already handled', async () => {
+    await openDrawer();
+    const handler = (event: Event) => event.preventDefault();
+    document.addEventListener('keydown', handler, true);
+    await press('Escape');
+    document.removeEventListener('keydown', handler, true);
+    assert.equal(document.body.classList.contains('sidebar-open'), true);
+  });
+
+  const inner = () => el('button', { id: 'inner' }, 'x');
+  for (const [name, overlay] of [
+    ['a role=dialog', () => el('div', { role: 'dialog' }, '', [inner()])],
+    ['an aria-modal region', () => el('div', { 'aria-modal': 'true' }, '', [inner()])],
+    ['an open dialog element', () => el('dialog', { open: '' }, '', [inner()])],
+    ['a popover', () => el('div', { popover: '' }, '', [inner()])],
+  ] as const) {
+    it(`does not close the drawer for Escape pressed inside ${name}`, async () => {
+      await openDrawer();
+      const holder = overlay();
+      document.body.append(holder);
+      const target = document.getElementById('inner') as HTMLElement;
+      await act(async () => void target.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })));
+      assert.equal(document.body.classList.contains('sidebar-open'), true);
+      holder.remove();
+    });
+  }
+});
+
+describe('MobileDrawer page lock', () => {
+  it('locks body scroll while open and restores it on close', async () => {
+    document.body.style.overflow = 'auto';
+    const toggle = mountShell();
+    render(<MobileDrawer />);
+    await settle();
+    assert.equal(document.body.style.overflow, 'auto');
+    toggle.click();
+    await settle();
+    assert.equal(document.body.style.overflow, 'hidden');
+    toggle.click();
+    await settle();
+    assert.equal(document.body.style.overflow, 'auto');
+  });
+
+  it('releases the scroll lock and inert regions when unmounted while open', async () => {
+    const toggle = mountShell();
+    const view = render(<MobileDrawer />);
+    await settle();
+    toggle.click();
+    await settle();
+    view.unmount();
+    assert.equal(document.body.style.overflow, '');
+    assert.equal((document.querySelector('.app-main') as HTMLElement).inert, false);
+    assert.equal((document.querySelector('.mobile-nav') as HTMLElement).inert, false);
+    assert.equal((document.getElementById('finder') as HTMLElement).inert, false);
+  });
+
+  it('puts the bottom tab bar and the rest of the header behind the open drawer, but not the toggle', async () => {
+    const toggle = mountShell();
+    render(<MobileDrawer />);
+    await settle();
+    toggle.click();
+    await settle();
+    assert.equal((document.querySelector('.mobile-nav') as HTMLElement).inert, true);
+    assert.equal((document.getElementById('finder') as HTMLElement).inert, true);
+    assert.ok(!toggle.inert);
+    assert.ok(!(toggle.parentElement as HTMLElement).inert);
+    toggle.click();
+    await settle();
+    assert.equal((document.querySelector('.mobile-nav') as HTMLElement).inert, false);
+    assert.equal((document.getElementById('finder') as HTMLElement).inert, false);
+  });
+});
+
+describe('MobileDrawer close slot', () => {
+  it('creates its slot on mount only and removes it on unmount', async () => {
+    mountShell();
+    const sidebar = document.querySelector('.app-sidebar') as HTMLElement;
+    const before = sidebar.children.length;
+    const view = render(<MobileDrawer />);
+    await settle();
+    assert.equal(sidebar.querySelectorAll('.mobile-drawer-slot').length, 1);
+    view.rerender(<MobileDrawer />);
+    assert.equal(sidebar.querySelectorAll('.mobile-drawer-slot').length, 1);
+    view.unmount();
+    assert.equal(sidebar.children.length, before);
   });
 });
 

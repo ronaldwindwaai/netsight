@@ -24,12 +24,37 @@ function first(value: Raw): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
 
-export function parsePageParams(query: { page?: Raw; page_size?: Raw }): PageParams {
+/** Cookie that mirrors the reader's preferred size so the server can render it without a second fetch. */
+export const PAGE_SIZE_COOKIE = 'netsight_page_size';
+const COOKIE_MAX_AGE_SECONDS = 365 * 24 * 60 * 60;
+
+/** A cookie value to a page size: only the offered sizes, anything else is the built-in default. */
+export function parsePageSizeCookie(value: string | undefined): number {
+  const size = value !== undefined && /^\d{1,3}$/.test(value) ? Number(value) : DEFAULT_PAGE_SIZE;
+  return (PAGE_SIZES as readonly number[]).includes(size) ? size : DEFAULT_PAGE_SIZE;
+}
+
+/**
+ * The `document.cookie` assignment that mirrors a preferred size. Not a secret and not HttpOnly (the
+ * page script writes it); the default size expires the cookie instead of storing it.
+ */
+export function pageSizeCookie(size: number, secure: boolean): string {
+  const isDefault = size === DEFAULT_PAGE_SIZE;
+  const attributes = `Path=/; SameSite=Lax; Max-Age=${isDefault ? 0 : COOKIE_MAX_AGE_SECONDS}${secure ? '; Secure' : ''}`;
+  return `${PAGE_SIZE_COOKIE}=${isDefault ? '' : size}; ${attributes}`;
+}
+
+/**
+ * Page and size from the address. `preferredSize` (from the cookie) applies only when the address has
+ * no `page_size`; any `page_size` in the address, valid or not, wins over it.
+ */
+export function parsePageParams(query: { page?: Raw; page_size?: Raw }, preferredSize: number = DEFAULT_PAGE_SIZE): PageParams {
   const rawPage = first(query.page);
   const parsed = rawPage !== undefined && /^\d{1,9}$/.test(rawPage) ? Number(rawPage) : 1;
   const page = parsed >= 1 && parsed <= MAX_PAGE ? parsed : 1;
   const rawSize = first(query.page_size);
-  const size = rawSize !== undefined && /^\d+$/.test(rawSize) ? Number(rawSize) : DEFAULT_PAGE_SIZE;
+  const fallback = (PAGE_SIZES as readonly number[]).includes(preferredSize) ? preferredSize : DEFAULT_PAGE_SIZE;
+  const size = rawSize !== undefined && /^\d+$/.test(rawSize) ? Number(rawSize) : rawSize === undefined ? fallback : DEFAULT_PAGE_SIZE;
   const pageSize = (PAGE_SIZES as readonly number[]).includes(size) ? size : DEFAULT_PAGE_SIZE;
   return { page, pageSize };
 }

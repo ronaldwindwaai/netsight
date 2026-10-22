@@ -44,4 +44,41 @@ describe('EARLY_SCRIPT', () => {
   it('does not replace working storage', () => {
     assert.equal((run(() => undefined).localStorage as unknown as { memory?: boolean }).memory, undefined);
   });
+
+  it('does not replace a working store whose getItem throws', () => {
+    const window = run((w) => {
+      Object.defineProperty(w.Storage.prototype, 'getItem', {
+        configurable: true,
+        value() {
+          throw new w.DOMException('quota', 'QuotaExceededError');
+        },
+      });
+    });
+    assert.equal((window.localStorage as unknown as { memory?: boolean }).memory, undefined);
+    assert.equal(window.document.documentElement.dataset.density, undefined);
+  });
+
+  it('keeps keys such as __proto__ as ordinary data in the stand-in', () => {
+    const store = run(blockStorage).localStorage as unknown as Storage;
+    assert.equal(store.getItem('__proto__'), null);
+    assert.equal(store.getItem('toString'), null);
+    store.setItem('__proto__', 'x');
+    assert.equal(store.getItem('__proto__'), 'x');
+    assert.equal(store.length, 1);
+    assert.equal(store.key(0), '__proto__');
+    store.removeItem('__proto__');
+    assert.equal(store.getItem('__proto__'), null);
+  });
+
+  it('gives the stand-in the rest of the Storage surface: length, key and clear', () => {
+    const store = run(blockStorage).localStorage as unknown as Storage;
+    store.setItem('a', '1');
+    store.setItem('b', '2');
+    assert.equal(store.length, 2);
+    assert.equal(store.key(0), 'a');
+    assert.equal(store.key(1), 'b');
+    assert.equal(store.key(2), null);
+    store.clear();
+    assert.equal(store.length, 0);
+  });
 });

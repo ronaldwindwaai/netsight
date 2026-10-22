@@ -42,11 +42,14 @@ Requirements:
   (`netsight.shortcuts`, `netsight.density`, `netsight.page_size`) inside try/catch; with storage blocked the
   controls still work for the page view and the panel says so. Nothing is sent to the API. Defaults are removed
   from storage. Table density is applied to `<html data-density>` by a tiny `beforeInteractive` script so rows do not
-  jump on load. The default list size is applied only when a list address has no `page_size`: the list controls swap
-  it in once with `router.replace`; a `page_size` in the URL always wins, and while a non-default size is preferred
-  the size links keep `page_size` explicit so choosing the built-in 50 is respected. It is parsed by the existing
-  `parsePageParams`. Known limit: the server renders the first response at the built-in size, so a reader with a
-  different preference sees one extra load on first arrival at a list.
+  jump on load. The default list size is mirrored into a
+  non-secret cookie (`netsight_page_size`, `SameSite=Lax`, `Path=/`, one year, only 25/50/100, expired for the
+  default) written by the page, and the devices and alerts pages read it server-side, so lists render at the
+  preferred size with no second fetch. A `page_size` in the URL always wins, and while a non-default size is
+  preferred the size links keep `page_size` explicit so choosing the built-in 50 is respected. Fallback: when the
+  cookie is missing or stale (first visit after upgrade, cookies blocked) the list controls add the size once with
+  `router.replace`, keeping `page` and filters. Display preferences never write `<html data-density>` before the
+  stored values are live, so the early script's value is not flickered over during hydration.
 - **Navigation drawer (below 992px):** `MobileDrawer` names the toggle ("Open/Close navigation menu",
   `aria-expanded`, `aria-controls`), moves focus into the drawer on open and back to the toggle on close, keeps Tab
   inside the drawer, closes on Escape and after navigation, and makes the closed drawer and (while open) the page
