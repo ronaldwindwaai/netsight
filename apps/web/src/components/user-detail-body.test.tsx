@@ -80,7 +80,7 @@ describe('every outcome of the read has its own surface', () => {
 describe('the profile', () => {
   it('names the person, the accounts and what the evidence was read from', () => {
     render(body(okState(detailFixture())));
-    assert.ok(screen.getByRole('heading', { name: 'Alice Example', level: 1 }));
+    assert.ok(screen.getByRole('heading', { name: 'Alice Example', level: 2 }));
     const accounts = section('Accounts');
     assert.match(accounts.textContent ?? '', /Person to account/);
     assert.match(accounts.textContent ?? '', /alice/);
@@ -101,7 +101,7 @@ describe('the profile', () => {
 
   it('labels an unnamed person', () => {
     render(body(okState(detailFixture({ user: profile({ display_name: null }) }))));
-    assert.ok(screen.getByRole('heading', { name: 'Unnamed person', level: 1 }));
+    assert.ok(screen.getByRole('heading', { name: 'Unnamed person', level: 2 }));
   });
 
   it('shows a partial-evidence notice when a source could not be read', () => {
@@ -244,9 +244,8 @@ describe('security events', () => {
 });
 
 describe('accessibility', () => {
-  it('uses one level-one heading and named regions for every section', () => {
+  it('names a region for every section', () => {
     render(body(okState(detailFixture())));
-    assert.equal(screen.getAllByRole('heading', { level: 1 }).length, 1);
     for (const name of ['Accounts', 'Current sessions', 'Assigned devices', 'Traffic', 'Security events']) {
       assert.ok(section(name), name);
     }
@@ -257,5 +256,14 @@ describe('accessibility', () => {
     for (const item of screen.getAllByRole('listitem')) {
       assert.match(item.textContent ?? '', /Observed|Inferred|Unknown/);
     }
+  });
+});
+
+describe('page structure', () => {
+  it('renders no h1 of its own: the page title belongs to AppContent', () => {
+    render(body(okState(detailFixture())));
+
+    assert.equal(screen.queryAllByRole('heading', { level: 1 }).length, 0);
+    assert.ok(screen.getAllByRole('heading', { level: 2 }).length > 0);
   });
 });

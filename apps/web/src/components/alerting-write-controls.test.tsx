@@ -165,6 +165,27 @@ describe('who can change alerting configuration', () => {
   });
 });
 
+describe('when the store cannot take a write', () => {
+  const REASON = 'The alert rule store is not connected, so rules cannot be created.';
+
+  it('New rule is disabled and states the store reason for a permitted viewer', () => {
+    render(<NewRuleButton viewer={VIEWERS.administrator} unavailableReason={REASON} />);
+    assert.equal(button(/New rule/).disabled, true);
+    assert.equal(describedText(button(/New rule/)), REASON);
+  });
+
+  it('a viewer without permission still gets the permission reason first', () => {
+    render(<NewRuleButton viewer={VIEWERS.auditor} unavailableReason={REASON} />);
+    assert.match(describedText(button(/New rule/)), /Your role does not permit this action/);
+  });
+
+  it('New window is disabled with the store reason too', () => {
+    render(<NewWindowButton viewer={VIEWERS.administrator} unavailableReason="Window store down." />);
+    assert.equal(button(/New window/).disabled, true);
+    assert.equal(describedText(button(/New window/)), 'Window store down.');
+  });
+});
+
 describe('creating a rule', () => {
   async function openCreate(viewer: Viewer = VIEWERS.administrator) {
     render(<NewRuleButton viewer={viewer} />);

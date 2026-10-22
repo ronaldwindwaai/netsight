@@ -1,4 +1,4 @@
-import { AppContent } from '@adminlte/react';
+import { AppContent } from '@/components/app-content';
 import { notFound } from 'next/navigation';
 
 import { ActionDecisionPanel } from '@/components/action-decision-panel';
@@ -9,6 +9,8 @@ import { apiGet } from '@/lib/api';
 import { parseSessionInfo } from '@/lib/api-contracts';
 import { ACTION_ID, parseActionDetail, parseActionStatus } from '@/lib/api-contracts-actions';
 import { canReadActions, viewerFromSession } from '@/lib/viewer';
+
+export const metadata = { title: 'Action request' };
 
 export default async function ActionPage({ params }: { params: Promise<{ actionId: string }> }) {
   const { actionId } = await params;
@@ -40,6 +42,7 @@ export default async function ActionPage({ params }: { params: Promise<{ actionI
       <ActionDetailBody
         state={detail}
         status={statusData}
+        viewer={viewer}
         panel={
           detail.kind === 'ok' ? (
             <ActionDecisionPanel

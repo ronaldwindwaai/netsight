@@ -127,7 +127,7 @@ describe('finding detail', () => {
   const detail = (
     state: Parameters<typeof UnknownDeviceDetailBody>[0]['state'],
     timelineState: Parameters<typeof UnknownDeviceDetailBody>[0]['timeline'] = okState(timeline()),
-  ) => <UnknownDeviceDetailBody state={state} actions={<p>ACTIONS-SLOT</p>} timeline={timelineState} />;
+  ) => <UnknownDeviceDetailBody state={state} actions={<p>ACTIONS-SLOT</p>} timeline={timelineState} permissions={[]} />;
 
   it('every outcome of the read has its own surface and no actions', () => {
     const outcomes: Array<[Parameters<typeof UnknownDeviceDetailBody>[0]['state'], RegExp]> = [

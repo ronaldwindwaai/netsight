@@ -1,4 +1,4 @@
-import { AppContent } from '@adminlte/react';
+import { AppContent } from '@/components/app-content';
 
 import { ForecastBody } from '@/components/forecast-body';
 import { Step8AccessDenied } from '@/components/step8-access-denied';
@@ -7,6 +7,8 @@ import { parseSessionInfo } from '@/lib/api-contracts';
 import { parseForecastResponse } from '@/lib/api-contracts-forecast';
 import { forecastPath, parseForecastQuery } from '@/lib/forecast-view';
 import { canExportForecast, canReadForecast, viewerFromSession } from '@/lib/viewer';
+
+export const metadata = { title: 'Capacity forecast' };
 
 type Params = Record<string, string | string[] | undefined>;
 

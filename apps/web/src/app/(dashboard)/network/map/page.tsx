@@ -1,9 +1,13 @@
-import { AppContent, Card } from '@adminlte/react';
+import { AppCard } from '@/components/app-card';
+import { AppContent } from '@/components/app-content';
 
 import { DataFailure, FreshnessNotice } from '@/components/data-state';
-import { TopologyGraph } from '@/components/topology-graph';
+import { TopologyView } from '@/components/topology-graph';
 import { apiGet } from '@/lib/api';
 import { parseTopologyResponse, type TopologyResponse } from '@/lib/api-contracts';
+import { resolveFocus } from '@/lib/topology-view';
+
+export const metadata = { title: 'Network map' };
 
 function EmptySurface({
   icon,
@@ -23,7 +27,7 @@ function EmptySurface({
   );
 }
 
-function GraphEvidence({ topology }: { topology: TopologyResponse }) {
+function GraphEvidence({ topology, focus }: { topology: TopologyResponse; focus: string | null }) {
   const labels = new Map(
     topology.nodes.map((node) => [node.device_id, node.name ?? node.device_id]),
   );
@@ -36,7 +40,7 @@ function GraphEvidence({ topology }: { topology: TopologyResponse }) {
   };
   return (
     <>
-      <TopologyGraph topology={topology} />
+      <TopologyView topology={topology} focus={focus} />
       <div className="d-flex flex-wrap gap-2 mb-3" role="list" aria-label="Topology nodes">
         {topology.nodes.map((node) => (
           <span
@@ -81,7 +85,7 @@ function GraphEvidence({ topology }: { topology: TopologyResponse }) {
           </ul>
         </div>
       ) : null}
-      <Card title="Explicit links" icon="bi bi-diagram-3" variant="outline" theme="primary" bodyClass="p-0">
+      <AppCard title="Explicit links" icon="bi bi-diagram-3" variant="outline" theme="primary" bodyClass="p-0">
         <div className="table-responsive">
           <table className="table table-sm mb-0">
             <thead>
@@ -122,14 +126,19 @@ function GraphEvidence({ topology }: { topology: TopologyResponse }) {
             </tbody>
           </table>
         </div>
-      </Card>
+      </AppCard>
     </>
   );
 }
 
-export default async function MapPage() {
+export default async function MapPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ focus?: string | string[] }>;
+}) {
   const state = await apiGet('/api/v1/topology', parseTopologyResponse);
   const topology = state.kind === 'ok' ? state.data : null;
+  const focus = topology === null ? null : resolveFocus((await searchParams).focus, topology);
 
   return (
     <AppContent
@@ -146,7 +155,7 @@ export default async function MapPage() {
       {state.kind !== 'ok' ? <DataFailure state={state} /> : null}
       {topology ? <FreshnessNotice freshness={topology.freshness} /> : null}
 
-      <Card
+      <AppCard
         className="operational-card operational-card--primary"
         title="Topology"
         icon="bi bi-diagram-3"
@@ -177,9 +186,9 @@ export default async function MapPage() {
             detail="A topology source is configured but its current state could not be confirmed. No graph is drawn."
           />
         ) : (
-          <GraphEvidence topology={topology} />
+          <GraphEvidence topology={topology} focus={focus} />
         )}
-      </Card>
+      </AppCard>
     </AppContent>
   );
 }

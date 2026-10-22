@@ -1,4 +1,4 @@
-import { AppContent } from '@adminlte/react';
+import { AppContent } from '@/components/app-content';
 
 import { InventoryBody } from '@/components/inventory-body';
 import { InventoryFilters } from '@/components/inventory-filters';
@@ -9,6 +9,8 @@ import { parseSessionInfo } from '@/lib/api-contracts';
 import { parseInventoryList, parseInventorySummaryResponse } from '@/lib/api-contracts-inventory';
 import { inventoryPath, parseInventoryQuery } from '@/lib/inventory-view';
 import { canReadInventory, canReadInventorySummary, viewerFromSession } from '@/lib/viewer';
+
+export const metadata = { title: 'Inventory' };
 
 type Params = Record<string, string | string[] | undefined>;
 

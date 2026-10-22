@@ -21,56 +21,63 @@ interface MenuEntry {
   requires?: string;
 }
 
-const MENU_ENTRIES: readonly MenuEntry[] = [
-  { node: { type: 'header', text: 'Main' } },
-  { node: { type: 'item', text: 'Overview', href: '/overview', icon: 'bi-speedometer2' } },
-  { node: { type: 'item', text: 'Network Map', href: '/network/map', icon: 'bi-diagram-3' } },
-  { node: { type: 'item', text: 'Devices', href: '/devices', icon: 'bi-hdd-network' } },
+interface MenuGroup {
+  /** Primary group from docs/03-ui-ux/INFORMATION-ARCHITECTURE.md. Shown only when an entry is visible. */
+  header: string;
+  entries: readonly MenuEntry[];
+}
+
+function item(text: string, href: string, icon: string, requires?: string): MenuEntry {
+  return { node: { type: 'item', text, href, icon }, requires };
+}
+
+const MENU_GROUPS: readonly MenuGroup[] = [
+  { header: 'Overview', entries: [item('Overview', '/overview', 'bi-speedometer2')] },
   {
-    node: { type: 'item', text: 'Inventory', href: '/inventory', icon: 'bi-boxes' },
-    requires: INVENTORY_PERMISSION,
+    header: 'Network',
+    entries: [
+      item('Network Map', '/network/map', 'bi-diagram-3'),
+      item('Devices', '/devices', 'bi-hdd-network'),
+      item('Internet', '/internet', 'bi-globe2', INTERNET_PERMISSION),
+    ],
   },
   {
-    node: { type: 'item', text: 'IPAM', href: '/ipam', icon: 'bi-diagram-2' },
-    requires: IPAM_PERMISSION,
+    header: 'Security',
+    entries: [
+      item('Security', '/security', 'bi-shield-exclamation'),
+      item('Unknown devices', '/unknown-devices', 'bi-patch-question', FINDINGS_PERMISSION),
+      item('Users', '/users', 'bi-people', USERS_PERMISSION),
+    ],
   },
   {
-    node: { type: 'item', text: 'Unknown devices', href: '/unknown-devices', icon: 'bi-patch-question' },
-    requires: FINDINGS_PERMISSION,
+    header: 'Operations',
+    entries: [
+      item('Incidents', '/incidents', 'bi-exclamation-triangle'),
+      item('Alerts', '/alerts', 'bi-bell'),
+      item('Diagnostics', '/diagnostics', 'bi-clipboard2-pulse', DIAGNOSTICS_PERMISSION),
+      item('Action requests', '/actions', 'bi-shield-check', ACTIONS_PERMISSION),
+    ],
   },
   {
-    node: { type: 'item', text: 'Users', href: '/users', icon: 'bi-people' },
-    requires: USERS_PERMISSION,
+    header: 'Infrastructure',
+    entries: [
+      item('Inventory', '/inventory', 'bi-boxes', INVENTORY_PERMISSION),
+      item('IPAM', '/ipam', 'bi-diagram-2', IPAM_PERMISSION),
+      item('Configuration', '/config', 'bi-file-earmark-code', 'configuration:read'),
+    ],
   },
   {
-    node: { type: 'item', text: 'Traffic', href: '/traffic', icon: 'bi-bar-chart-line' },
-    requires: TRAFFIC_PERMISSION,
+    header: 'Intelligence',
+    entries: [item('Ask Netsight', '/copilot', 'bi-chat-left-text', COPILOT_PERMISSION)],
   },
   {
-    node: { type: 'item', text: 'Internet', href: '/internet', icon: 'bi-globe2' },
-    requires: INTERNET_PERMISSION,
+    header: 'Analytics',
+    entries: [
+      item('Traffic', '/traffic', 'bi-bar-chart-line', TRAFFIC_PERMISSION),
+      item('Capacity forecast', '/forecast', 'bi-graph-up-arrow', FORECAST_PERMISSION),
+      item('Reports', '/reports', 'bi-file-earmark-bar-graph', 'reports:read'),
+    ],
   },
-  {
-    node: { type: 'item', text: 'Capacity forecast', href: '/forecast', icon: 'bi-graph-up-arrow' },
-    requires: FORECAST_PERMISSION,
-  },
-  { node: { type: 'item', text: 'Security', href: '/security', icon: 'bi-shield-exclamation' } },
-  {
-    node: { type: 'item', text: 'Diagnostics', href: '/diagnostics', icon: 'bi-clipboard2-pulse' },
-    requires: DIAGNOSTICS_PERMISSION,
-  },
-  {
-    node: { type: 'item', text: 'Ask Netsight', href: '/copilot', icon: 'bi-chat-left-text' },
-    requires: COPILOT_PERMISSION,
-  },
-  {
-    node: { type: 'item', text: 'Action requests', href: '/actions', icon: 'bi-shield-check' },
-    requires: ACTIONS_PERMISSION,
-  },
-  { node: { type: 'item', text: 'Incidents', href: '/incidents', icon: 'bi-exclamation-triangle' } },
-  { node: { type: 'item', text: 'Alerts', href: '/alerts', icon: 'bi-bell' } },
-  { node: { type: 'item', text: 'Configuration', href: '/config', icon: 'bi-file-earmark-code' }, requires: 'configuration:read' },
-  { node: { type: 'item', text: 'Reports', href: '/reports', icon: 'bi-file-earmark-bar-graph' }, requires: 'reports:read' },
 ];
 
 /**
@@ -80,7 +87,10 @@ const MENU_ENTRIES: readonly MenuEntry[] = [
  */
 export function menuItemsFor(permissions: readonly string[] | null): MenuNode[] {
   const held = new Set(permissions ?? []);
-  return MENU_ENTRIES.filter((entry) => entry.requires === undefined || held.has(entry.requires)).map(
-    (entry) => entry.node,
-  );
+  return MENU_GROUPS.flatMap((group) => {
+    const visible = group.entries
+      .filter((entry) => entry.requires === undefined || held.has(entry.requires))
+      .map((entry) => entry.node);
+    return visible.length === 0 ? [] : [{ type: 'header' as const, text: group.header }, ...visible];
+  });
 }

@@ -4,7 +4,8 @@
  * injected HTML. Every finding is shown as data with its source evidence count;
  * nothing is estimated in place of an unknown.
  */
-import { Alert, Card } from '@adminlte/react';
+import { Alert } from '@adminlte/react';
+import { AppCard } from '@/components/app-card';
 
 import { UnavailableActions } from '@/components/unavailable-actions';
 import type {
@@ -165,7 +166,7 @@ export function DiagnosticRunView({ run }: { run: DiagnosticRun }) {
       </div>
 
       {run.checks.length > 0 ? (
-        <Card
+        <AppCard
           className="operational-card mb-3"
           title="Automated check results"
           icon="bi bi-list-ul"
@@ -178,10 +179,10 @@ export function DiagnosticRunView({ run }: { run: DiagnosticRun }) {
               <CheckRow key={check.id} index={index + 1} check={check} />
             ))}
           </ol>
-        </Card>
+        </AppCard>
       ) : null}
 
-      <Card
+      <AppCard
         className="operational-card"
         title="Probable cause"
         icon="bi bi-bandaid"
@@ -206,7 +207,7 @@ export function DiagnosticRunView({ run }: { run: DiagnosticRun }) {
             <FindingList heading="Evidence" items={run.facts} />
           </>
         )}
-      </Card>
+      </AppCard>
 
       {run.contradictions.length > 0 ? (
         <div className="mb-3">
@@ -230,7 +231,7 @@ export function DiagnosticRunView({ run }: { run: DiagnosticRun }) {
         </div>
       ) : null}
 
-      <Card
+      <AppCard
         className="operational-card mt-3"
         title="Recommended next checks"
         icon="bi bi-list-check"
@@ -244,9 +245,9 @@ export function DiagnosticRunView({ run }: { run: DiagnosticRun }) {
             No further checks are recommended from one run.
           </p>
         ) : null}
-      </Card>
+      </AppCard>
 
-      <Card
+      <AppCard
         className="operational-card mt-3"
         title="Follow-up actions"
         icon="bi bi-shield-lock"
@@ -266,7 +267,7 @@ export function DiagnosticRunView({ run }: { run: DiagnosticRun }) {
             actions={['Prepare restart']}
           />
         </div>
-      </Card>
+      </AppCard>
     </>
   );
 }

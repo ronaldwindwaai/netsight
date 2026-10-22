@@ -1,13 +1,11 @@
-import { AppContent } from '@adminlte/react';
+import { AppContent } from '@/components/app-content';
 
 import { LoadingState } from '@/components/data-state';
 
 export default function IncidentDetailLoading() {
   return (
     <AppContent title="Incident">
-      <div role="status" aria-live="polite">
-        <LoadingState label="Loading incident" />
-      </div>
+      <LoadingState label="Loading incident" />
     </AppContent>
   );
 }

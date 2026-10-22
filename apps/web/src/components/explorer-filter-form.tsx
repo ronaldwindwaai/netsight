@@ -1,21 +1,9 @@
 import Link from 'next/link';
 
 import type { FilterName } from '@/lib/api-contracts-traffic-explorer';
+import { FILTER_LABELS } from '@/lib/traffic-filter-labels';
 import { trafficHref } from '@/lib/traffic-view';
 import type { FilterValues, TrafficWindow } from '@/lib/traffic-view';
-
-const FILTER_LABELS: Record<FilterName, string> = {
-  source_ip: 'Source IP',
-  destination_ip: 'Destination IP',
-  device: 'Exporter (device)',
-  vlan: 'VLAN',
-  application: 'Application',
-  protocol: 'Protocol',
-  port: 'Port',
-  country: 'Country',
-  asn: 'ASN',
-  direction: 'Direction',
-};
 
 function Field({
   name,

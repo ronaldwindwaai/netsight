@@ -1,4 +1,7 @@
-import { Alert, Card, Spinner } from '@adminlte/react';
+import { Alert } from '@adminlte/react';
+import Link from 'next/link';
+import { AppCard } from '@/components/app-card';
+import { RetryButton } from '@/components/retry-button';
 
 import type { FetchState } from '@/lib/api';
 import type { Freshness } from '@/lib/api-contracts';
@@ -8,6 +11,14 @@ function Reference({ correlationId }: { correlationId: string }) {
     <small className="d-block mt-2 text-body-secondary">
       Reference: <code>{correlationId}</code>
     </small>
+  );
+}
+
+function Retry() {
+  return (
+    <div className="mt-2">
+      <RetryButton />
+    </div>
   );
 }
 
@@ -62,6 +73,7 @@ export function DataFailure<T>({ state }: { state: Exclude<FetchState<T>, { kind
           {state.message ||
             'This action was rate limited. Wait a moment and try again.'}
         </span>
+        <Retry />
         <Reference correlationId={state.correlationId} />
       </Alert>
     );
@@ -74,6 +86,7 @@ export function DataFailure<T>({ state }: { state: Exclude<FetchState<T>, { kind
         <span>
           Current monitoring data is unavailable while the source is under maintenance.
         </span>
+        <Retry />
         <Reference correlationId={state.correlationId} />
       </Alert>
     );
@@ -87,6 +100,7 @@ export function DataFailure<T>({ state }: { state: Exclude<FetchState<T>, { kind
           The monitoring source returned data that Netsight could not safely map to its canonical
           contract. The data was rejected and is not shown as current telemetry.
         </span>
+        <Retry />
         <Reference correlationId={state.correlationId} />
       </Alert>
     );
@@ -100,6 +114,7 @@ export function DataFailure<T>({ state }: { state: Exclude<FetchState<T>, { kind
           Current monitoring data could not be obtained. Netsight will not substitute an empty or
           healthy result.
         </span>
+        <Retry />
         <Reference correlationId={state.correlationId} />
       </Alert>
     );
@@ -112,6 +127,7 @@ export function DataFailure<T>({ state }: { state: Exclude<FetchState<T>, { kind
         <span>
           The Netsight API response was unreadable or did not match the canonical contract.
         </span>
+        <Retry />
         <Reference correlationId={state.correlationId} />
       </Alert>
     );
@@ -121,6 +137,7 @@ export function DataFailure<T>({ state }: { state: Exclude<FetchState<T>, { kind
     <Alert theme="danger" title="Unable to load data" icon="bi bi-exclamation-triangle">
       {' '}
       <span>{state.message}</span>
+      <Retry />
       <Reference correlationId={state.correlationId} />
     </Alert>
   );
@@ -145,27 +162,56 @@ export function FreshnessNotice({ freshness }: { freshness: Freshness }) {
   );
 }
 
-export function EmptyState({ filtered = false }: { filtered?: boolean }) {
+interface EmptyStateProps {
+  filtered?: boolean;
+  /** Filtered only: where "Clear filters" goes, for a screen whose filters live in the URL. */
+  clearHref?: string;
+  /** Filtered only: called by "Clear filters", for a screen that holds its filters in the page. */
+  onClear?: () => void;
+}
+
+export function EmptyState({ filtered = false, clearHref, onClear }: EmptyStateProps) {
   return (
-    <Card className="text-center" bodyClass="py-5">
+    <AppCard className="text-center" bodyClass="py-5">
       <i className="bi bi-hdd-network fs-2 text-body-secondary" aria-hidden="true" />
       <h2 className="h5 mt-3">{filtered ? 'No devices match these filters' : 'No devices found'}</h2>
-      <p className="mb-0 text-body-secondary">
+      <p className="text-body-secondary">
         {filtered
           ? 'Adjust the search text or status filter.'
           : 'The source returned a valid empty device inventory.'}
       </p>
-    </Card>
+      {filtered ? (
+        onClear ? (
+          <button className="btn btn-sm btn-outline-primary" onClick={onClear} type="button">
+            Clear filters
+          </button>
+        ) : clearHref ? (
+          <Link className="btn btn-sm btn-outline-primary" href={clearHref}>
+            Clear filters
+          </Link>
+        ) : null
+      ) : (
+        <RetryButton label="Refresh" />
+      )}
+    </AppCard>
   );
 }
 
+const SKELETON_WIDTHS: readonly string[] = ['w-75', 'w-100', 'w-50', 'w-100'];
+
+/**
+ * One loading surface for every screen: a skeleton that hints at the shape of the content, plus a
+ * single polite status region so assistive technology hears "Loading ..." once.
+ */
 export function LoadingState({ label = 'Loading device data' }: { label?: string }) {
   return (
-    <Card className="text-center" bodyClass="py-5">
-      <Spinner theme="primary" label={label} />
-      <p className="mt-3 mb-0 text-body-secondary">
-        {label}…
-      </p>
-    </Card>
+    <AppCard bodyClass="py-4">
+      <div role="status" aria-live="polite">
+        <span className="visually-hidden">{label}…</span>
+        {SKELETON_WIDTHS.map((width, index) => (
+          <div key={index} className={`skeleton-line ${width}`} aria-hidden="true" />
+        ))}
+      </div>
+    </AppCard>
   );
 }
