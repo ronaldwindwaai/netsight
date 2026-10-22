@@ -184,7 +184,7 @@ export interface ActionStatus {
   generated_at: string;
   dry_run_only: boolean;
   kill_switch: KillSwitchStatus;
-  store: { kind: 'memory'; durable: false };
+  store: { kind: 'memory' | 'postgres'; durable: boolean };
   policy: { self_execute_allowed: boolean };
   executors: ExecutorStatus[];
   definitions: ActionDefinition[];
@@ -590,7 +590,9 @@ export function parseActionStatus(value: unknown): ActionStatus | null {
     return null;
   }
   const store = exactRecord(r.store, ['kind', 'durable']);
-  if (store === null || store.kind !== 'memory' || store.durable !== false) return null;
+  // Durable exactly when it is the PostgreSQL store; a store that claims otherwise is refused.
+  if (store === null || (store.kind !== 'memory' && store.kind !== 'postgres')) return null;
+  if (store.durable !== (store.kind === 'postgres')) return null;
   const policy = exactRecord(r.policy, ['self_execute_allowed']);
   if (policy === null || !isBoolean(policy.self_execute_allowed)) return null;
   const kill = parseKillSwitch(r.kill_switch);
@@ -605,7 +607,7 @@ export function parseActionStatus(value: unknown): ActionStatus | null {
     generated_at: r.generated_at,
     dry_run_only: r.dry_run_only,
     kill_switch: kill,
-    store: { kind: 'memory', durable: false },
+    store: { kind: store.kind, durable: store.durable },
     policy: { self_execute_allowed: policy.self_execute_allowed },
     executors,
     definitions,

@@ -203,13 +203,13 @@ def test_a_link_cannot_outlive_a_missing_incident(env: Env) -> None:
 def test_down_refuses_while_the_new_tables_hold_rows_and_succeeds_with_consent(env: Env) -> None:
     _seed(env)
     with env.owner.connect() as conn, pytest.raises(migrate.DestructiveMigrationError) as raised:
-        migrate.apply_down(conn, steps=4, allow_destructive=True, env={})
+        migrate.apply_down(conn, steps=5, allow_destructive=True, env={})
     message = str(raised.value)
     assert "alert_incident_links" in message and "notification_delivery_attempts" in message
     with env.owner.connect() as conn:
         assert migrate.apply_down(
-            conn, steps=4, allow_destructive=True, env={migrate.DESTRUCTIVE_ENV: "1"}
-        ) == ["0006", "0005", "0004", "0003"]
+            conn, steps=5, allow_destructive=True, env={migrate.DESTRUCTIVE_ENV: "1"}
+        ) == ["0007", "0006", "0005", "0004", "0003"]
         row = conn.execute(
             "SELECT to_regclass('alert_incident_links') AS l, "
             "to_regclass('notification_delivery_attempts') AS a"
@@ -222,7 +222,8 @@ def test_down_refuses_while_the_new_tables_hold_rows_and_succeeds_with_consent(e
 @requires_pg
 def test_down_on_empty_tables_needs_no_environment_override(env: Env) -> None:
     with env.owner.connect() as conn:
-        assert migrate.apply_down(conn, steps=4, allow_destructive=True, env={}) == [
+        assert migrate.apply_down(conn, steps=5, allow_destructive=True, env={}) == [
+            "0007",
             "0006",
             "0005",
             "0004",

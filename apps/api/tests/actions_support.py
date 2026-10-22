@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from netsight_api.actions.killswitch import KillSwitch
 from netsight_api.actions.model import NewAction
-from netsight_api.actions.store import InMemoryActionStore
+from netsight_api.actions.store import ActionStore, InMemoryActionStore
 from netsight_api.schemas_actions import ActionActor
 from netsight_api.schemas_unknown_devices import UnknownDeviceFinding
+from netsight_api.storage.connection import PostgresSettings
 
 NOW = datetime(2026, 10, 18, 12, 0, 0, tzinfo=UTC)
 FINDING = "unknown-device-aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"
@@ -58,8 +60,36 @@ def two_person(**overrides: Any) -> NewAction:
     )
 
 
-def new_store(*, kill_switch: KillSwitch | None = None, **limits: int) -> InMemoryActionStore:
-    return InMemoryActionStore(kill_switch=kill_switch or KillSwitch(), **limits)
+class Backend:
+    """Which implementation ``new_store`` builds: the store suites run against each (see test_actions_store)."""
+
+    name = "memory"
+    settings: PostgresSettings | None = None
+
+
+def use_backend(name: str, settings: PostgresSettings | None = None) -> None:
+    Backend.name, Backend.settings = name, settings
+
+
+def new_store(
+    *,
+    kill_switch: KillSwitch | None = None,
+    on_system_transition: Callable[[str, str, str], None] | None = None,
+    allow_self_execute: bool = False,
+    **limits: int,
+) -> ActionStore:
+    common: dict[str, Any] = {
+        "kill_switch": kill_switch or KillSwitch(),
+        "on_system_transition": on_system_transition,
+        "allow_self_execute": allow_self_execute,
+        **limits,
+    }
+    if Backend.name == "postgres":
+        from netsight_api.actions.postgres_store import PostgresActionStore
+
+        assert Backend.settings is not None
+        return PostgresActionStore(Backend.settings, **common)
+    return InMemoryActionStore(**common)
 
 
 def make_finding(**changes: Any) -> UnknownDeviceFinding:

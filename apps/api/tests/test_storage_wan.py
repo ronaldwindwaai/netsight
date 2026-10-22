@@ -761,12 +761,12 @@ def test_down_refuses_while_rows_exist_and_succeeds_with_consent(database: WanDa
         database.owner.connect() as conn,
         pytest.raises(migrate.DestructiveMigrationError) as raised,
     ):
-        migrate.apply_down(conn, steps=2, allow_destructive=True, env={})
+        migrate.apply_down(conn, steps=3, allow_destructive=True, env={})
     assert "wan_link_cycles" in str(raised.value)
     with database.owner.connect() as conn:
         assert migrate.apply_down(
-            conn, steps=2, allow_destructive=True, env={migrate.DESTRUCTIVE_ENV: "1"}
-        ) == ["0006", "0005"]
+            conn, steps=3, allow_destructive=True, env={migrate.DESTRUCTIVE_ENV: "1"}
+        ) == ["0007", "0006", "0005"]
         assert conn.execute("SELECT to_regclass('wan_link_cycles') AS t").fetchone() == {"t": None}
         assert conn.execute("SELECT to_regclass('wan_link_cycles_p202610') AS t").fetchone() == {
             "t": None
@@ -784,7 +784,11 @@ def test_down_refuses_while_rows_exist_and_succeeds_with_consent(database: WanDa
 @requires_pg
 def test_down_on_empty_tables_needs_no_environment_override(database: WanDatabase) -> None:
     with database.owner.connect() as conn:
-        assert migrate.apply_down(conn, steps=2, allow_destructive=True, env={}) == ["0006", "0005"]
+        assert migrate.apply_down(conn, steps=3, allow_destructive=True, env={}) == [
+            "0007",
+            "0006",
+            "0005",
+        ]
 
 
 @requires_pg
@@ -792,8 +796,8 @@ def test_up_again_after_down_restores_the_tables_without_partitions(
     database: WanDatabase,
 ) -> None:
     with database.owner.connect() as conn:
-        migrate.apply_down(conn, steps=2, allow_destructive=True, env={})
-        assert migrate.apply_up(conn) == ["0005", "0006"]
+        migrate.apply_down(conn, steps=3, allow_destructive=True, env={})
+        assert migrate.apply_up(conn) == ["0005", "0006", "0007"]
         # a fresh table has no partition until the migrator step creates one: writes fail closed
     with pytest.raises(WanPartitionMissingError):
         record(_owner_repo(database), 0, "pass")

@@ -586,14 +586,40 @@ ACTION-ENGINE.md. **No executor that changes anything ships**; the dry-run execu
   under one lock (eight parallel approvals record exactly one). An execution key starts a run once; a target runs one execution at a time; a quarantine re-checks that the finding is still open
   and its evidence has not moved immediately before it runs.
 - **Repudiation / audit integrity (improved, not closed).** Every mutation and every refusal is audited with actor, request id and static facts; the history is append-only and hash-chained and
-  its verdict is in every detail response. The store is memory and the audit sink is a log: neither is tamper-evident storage (PRD 32 still open).
+  its verdict is in every detail response. The memory store and the audit sink are not tamper-evident storage (PRD 32 still open); the PostgreSQL store adds triggers (see the durable action store delta below).
 - **Denial of service.** Caps: 25 open requests per requester, 5 000 stored, 100 history events per request, 8 parameters, per-identity budgets (writes 30/min, execute 10/min, kill switch 5/min).
   A run that never reports back is failed after its timeout plus 60 s; an overrunning executor call is abandoned on a daemon thread (it cannot be killed).
 - **Information disclosure.** A quarantine proposal copies no MAC, address or name into the action store; audit records carry no reason, parameter or target; executor exceptions are discarded
   (they may carry addresses or credentials); errors are fixed sentences; all responses `no-store`.
 - **Fail-closed configuration.** Engine and live-execution flags fail start-up when garbled; an unreadable kill-switch value counts as engaged; a missing flag means `not-connected`.
-- **Still open.** Durable multi-worker store and a tamper-evident audit sink; a per-process kill switch; approver policy (Administrator only today); no live executor, lab or connector security
+- **Still open.** ~~Durable multi-worker store~~ (built: see the durable action store delta below) and a tamper-evident audit sink; a per-process kill switch; approver policy (Administrator only today); no live executor, lab or connector security
   review; a Playwright run of the pages; shared (non per-worker) rate limits.
+
+### Durable action store (Step 12 follow-up, D-53, migration 0007) - threat-model delta
+
+The action store can now be PostgreSQL (`DATABASE_URL`): requests, approvals and the hash-chained history survive a restart and are shared by every worker. No executor changed; the dry-run executor is
+still the only one. New surface: two tables, six trigger functions, one grant block, one more way for the engine to fail (the database).
+
+- **Tampering with the decision record (improved).** The history rejects `UPDATE`/`DELETE`/`TRUNCATE` for every role including the owner (`ENABLE ALWAYS`, so also under `session_replication_role = replica`),
+  every event must continue the chain (sequence, previous hash, the state it starts from, a legal move), and a deferred trigger fails any commit in which a request is not what its history says (version, state,
+  approvals, execution record). The runtime role has `SELECT`/`INSERT` and column-level `UPDATE` of the mutable columns only: it cannot change a request's target, parameters, requester, reason, digest or
+  idempotency key, cannot remove a row and cannot truncate. Tests disable the triggers as the owner and show `chain_intact` turns false for an edit, a gap, a reorder, a cut-off head or tail and a history
+  moved to another request. **Residual:** the table owner and superusers can disable the triggers (keep `DATABASE_MIGRATION_URL` out of the service) and, with the owner, recompute a whole chain: SHA-256
+  without a secret key is detectable, not tamper-proof; the audit sink is still a log (PRD 32).
+- **Races between workers (closed for the store).** Approvals, rejections, cancellations, execution starts and expiry all run under `SELECT ... FOR UPDATE` on the request row and quote digest and version;
+  creation is serialised by an advisory lock (caps and the one-open-per-target rule are exact across workers) and an execution by a lock on its target, with unique indexes as the backstop. Tested live with
+  parallel approvals (exactly one recorded), parallel execution starts (one run), parallel creation (cap, duplicates, one idempotency key) and parallel expiry sweeps (each overdue request moved once, and its audit callback run at most once after commit).
+  **Still per process:** the kill switch and the rate limits (a runtime stop on one worker does not stop the others; use `NETSIGHT_ACTIONS_KILL_SWITCH` and a restart for a hard stop).
+- **Availability and misconfiguration.** An unreachable or failing database is a `503 STORE_UNAVAILABLE`, never a silent switch to memory (that would split the record between workers) and never an empty
+  success; `DATABASE_URL` that is not a PostgreSQL URL fails start-up when the engine is enabled, as does a missing migration, grant or trigger found by the one-off start-up probe (an unreachable database does not: it is logged and answers 503; `NETSIGHT_ACTIONS_REQUIRE_DURABLE` refuses start-up without a database); session timeouts bound every statement and lock wait. The creation lock is global, so a stuck creator can
+  delay other proposals until the lock timeout (5 s), not other decisions.
+- **Information disclosure.** The tables hold what the memory store held (type, target id, parameters, requester id, reason, approver ids, static codes, rejection/cancellation notes); no endpoint MAC, address or
+  name is added, no secret, no DSN in an error message (errors are fixed sentences, a row that fails validation is logged without its content). Retention of this data is a pending human decision (DATA-RETENTION-MATRIX);
+  no prune is built and the 5 000 cap hides the oldest finished request instead of removing it, so the table only grows.
+- **Bad rows and content binding.** A stored request or event that no longer parses as the contract raises a storage error and is never served or reported as "intact". Every history hash covers the request digest and the store recomputes the digest from the stored content on each read, so content edited behind the digest is refused; `chain_intact` also requires the approvers on the request to equal those in the `approved` events. Remaining owner-level limit: someone who can disable the triggers and recompute SHA-256 can rewrite content, digest and chain together, or edit uncovered columns (execution record, pre-checks, execute_by).
+- **Shadowed tables (search_path).** The 0007 trigger functions pin `search_path = pg_catalog, <schema>, pg_temp`, so a runtime session cannot create a `TEMP` table named `action_history` to make the chain guards read a past of its choosing (tested live). The trigger functions of 0006, and 0002 to 0004 where they read tables, resolve names through the session path and are still exposed: follow-up.
+- **Eviction.** Only a finished request at least an hour old is evicted (hidden, never removed), so a propose-and-cancel loop cannot hide other people's records; each eviction is logged by id. The `reason` of a rejection or cancellation is stored permanently in the append-only history; worker clock skew moves deadlines by the skew.
+- **Kill switch.** Per process with either store (documented follow-up: persist the flag in a row read per decision transaction); the environment variable plus restart is the hard stop.
 
 ## AI-specific threats
 - prompt injection in logs/hostnames/knowledge;

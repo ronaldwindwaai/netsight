@@ -1,13 +1,24 @@
 """The action request lifecycle and its invariants (Step 12): approval rules, replay, TOCTOU, expiry,
-idempotency, the target lock and the append-only hash-chained history."""
+idempotency, the target lock and the append-only hash-chained history.
+
+One suite, every implementation: each test runs against the in-memory store and, with
+``NETSIGHT_TEST_PG_DSN``, the PostgreSQL store as the schema owner and as the least-privilege application
+role (a throwaway schema per test, migrated and granted by the runner). The two tests that reach into the
+in-memory records say so with ``memory_only``; their PostgreSQL counterparts are in
+``test_actions_store_postgres``.
+"""
 
 from __future__ import annotations
 
 import itertools
+import logging
 import threading
+from collections.abc import Callable, Iterator
+from contextlib import ExitStack
 from datetime import timedelta
 from typing import Any
 
+import actions_support
 import pytest
 from actions_support import (
     ALICE,
@@ -19,34 +30,83 @@ from actions_support import (
     new_store,
     two_person,
 )
+from pg_support import PG_DSN, app_role, isolated_schema, requires_pg
 
 from netsight_api.actions import errors as e
 from netsight_api.actions.history import ZERO_HASH, verify_chain
 from netsight_api.actions.killswitch import KillSwitch
 from netsight_api.actions.model import ExecutionFinish
-from netsight_api.actions.store import InMemoryActionStore
+from netsight_api.actions.store import EVICT_MIN_AGE_SECONDS, ActionStore
 from netsight_api.schemas_actions import (
     ALLOWED_TRANSITIONS,
     ActionRequest,
     ActionRollback,
     ActionVerification,
 )
+from netsight_api.storage import migrate
+from netsight_api.storage.connection import PostgresSettings
 
 KEY = "idem-key-0000000001"
+LATER = NOW + timedelta(seconds=EVICT_MIN_AGE_SECONDS + 1)
 _keys = itertools.count(1)
+
+
+@pytest.fixture(
+    autouse=True,
+    params=[
+        "memory",
+        pytest.param("postgres", marks=requires_pg),
+        pytest.param("postgres-app-role", marks=requires_pg),
+    ],
+)
+def backend(request: pytest.FixtureRequest) -> Iterator[str]:
+    """memory; PostgreSQL as the schema owner; PostgreSQL as the least-privilege application role."""
+    if request.param == "memory":
+        actions_support.use_backend("memory")
+        yield "memory"
+        return
+    assert PG_DSN
+    with ExitStack() as stack:
+        schema = stack.enter_context(isolated_schema())
+        owner = PostgresSettings(dsn=PG_DSN, schema=schema)
+        runtime = owner
+        role = ""
+        if request.param == "postgres-app-role":
+            role, role_dsn = stack.enter_context(app_role())
+            runtime = PostgresSettings(dsn=role_dsn, schema=schema)
+        with owner.connect() as conn:
+            migrate.apply_up(conn)
+            if role:
+                migrate.apply_grants(conn, role)
+        actions_support.use_backend("postgres", runtime)
+        try:
+            yield request.param
+        finally:
+            actions_support.use_backend("memory")
+
+
+def memory_only[F: Callable[..., Any]](test: F) -> F:
+    """The test reaches into the in-memory store's records, which no other implementation has."""
+    return pytest.mark.usefixtures("require_memory")(test)  # type: ignore[no-any-return]
+
+
+@pytest.fixture
+def require_memory(backend: str) -> None:
+    if backend != "memory":
+        pytest.skip(
+            "pokes at the in-memory records; the PostgreSQL tamper tests are in test_actions_store_postgres"
+        )
 
 
 def next_key() -> str:
     return f"idem-key-{next(_keys):012d}"
 
 
-def make(store: InMemoryActionStore, **overrides: Any) -> ActionRequest:
-    return store.create(new_action(**overrides), idempotency_key=next_key(), now=NOW).request
+def make(store: ActionStore, now: Any = NOW, **overrides: Any) -> ActionRequest:
+    return store.create(new_action(**overrides), idempotency_key=next_key(), now=now).request
 
 
-def approve(
-    store: InMemoryActionStore, request: ActionRequest, who: Any = BOB, **kw: Any
-) -> ActionRequest:
+def approve(store: ActionStore, request: ActionRequest, who: Any = BOB, **kw: Any) -> ActionRequest:
     return store.approve(
         request.id,
         approver=who,
@@ -56,12 +116,12 @@ def approve(
     )
 
 
-def approved(store: InMemoryActionStore) -> ActionRequest:
+def approved(store: ActionStore) -> ActionRequest:
     return approve(store, make(store))
 
 
 def begin(
-    store: InMemoryActionStore, request: ActionRequest, key: str = "exec-key-000000001", **kw: Any
+    store: ActionStore, request: ActionRequest, key: str = "exec-key-000000001", **kw: Any
 ) -> Any:
     return store.begin_execution(
         request.id,
@@ -576,15 +636,33 @@ def test_a_tampered_history_fails_verification() -> None:
     request = make(store)
     approve(store, request)
     events = store.history(request.id)
-    assert verify_chain(request.id, events)
+    digest = request.digest
+    assert verify_chain(request.id, events, digest)
     edited = [events[0].model_copy(update={"actor_id": "mallory"}), *events[1:]]
-    assert not verify_chain(request.id, edited)
-    assert not verify_chain(request.id, [events[0], *events[2:]])  # a missing event
-    assert not verify_chain(request.id, [events[1], events[0], *events[2:]])  # reordered
-    assert not verify_chain(request.id, events[1:])  # a truncated start
-    assert not verify_chain(
-        "action-ffffffff-0000-4000-8000-000000000000", events
-    )  # moved to another request
+    assert not verify_chain(request.id, edited, digest)
+    assert not verify_chain(request.id, [events[0], *events[2:]], digest)  # a missing event
+    assert not verify_chain(request.id, [events[1], events[0], *events[2:]], digest)  # reordered
+    assert not verify_chain(request.id, events[1:], digest)  # a truncated start
+    other = "action-ffffffff-0000-4000-8000-000000000000"
+    assert not verify_chain(other, events, digest)  # moved to another request
+    # The content an approver saw is in every hash: the same events under another digest do not verify.
+    assert not verify_chain(request.id, events, "sha256:" + "0" * 64)
+
+
+def test_the_approvers_on_the_request_are_the_approvers_its_history_records() -> None:
+    from netsight_api.actions.history import history_matches
+
+    store = new_store()
+    request = approve(store, make(store))
+    events = store.history(request.id)
+    assert history_matches(request, events)
+    swapped = request.model_copy(
+        update={"approvals": [request.approvals[0].model_copy(update={"approver_id": "mallory"})]}
+    )
+    assert not history_matches(swapped, events)
+    assert not history_matches(request.model_copy(update={"approvals": []}), events)
+    late = request.approvals[0].model_copy(update={"approved_at": NOW + timedelta(days=1)})
+    assert not history_matches(request.model_copy(update={"approvals": [late]}), events)
 
 
 def test_unknown_requests_are_not_found() -> None:
@@ -617,7 +695,7 @@ def test_terminal_records_are_evicted_oldest_first_so_the_store_cannot_be_exhaus
             reason="Stand down",
             now=NOW,
         )
-    fresh = make(store)  # the oldest finished record makes room
+    fresh = make(store, now=LATER)  # the oldest finished record makes room
     assert store.get(first.id) is None
     assert store.get(second.id) is not None
     assert {open_one.id, open_two.id, fresh.id} <= {
@@ -627,17 +705,54 @@ def test_terminal_records_are_evicted_oldest_first_so_the_store_cannot_be_exhaus
 
 def test_a_propose_and_cancel_loop_never_fills_the_store() -> None:
     store = new_store(max_stored=5, max_open_per_requester=3)
-    for _ in range(60):
-        request = make(store)
+    for hour in range(0, 120, 2):  # each round is old enough to make room for the next
+        at = NOW + timedelta(hours=hour)
+        request = make(store, now=at, created_at=at, approve_by=at + timedelta(hours=24))
         store.cancel(
             request.id,
             actor=ALICE,
             expected_digest=request.digest,
             expected_version=request.version,
             reason="Loop",
+            now=at,
+        )
+    assert store.list_requests(limit=50, offset=0, now=at)[1] <= 5
+
+
+def test_a_young_finished_request_is_not_evicted_so_a_loop_cannot_hide_other_records() -> None:
+    store = new_store(max_stored=3, max_open_per_requester=10)
+    kept = [make(store) for _ in range(2)]
+    for request in kept:
+        store.cancel(
+            request.id,
+            actor=ALICE,
+            expected_digest=request.digest,
+            expected_version=request.version,
+            reason="Withdrawn",
             now=NOW,
         )
-    assert store.list_requests(limit=50, offset=0, now=NOW)[1] <= 5
+    make(store)  # the third slot
+    with pytest.raises(e.StoreFull):  # the finished ones are younger than the minimum age
+        make(store)
+    assert all(store.get(r.id) is not None for r in kept)
+
+
+def test_an_eviction_is_logged_with_the_request_id_only(caplog: pytest.LogCaptureFixture) -> None:
+    store = new_store(max_stored=1, max_open_per_requester=10)
+    first = make(store)
+    store.cancel(
+        first.id,
+        actor=ALICE,
+        expected_digest=first.digest,
+        expected_version=first.version,
+        reason="A private reason",
+        now=NOW,
+    )
+    with caplog.at_level(logging.WARNING, logger="netsight_api"):
+        make(store, now=LATER)
+    messages = [r.getMessage() for r in caplog.records]
+    assert any(first.id in m and "evicted" in m for m in messages)
+    assert not any("A private reason" in m for m in messages)
 
 
 def test_open_requests_are_never_evicted_and_a_store_full_of_them_is_full() -> None:
@@ -661,7 +776,7 @@ def test_an_evicted_record_takes_its_idempotency_key_with_it() -> None:
         now=NOW,
     )
     make(store)
-    third = make(store)  # the store is full: the finished first record is evicted
+    third = make(store, now=LATER)  # the store is full: the finished first record is evicted
     assert store.get(first.id) is None
     store.cancel(
         third.id,
@@ -672,10 +787,11 @@ def test_an_evicted_record_takes_its_idempotency_key_with_it() -> None:
         now=NOW,
     )
     same_body = new_action(target_id=body.target_id)
-    again = store.create(same_body, idempotency_key="evict-key-0000000001", now=NOW)
+    again = store.create(same_body, idempotency_key="evict-key-0000000001", now=LATER)
     assert again.replayed is False and again.request.id == same_body.id
 
 
+@memory_only
 def test_the_chain_verdict_also_checks_the_history_matches_the_request() -> None:
     store = new_store()
     request = make(store)
@@ -686,6 +802,7 @@ def test_the_chain_verdict_also_checks_the_history_matches_the_request() -> None
     assert store.verify_chain(request.id) is False
 
 
+@memory_only
 def test_a_request_whose_state_disagrees_with_its_history_fails_the_chain_verdict() -> None:
     store = new_store()
     request = make(store)
@@ -696,9 +813,7 @@ def test_a_request_whose_state_disagrees_with_its_history_fails_the_chain_verdic
 
 def test_system_transitions_are_reported_so_they_can_be_audited() -> None:
     seen: list[tuple[str, str, str]] = []
-    store = InMemoryActionStore(
-        kill_switch=KillSwitch(), on_system_transition=lambda i, s, c: seen.append((i, s, c))
-    )
+    store = new_store(on_system_transition=lambda i, s, c: seen.append((i, s, c)))
     request = make(store)
     store.expire_due(request.approve_by + timedelta(seconds=1))
     assert seen == [(request.id, "expired", "approval-window-closed")]

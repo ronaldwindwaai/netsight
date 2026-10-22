@@ -42,6 +42,21 @@ aggregate; (3) who may prune and how a prune is audited; (4) whether a privacy/l
 respect: the table would be Netsight app state in PostgreSQL (DATABASE-OWNERSHIP), append-only with audited, migrator-owned deletion, least-privilege roles, a guarded `down`, and
 evidence references rather than copies of source records. Until decided, **no migration 0006 exists and nothing is stored**.
 
+## Decision needed: action requests and their history (open, human; Step 12 follow-up, migration 0007)
+
+| Data class | Retention |
+|---|---|
+| Action requests (`action_requests`: type, target id, parameters, requester id, reason, approvals, execution record) | **PENDING HUMAN DECISION** (no period is set) |
+| Action history (`action_history`, append-only hash chain: actor ids, states, static codes, the notes written on a rejection or cancellation) | **PENDING HUMAN DECISION** (no period is set) |
+
+Not decided and **not invented here**: (1) how long a finished request and its history are kept (they are the decision record for a change that was approved or run, and the audit log is
+only an operational sink, so this is a governance and legal question); (2) whether the operator-typed reasons and notes, the identity ids and the target ids may be kept for the whole period or
+must be minimised sooner; (3) who may prune and how a prune is audited; (4) whether a privacy and legal review (PRD 92) must precede keeping per-person approval history. Constraints any answer must
+respect: the history table is append-only and its triggers (`ENABLE ALWAYS`) stop every role including the owner, so removal is an audited migrator step that disables them deliberately, or a
+partitioning change; the request table is never removed from either (the history references it). The 5 000-request cap is **not** a prune: "evicting" the oldest finished request only hides it
+(`evicted_at`) so the API stays bounded; the row and its history remain. The `down` migration is destructive and needs `NETSIGHT_ALLOW_DESTRUCTIVE_DOWN=1` while rows exist. **No prune is
+built**: until a period is approved the tables only grow, bounded by how many requests people make (25 open per requester, a rate limit on proposals) and the events per request (about a dozen).
+
 ## Decision needed: unknown-device findings and timeline (open, human; Step 8)
 
 | Data class | Retention |

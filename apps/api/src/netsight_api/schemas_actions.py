@@ -323,8 +323,16 @@ class KillSwitchStatus(ApiModel):
 
 
 class StoreStatus(ApiModel):
-    kind: Literal["memory"]
-    durable: Literal[False]
+    """Where requests are held. Only the PostgreSQL store survives a restart and is shared by workers."""
+
+    kind: Literal["memory", "postgres"]
+    durable: StrictBool
+
+    @model_validator(mode="after")
+    def _only_postgres_is_durable(self) -> StoreStatus:
+        if self.durable != (self.kind == "postgres"):
+            raise ValueError("a store is durable exactly when it is the PostgreSQL store")
+        return self
 
 
 class PolicyStatus(ApiModel):

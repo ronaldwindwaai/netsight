@@ -77,7 +77,7 @@ def status_body(runtime: ActionRuntime | None, now: support.Clock) -> ActionStat
         generated_at=generated_at,
         dry_run_only=not any(e.mode == "live" and e.state == "ok" for e in executors),
         kill_switch=runtime.kill_switch.status(),
-        store=StoreStatus(kind="memory", durable=False),
+        store=StoreStatus(kind=runtime.store.kind, durable=runtime.store.durable),
         policy=PolicyStatus(self_execute_allowed=runtime.store.allow_self_execute),
         executors=executors,
         definitions=[definition_contract(d) for d in CATALOG.values()],

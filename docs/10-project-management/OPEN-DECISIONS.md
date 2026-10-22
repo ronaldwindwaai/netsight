@@ -81,7 +81,7 @@ Every "human decision pending / needed" recorded in `docs/00-product/BUILD-PLAN-
 | D-50 | **Forecast partial-day rules**: a newest day is partial when its last flow is more than 1 h before midnight; a day is an outage day when fewer than 22 of 24 UTC hours held a flow | Keep (22 h and 1 h are engineering judgement) | **changed 2026-10-18**: such days are excluded and counted as missing, never shown as measured | FORECASTING |
 | D-51 | Whether a scheduled/archived capacity report, PDF/Excel and an inventory report are wanted | No until a consumer asks | Synchronous CSV only | FORECASTING, REPORTING |
 | D-52 | Executors: which action types get a real executor, in which order, and the lab that proves them | None until a lab exists | Dry-run executor only; no live executor | ACTION-ENGINE |
-| D-53 | Where the durable action store lives | PostgreSQL, behind the `ActionStore` Protocol | In-memory, lost on restart | ACTION-ENGINE |
+| D-53 | Where the durable action store lives | PostgreSQL, behind the `ActionStore` Protocol | **built**: PostgreSQL (migration 0007) when `DATABASE_URL` is set, in-memory (lost on restart) otherwise; retention of requests and history is a separate pending decision (DATA-RETENTION-MATRIX) | ACTION-ENGINE |
 
 ## 5. Deployment and security posture
 
