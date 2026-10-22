@@ -31,7 +31,7 @@ jobs:
     outputs:
       sha: ${{ steps.release.outputs.sha }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.workflow_run.head_sha || inputs.ref || 'main' }}
           fetch-depth: 0
@@ -55,7 +55,7 @@ jobs:
       name: vps
       url: https://netsight.sadcpf.org
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ needs.release-gates.outputs.sha }}
 
