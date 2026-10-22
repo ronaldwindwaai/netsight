@@ -8,6 +8,7 @@ import { Pager } from '@/components/pager';
 import { StateSurface, StoreStateSurface } from '@/components/state-surface';
 import type { ConfigurationNode, ConfigurationRead, ConfigurationVersion } from '@/lib/api-contracts-configuration';
 import type { FetchState } from '@/lib/api-response';
+import { RelativeTime } from '@/components/relative-time';
 import { formatUtcTimestamp } from '@/lib/format-time';
 
 type Row = ConfigurationNode | ConfigurationVersion;
@@ -29,6 +30,13 @@ const UNKNOWN_FRESHNESS = FRESHNESS.unknown;
 function ViewBadge({ view }: { view: BadgeView }) {
   return <Badge theme={view.theme} pill><i className={`bi ${view.icon} me-1`} aria-hidden="true" />{view.label}</Badge>;
 }
+/** Freshness is only judged for a successful backup; for the rest it says so rather than "unknown". */
+function FreshnessBadge({ item }: { item: ConfigurationNode }) {
+  if (item.backup_status === 'failed' || item.backup_status === 'never') {
+    return <ViewBadge view={{ label: 'Not assessed', icon: 'bi-dash-circle', theme: 'secondary' }} />;
+  }
+  return <ViewBadge view={FRESHNESS[item.backup_freshness] ?? UNKNOWN_FRESHNESS} />;
+}
 export function ConfigurationSurface<T extends Row>({ state, children, baseHref = "/config" }: {
   state: FetchState<ConfigurationRead<T>>; children: React.ReactNode; baseHref?: string;
 }) {
@@ -48,12 +56,16 @@ const nodeColumns: TableColumn<ConfigurationNode>[] = [
   { key: 'group', header: 'Group', render: item => item.group ?? 'Not reported' },
   { key: 'model', header: 'Model', render: item => item.model ?? 'Not reported' },
   { key: 'backup_status', header: 'Last attempt', render: item => <ViewBadge view={BACKUP[item.backup_status] ?? UNKNOWN_BACKUP} /> },
-  { key: 'last_attempt_at', header: 'Attempt time', render: item => item.last_attempt_at ? formatUtcTimestamp(item.last_attempt_at) : 'Not reported' },
-  { key: 'backup_freshness', header: 'Backup freshness', render: item => <ViewBadge view={FRESHNESS[item.backup_freshness] ?? UNKNOWN_FRESHNESS} /> },
+  { key: 'last_attempt_at', header: 'Attempt time', render: item => item.last_attempt_at ? <RelativeTime value={item.last_attempt_at} /> : 'Not reported' },
+  { key: 'backup_freshness', header: 'Backup freshness', render: item => <FreshnessBadge item={item} /> },
 ];
-const versionColumns: TableColumn<ConfigurationVersion>[] = [
-  { key: 'id', header: 'Version', render: item => <code className="text-break">{item.id}</code> },
-  { key: 'saved_at', header: 'Saved at', render: item => formatUtcTimestamp(item.saved_at) },
+/** Only the first row of the first page is the newest version. */
+function LatestMark({ show }: { show: boolean }) {
+  return show ? <Badge theme="primary" pill className="ms-2">Latest</Badge> : null;
+}
+const versionColumns = (page: number): TableColumn<ConfigurationVersion>[] => [
+  { key: 'id', header: 'Version', render: (item, index) => <><code className="text-break">{item.id}</code><LatestMark show={page === 1 && index === 0} /></> },
+  { key: 'saved_at', header: 'Saved at', render: item => <RelativeTime value={item.saved_at} /> },
 ];
 export function ConfigurationNodesBody({ state }: { state: FetchState<ConfigurationRead<ConfigurationNode>> }) {
   return <AppCard title="Configuration backups"><ConfigurationSurface state={state}>
@@ -66,16 +78,16 @@ export function ConfigurationNodesBody({ state }: { state: FetchState<Configurat
           <dl className="row small mt-2 mb-0">
             <dt className="col-5">Group / model</dt><dd className="col-7 text-break">{item.group ?? 'Not reported'} / {item.model ?? 'Not reported'}</dd>
             <dt className="col-5">Last attempt</dt><dd className="col-7"><ViewBadge view={BACKUP[item.backup_status] ?? UNKNOWN_BACKUP} /></dd>
-            <dt className="col-5">Attempt time</dt><dd className="col-7">{item.last_attempt_at ? formatUtcTimestamp(item.last_attempt_at) : 'Not reported'}</dd>
-            <dt className="col-5">Freshness</dt><dd className="col-7"><ViewBadge view={FRESHNESS[item.backup_freshness] ?? UNKNOWN_FRESHNESS} /></dd>
+            <dt className="col-5">Attempt time</dt><dd className="col-7">{item.last_attempt_at ? <RelativeTime value={item.last_attempt_at} /> : 'Not reported'}</dd>
+            <dt className="col-5">Freshness</dt><dd className="col-7"><FreshnessBadge item={item} /></dd>
           </dl>
         </li>)}
       </ul>
     </> : null}
   </ConfigurationSurface></AppCard>;
 }
-export function ConfigurationVersionsBody({ state, nodeId, permissions = [] }: { state: FetchState<ConfigurationRead<ConfigurationVersion>>; nodeId: string; permissions?: readonly string[] }) {
-  return <AppCard title={`Saved versions for ${nodeId}`}>
+export function ConfigurationVersionsBody({ state, nodeId, nodeName = null, permissions = [] }: { state: FetchState<ConfigurationRead<ConfigurationVersion>>; nodeId: string; nodeName?: string | null; permissions?: readonly string[] }) {
+  return <AppCard title={`Saved versions for ${nodeName ?? nodeId}`}>
     <nav className="d-flex flex-wrap gap-3 small mb-3" aria-label="Related views">
       <Link href="/config"><i className="bi bi-arrow-left me-1" aria-hidden="true" />All configuration backups</Link>
       <Link href="/incidents"><i className="bi bi-exclamation-diamond me-1" aria-hidden="true" />All incidents</Link>
@@ -83,11 +95,12 @@ export function ConfigurationVersionsBody({ state, nodeId, permissions = [] }: {
     </nav>
     <ConfigurationSurface state={state} baseHref={`/config/changes?node=${encodeURIComponent(nodeId)}`}>
     {state.kind === 'ok' ? <>
-      <div className="d-none d-md-block"><Table columns={versionColumns} data={state.data.items} rowKey={item => item.id} /></div>
+      <p className="small text-body-secondary">Only the identifier of each version and save time are shown; configuration contents and differences are not shown here. Newest first.</p>
+      <div className="d-none d-md-block"><Table columns={versionColumns(state.data.page)} data={state.data.items} rowKey={item => item.id} /></div>
       <ol className="list-group list-group-flush d-md-none" aria-label="Saved configuration versions">
-        {state.data.items.map(item => <li className="list-group-item px-0" key={item.id}>
-          <code className="d-block text-break">{item.id}</code>
-          <span className="small text-body-secondary">Saved at {formatUtcTimestamp(item.saved_at)}</span>
+        {state.data.items.map((item, index) => <li className="list-group-item px-0" key={item.id}>
+          <code className="text-break">{item.id}</code><LatestMark show={state.data.page === 1 && index === 0} />
+          <span className="small text-body-secondary">Saved <RelativeTime value={item.saved_at} /></span>
         </li>)}
       </ol>
     </> : null}

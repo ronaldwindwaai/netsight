@@ -1,9 +1,9 @@
 import { Suspense } from 'react';
-import Link from 'next/link';
 import { AppCard } from '@/components/app-card';
 import { AppContent } from '@/components/app-content';
 import { RetryButton } from '@/components/retry-button';
 
+import { PageControls } from '@/components/page-controls';
 import { AlertTable } from '@/components/alert-table';
 import { AlertRulesCard, MaintenanceWindowsCard } from '@/components/alerting-sections';
 import { DataFailure, FreshnessNotice, LoadingState } from '@/components/data-state';
@@ -13,18 +13,10 @@ import { parseAlertRuleListResponse, parseMaintenanceWindowListResponse } from '
 import { alertingListPath, parseAlertingOffsets } from '@/lib/alerting-view';
 import { formatUtcTimestamp } from '@/lib/format-time';
 import type { RawQuery } from '@/lib/incident-view';
+import { parsePageParams } from '@/lib/page-state';
 import { viewerFromSession } from '@/lib/viewer';
 
 export const metadata = { title: 'Alerts' };
-
-const PAGE_SIZE = 50;
-
-function requestedPage(value: string | string[] | undefined): number {
-  const raw = Array.isArray(value) ? value[0] : value;
-  if (!raw || !/^\d+$/.test(raw)) return 1;
-  const parsed = Number(raw);
-  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : 1;
-}
 
 export default async function AlertsPage({
   searchParams,
@@ -32,7 +24,7 @@ export default async function AlertsPage({
   searchParams: Promise<RawQuery>;
 }) {
   const query = await searchParams;
-  const page = requestedPage(query.page);
+  const { page, pageSize } = parsePageParams(query);
   const offsets = parseAlertingOffsets(query);
   const nowMs = new Date().getTime();
   const [rules, windows, sessionState] = await Promise.all([
@@ -43,7 +35,7 @@ export default async function AlertsPage({
   const viewer = sessionState.kind === 'ok' ? viewerFromSession(sessionState.data) : null;
   const paging = { offsets, alertsPage: page };
   const state = await apiGet(
-    `/api/v1/alerts?page=${page}&page_size=${PAGE_SIZE}`,
+    `/api/v1/alerts?page=${page}&page_size=${pageSize}`,
     parseAlertList,
   );
   const retrievedAt = formatUtcTimestamp(new Date().toISOString());
@@ -78,37 +70,14 @@ export default async function AlertsPage({
               <Suspense fallback={<LoadingState label="Loading alerts" />}>
                 <AlertTable alerts={state.data.items} total={state.data.total} />
               </Suspense>
-              <nav
-                className="d-flex align-items-center justify-content-between mt-3"
-                aria-label="Alert pages"
-              >
-                <Link
-                  aria-disabled={state.data.page <= 1}
-                  className={`btn btn-outline-secondary btn-sm ${state.data.page <= 1 ? 'disabled' : ''}`}
-                  href={`/alerts?page=${Math.max(1, state.data.page - 1)}`}
-                  tabIndex={state.data.page <= 1 ? -1 : undefined}
-                >
-                  <i className="bi bi-chevron-left me-1" aria-hidden="true" />
-                  Previous
-                </Link>
-                <span className="small text-body-secondary">
-                  Page {state.data.page} of{' '}
-                  {Math.max(1, Math.ceil(state.data.total / state.data.page_size))}
-                </span>
-                <Link
-                  aria-disabled={state.data.page * state.data.page_size >= state.data.total}
-                  className={`btn btn-outline-secondary btn-sm ${
-                    state.data.page * state.data.page_size >= state.data.total ? 'disabled' : ''
-                  }`}
-                  href={`/alerts?page=${state.data.page + 1}`}
-                  tabIndex={
-                    state.data.page * state.data.page_size >= state.data.total ? -1 : undefined
-                  }
-                >
-                  Next
-                  <i className="bi bi-chevron-right ms-1" aria-hidden="true" />
-                </Link>
-              </nav>
+              <PageControls
+                count={state.data.items.length}
+                label="Alert pages"
+                noun="alerts"
+                page={state.data.page}
+                pageSize={state.data.page_size}
+                total={state.data.total}
+              />
             </>
           )}
         </>

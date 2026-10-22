@@ -25,6 +25,7 @@ import {
 import { REQUEST_STATES } from '@/lib/api-contracts-actions';
 import type { ActionList, ActionRequest } from '@/lib/api-contracts-actions';
 import type { FetchState } from '@/lib/api-response';
+import { RelativeTime } from '@/components/relative-time';
 import { formatUtcTimestamp } from '@/lib/format-time';
 
 const columns: TableColumn<ActionRequest>[] = [
@@ -62,7 +63,7 @@ const columns: TableColumn<ActionRequest>[] = [
       </span>
     ),
   },
-  { key: 'created', header: 'Created', render: (item) => <span className="small">{formatUtcTimestamp(item.created_at)}</span> },
+  { key: 'created', header: 'Created', render: (item) => <RelativeTime className="small" value={item.created_at} /> },
 ];
 
 function Chip({ href, current, children }: { href: string; current: boolean; children: React.ReactNode }) {

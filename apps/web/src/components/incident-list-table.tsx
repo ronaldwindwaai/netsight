@@ -35,7 +35,7 @@ export function IncidentListTable({ incidents }: { incidents: readonly Incident[
                 <td>
                   <SeverityBadge severity={incident.severity} />
                 </td>
-                <td className="text-break">
+                <td className="text-break incident-title">
                   {href ? (
                     <Link className="fw-semibold" href={href}>
                       {incident.title}
@@ -47,7 +47,7 @@ export function IncidentListTable({ incidents }: { incidents: readonly Incident[
                 <td>
                   <StateBadge state={incident.state} />
                 </td>
-                <td className="text-break">
+                <td className="text-break incident-assignee">
                   {incident.assignee_id ?? (
                     <span className="small text-body-secondary">Unassigned</span>
                   )}

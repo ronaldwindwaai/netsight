@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { usePathname, useSearchParams } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 
 import { MAX_QUERY_LENGTH, listStateToSearch, parseListState } from '@/lib/list-url-state';
 import type { ListSpec, ListState } from '@/lib/list-url-state';
@@ -31,6 +31,7 @@ function urlQuery(text: string): string {
 export function useListUrlState(spec: ListSpec): ListUrlState {
   const params = useSearchParams();
   const pathname = usePathname();
+  const router = useRouter();
   const searchText = params.toString();
   const urlState = useMemo(() => parseListState(new URLSearchParams(searchText), spec), [searchText, spec]);
 
@@ -45,14 +46,20 @@ export function useListUrlState(spec: ListSpec): ListUrlState {
     timer.current = null;
   }, []);
 
+  // A search or filter change starts again at page 1. Dropping `page` changes which rows the server
+  // returns, so that case goes through the router (which refetches); the history API alone only
+  // updates the URL. Sort changes keep the page, as does every other parameter (page_size, ...).
   const commit = useCallback(
-    (next: ListState, mode: 'push' | 'replace') => {
+    (next: ListState, mode: 'push' | 'replace', resetPage = false) => {
       const query = new URLSearchParams(window.location.search);
+      const refetch = resetPage && query.has('page');
+      if (refetch) query.delete('page');
       const url = `${pathname}${listStateToSearch(query, next, spec)}`;
-      if (mode === 'push') window.history.pushState(null, '', url);
+      if (refetch) router[mode](url);
+      else if (mode === 'push') window.history.pushState(null, '', url);
       else window.history.replaceState(null, '', url);
     },
-    [pathname, spec],
+    [pathname, router, spec],
   );
 
   const readUrl = useCallback(
@@ -68,7 +75,7 @@ export function useListUrlState(spec: ListSpec): ListUrlState {
       timer.current = setTimeout(() => {
         timer.current = null;
         if (urlQuery(searchRef.current) !== readUrl().q) {
-          commit({ ...readUrl(), q: searchRef.current }, 'replace');
+          commit({ ...readUrl(), q: searchRef.current }, 'replace', true);
         }
       }, SEARCH_URL_DEBOUNCE_MS);
     },
@@ -98,7 +105,7 @@ export function useListUrlState(spec: ListSpec): ListUrlState {
       if (Object.keys(rest).length === 0) return;
       // A discrete change carries the text typed so far, so it is neither lost nor reordered.
       cancelTimer();
-      commit({ ...readUrl(), ...rest, q: searchRef.current }, mode);
+      commit({ ...readUrl(), ...rest, q: searchRef.current }, mode, rest.filters !== undefined);
     },
     [cancelTimer, commit, readUrl, setSearch],
   );
@@ -107,7 +114,7 @@ export function useListUrlState(spec: ListSpec): ListUrlState {
     cancelTimer();
     searchRef.current = '';
     setSearchText('');
-    commit({ q: '', filters: {}, sort: urlState.sort }, 'push');
+    commit({ q: '', filters: {}, sort: urlState.sort }, 'push', true);
   }, [cancelTimer, commit, urlState.sort]);
 
   const state = useMemo(() => ({ ...urlState, q: search }), [urlState, search]);

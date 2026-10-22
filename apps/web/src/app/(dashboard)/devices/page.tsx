@@ -1,32 +1,25 @@
 import { Suspense } from 'react';
-import Link from 'next/link';
 import { AppContent } from '@/components/app-content';
 
 import { DataFailure, EmptyState, FreshnessNotice, LoadingState } from '@/components/data-state';
 import { DeviceTable } from '@/components/device-table';
+import { PageControls } from '@/components/page-controls';
 import { SourceHealth } from '@/components/source-health';
 import { apiGet } from '@/lib/api';
 import { parseDeviceList, parseSourceHealth } from '@/lib/api-contracts';
+import { parsePageParams } from '@/lib/page-state';
 
 export const metadata = { title: 'Devices' };
-
-const PAGE_SIZE = 50;
-
-function requestedPage(raw: string | string[] | undefined): number {
-  const value = Array.isArray(raw) ? raw[0] : raw;
-  const parsed = Number(value ?? '1');
-  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : 1;
-}
 
 export default async function DevicesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string | string[] }>;
+  searchParams: Promise<{ page?: string | string[]; page_size?: string | string[] }>;
 }) {
-  const page = requestedPage((await searchParams).page);
+  const { page, pageSize } = parsePageParams(await searchParams);
   const [sourceHealthState, devicesState] = await Promise.all([
     apiGet('/api/v1/sources/librenms/health', parseSourceHealth),
-    apiGet(`/api/v1/devices?page=${page}&page_size=${PAGE_SIZE}`, parseDeviceList),
+    apiGet(`/api/v1/devices?page=${page}&page_size=${pageSize}`, parseDeviceList),
   ]);
 
   return (
@@ -54,43 +47,14 @@ export default async function DevicesPage({
               <Suspense fallback={<LoadingState label="Loading devices" />}>
                 <DeviceTable devices={devicesState.data.items} total={devicesState.data.total} />
               </Suspense>
-              <nav className="d-flex align-items-center justify-content-between mt-3" aria-label="Device pages">
-                <Link
-                  aria-disabled={devicesState.data.page <= 1}
-                  className={`btn btn-outline-secondary btn-sm ${devicesState.data.page <= 1 ? 'disabled' : ''}`}
-                  href={`/devices?page=${Math.max(1, devicesState.data.page - 1)}`}
-                  tabIndex={devicesState.data.page <= 1 ? -1 : undefined}
-                >
-                  <i className="bi bi-chevron-left me-1" aria-hidden="true" />
-                  Previous
-                </Link>
-                <span className="small text-body-secondary">
-                  Page {devicesState.data.page} of{' '}
-                  {Math.max(
-                    1,
-                    Math.ceil(devicesState.data.total / devicesState.data.page_size),
-                  )}
-                </span>
-                <Link
-                  aria-disabled={
-                    devicesState.data.page * devicesState.data.page_size >= devicesState.data.total
-                  }
-                  className={`btn btn-outline-secondary btn-sm ${
-                    devicesState.data.page * devicesState.data.page_size >= devicesState.data.total
-                      ? 'disabled'
-                      : ''
-                  }`}
-                  href={`/devices?page=${devicesState.data.page + 1}`}
-                  tabIndex={
-                    devicesState.data.page * devicesState.data.page_size >= devicesState.data.total
-                      ? -1
-                      : undefined
-                  }
-                >
-                  Next
-                  <i className="bi bi-chevron-right ms-1" aria-hidden="true" />
-                </Link>
-              </nav>
+              <PageControls
+                count={devicesState.data.items.length}
+                label="Device pages"
+                noun="devices"
+                page={devicesState.data.page}
+                pageSize={devicesState.data.page_size}
+                total={devicesState.data.total}
+              />
             </>
           )}
         </>
