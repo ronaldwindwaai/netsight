@@ -5,6 +5,7 @@ import type {
   AlertScope,
   MaintenanceWindow,
 } from './api-contracts-alert-rule.ts';
+import type { AlertingApiState } from './api-contracts-alert-rule-api.ts';
 import { MAX_RULE_LIST_OFFSET } from './api-contracts-alert-rule-api.ts';
 import type { PageHrefs, RawQuery } from './incident-view.ts';
 
@@ -162,4 +163,25 @@ export function alertingPageHrefs(
     previous: current > 0 ? withOffset(Math.max(0, current - limit)) : null,
     next: nextOffset === null ? null : withOffset(nextOffset),
   };
+}
+
+/**
+ * Why a create control must stay disabled although the viewer may have the permission: the store
+ * behind the list did not answer with stored rows, so a write could not be listed or trusted.
+ * Returns null when the store answered ok. `store` is a lower-case noun phrase.
+ */
+export function storeWriteBlock(
+  state: { kind: string; data?: { state: AlertingApiState } },
+  store: string,
+): string | null {
+  if (state.kind !== 'ok' || state.data === undefined) {
+    return `The ${store} could not be reached, so nothing can be created right now.`;
+  }
+  if (state.data.state === 'not-connected') {
+    return `The ${store} is not connected, so nothing can be created until it is configured.`;
+  }
+  if (state.data.state === 'unknown') {
+    return `The ${store} could not be read, so nothing can be created until it is available.`;
+  }
+  return null;
 }

@@ -172,10 +172,7 @@ def test_hostile_device_identifiers_never_reach_the_source(
     leaked = [
         url
         for url in calls
-        if any(
-            fragment in url
-            for fragment in ("etc/passwd", "DROP TABLE", "OR 1=1", device_id)
-        )
+        if any(fragment in url for fragment in ("etc/passwd", "DROP TABLE", "OR 1=1", device_id))
     ]
     assert leaked == [], f"hostile id reached the source URL: {leaked}"
 
@@ -199,9 +196,7 @@ def test_device_detail_does_not_leak_other_inventory_rows(
         )
 
     _override_source(handler)
-    response = TestClient(app).get(
-        "/api/v1/devices/device-00000000-0000-4000-8000-000000000001"
-    )
+    response = TestClient(app).get("/api/v1/devices/device-00000000-0000-4000-8000-000000000001")
     assert "secret-host.example.test" not in response.text
 
 
@@ -370,9 +365,7 @@ def test_web_layer_never_uses_raw_html_injection() -> None:
 
 def test_api_never_echoes_the_source_token(monkeypatch: pytest.MonkeyPatch) -> None:
     _enable_dev_identity(monkeypatch)
-    _override_source(
-        lambda request: httpx.Response(401, json={"status": "unauthorized"})
-    )
+    _override_source(lambda request: httpx.Response(401, json={"status": "unauthorized"}))
     for path in ("/api/v1/devices", "/api/v1/overview", "/api/v1/alerts"):
         body = TestClient(app).get(path).text
         assert "adapter-secret-do-not-leak" not in body, path
@@ -457,9 +450,13 @@ def test_session_cookie_cannot_be_forged() -> None:
 
     # Swap the session id but keep a well-formed envelope.
     other = manager.create_session("other", "google", ["administrator"])
-    forged_raw = base64.urlsafe_b64encode(
-        f"{other.id}.{base64.urlsafe_b64encode(b'0' * 32).decode()}".encode()
-    ).decode().rstrip("=")
+    forged_raw = (
+        base64.urlsafe_b64encode(
+            f"{other.id}.{base64.urlsafe_b64encode(b'0' * 32).decode()}".encode()
+        )
+        .decode()
+        .rstrip("=")
+    )
     assert manager.validate_cookie(forged_raw) is None
 
     session_module._manager = None
@@ -471,9 +468,7 @@ def test_new_login_does_not_reuse_a_fixated_session_id() -> None:
 
     session_module._manager = None
     manager = session_module.session_manager()
-    ids = {
-        manager.create_session("sub", "google", ["auditor"]).id for _ in range(50)
-    }
+    ids = {manager.create_session("sub", "google", ["auditor"]).id for _ in range(50)}
     assert len(ids) == 50
     session_module._manager = None
 
@@ -798,9 +793,7 @@ def test_validate_id_token_requires_a_matching_nonce() -> None:
         }
         import jwt as pyjwt
 
-        token = pyjwt.encode(
-            claims, private_key, algorithm="RS256", headers={"kid": "k1"}
-        )
+        token = pyjwt.encode(claims, private_key, algorithm="RS256", headers={"kid": "k1"})
 
         import anyio
 

@@ -266,11 +266,15 @@ def _wire_netbox(
     from netsight_api.adapters.netbox import NetboxClient
     from netsight_api.main import get_optional_netbox_client
 
-    device_rows = devices if devices is not None else [
-        {"id": 1, "name": "core-sw-01", "display": "core-sw-01"},
-        {"id": 2, "name": "edge-sw-02", "display": "edge-sw-02"},
-        {"id": 3, "name": "dist-sw-03", "display": "dist-sw-03"},
-    ]
+    device_rows = (
+        devices
+        if devices is not None
+        else [
+            {"id": 1, "name": "core-sw-01", "display": "core-sw-01"},
+            {"id": 2, "name": "edge-sw-02", "display": "edge-sw-02"},
+            {"id": 3, "name": "dist-sw-03", "display": "dist-sw-03"},
+        ]
+    )
 
     def handler(request: httpx.Request) -> httpx.Response:
         if request.url.path == "/api/dcim/cables/":
@@ -308,14 +312,9 @@ def test_topology_builds_explicit_graph_from_active_cables(
         netbox_id("3"): "dist-sw-03",
     }
     assert {edge["source"] for edge in body["edges"]} == {"netbox"}
-    assert {
-        edge["observed_at"] for edge in body["edges"]
-    } == {"2026-10-05T10:00:00Z"}
+    assert {edge["observed_at"] for edge in body["edges"]} == {"2026-10-05T10:00:00Z"}
     # Discovery source not configured: reconciliation is explicitly NOT checked.
-    assert all(
-        node["reconciled"] is False and node["finding"] is None
-        for node in body["nodes"]
-    )
+    assert all(node["reconciled"] is False and node["finding"] is None for node in body["nodes"])
     assert body["freshness"] == {
         "state": "fresh",
         "observed_at": body["freshness"]["observed_at"],
@@ -416,9 +415,7 @@ def test_topology_keeps_graph_when_name_lookup_fails(
     validate("topology", body)
 
 
-def _wire_librenms(
-    rows: list[dict[str, Any]] | None, *, fail: bool = False
-) -> None:
+def _wire_librenms(rows: list[dict[str, Any]] | None, *, fail: bool = False) -> None:
     """Wire the optional discovery source; rows=None means not configured."""
     from netsight_api.main import get_optional_librenms_client
 
@@ -504,8 +501,5 @@ def test_topology_discovery_failure_leaves_reconciliation_not_checked(
     body: dict[str, Any] = response.json()
     assert body["state"] == "ok"
     assert len(body["nodes"]) == 2
-    assert all(
-        node["reconciled"] is False and node["finding"] is None
-        for node in body["nodes"]
-    )
+    assert all(node["reconciled"] is False and node["finding"] is None for node in body["nodes"])
     validate("topology", body)

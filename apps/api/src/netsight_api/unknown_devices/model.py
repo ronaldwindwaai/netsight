@@ -75,7 +75,9 @@ def same_endpoint(stored: UnknownDeviceEndpoint, seen: UnknownDeviceEndpoint) ->
     if stored.mac is not None and seen.mac is not None:
         return stored.mac == seen.mac
     if stored.mac is not None or seen.mac is not None:
-        return stored.ip is not None and stored.ip == seen.ip  # one MAC unknown: the address bridges
+        return (
+            stored.ip is not None and stored.ip == seen.ip
+        )  # one MAC unknown: the address bridges
     if stored.ip is not None or seen.ip is not None:
         return stored.ip == seen.ip
     return subject_key_for(stored) == subject_key_for(seen)

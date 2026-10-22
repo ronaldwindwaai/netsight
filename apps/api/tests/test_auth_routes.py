@@ -90,14 +90,10 @@ def test_login_redirects_to_provider(
     async def fake_authorization_url(*_args: Any, **_kwargs: Any) -> str:
         return "https://provider.example/authorize?state=xyz"
 
-    monkeypatch.setattr(
-        "netsight_api.auth.routes.authorization_url", fake_authorization_url
-    )
+    monkeypatch.setattr("netsight_api.auth.routes.authorization_url", fake_authorization_url)
 
     client = TestClient(app, follow_redirects=False)
-    response = client.get(
-        "/api/v1/auth/login/microsoft", params={"redirect_to": "/devices"}
-    )
+    response = client.get("/api/v1/auth/login/microsoft", params={"redirect_to": "/devices"})
     assert response.status_code == 302
     assert response.headers["location"] == "https://provider.example/authorize?state=xyz"
 
@@ -184,15 +180,9 @@ def test_full_login_session_logout_roundtrip(
             raw={"sub": "user-1", "roles": ["admin"]},
         )
 
-    monkeypatch.setattr(
-        "netsight_api.auth.routes.authorization_url", fake_authorization_url
-    )
-    monkeypatch.setattr(
-        "netsight_api.auth.routes.exchange_code", fake_exchange_code
-    )
-    monkeypatch.setattr(
-        "netsight_api.auth.routes.validate_id_token", fake_validate_id_token
-    )
+    monkeypatch.setattr("netsight_api.auth.routes.authorization_url", fake_authorization_url)
+    monkeypatch.setattr("netsight_api.auth.routes.exchange_code", fake_exchange_code)
+    monkeypatch.setattr("netsight_api.auth.routes.validate_id_token", fake_validate_id_token)
 
     client = TestClient(
         app,
@@ -247,9 +237,7 @@ def test_logout_rejects_missing_csrf_token(
         return "https://provider.example/authorize"
 
     async def fake_exchange_code(*_args: Any, **_kwargs: Any) -> TokenResponse:
-        return TokenResponse(
-            id_token="t", access_token=None, expires_in=None, token_type=None
-        )
+        return TokenResponse(id_token="t", access_token=None, expires_in=None, token_type=None)
 
     async def fake_validate_id_token(*_args: Any, **_kwargs: Any) -> VerifiedClaims:
         return VerifiedClaims(
@@ -260,15 +248,9 @@ def test_logout_rejects_missing_csrf_token(
             raw={"sub": "user-1"},
         )
 
-    monkeypatch.setattr(
-        "netsight_api.auth.routes.authorization_url", fake_authorization_url
-    )
-    monkeypatch.setattr(
-        "netsight_api.auth.routes.exchange_code", fake_exchange_code
-    )
-    monkeypatch.setattr(
-        "netsight_api.auth.routes.validate_id_token", fake_validate_id_token
-    )
+    monkeypatch.setattr("netsight_api.auth.routes.authorization_url", fake_authorization_url)
+    monkeypatch.setattr("netsight_api.auth.routes.exchange_code", fake_exchange_code)
+    monkeypatch.setattr("netsight_api.auth.routes.validate_id_token", fake_validate_id_token)
 
     client = TestClient(
         app,
@@ -417,7 +399,12 @@ def _stored_session(client: TestClient) -> Any:
 
 
 def test_an_oidc_sign_in_that_asserts_mfa_is_stamped(monkeypatch: pytest.MonkeyPatch) -> None:
-    raw = {"sub": "user-1", "roles": ["admin"], "amr": ["pwd", "mfa"], "auth_time": time.time() - 30}
+    raw = {
+        "sub": "user-1",
+        "roles": ["admin"],
+        "amr": ["pwd", "mfa"],
+        "auth_time": time.time() - 30,
+    }
     client = _sign_in(monkeypatch, raw)
     from netsight_api.auth.session import session_manager
 
@@ -443,7 +430,14 @@ def test_session_info_lists_the_permissions_the_identity_holds(
     assert "incidents:resolve" in body["permissions"]
     assert "incidents:read" in body["permissions"]
     # Never a secret or token, only permission names.
-    assert set(body) == {"authenticated", "identity_id", "provider", "email", "roles", "permissions"}
+    assert set(body) == {
+        "authenticated",
+        "identity_id",
+        "provider",
+        "email",
+        "roles",
+        "permissions",
+    }
 
 
 def test_management_session_lists_the_summary_permission_and_not_the_full_read(
@@ -503,7 +497,10 @@ def _mfa_claims(**extra: Any) -> dict[str, Any]:
     ],
 )
 def test_an_mfa_assertion_without_a_usable_fresh_auth_time_is_not_verified(
-    monkeypatch: pytest.MonkeyPatch, extra: dict[str, Any], reason: str, caplog: pytest.LogCaptureFixture
+    monkeypatch: pytest.MonkeyPatch,
+    extra: dict[str, Any],
+    reason: str,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     import json
     import logging

@@ -192,8 +192,15 @@ def test_a_known_endpoint_keeps_its_state_and_assignee_when_it_is_seen_again(
     store: UnknownDeviceRepository,
 ) -> None:
     first = created(store)
-    store.transition_state(first.id, expected_evidence_version=ver(store, first.id), to_state="acknowledged", actor_id=ACTOR)
-    store.set_assignee(first.id, expected_evidence_version=ver(store, first.id), assignee_id=ACTOR, actor_id=ACTOR)
+    store.transition_state(
+        first.id,
+        expected_evidence_version=ver(store, first.id),
+        to_state="acknowledged",
+        actor_id=ACTOR,
+    )
+    store.set_assignee(
+        first.id, expected_evidence_version=ver(store, first.id), assignee_id=ACTOR, actor_id=ACTOR
+    )
     store.observe(detection(port=True))
     now = store.get_finding(first.id)
     assert now is not None and now.state == "acknowledged" and now.assignee_id == ACTOR
@@ -222,7 +229,13 @@ def test_a_false_positive_suppresses_the_endpoint_and_writes_nothing(
     store: UnknownDeviceRepository,
 ) -> None:
     first = created(store)
-    store.transition_state(first.id, expected_evidence_version=ver(store, first.id), to_state="false-positive", actor_id=ACTOR, reason="Lab device")
+    store.transition_state(
+        first.id,
+        expected_evidence_version=ver(store, first.id),
+        to_state="false-positive",
+        actor_id=ACTOR,
+        reason="Lab device",
+    )
     before = store.get_finding(first.id)
     outcome = store.observe(detection())
     assert outcome.outcome == "suppressed" and outcome.finding_id == first.id
@@ -235,7 +248,13 @@ def test_after_a_resolution_a_new_sighting_is_a_new_finding_that_remembers_the_o
     store: UnknownDeviceRepository,
 ) -> None:
     first = created(store)
-    store.transition_state(first.id, expected_evidence_version=ver(store, first.id), to_state="resolved", actor_id=ACTOR, reason="Added to NetBox")
+    store.transition_state(
+        first.id,
+        expected_evidence_version=ver(store, first.id),
+        to_state="resolved",
+        actor_id=ACTOR,
+        reason="Added to NetBox",
+    )
     outcome = store.observe(detection())
     assert outcome.outcome == "created" and outcome.finding_id != first.id
     second = store.get_finding(outcome.finding_id)
@@ -272,16 +291,32 @@ def test_the_lifecycle_is_exactly_the_documented_table(
         "false-positive": ["false-positive"],
     }[start]
     for step in path:
-        store.transition_state(finding.id, expected_evidence_version=ver(store, finding.id), to_state=step, actor_id=ACTOR, reason="because")  # type: ignore[arg-type]
+        store.transition_state(
+            finding.id,
+            expected_evidence_version=ver(store, finding.id),
+            to_state=step,
+            actor_id=ACTOR,
+            reason="because",
+        )  # type: ignore[arg-type]
     allowed = target in ALLOWED_TRANSITIONS[start]  # type: ignore[index]
     if allowed:
         moved = store.transition_state(
-            finding.id, expected_evidence_version=ver(store, finding.id), to_state=target, actor_id=ACTOR, reason="because"
+            finding.id,
+            expected_evidence_version=ver(store, finding.id),
+            to_state=target,
+            actor_id=ACTOR,
+            reason="because",
         )  # type: ignore[arg-type]
         assert moved.state == target
     else:
         with pytest.raises(IllegalTransitionError):
-            store.transition_state(finding.id, expected_evidence_version=ver(store, finding.id), to_state=target, actor_id=ACTOR, reason="because")  # type: ignore[arg-type]
+            store.transition_state(
+                finding.id,
+                expected_evidence_version=ver(store, finding.id),
+                to_state=target,
+                actor_id=ACTOR,
+                reason="because",
+            )  # type: ignore[arg-type]
         current = store.get_finding(finding.id)
         assert current is not None and current.state == start
 
@@ -290,7 +325,12 @@ def test_a_transition_leaves_an_event_with_both_states_and_the_actor(
     store: UnknownDeviceRepository,
 ) -> None:
     finding = created(store)
-    store.transition_state(finding.id, expected_evidence_version=ver(store, finding.id), to_state="acknowledged", actor_id=ACTOR)
+    store.transition_state(
+        finding.id,
+        expected_evidence_version=ver(store, finding.id),
+        to_state="acknowledged",
+        actor_id=ACTOR,
+    )
     events = store.list_timeline(finding.id)
     last = events[-1]
     assert (last.kind, last.state_from, last.state_to, last.actor_id) == (
@@ -309,14 +349,26 @@ def test_a_resolution_or_dismissal_needs_a_real_reason(
 ) -> None:
     finding = created(store)
     with pytest.raises(InvalidOperationError):
-        store.transition_state(finding.id, expected_evidence_version=ver(store, finding.id), to_state=outcome, actor_id=ACTOR, reason=reason)  # type: ignore[arg-type]
+        store.transition_state(
+            finding.id,
+            expected_evidence_version=ver(store, finding.id),
+            to_state=outcome,
+            actor_id=ACTOR,
+            reason=reason,
+        )  # type: ignore[arg-type]
     current = store.get_finding(finding.id)
     assert current is not None and current.state == "new"
 
 
 def test_the_reason_is_stored_verbatim_as_data(store: UnknownDeviceRepository) -> None:
     finding = created(store)
-    store.transition_state(finding.id, expected_evidence_version=ver(store, finding.id), to_state="resolved", actor_id=ACTOR, reason=HOSTILE)
+    store.transition_state(
+        finding.id,
+        expected_evidence_version=ver(store, finding.id),
+        to_state="resolved",
+        actor_id=ACTOR,
+        reason=HOSTILE,
+    )
     assert store.list_timeline(finding.id)[-1].reason == HOSTILE
 
 
@@ -342,7 +394,12 @@ def test_concurrent_acknowledgements_have_exactly_one_winner(
 
     def attempt(_: int) -> str:
         try:
-            store.transition_state(finding.id, expected_evidence_version=ver(store, finding.id), to_state="acknowledged", actor_id=ACTOR)
+            store.transition_state(
+                finding.id,
+                expected_evidence_version=ver(store, finding.id),
+                to_state="acknowledged",
+                actor_id=ACTOR,
+            )
         except IllegalTransitionError:
             return "lost"
         return "won"
@@ -360,19 +417,39 @@ def test_assigning_records_the_assignee_and_unassigning_clears_it(
     store: UnknownDeviceRepository,
 ) -> None:
     finding = created(store)
-    assigned = store.set_assignee(finding.id, expected_evidence_version=ver(store, finding.id), assignee_id="oidc:tech-9", actor_id=ACTOR)
+    assigned = store.set_assignee(
+        finding.id,
+        expected_evidence_version=ver(store, finding.id),
+        assignee_id="oidc:tech-9",
+        actor_id=ACTOR,
+    )
     assert assigned.assignee_id == "oidc:tech-9"
     last = store.list_timeline(finding.id)[-1]
     assert (last.kind, last.subject_id, last.actor_id) == ("assignee-changed", "oidc:tech-9", ACTOR)
-    cleared = store.set_assignee(finding.id, expected_evidence_version=ver(store, finding.id), assignee_id=None, actor_id=ACTOR)
+    cleared = store.set_assignee(
+        finding.id,
+        expected_evidence_version=ver(store, finding.id),
+        assignee_id=None,
+        actor_id=ACTOR,
+    )
     assert cleared.assignee_id is None
     assert kinds(store, finding.id).count("assignee-changed") == 2
 
 
 def test_assigning_the_same_person_again_changes_nothing(store: UnknownDeviceRepository) -> None:
     finding = created(store)
-    store.set_assignee(finding.id, expected_evidence_version=ver(store, finding.id), assignee_id=ACTOR, actor_id=ACTOR)
-    store.set_assignee(finding.id, expected_evidence_version=ver(store, finding.id), assignee_id=ACTOR, actor_id=ACTOR)
+    store.set_assignee(
+        finding.id,
+        expected_evidence_version=ver(store, finding.id),
+        assignee_id=ACTOR,
+        actor_id=ACTOR,
+    )
+    store.set_assignee(
+        finding.id,
+        expected_evidence_version=ver(store, finding.id),
+        assignee_id=ACTOR,
+        actor_id=ACTOR,
+    )
     assert kinds(store, finding.id).count("assignee-changed") == 1
 
 
@@ -380,7 +457,12 @@ def test_assigning_the_same_person_again_changes_nothing(store: UnknownDeviceRep
 def test_an_unusable_assignee_is_refused(store: UnknownDeviceRepository, bad: str) -> None:
     finding = created(store)
     with pytest.raises((InvalidOperationError, ValueError)):
-        store.set_assignee(finding.id, expected_evidence_version=ver(store, finding.id), assignee_id=bad, actor_id=ACTOR)
+        store.set_assignee(
+            finding.id,
+            expected_evidence_version=ver(store, finding.id),
+            assignee_id=bad,
+            actor_id=ACTOR,
+        )
 
 
 @pytest.mark.parametrize("outcome", ["resolved", "false-positive"])
@@ -388,16 +470,33 @@ def test_a_finished_finding_cannot_be_reassigned(
     store: UnknownDeviceRepository, outcome: str
 ) -> None:
     finding = created(store)
-    store.transition_state(finding.id, expected_evidence_version=ver(store, finding.id), to_state=outcome, actor_id=ACTOR, reason="done")  # type: ignore[arg-type]
+    store.transition_state(
+        finding.id,
+        expected_evidence_version=ver(store, finding.id),
+        to_state=outcome,
+        actor_id=ACTOR,
+        reason="done",
+    )  # type: ignore[arg-type]
     with pytest.raises(IllegalTransitionError):
-        store.set_assignee(finding.id, expected_evidence_version=ver(store, finding.id), assignee_id=ACTOR, actor_id=ACTOR)
+        store.set_assignee(
+            finding.id,
+            expected_evidence_version=ver(store, finding.id),
+            assignee_id=ACTOR,
+            actor_id=ACTOR,
+        )
 
 
 def test_a_comment_is_stored_verbatim_and_allowed_even_after_the_finding_is_finished(
     store: UnknownDeviceRepository,
 ) -> None:
     finding = created(store)
-    store.transition_state(finding.id, expected_evidence_version=ver(store, finding.id), to_state="resolved", actor_id=ACTOR, reason="done")
+    store.transition_state(
+        finding.id,
+        expected_evidence_version=ver(store, finding.id),
+        to_state="resolved",
+        actor_id=ACTOR,
+        reason="done",
+    )
     event = store.add_comment(finding.id, actor_id=ACTOR, message=HOSTILE)
     assert (event.kind, event.message, event.actor_id) == ("comment", HOSTILE, ACTOR)
     assert store.list_timeline(finding.id)[-1] == event
@@ -439,9 +538,19 @@ def test_the_list_filters_orders_and_counts(store: UnknownDeviceRepository) -> N
     c = created(
         store, mac="aa:bb:cc:00:11:44", ip="10.0.5.11", severity="unknown", basis="no-policy"
     )
-    store.transition_state(b.id, expected_evidence_version=ver(store, b.id), to_state="acknowledged", actor_id=ACTOR)
-    store.set_assignee(b.id, expected_evidence_version=ver(store, b.id), assignee_id=ACTOR, actor_id=ACTOR)
-    store.transition_state(c.id, expected_evidence_version=ver(store, c.id), to_state="false-positive", actor_id=ACTOR, reason="lab")
+    store.transition_state(
+        b.id, expected_evidence_version=ver(store, b.id), to_state="acknowledged", actor_id=ACTOR
+    )
+    store.set_assignee(
+        b.id, expected_evidence_version=ver(store, b.id), assignee_id=ACTOR, actor_id=ACTOR
+    )
+    store.transition_state(
+        c.id,
+        expected_evidence_version=ver(store, c.id),
+        to_state="false-positive",
+        actor_id=ACTOR,
+        reason="lab",
+    )
 
     rows, total = store.list_findings()
     assert total == 3
@@ -473,8 +582,16 @@ def test_counts_cover_state_severity_and_open(store: UnknownDeviceRepository) ->
     c = created(
         store, mac="aa:bb:cc:00:11:44", ip="10.0.5.11", severity="unknown", basis="no-policy"
     )
-    store.transition_state(a.id, expected_evidence_version=ver(store, a.id), to_state="acknowledged", actor_id=ACTOR)
-    store.transition_state(c.id, expected_evidence_version=ver(store, c.id), to_state="resolved", actor_id=ACTOR, reason="done")
+    store.transition_state(
+        a.id, expected_evidence_version=ver(store, a.id), to_state="acknowledged", actor_id=ACTOR
+    )
+    store.transition_state(
+        c.id,
+        expected_evidence_version=ver(store, c.id),
+        to_state="resolved",
+        actor_id=ACTOR,
+        reason="done",
+    )
     counts = store.counts()
     assert counts.open == 2
     assert {r.state: r.count for r in counts.by_state} == {
@@ -723,7 +840,11 @@ def test_a_dismissed_endpoint_seen_with_different_evidence_leaves_a_suppressed_s
     store.observe(detection(port=True))
     assert kinds(store, first.id).count("suppressed-sighting") == 2
     last = store.list_timeline(first.id)[-1]
-    assert (last.kind, last.actor_id, last.state_from) == ("suppressed-sighting", SYSTEM_ACTOR, None)
+    assert (last.kind, last.actor_id, last.state_from) == (
+        "suppressed-sighting",
+        SYSTEM_ACTOR,
+        None,
+    )
     finding = store.get_finding(first.id)
     assert finding is not None and finding.state == "false-positive"  # the dismissal is untouched
 

@@ -531,7 +531,7 @@ additions (assets, prefixes, VLANs, addresses, ranges, interfaces by MAC); migra
 
 - **Write path to an external system: none.** The NetBox adapter issues `GET` only (the adapter tests assert `GET` on the requests seen by a mock transport). A quarantine is a `proposed_action`
   record with `executable: false` as a constant in every schema (JSON Schema, OpenAPI, pydantic, TS parser, vectors). No route, button, permission or code path isolates an endpoint;
-  Step 14 (the action engine, with its own approvals) owns execution. The UI says "Quarantine proposed, not executed".
+  the action engine (Step 12, with its own approvals) owns execution; it can now hold the request (see "Controlled action delta (Step 12)") but ships no executor that changes anything. The UI says "Quarantine proposed, not executed".
 - **Untrusted source text.** Device names, roles, sites, descriptions, hostnames, DNS names, VLAN names and NetBox custom-field values reach the API from third-party systems and may
   hold markup or instructions. They are length- and shape-bounded by the parsers, returned as JSON strings, never interpolated into SQL (all queries are parameterised), never used as
   a key without validation, never given to an AI, and rendered as React text nodes (component tests put `<img onerror>` and "ignore previous instructions" into the untrusted fields and
@@ -560,6 +560,34 @@ additions (assets, prefixes, VLANs, addresses, ranges, interfaces by MAC); migra
   the finding. Open-redirect rules (no scheme, no `//`, no backslash, no controls) are unchanged and still tested.
 - **Still open.** No live NetBox, LibreNMS or Wazuh run (shapes pinned by mock transport only); no DHCP, switch-FDB/ARP or Wi-Fi adapters, so attachment, port and VLAN stay Unknown; retention and
   prune; site scoping; whether dismissal needs step-up; a shared (non per-worker) cache and limiter; a Playwright run of the pages; tamper-evident audit; independent code and security review of this step.
+
+## Controlled action delta (Step 12, E11)
+
+New surface: `/api/v1/actions` (status, list, detail, propose, propose-from-finding, approve, reject, cancel, execute, kill switch), six `actions:*` permissions, two pages. Design:
+ACTION-ENGINE.md. **No executor that changes anything ships**; the dry-run executor imports no network or process library (a test asserts it) and the live slot is
+`disabled`/`not-connected`.
+
+- **Arbitrary command execution (the headline threat).** There is no command field in any contract (a test walks every `Action*` schema), no route that takes one, and no executor context
+  field for free text. The action type must be in a closed catalogue of three; parameters are typed and ranged (`bool` is refused for an integer); targets match a per-kind pattern with
+  `fullmatch` (a trailing newline cannot slip past `$`); the dry-run plan is fixed wording filled only from validated values. Hostile reasons are bounded, stripped of control, format (bidi,
+  zero-width) and separator characters, stored and shown as text, and never reach an executor, a plan or an audit record.
+- **Elevation / authz bypass.** Propose, propose-high, approve, execute and kill-switch are separate permissions; approve, execute and kill-switch are human-only (service and AI principals get 403
+  whatever their role) and are re-checked inside the store. A risk C or D request needs `actions:propose-high`, so a Technician cannot raise one. Authorisation is decided before CSRF, CSRF and
+  origin before step-up, step-up before the budget, the body last.
+- **Self-approval and collusion.** The requester can never approve (by identity id, so two sessions of one person are one identity); one person approves once; risk D needs two distinct approvers.
+  The approver is the session's identity, never a body field (a body naming an approver is a 422). Not addressed: two real people colluding, or one person holding two identities.
+- **Replay and TOCTOU.** Every decision quotes the request's digest and version and loses with 409 `STALE_REQUEST` if either moved; the check, the state transition and the history append happen
+  under one lock (eight parallel approvals record exactly one). An execution key starts a run once; a target runs one execution at a time; a quarantine re-checks that the finding is still open
+  and its evidence has not moved immediately before it runs.
+- **Repudiation / audit integrity (improved, not closed).** Every mutation and every refusal is audited with actor, request id and static facts; the history is append-only and hash-chained and
+  its verdict is in every detail response. The store is memory and the audit sink is a log: neither is tamper-evident storage (PRD 32 still open).
+- **Denial of service.** Caps: 25 open requests per requester, 5 000 stored, 100 history events per request, 8 parameters, per-identity budgets (writes 30/min, execute 10/min, kill switch 5/min).
+  A run that never reports back is failed after its timeout plus 60 s; an overrunning executor call is abandoned on a daemon thread (it cannot be killed).
+- **Information disclosure.** A quarantine proposal copies no MAC, address or name into the action store; audit records carry no reason, parameter or target; executor exceptions are discarded
+  (they may carry addresses or credentials); errors are fixed sentences; all responses `no-store`.
+- **Fail-closed configuration.** Engine and live-execution flags fail start-up when garbled; an unreadable kill-switch value counts as engaged; a missing flag means `not-connected`.
+- **Still open.** Durable multi-worker store and a tamper-evident audit sink; a per-process kill switch; approver policy (Administrator only today); no live executor, lab or connector security
+  review; a Playwright run of the pages; shared (non per-worker) rate limits.
 
 ## AI-specific threats
 - prompt injection in logs/hostnames/knowledge;

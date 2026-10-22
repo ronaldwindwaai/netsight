@@ -23,6 +23,10 @@ const UI_AREAS = [
   'inventory',
   'ipam',
   'unknown-devices',
+  'config',
+  'copilot',
+  'actions',
+  'forecast',
 ];
 
 type RawParam = string | string[] | undefined;

@@ -160,9 +160,7 @@ def test_requires_authentication() -> None:
 
 @pytest.mark.parametrize("roles", [{"technician"}, {"unknown-role"}])
 def test_forbidden_without_security_read(roles: set[str]) -> None:
-    app.dependency_overrides[get_current_identity] = lambda: Identity(
-        "limited", frozenset(roles)
-    )
+    app.dependency_overrides[get_current_identity] = lambda: Identity("limited", frozenset(roles))
     response = TestClient(app).get("/api/v1/security/events")
     assert response.status_code == 403
     assert response.json()["error"]["code"] == "FORBIDDEN"
@@ -170,9 +168,7 @@ def test_forbidden_without_security_read(roles: set[str]) -> None:
 
 @pytest.mark.parametrize("role", ["security_analyst", "administrator", "auditor"])
 def test_permitted_roles_read(role: str) -> None:
-    app.dependency_overrides[get_current_identity] = lambda: Identity(
-        "reader", frozenset({role})
-    )
+    app.dependency_overrides[get_current_identity] = lambda: Identity("reader", frozenset({role}))
     assert TestClient(app).get("/api/v1/security/events").status_code == 200
 
 
@@ -193,8 +189,7 @@ def test_ok_returns_source_events(monkeypatch: pytest.MonkeyPatch) -> None:
     _override(source)
 
     response = TestClient(app).get(
-        "/api/v1/security/events"
-        "?limit=5&from=2026-10-06T00:00:00Z&to=2026-10-06T08:00:00Z"
+        "/api/v1/security/events?limit=5&from=2026-10-06T00:00:00Z&to=2026-10-06T08:00:00Z"
     )
 
     body = response.json()
@@ -207,11 +202,7 @@ def test_ok_returns_source_events(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_ok_with_old_data_is_stale(monkeypatch: pytest.MonkeyPatch) -> None:
     _dev_identity(monkeypatch)
-    _override(
-        _FakeSecuritySource(
-            [_model_event()], observed_at=datetime(2026, 10, 1, tzinfo=UTC)
-        )
-    )
+    _override(_FakeSecuritySource([_model_event()], observed_at=datetime(2026, 10, 1, tzinfo=UTC)))
     body = (
         TestClient(app)
         .get("/api/v1/security/events?from=2026-10-06T00:00:00Z&to=2026-10-06T08:00:00Z")
@@ -282,8 +273,6 @@ def test_untrusted_signature_passes_through_as_data(
         "limit=501",
     ],
 )
-def test_rejects_unbounded_or_invalid_requests(
-    monkeypatch: pytest.MonkeyPatch, query: str
-) -> None:
+def test_rejects_unbounded_or_invalid_requests(monkeypatch: pytest.MonkeyPatch, query: str) -> None:
     _dev_identity(monkeypatch)
     assert TestClient(app).get(f"/api/v1/security/events?{query}").status_code == 422

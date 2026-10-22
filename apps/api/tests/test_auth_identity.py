@@ -26,9 +26,7 @@ def test_unmapped_identity_gets_explicit_valid_default_role(
 
     settings = AuthSettings()
 
-    assert resolve_roles({"roles": ["unmapped-group"]}, settings) == frozenset(
-        {"technician"}
-    )
+    assert resolve_roles({"roles": ["unmapped-group"]}, settings) == frozenset({"technician"})
 
 
 def test_mapped_role_takes_precedence_over_explicit_default(
@@ -39,6 +37,4 @@ def test_mapped_role_takes_precedence_over_explicit_default(
 
     settings = AuthSettings()
 
-    assert resolve_roles({"roles": ["network-team"]}, settings) == frozenset(
-        {"network_engineer"}
-    )
+    assert resolve_roles({"roles": ["network-team"]}, settings) == frozenset({"network_engineer"})

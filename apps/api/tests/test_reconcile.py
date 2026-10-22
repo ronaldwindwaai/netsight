@@ -27,13 +27,21 @@ def _device(
 
 
 def test_all_match() -> None:
-    netbox = [_device(device_id=NB_1, native_id="1", name="core-sw-01", status="healthy", source="netbox")]
-    discovered = [_device(device_id=DS_1, native_id="a", name="core-sw-01", status="healthy", source="librenms")]
+    netbox = [
+        _device(device_id=NB_1, native_id="1", name="core-sw-01", status="healthy", source="netbox")
+    ]
+    discovered = [
+        _device(
+            device_id=DS_1, native_id="a", name="core-sw-01", status="healthy", source="librenms"
+        )
+    ]
     assert reconcile(netbox, discovered) == []
 
 
 def test_missing_discovered() -> None:
-    netbox = [_device(device_id=NB_1, native_id="1", name="core-sw-01", status="healthy", source="netbox")]
+    netbox = [
+        _device(device_id=NB_1, native_id="1", name="core-sw-01", status="healthy", source="netbox")
+    ]
     findings = reconcile(netbox, [])
     assert len(findings) == 1
     assert findings[0].kind == "missing-discovered"
@@ -41,15 +49,23 @@ def test_missing_discovered() -> None:
 
 
 def test_unknown_discovered() -> None:
-    discovered = [_device(device_id=DS_1, native_id="a", name="mystery", status="healthy", source="librenms")]
+    discovered = [
+        _device(device_id=DS_1, native_id="a", name="mystery", status="healthy", source="librenms")
+    ]
     findings = reconcile([], discovered)
     assert len(findings) == 1
     assert findings[0].kind == "unknown-discovered"
 
 
 def test_status_mismatch() -> None:
-    netbox = [_device(device_id=NB_1, native_id="1", name="core-sw-01", status="offline", source="netbox")]
-    discovered = [_device(device_id=DS_1, native_id="a", name="core-sw-01", status="healthy", source="librenms")]
+    netbox = [
+        _device(device_id=NB_1, native_id="1", name="core-sw-01", status="offline", source="netbox")
+    ]
+    discovered = [
+        _device(
+            device_id=DS_1, native_id="a", name="core-sw-01", status="healthy", source="librenms"
+        )
+    ]
     findings = reconcile(netbox, discovered)
     assert len(findings) == 1
     assert findings[0].kind == "status-mismatch"

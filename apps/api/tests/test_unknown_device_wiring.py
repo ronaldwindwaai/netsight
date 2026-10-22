@@ -167,7 +167,9 @@ def test_the_application_starts_with_the_scan_disabled_and_exposes_no_task() -> 
 @pytest.mark.parametrize(
     ("raw", "days"), [("", 90), ("1", 1), ("90", 90), ("3650", 3650), (" 30 ", 30)]
 )
-def test_the_dismissal_lifetime_is_in_whole_days_and_defaults_to_ninety(raw: str, days: int) -> None:
+def test_the_dismissal_lifetime_is_in_whole_days_and_defaults_to_ninety(
+    raw: str, days: int
+) -> None:
     from datetime import timedelta
 
     from netsight_api.storage.unknown_devices import FP_TTL_ENV, fp_ttl_from_env

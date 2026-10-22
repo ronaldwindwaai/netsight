@@ -56,9 +56,7 @@ class Harness:
         )
         self.notifier = AlertNotifier(
             self.dispatcher,
-            rules
-            if rules is not None
-            else (RoutingRule("high", (EMAIL, PUSH)),),
+            rules if rules is not None else (RoutingRule("high", (EMAIL, PUSH)),),
             self.recorder,
             public_base_url=base_url,
         )
@@ -314,9 +312,15 @@ def test_a_dispatcher_crash_is_contained_and_reported_as_a_failure() -> None:
             return ()
 
     h = Harness()
-    notifier = AlertNotifier(Exploding(), (RoutingRule("high", (EMAIL,)),), h.recorder, public_base_url=BASE)  # type: ignore[arg-type]
+    notifier = AlertNotifier(
+        Exploding(), (RoutingRule("high", (EMAIL,)),), h.recorder, public_base_url=BASE
+    )  # type: ignore[arg-type]
     rule = h.stack.active_rule()
     result = notifier.notify(
-        rule=rule, decision=decision_for(rule, DEVICE_A), entity=DEVICE_A, incident_id=None, correlation_id="c"
+        rule=rule,
+        decision=decision_for(rule, DEVICE_A),
+        entity=DEVICE_A,
+        incident_id=None,
+        correlation_id="c",
     )
     assert (result.sent, result.failed) == (0, 1)

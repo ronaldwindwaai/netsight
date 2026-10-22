@@ -1,4 +1,5 @@
 import { apiGetRaw } from '@/lib/api';
+import { originPolicyFromEnv } from '@/lib/request-origin';
 import {
   apiExportPath,
   isCrossSiteRequest,
@@ -11,7 +12,7 @@ import {
  *
  * It forwards the session cookie to the API, which enforces `internet:export`, the export rate
  * limit and the audit record. The route validates the query first (a supported month, a known
- * format), refuses a request a browser marks as cross-site, relays only a known attachment type with
+ * format), refuses a request that is cross-site or that cannot show a same-site Origin/Referer, relays only a known attachment type with
  * a fixed file name, and answers failures with fixed text: nothing the API said is echoed.
  */
 
@@ -33,7 +34,7 @@ const UPSTREAM_REFUSALS: Readonly<Record<number, readonly [number, string]>> = {
 };
 
 export async function GET(request: Request): Promise<Response> {
-  if (isCrossSiteRequest(request.headers)) {
+  if (isCrossSiteRequest(request.headers, originPolicyFromEnv(process.env))) {
     return refusal(403, 'Exports can only be started from Netsight.');
   }
   const query = parseExportQuery(new URL(request.url).searchParams, new Date());

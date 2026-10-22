@@ -215,9 +215,7 @@ async def test_invalid_dsn_raises_unavailable_without_network(dsn: str) -> None:
         return _discovery(_TOP_COLUMNS)
 
     with pytest.raises(AdapterError) as excinfo:
-        await _client(handler, dsn=dsn).top(
-            dimension="talkers", start=_START, end=_END, limit=5
-        )
+        await _client(handler, dsn=dsn).top(dimension="talkers", start=_START, end=_END, limit=5)
 
     assert excinfo.value.status is AdapterStatus.UNAVAILABLE
     assert calls == []
@@ -289,9 +287,7 @@ async def test_readonly_settings_error_retries_without_setting() -> None:
             },
         )
 
-    items, _ = await _client(handler).top(
-        dimension="talkers", start=_START, end=_END, limit=5
-    )
+    items, _ = await _client(handler).top(dimension="talkers", start=_START, end=_END, limit=5)
 
     assert len(items) == 1
     assert len(calls) == 3  # failed attempt, settings-free retry, one data query
@@ -414,9 +410,7 @@ async def test_live_clickhouse_read_is_bounded_and_typed() -> None:
     end = datetime.now(UTC)
     start = end - timedelta(hours=1)
     try:
-        items, observed_at = await client.top(
-            dimension="talkers", start=start, end=end, limit=10
-        )
+        items, observed_at = await client.top(dimension="talkers", start=start, end=end, limit=10)
     except AdapterError as exc:
         assert exc.status in {
             AdapterStatus.UNAVAILABLE,

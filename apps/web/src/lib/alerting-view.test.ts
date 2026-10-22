@@ -10,6 +10,7 @@ import {
   describeScope,
   formatSeconds,
   parseAlertingOffsets,
+  storeWriteBlock,
   ruleStatusView,
   windowCounts,
   windowPhase,
@@ -194,4 +195,21 @@ test('page links keep the other list position and the source alerts page', () =>
   const none = alertingPageHrefs('windows', { rules: 0, windows: 0 }, 50, null, 1);
   assert.equal(none.next, null);
   assert.equal(none.previous, null);
+});
+
+test('storeWriteBlock allows writes only when the store answered ok', () => {
+  const ok = { kind: 'ok', data: { state: 'ok' }, correlationId: 'c' } as const;
+  assert.equal(storeWriteBlock(ok, 'alert rule store'), null);
+});
+
+test('storeWriteBlock names a not-connected store', () => {
+  const state = { kind: 'ok', data: { state: 'not-connected' }, correlationId: 'c' } as const;
+  assert.match(storeWriteBlock(state, 'alert rule store') ?? '', /alert rule store is not connected/);
+});
+
+test('storeWriteBlock names an unreadable store and a failed request', () => {
+  const unknown = { kind: 'ok', data: { state: 'unknown' }, correlationId: 'c' } as const;
+  assert.match(storeWriteBlock(unknown, 'alert rule store') ?? '', /could not be read/);
+  const failed = { kind: 'source_unavailable', code: 'x', message: 'm', correlationId: 'c', status: 502 } as const;
+  assert.match(storeWriteBlock(failed, 'alert rule store') ?? '', /could not be reached/);
 });

@@ -1,10 +1,12 @@
-import { AppContent } from '@adminlte/react';
+import { AppContent } from '@/components/app-content';
 import { ConfigurationNodesBody } from '@/components/configuration-read';
 import { DataFailure } from '@/components/data-state';
 import { Step8AccessDenied } from '@/components/step8-access-denied';
 import { apiGet } from '@/lib/api';
 import { parseSessionInfo } from '@/lib/api-contracts';
 import { parseConfigurationNodes } from '@/lib/api-contracts-configuration';
+
+export const metadata = { title: 'Configuration' };
 
 export default async function ConfigurationPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = await searchParams;
@@ -14,7 +16,7 @@ export default async function ConfigurationPage({ searchParams }: { searchParams
   if (!session.data.permissions.includes('configuration:read')) return <AppContent title="Configuration"><Step8AccessDenied surface="Configuration" permission="configuration:read" /></AppContent>;
   const state = await apiGet(`/api/v1/config/nodes?page=${page}&page_size=50`, parseConfigurationNodes);
   return <AppContent title="Configuration" breadcrumbs={[{ label: 'Overview', href: '/overview' }, { label: 'Configuration' }]}>
-    <p className="text-body-secondary">Read-only backup status and saved version history. Configuration contents and source credentials are withheld. A saved version is evidence of a backup, not proof that the current device configuration matches it.</p>
+    <div className="page-intro"><p className="text-body-secondary mb-0">Read-only backup status and saved version history. Configuration contents and source credentials are withheld. A saved version is evidence of a backup, not proof that the current device configuration matches it.</p></div>
     <ConfigurationNodesBody state={state} />
   </AppContent>;
 }

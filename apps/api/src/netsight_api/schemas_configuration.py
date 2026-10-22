@@ -1,4 +1,5 @@
 """Read-only configuration backup metadata; configuration bodies never cross this boundary."""
+
 from __future__ import annotations
 
 from typing import Literal
