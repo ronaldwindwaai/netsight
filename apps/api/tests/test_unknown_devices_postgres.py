@@ -43,7 +43,7 @@ LEGAL_PATHS = {
 
 def test_the_migration_has_a_rollback_and_is_the_newest() -> None:
     versions = [m.version for m in migrate.available_migrations()]
-    assert versions[-1] == "0006" and versions == sorted(versions)
+    assert "0006" in versions and versions == sorted(versions)  # later migrations may follow
     assert UP.is_file() and DOWN.is_file()
 
 
@@ -855,12 +855,12 @@ def test_the_rollback_is_guarded_and_reversible(db: Db) -> None:
         insert_finding(conn)
         conn.commit()
         with pytest.raises(migrate.DestructiveMigrationError):
-            migrate.apply_down(conn, allow_destructive=True, env={})
+            migrate.apply_down(conn, steps=2, allow_destructive=True, env={})
         assert "0006" in migrate.migration_status(conn).applied
-        # reverse only 0006 (the newest), with consent
+        # reverse 0007 (empty) and 0006 (holds a finding), with consent
         assert migrate.apply_down(
-            conn, allow_destructive=True, env={migrate.DESTRUCTIVE_ENV: "1"}
-        ) == ["0006"]
+            conn, steps=2, allow_destructive=True, env={migrate.DESTRUCTIVE_ENV: "1"}
+        ) == ["0007", "0006"]
         conn.commit()
         assert conn.execute(
             "SELECT to_regclass('unknown_device_findings') IS NULL AS gone"
@@ -872,7 +872,7 @@ def test_the_rollback_is_guarded_and_reversible(db: Db) -> None:
             ).fetchone()["n"]
             == 0
         )  # type: ignore[index]
-        assert migrate.apply_up(conn) == ["0006"]
+        assert migrate.apply_up(conn) == ["0006", "0007"]
         conn.commit()
         assert conn.execute(
             "SELECT to_regclass('unknown_device_events') IS NOT NULL AS here"

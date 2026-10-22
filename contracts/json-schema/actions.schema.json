@@ -812,22 +812,44 @@
       "type": "object"
     },
     "storeStatus": {
-      "additionalProperties": false,
-      "properties": {
-        "kind": {
-          "const": "memory",
-          "type": "string"
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "memory",
+              "type": "string"
+            },
+            "durable": {
+              "const": false,
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "kind",
+            "durable"
+          ],
+          "type": "object"
         },
-        "durable": {
-          "const": false,
-          "type": "boolean"
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "postgres",
+              "type": "string"
+            },
+            "durable": {
+              "const": true,
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "kind",
+            "durable"
+          ],
+          "type": "object"
         }
-      },
-      "required": [
-        "kind",
-        "durable"
-      ],
-      "type": "object"
+      ]
     },
     "policyStatus": {
       "additionalProperties": false,
@@ -894,7 +916,7 @@
         "definitions"
       ],
       "type": "object",
-      "description": "GET /api/v1/actions/status. dry_run_only is true exactly when no live executor is ready. store.durable is false: requests are lost on restart until a persistent store ships."
+      "description": "GET /api/v1/actions/status. dry_run_only is true exactly when no live executor is ready. store is the in-memory store (durable false: requests are lost on restart and not shared between workers) or the PostgreSQL store (durable true)."
     },
     "detailResponse": {
       "additionalProperties": false,

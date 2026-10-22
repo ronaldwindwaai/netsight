@@ -12,11 +12,15 @@ human). What it deliberately cannot do is as important as what it can:
 
 Idempotence rests on ``alert_incident_links``. A key (alert fingerprint, or group key for policy
 ``group``) points at the incident that carries it; the incident counts as open until a human
-resolves it. The link is claimed by compare-and-set *before* the timeline note is written, so a
-crash in between leaves a note-less incident that is still linked (never a duplicate on the next
-cycle). Inside one process a lock makes the read-decide-write sequence atomic. Two evaluators on
-one database can still race: the loser's claim fails, it attaches to the winner and leaves a
-comment on the surplus incident (nothing is ever deleted). Run a single evaluator.
+resolves it. A new incident, its first ``alert-linked`` note and the link claim are written by ONE
+store operation (``EvaluatorIncidents.open_linked``, a single transaction in PostgreSQL), so a
+failure anywhere leaves nothing behind: no unlinked incident that the next cycle would duplicate.
+Inside one process a lock makes the read-decide-write sequence atomic. Two evaluators on one
+database can still race: the loser's claim fails, its transaction is rolled back (no surplus
+incident is ever stored) and it attaches to the winner. Run a single evaluator (``leader.py``).
+
+The service is handed the narrow ``EvaluatorIncidents`` adapter (``adapter.py``), never the
+repository, and the storage layer refuses the service principal for every judgement or edit.
 """
 
 from __future__ import annotations
@@ -32,14 +36,20 @@ from netsight_api.audit import record_audit
 from netsight_api.notifications.models import sanitize_line
 from netsight_api.rbac import Identity, PrincipalKind
 from netsight_api.schemas import AlertRule, Incident, IncidentSeverity, IncidentTimelineEvent
-from netsight_api.storage import AlertIncidentLinkRepository, LinkKind
+from netsight_api.storage import (
+    AlertIncidentLinkRepository,
+    LinkClaim,
+    LinkKind,
+    OpenedIncident,
+)
 
 _LOGGER: Final = logging.getLogger("netsight_api.evaluation")
-SERVICE_ACTOR_ID: Final = "service:alert-evaluator"
 # Not human, no roles: it holds no permission at all, and the human-only ones are denied twice.
+# The ``service:`` prefix is also what the storage layer keys on to refuse judgements and edits.
 SERVICE_IDENTITY: Final = Identity(
-    id=SERVICE_ACTOR_ID, roles=frozenset(), principal=PrincipalKind.SERVICE
+    id="service:alert-evaluator", roles=frozenset(), principal=PrincipalKind.SERVICE
 )
+SERVICE_ACTOR_ID: Final = SERVICE_IDENTITY.id
 MAX_TITLE_LENGTH: Final = 255
 MAX_NOTE_LENGTH: Final = 1000
 _CLOSED_STATES: Final = frozenset({"resolved", "closed"})
@@ -63,12 +73,21 @@ class IncidentEffect:
 
 
 class EvaluatorIncidents(Protocol):
-    """The only incident-store operations the evaluator may use: it can open an incident, add a
-    timeline note and read one back. Nothing that acknowledges, assigns, resolves or edits."""
+    """The only incident-store operations the evaluator may use: it can open an incident (with its
+    link and first note, atomically), add a timeline note and read one back. Nothing that
+    acknowledges, assigns, resolves or edits."""
 
-    def create_incident(
-        self, *, title: str, severity: IncidentSeverity, actor_id: str
-    ) -> Incident: ...
+    def open_linked(
+        self,
+        *,
+        title: str,
+        severity: IncidentSeverity,
+        actor_id: str,
+        primary: LinkClaim,
+        secondary: LinkClaim | None = None,
+        note: str,
+        note_subject: str,
+    ) -> OpenedIncident | None: ...
 
     def append_event(
         self,
@@ -105,7 +124,7 @@ class AlertIncidentService:
                 record_audit(
                     "incident.auto_create",
                     outcome="failure",
-                    actor_id=SERVICE_ACTOR_ID,
+                    actor_id=SERVICE_IDENTITY.id,
                     correlation_id=correlation_id,
                     rule_id=rule.id,
                     policy=definition.incident_policy,
@@ -173,7 +192,7 @@ class AlertIncidentService:
         record_audit(
             "incident.auto_attach",
             outcome="success",
-            actor_id=SERVICE_ACTOR_ID,
+            actor_id=SERVICE_IDENTITY.id,
             correlation_id=correlation_id,
             target=incident_id,
             rule_id=rule.id,
@@ -193,54 +212,50 @@ class AlertIncidentService:
         group_link: str | None,
     ) -> IncidentEffect:
         fingerprint = decision.fingerprint
-        incident = self._incidents.create_incident(
+        grouped = policy == "group"
+        primary = (
+            LinkClaim("group", decision.group_key, group_link)
+            if grouped
+            else LinkClaim("alert", fingerprint, alert_link)
+        )
+        opened = self._incidents.open_linked(
             title=_title(rule, entity),
             severity=_SEVERITY[rule.severity],
-            actor_id=SERVICE_ACTOR_ID,
+            actor_id=SERVICE_IDENTITY.id,
+            primary=primary,
+            secondary=LinkClaim("alert", fingerprint, alert_link) if grouped else None,
+            note=_note_text(rule, entity),
+            note_subject=fingerprint,
         )
-        key_kind: LinkKind = "group" if policy == "group" else "alert"
-        key = decision.group_key if policy == "group" else fingerprint
-        replacing = group_link if policy == "group" else alert_link
-        if not self._links.claim(key_kind, key, incident_id=incident.id, replacing=replacing):
-            return self._yield_to_winner(incident.id, key_kind, key, rule, correlation_id)
-        if policy == "group" and not self._links.claim(
-            "alert", fingerprint, incident_id=incident.id, replacing=alert_link
-        ):
-            self._audit_claim_lost(incident.id, rule, correlation_id)
-        self._note(incident.id, rule, fingerprint, entity)
+        if opened is None:  # lost the race: nothing was written, join the winner
+            return self._yield_to_winner(primary.kind, primary.key, rule, correlation_id)
+        incident_id = opened.incident.id
+        if not opened.secondary_claimed:
+            self._audit_claim_lost(incident_id, rule, correlation_id)
         record_audit(
             "incident.auto_create",
             outcome="success",
-            actor_id=SERVICE_ACTOR_ID,
+            actor_id=SERVICE_IDENTITY.id,
             correlation_id=correlation_id,
-            target=incident.id,
+            target=incident_id,
             rule_id=rule.id,
             policy=policy,
             alert=fingerprint,
         )
-        return IncidentEffect("created", incident.id)
+        return IncidentEffect("created", incident_id)
 
     def _yield_to_winner(
-        self,
-        surplus_id: str,
-        kind: LinkKind,
-        key: str,
-        rule: AlertRule,
-        correlation_id: str,
+        self, kind: LinkKind, key: str, rule: AlertRule, correlation_id: str
     ) -> IncidentEffect:
-        """Another evaluator linked this key first: mark our surplus incident, join the winner."""
+        """Another evaluator linked this key first: our incident was never stored; join theirs."""
         winner = self._open(self._links.get(kind, key))
-        self._audit_claim_lost(surplus_id, rule, correlation_id)
-        reference = winner or "another incident"
-        self._safe_append(
-            surplus_id, "comment", f"Superseded: this alert is carried by {reference}.", None
-        )
+        self._audit_claim_lost(winner, rule, correlation_id)
         if winner is None:
             return IncidentEffect("none", None)
         record_audit(
             "incident.auto_attach",
             outcome="success",
-            actor_id=SERVICE_ACTOR_ID,
+            actor_id=SERVICE_IDENTITY.id,
             correlation_id=correlation_id,
             target=winner,
             rule_id=rule.id,
@@ -256,11 +271,11 @@ class AlertIncidentService:
         return IncidentEffect("none", self._open(self._links.get("alert", fingerprint)))
 
     @staticmethod
-    def _audit_claim_lost(incident_id: str, rule: AlertRule, correlation_id: str) -> None:
+    def _audit_claim_lost(incident_id: str | None, rule: AlertRule, correlation_id: str) -> None:
         record_audit(
             "incident.auto_create",
             outcome="failure",
-            actor_id=SERVICE_ACTOR_ID,
+            actor_id=SERVICE_IDENTITY.id,
             correlation_id=correlation_id,
             target=incident_id,
             rule_id=rule.id,
@@ -268,10 +283,7 @@ class AlertIncidentService:
         )
 
     def _note(self, incident_id: str, rule: AlertRule, fingerprint: str, entity: str) -> None:
-        message = sanitize_line(
-            f"Alert rule '{rule.name}' ({rule.severity}) fired for {entity}.", MAX_NOTE_LENGTH
-        )
-        self._safe_append(incident_id, "alert-linked", message, fingerprint)
+        self._safe_append(incident_id, "alert-linked", _note_text(rule, entity), fingerprint)
 
     def _safe_append(
         self,
@@ -286,7 +298,7 @@ class AlertIncidentService:
             self._incidents.append_event(
                 incident_id,
                 kind=kind,
-                actor_id=SERVICE_ACTOR_ID,
+                actor_id=SERVICE_IDENTITY.id,
                 message=message,
                 subject_id=subject,
             )
@@ -294,6 +306,12 @@ class AlertIncidentService:
             _LOGGER.warning(
                 "incident timeline note was not written", extra={"error_type": type(error).__name__}
             )
+
+
+def _note_text(rule: AlertRule, entity: str) -> str:
+    return sanitize_line(
+        f"Alert rule '{rule.name}' ({rule.severity}) fired for {entity}.", MAX_NOTE_LENGTH
+    )
 
 
 def _title(rule: AlertRule, entity: str) -> str:

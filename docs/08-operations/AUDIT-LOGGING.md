@@ -74,8 +74,8 @@ only when refused (`permission`, `csrf`, `origin`, `rate-limit`, `busy`).
 The background evaluator writes with the actor `service:alert-evaluator` and the correlation id of its cycle
 (`eval-<12 hex>`). `incident.auto_create` and `incident.auto_attach` carry `target` (the incident id), `rule_id`, `policy`
 (`create`, `group` or `race`) and `alert` (the 32-hex alert fingerprint); a failure is `incident.auto_create` with
-`outcome = failure` and `reason = <exception type>`, or `reason = CLAIM_LOST` (another writer claimed the key first; `target` is
-the surplus incident). `notification.send` is one record per destination attempted:
+`outcome = failure` and `reason = <exception type>`, or `reason = CLAIM_LOST` (another writer claimed the key first; its incident was rolled
+back, so `target` is the incident that carries the alert). `notification.send` is one record per destination attempted:
 `target` is the notification id, with `channel`, `destination` (a keyed hash or a host, never an address or token), `code`
 (a static code such as `OK`, `QUEUE_FULL`, `SMTP_5XX`), `attempts`, `alert` and `incident`; a send that could not be attempted
 carries `reason` (`no-public-url`); a page dropped because the backlog was full carries `code = BACKLOG_FULL` with `rule_id` and `alert`. Rule names, entity names, addresses and payload text are never logged.

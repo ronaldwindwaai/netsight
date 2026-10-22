@@ -128,7 +128,7 @@ export function ActionsBody({ state, query }: { state: FetchState<ActionList>; q
       <StateSurface
         icon="bi bi-inbox"
         title="No action requests"
-        detail="Nothing has been proposed. Requests are held in memory and are lost when the service restarts."
+        detail="Nothing has been proposed."
       />
     );
   }

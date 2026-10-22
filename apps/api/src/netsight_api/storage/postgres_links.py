@@ -8,6 +8,7 @@ serialise on the row and exactly one succeeds.
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 
 from netsight_api.storage import lifecycle
 from netsight_api.storage.connection import Connection, PostgresSettings
@@ -35,6 +36,20 @@ _SELECT_RECOVERED = (
 )
 
 
+def claim_link(
+    conn: Connection,
+    now: datetime,
+    kind: str,
+    key: str,
+    target: uuid.UUID,
+    current: uuid.UUID | None,
+) -> bool:
+    """The compare-and-set in the caller's transaction (also used by ``open_linked``)."""
+    if current is None:
+        return conn.execute(_INSERT_LINK, (kind, key, target, now)).rowcount == 1
+    return conn.execute(_REPLACE_LINK, (target, now, kind, key, current)).rowcount == 1
+
+
 class PostgresAlertIncidentLinkRepository:
     def __init__(self, settings: PostgresSettings, *, clock: Clock = lifecycle.utc_now) -> None:
         self._settings = settings
@@ -54,20 +69,7 @@ class PostgresAlertIncidentLinkRepository:
         with self._settings.session() as conn:
             if conn.execute(_SELECT_INCIDENT, (target,)).fetchone() is None:
                 raise NotFoundError("incident not found")
-            return self._claim(conn, kind, key, target, current)
-
-    def _claim(
-        self,
-        conn: Connection,
-        kind: str,
-        key: str,
-        target: uuid.UUID,
-        current: uuid.UUID | None,
-    ) -> bool:
-        now = self._clock()
-        if current is None:
-            return conn.execute(_INSERT_LINK, (kind, key, target, now)).rowcount == 1
-        return conn.execute(_REPLACE_LINK, (target, now, kind, key, current)).rowcount == 1
+            return claim_link(conn, self._clock(), kind, key, target, current)
 
     def mark_recovered(self, kind: LinkKind, key: str) -> bool:
         check_link_args(kind, key)

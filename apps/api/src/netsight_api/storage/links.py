@@ -9,8 +9,10 @@ A link says only which incident a key currently points at; whether that incident
 is judged from the incident itself, so a human resolving an incident is what frees the key (the
 evaluator never resolves anything). ``claim`` is compare-and-set, which is what keeps the
 number of incidents per key at one even when two evaluators race: exactly one claim wins.
-A loser holds an incident nobody links to; the caller notes that on the loser's timeline
-(there is no delete, by design). Running a single evaluator avoids the race altogether.
+The evaluator never claims on its own: ``AlertIncidentStore.open_linked`` creates the incident,
+its first note and the claim in one transaction, so a loser's incident is rolled back with its
+claim and no unlinked incident is ever stored (there is no delete, by design, so the claim must
+not be separable from the creation). Running a single evaluator avoids the race altogether.
 
 Each link also records whether the alert was seen to *recover* since it was claimed
 (``mark_recovered``; ``claim`` clears it). That is what lets a restarted evaluator behave like a
@@ -22,7 +24,8 @@ from __future__ import annotations
 
 import re
 import threading
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from typing import Final, Literal, Protocol
 
 from netsight_api.storage import lifecycle
@@ -74,9 +77,33 @@ class InMemoryAlertIncidentLinkRepository:
 
     def __init__(self, *, incident_exists: Callable[[str], bool]) -> None:
         self._incident_exists = incident_exists
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
         self._links: dict[tuple[str, str], str] = {}
         self._recovered: set[tuple[str, str]] = set()
+
+    @contextmanager
+    def _atomic(self) -> Iterator[Callable[[str], None]]:
+        """Hold the lock across several calls and yield ``undo(incident_id)``, which takes back
+        the claims that now point at that incident and restores what each key held on entry (the
+        in-memory stand-in for a rolled-back transaction; ``AlertIncidentStore`` uses it). Claims
+        by other writers are never touched."""
+        with self._lock:
+            links, recovered = dict(self._links), set(self._recovered)
+
+            def undo(incident_id: str) -> None:
+                for link_key, current in list(self._links.items()):
+                    if current != incident_id:
+                        continue
+                    if link_key in links:
+                        self._links[link_key] = links[link_key]
+                    else:
+                        del self._links[link_key]
+                    if link_key in recovered:
+                        self._recovered.add(link_key)
+                    else:
+                        self._recovered.discard(link_key)
+
+            yield undo
 
     def get(self, kind: LinkKind, key: str) -> str | None:
         check_link_args(kind, key)

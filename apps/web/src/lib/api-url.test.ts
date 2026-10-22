@@ -12,7 +12,7 @@ test('accepts plain v1 paths and keeps query strings intact', () => {
     'http://127.0.0.1:8000/api/v1/traffic/destinations?preset=24h&limit=5',
   );
   assert.equal(
-    safeApiUrl(`/api/v1/devices/${encodeURIComponent('a/b c')}?page=1&page_size=50`, BASE).search,
+    safeApiUrl(`/api/v1/devices/${encodeURIComponent('a b')}?page=1&page_size=50`, BASE).search,
     '?page=1&page_size=50',
   );
   assert.equal(
@@ -48,6 +48,30 @@ test('rejects traversal, encoded dot segments and non-v1 paths', () => {
   ]) {
     assert.throws(() => safeApiUrl(bad, BASE), /Only Netsight API v1 paths are allowed/, bad);
   }
+});
+
+test('rejects encoded slashes and backslashes in the path (proxy and backend decode them differently)', () => {
+  for (const bad of [
+    '/api/v1/a%2fb',
+    '/api/v1/a%2Fb',
+    '/api/v1/a%5cb',
+    '/api/v1/a%5Cb',
+    '/api/v1/devices/%2f..%2fadmin',
+    '/api/v1/x%2F?ok=1',
+    '/api/v1/a%252fb',
+    '/api/v1/a%252Fb',
+    '/api/v1/%252e%252e/x',
+    '/api/v1/a%255cb',
+    '/api/v1/a%25b',
+  ]) {
+    assert.throws(() => safeApiUrl(bad, BASE), /Only Netsight API v1 paths are allowed/, bad);
+  }
+});
+
+test('an encoded slash in the query string stays allowed (CIDR filters)', () => {
+  assert.equal(safeApiUrl('/api/v1/x?pct=100%25&q=%252f', BASE).search, '?pct=100%25&q=%252f');
+  assert.equal(safeApiUrl('/api/v1/x?src=10.0.0.0%2F8&p=a%5Cb', BASE).search, '?src=10.0.0.0%2F8&p=a%5Cb');
+  assert.equal(safeApiUrl('/api/v1/devices/a%20b%2e', BASE).pathname, '/api/v1/devices/a%20b%2e');
 });
 
 test('resolved URL always stays on the configured origin under /api/v1/', () => {

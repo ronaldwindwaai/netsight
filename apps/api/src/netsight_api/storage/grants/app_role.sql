@@ -24,6 +24,10 @@
 --                              last_seen_at, seen_count, endpoint, chain, comparison, proposed_action,
 --                              updated_at): the identity columns and the history are not updatable
 --   unknown_device_events      SELECT, INSERT only (append-only)
+--   action_requests            SELECT, INSERT, UPDATE (state, version, approvals, execute_by, run_by,
+--                              pre_checks, execution, exec_key, exec_actor_id, evicted_at): the identity
+--                              of a request is not updatable
+--   action_history             SELECT, INSERT only (append-only hash chain)
 --   netsight_schema_migrations nothing
 -- It gets no DELETE, TRUNCATE, REFERENCES, TRIGGER, CREATE or ownership anywhere.
 
@@ -52,7 +56,8 @@ BEGIN
                           'maintenance_windows', 'netsight_schema_migrations',
                           'alert_incident_links', 'notification_delivery_attempts',
                           'diagnostic_sessions', 'wan_link_cycles', 'wan_probe_samples',
-                          'unknown_device_findings', 'unknown_device_events')
+                          'unknown_device_findings', 'unknown_device_events',
+                          'action_requests', 'action_history')
           AND pg_has_role(app_role, relowner, 'USAGE')
     ) THEN
         RAISE EXCEPTION 'application role % owns (or inherits ownership of) the tables; '
@@ -68,7 +73,8 @@ BEGIN
         '%1$I.alert_rules, %1$I.maintenance_windows, %1$I.netsight_schema_migrations, '
         '%1$I.alert_incident_links, %1$I.notification_delivery_attempts, '
         '%1$I.diagnostic_sessions, %1$I.wan_link_cycles, %1$I.wan_probe_samples, '
-        '%1$I.unknown_device_findings, %1$I.unknown_device_events '
+        '%1$I.unknown_device_findings, %1$I.unknown_device_events, '
+        '%1$I.action_requests, %1$I.action_history '
         'FROM %2$I',
         schema_name, app_role);
 
@@ -114,6 +120,13 @@ BEGIN
         'ON TABLE %I.unknown_device_findings TO %I', schema_name, app_role);
     EXECUTE format(
         'GRANT SELECT, INSERT ON TABLE %I.unknown_device_events TO %I', schema_name, app_role);
+
+    EXECUTE format('GRANT SELECT, INSERT ON TABLE %I.action_requests TO %I', schema_name, app_role);
+    EXECUTE format(
+        'GRANT UPDATE (state, version, approvals, execute_by, run_by, pre_checks, execution, '
+        'exec_key, exec_actor_id, evicted_at) ON TABLE %I.action_requests TO %I',
+        schema_name, app_role);
+    EXECUTE format('GRANT SELECT, INSERT ON TABLE %I.action_history TO %I', schema_name, app_role);
 
     -- Read-only on the (partitioned) WAN tables: the privilege on the parent covers reads through it;
     -- the month partitions carry no grant of their own, so they are not reachable directly.

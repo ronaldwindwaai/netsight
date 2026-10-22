@@ -42,6 +42,9 @@ Clock = Callable[[], datetime]
 UuidFactory = Callable[[], uuid.UUID]
 
 MAX_REASON_LENGTH = 1000
+# Actor ids in this namespace are non-human principals (the alert evaluator is
+# ``service:alert-evaluator``); human ids come from the identity provider or the seed tooling.
+SERVICE_ACTOR_PREFIX = "service:"
 MAX_EVIDENCE_IDS = 256
 
 # Capacity caps on monitoring configuration (S6-3 security review H1/M5). Rules and windows are
@@ -114,6 +117,18 @@ def check_timeline_page(after_seq: int, limit: int) -> None:
 def check_identity(identity: str) -> str:
     _IDENTITY.validate_python(identity)
     return identity
+
+
+def is_service_actor(actor_id: str) -> bool:
+    """True for a non-human principal: the reserved ``service:`` namespace."""
+    return actor_id.lower().startswith(SERVICE_ACTOR_PREFIX)
+
+
+def require_human_actor(actor_id: str, what: str) -> None:
+    """Judgements and configuration edits are human-only: a service principal is refused here, in
+    the shared domain rules, so no store (memory or PostgreSQL) can be talked into them."""
+    if is_service_actor(actor_id):
+        raise ScopeViolationError(f"a service principal may not {what}")
 
 
 def revalidate[M: BaseModel](model: M) -> M:
@@ -191,6 +206,7 @@ def plan_transition(
 ) -> TransitionPlan:
     """Validate one state change and return the new record plus timeline entries."""
     check_identity(actor_id)
+    require_human_actor(actor_id, "acknowledge, advance, resolve or reopen an incident")
     is_reopen = to_state == "open" and incident.state in _REOPENABLE
     if _FORWARD.get(incident.state) != to_state and not is_reopen:
         raise IllegalTransitionError(f"cannot move an incident from {incident.state} to {to_state}")
@@ -228,6 +244,7 @@ def plan_assignee(
     incident: Incident, *, assignee_id: str | None, actor_id: str, now: datetime
 ) -> TransitionPlan:
     check_identity(actor_id)
+    require_human_actor(actor_id, "assign an incident")
     require_mutable(incident)
     updated = revalidate(
         incident.model_copy(update={"assignee_id": assignee_id, "updated_at": now})
@@ -240,6 +257,7 @@ def plan_evidence(
 ) -> TransitionPlan:
     """Idempotent: re-adding existing evidence changes nothing and records nothing."""
     check_identity(actor_id)
+    require_human_actor(actor_id, "attach evidence to an incident")
     require_mutable(incident)
     if evidence_id in incident.evidence_ids:
         return TransitionPlan(incident, ())
@@ -301,6 +319,7 @@ def new_rule(
 ) -> AlertRule:
     """Rules are always created as unapproved drafts, never active."""
     check_identity(actor_id)
+    require_human_actor(actor_id, "create an alert rule")
     return AlertRule(
         **definition.model_dump(),
         id=format_id("alert-rule", rule_uuid),
@@ -329,6 +348,7 @@ def edited_rule(
     the route layer writes the audit event and cannot call this without naming one.
     """
     check_identity(actor_id)
+    require_human_actor(actor_id, "edit an alert rule")
     if rule.status == "active":
         raise IllegalTransitionError("disable an active rule before editing it")
     return AlertRule(
@@ -349,6 +369,7 @@ def approved_rule(
 ) -> AlertRule:
     """Activate exactly the version the approver reviewed (never a later edit)."""
     check_identity(approver_id)
+    require_human_actor(approver_id, "approve an alert rule")
     require_version(rule, expected_version)
     if rule.status == "active":
         raise IllegalTransitionError("the rule is already active")
@@ -368,6 +389,7 @@ def approved_rule(
 def disabled_rule(rule: AlertRule, *, actor_id: str, now: datetime) -> AlertRule:
     """Disable an active rule; ``actor_id`` is validated for the caller's audit event."""
     check_identity(actor_id)
+    require_human_actor(actor_id, "disable an alert rule")
     if rule.status != "active":
         raise IllegalTransitionError("only an active rule can be disabled")
     return revalidate(
@@ -385,6 +407,7 @@ def new_window(
     now: datetime,
 ) -> MaintenanceWindow:
     check_identity(actor_id)
+    require_human_actor(actor_id, "create a maintenance window")  # a window silences alerts
     return MaintenanceWindow(
         **definition.model_dump(),
         id=format_id("maintenance", window_uuid),
@@ -446,6 +469,7 @@ def cancelled_window(
     window: MaintenanceWindow, *, actor_id: str, now: datetime
 ) -> MaintenanceWindow:
     check_identity(actor_id)
+    require_human_actor(actor_id, "cancel a maintenance window")
     if window.status == "cancelled":
         raise IllegalTransitionError("the maintenance window is already cancelled")
     return revalidate(

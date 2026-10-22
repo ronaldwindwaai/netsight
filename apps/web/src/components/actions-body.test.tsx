@@ -52,6 +52,12 @@ describe('the status card', () => {
     assert.match(document.body.textContent ?? '', /lost when the service restarts/);
   });
 
+  it('says requests survive a restart only when the store is durable', () => {
+    render(<ActionsStatusCard state={ok(actionStatus({ store: { kind: 'postgres', durable: true } }))} />);
+    assert.match(document.body.textContent ?? '', /survive a restart and are shared between workers/);
+    assert.doesNotMatch(document.body.textContent ?? '', /lost when the service restarts/);
+  });
+
   it('a failed read is an explicit failure', () => {
     render(<ActionsStatusCard state={failure('error', 500)} />);
     assert.ok(document.body.textContent?.length);
