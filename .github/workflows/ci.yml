@@ -36,7 +36,10 @@ jobs:
     timeout-minutes: 15
     services:
       postgres:
-        image: postgres:16
+        # PostgreSQL 17 matches the compose target (infrastructure/compose/docker-compose.dev.yml).
+        # Pinned by digest (multi-arch index for tag 17, read from the Docker Hub registry
+        # 2026-10-20); bump tag and digest together.
+        image: postgres:17@sha256:2d2b8998d31037bf721cfdf764d76ba74171b4fab3431b7f72c27c56ddbdf9e3
         env:
           POSTGRES_USER: netsight_test
           POSTGRES_PASSWORD: ci-only-password
@@ -49,6 +52,11 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     env:
+      # Throwaway CI-only credential for the job-local service container; not a secret. The
+      # POSTGRES_USER is the container superuser, which the live suites need to CREATE ROLE
+      # (app / WAN collector roles) and CREATE SCHEMA themselves.
+      # NETSIGHT_REQUIRE_PG=1 makes the suite fail if a live PostgreSQL test is skipped.
+      NETSIGHT_REQUIRE_PG: '1'
       NETSIGHT_TEST_PG_DSN: postgresql://netsight_test:ci-only-password@localhost:5432/netsight_test
     steps:
       - uses: actions/checkout@v4

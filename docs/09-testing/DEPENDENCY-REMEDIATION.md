@@ -32,9 +32,11 @@ exports the locked production requirements with hashes. Python auditing has its
 own job, so an npm audit failure cannot prevent it from running.
 
 The deploy workflow description is valid YAML. Trivy uses the verified upstream
-`v0.28.0` tag. The Python CI job now supplies an isolated PostgreSQL 16 service via
-NETSIGHT_TEST_PG_DSN, enabling the existing database tests instead of silently
-omitting them. Existing Ruff failures were corrected without removing checks or
+`v0.28.0` tag. The Python CI job now supplies an isolated PostgreSQL 17 service
+(digest-pinned) via NETSIGHT_TEST_PG_DSN, enabling the existing database tests
+instead of silently omitting them. The job also sets NETSIGHT_REQUIRE_PG=1, so a
+missing DSN or any skipped live PostgreSQL test fails the run (see
+`apps/api/tests/conftest.py`). Existing Ruff failures were corrected without removing checks or
 changing hostile-character fixture values.
 
 ## Security findings

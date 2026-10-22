@@ -65,7 +65,10 @@ Rollback SQL (`*.down.sql`) is destructive and is not packaged in the production
 source checkout `apply_down` needs `allow_destructive=True` and, when it would drop tables that
 hold rows, `NETSIGHT_ALLOW_DESTRUCTIVE_DOWN=1`. Live database tests are opt-in:
 `NETSIGHT_TEST_PG_DSN=postgresql://...` (a role allowed to `CREATE ROLE`/`CREATE SCHEMA`; each
-test uses a throwaway schema and role).
+test uses a throwaway schema and role). CI runs these against a PostgreSQL 17 service container
+(superuser `netsight_test`, throwaway CI-only password in `.github/workflows/ci.yml`) with
+`NETSIGHT_REQUIRE_PG=1`: the run aborts if the DSN is missing and fails if any live PostgreSQL
+test is skipped. Set `NETSIGHT_REQUIRE_PG=1` locally to get the same guard.
 
 ## OpenCode plugin (ECC port)
 
