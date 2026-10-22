@@ -1,4 +1,4 @@
-import { AppContent } from '@adminlte/react';
+import { AppContent } from '@/components/app-content';
 import { notFound } from 'next/navigation';
 import { DataFailure } from '@/components/data-state';
 import { InternetSlaPanel } from '@/components/internet-sla-panel';
@@ -9,6 +9,8 @@ import { parseSessionInfo } from '@/lib/api-contracts';
 import { parseSlaResponse } from '@/lib/api-contracts-internet';
 import { monthOptions, requestedMonth, slaPath } from '@/lib/internet-view';
 import { reportTemplate, visibleReports } from '@/lib/report-catalog';
+
+export const metadata = { title: 'WAN SLA report' };
 
 export default async function ReportPage({searchParams}: {
   searchParams: Promise<{month?: string | string[]}>;
@@ -24,7 +26,7 @@ export default async function ReportPage({searchParams}: {
   const readable = state.kind === 'ok' && state.data.state === 'ok';
   return <AppContent title={report.title} breadcrumbs={[{label:'Reports',href:'/reports'},{label:report.title}]}>
     <div data-print-report>
-      <p className="text-body-secondary">Source-backed monthly availability. Unknown intervals are included in the evidence; a gap is never reported as uptime. This view reflects the current source read rather than an archived snapshot.</p>
+      <div className="page-intro"><p className="text-body-secondary mb-0">Source-backed monthly availability. Unknown intervals are included in the evidence; a gap is never reported as uptime. This view reflects the current source read rather than an archived snapshot.</p></div>
       <PrintReport readable={readable} />
       <InternetSlaPanel monthAction="/reports/wan-sla" state={state} month={month} months={monthOptions(now)} adjusted={adjusted} canExport={session.data.permissions.includes('internet:export')} />
     </div>

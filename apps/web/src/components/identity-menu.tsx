@@ -1,6 +1,8 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useId, useRef, useState, useTransition } from 'react';
+import type { KeyboardEvent } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 import type { SessionInfo } from '@/lib/api-contracts';
@@ -19,6 +21,8 @@ export function IdentityMenu({ session }: { session: SessionInfo | null }) {
   const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
   const router = useRouter();
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const panelId = useId();
 
   if (session === null) {
     return (
@@ -63,62 +67,67 @@ export function IdentityMenu({ session }: { session: SessionInfo | null }) {
     }
   }
 
+  const label = session.email ?? session.identity_id;
+
+  function closeOnEscape(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.key !== 'Escape' || !open) return;
+    event.preventDefault();
+    setOpen(false);
+    buttonRef.current?.focus();
+  }
+
   return (
-    <div className="dropdown">
+    <div className="dropdown" onKeyDown={closeOnEscape}>
       <button
+        ref={buttonRef}
         type="button"
         className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-2"
-        aria-haspopup="true"
         aria-expanded={open}
+        aria-controls={panelId}
+        aria-label={`Account menu: ${label}`}
         onClick={() => setOpen((value) => !value)}
       >
-        <span className="identity-avatar" aria-hidden="true">
-          {initials(session.email, session.identity_id)}
+        <span
+          className="identity-avatar"
+          aria-hidden="true"
+          data-initials={initials(session.email, session.identity_id)}
+        />
+        <span className="d-none d-md-inline" aria-hidden="true">
+          {label}
         </span>
-        <span className="d-none d-md-inline">{session.email ?? session.identity_id}</span>
         <i className="bi bi-chevron-down fs-7" aria-hidden="true" />
       </button>
       {open ? (
-        <ul className="dropdown-menu dropdown-menu-end show" role="menu">
-          <li className="dropdown-header">
-            <strong>{session.email ?? session.identity_id}</strong>
+        <div id={panelId} className="dropdown-menu dropdown-menu-end show p-2">
+          <p className="mb-1 px-2">
+            <strong>{label}</strong>
             <small className="d-block text-body-secondary">via {session.provider}</small>
-          </li>
+          </p>
           {session.roles.length > 0 ? (
-            <li>
-              <span className="dropdown-item-text">
-                <small className="d-block text-body-secondary">Roles</small>
-                {session.roles.map((role) => (
-                  <span key={role} className="badge text-bg-secondary me-1">
-                    {role}
-                  </span>
-                ))}
-              </span>
-            </li>
+            <p className="mb-1 px-2">
+              <small className="d-block text-body-secondary">Roles</small>
+              {session.roles.map((role) => (
+                <span key={role} className="badge text-bg-secondary me-1">
+                  {role}
+                </span>
+              ))}
+            </p>
           ) : null}
-          <li>
-            <hr className="dropdown-divider" />
-          </li>
-          <li>
-            <button
-              type="button"
-              className="dropdown-item text-danger"
-              role="menuitem"
-              disabled={signingOut}
-              onClick={signOut}
-            >
-              <i className="bi bi-box-arrow-right me-2" aria-hidden="true" />
-              {signingOut ? 'Signing out…' : 'Sign out'}
-            </button>
-          </li>
+          <hr className="dropdown-divider" />
+          <Link className="dropdown-item" href="/preferences" onClick={() => setOpen(false)}>
+            <i className="bi bi-sliders me-2" aria-hidden="true" />
+            Preferences
+          </Link>
+          <button type="button" className="dropdown-item text-danger" disabled={signingOut} onClick={signOut}>
+            <i className="bi bi-box-arrow-right me-2" aria-hidden="true" />
+            {signingOut ? 'Signing out…' : 'Sign out'}
+          </button>
           {error !== null ? (
-            <li>
-              <span className="dropdown-item-text small text-danger" role="alert">
-                {error}
-              </span>
-            </li>
+            <p className="small text-danger px-2 mb-0" role="alert">
+              {error}
+            </p>
           ) : null}
-        </ul>
+        </div>
       ) : null}
     </div>
   );

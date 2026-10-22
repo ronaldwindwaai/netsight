@@ -160,6 +160,12 @@ describe('IP usage', () => {
     assert.match(document.body.textContent ?? '', /Seen means reported by LibreNMS within the last 24 hours/);
   });
 
+  it('marks the active activity filter with aria-current', () => {
+    render(view(okState(ipamAddresses()), parseIpamQuery({ activity: 'stale' })));
+    assert.equal(screen.getByRole('link', { name: 'Stale (1)' }).getAttribute('aria-current'), 'true');
+    assert.equal(screen.getByRole('link', { name: 'Active (1)' }).getAttribute('aria-current'), null);
+  });
+
   it('offers the activity filters with their counts', () => {
     render(view(okState(ipamAddresses()), parseIpamQuery({ activity: 'stale' })));
     assert.equal(screen.getByRole('link', { name: 'Stale (1)' }).getAttribute('href'), '/ipam?activity=stale');

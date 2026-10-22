@@ -28,19 +28,27 @@ export function Footer({
   onCancel,
   submitLabel,
   theme = 'primary',
+  blockedBy,
 }: {
   disabled: boolean;
   locked: boolean;
   onCancel: () => void;
   submitLabel: string;
   theme?: string;
+  /** Id of text that says why the form cannot be submitted yet (disabled-with-reason). */
+  blockedBy?: string;
 }) {
   return (
     <div className="d-flex justify-content-end gap-2 mt-3">
       <button type="button" className="btn btn-outline-secondary" onClick={onCancel} disabled={disabled}>
         Cancel
       </button>
-      <button type="submit" className={`btn btn-${theme}`} disabled={disabled || locked}>
+      <button
+        type="submit"
+        className={`btn btn-${theme}`}
+        disabled={disabled || locked}
+        aria-describedby={blockedBy}
+      >
         {disabled ? 'Working…' : submitLabel}
       </button>
     </div>

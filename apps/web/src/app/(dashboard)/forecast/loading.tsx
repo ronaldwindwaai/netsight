@@ -1,13 +1,11 @@
-import { AppContent } from '@adminlte/react';
+import { AppContent } from '@/components/app-content';
 
 import { LoadingState } from '@/components/data-state';
 
 export default function ForecastLoading() {
   return (
     <AppContent title="Capacity forecast">
-      <div role="status" aria-live="polite">
-        <LoadingState label="Loading capacity forecast" />
-      </div>
+      <LoadingState label="Loading capacity forecast" />
     </AppContent>
   );
 }

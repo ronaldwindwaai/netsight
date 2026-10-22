@@ -2,7 +2,8 @@ import Link from 'next/link';
 
 import { SeverityBadge, StateBadge } from '@/components/incident-badges';
 import type { Incident } from '@/lib/api-contracts-incident';
-import { formatUtcTimestamp } from '@/lib/format-time';
+import { RelativeTime } from '@/components/relative-time';
+
 import { incidentHref } from '@/lib/incident-view';
 
 /**
@@ -34,7 +35,7 @@ export function IncidentListTable({ incidents }: { incidents: readonly Incident[
                 <td>
                   <SeverityBadge severity={incident.severity} />
                 </td>
-                <td className="text-break">
+                <td className="text-break incident-title">
                   {href ? (
                     <Link className="fw-semibold" href={href}>
                       {incident.title}
@@ -46,14 +47,14 @@ export function IncidentListTable({ incidents }: { incidents: readonly Incident[
                 <td>
                   <StateBadge state={incident.state} />
                 </td>
-                <td className="text-break">
+                <td className="text-break incident-assignee">
                   {incident.assignee_id ?? (
                     <span className="small text-body-secondary">Unassigned</span>
                   )}
                 </td>
                 <td>{incident.evidence_ids.length}</td>
-                <td className="text-nowrap">{formatUtcTimestamp(incident.created_at)}</td>
-                <td className="text-nowrap">{formatUtcTimestamp(incident.updated_at)}</td>
+                <td className="text-nowrap"><RelativeTime value={incident.created_at} /></td>
+                <td className="text-nowrap"><RelativeTime value={incident.updated_at} /></td>
               </tr>
             );
           })}

@@ -1,9 +1,10 @@
-import { Badge, Card } from '@adminlte/react';
+import { Badge } from '@adminlte/react';
+import { AppCard } from '@/components/app-card';
 
 import { ForecastChart } from '@/components/forecast-chart';
 import type { ForecastSeries } from '@/lib/api-contracts-forecast';
 import { formatUtcTimestamp } from '@/lib/format-time';
-import { formatAmount, reasonText, statePresentation } from '@/lib/forecast-view';
+import { formatAmount, reasonText, statePresentation, uniqueNotes } from '@/lib/forecast-view';
 
 function StateBadge({ series }: { series: ForecastSeries }) {
   const view = statePresentation(series.state);
@@ -72,8 +73,11 @@ function WithoutForecast({ series }: { series: ForecastSeries }) {
   return (
     <div role="status" className="small">
       <p className="mb-1">{view.explanation}</p>
-      {series.reason !== null && <p className="mb-1">{reasonText(series.reason)}</p>}
-      {series.detail !== null && <p className="mb-0 text-break">{series.detail}</p>}
+      {uniqueNotes([series.reason === null ? null : reasonText(series.reason), series.detail]).map((note) => (
+        <p key={note} className="mb-1 text-break">
+          {note}
+        </p>
+      ))}
     </div>
   );
 }
@@ -81,7 +85,7 @@ function WithoutForecast({ series }: { series: ForecastSeries }) {
 /** One series: its state as a word and icon, the chart when there are measured days, the method. */
 export function ForecastSeriesCard({ series }: { series: ForecastSeries }) {
   return (
-    <Card
+    <AppCard
       title={series.name}
       icon="bi bi-graph-up"
       variant="outline"
@@ -97,6 +101,6 @@ export function ForecastSeriesCard({ series }: { series: ForecastSeries }) {
       ) : (
         <WithoutForecast series={series} />
       )}
-    </Card>
+    </AppCard>
   );
 }

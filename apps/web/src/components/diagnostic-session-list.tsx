@@ -5,7 +5,7 @@
  * so the page prints when it was retrieved instead of implying currency. Targets are untrusted text.
  */
 import Link from 'next/link';
-import { Card } from '@adminlte/react';
+import { AppCard } from '@/components/app-card';
 
 import { DataFailure } from '@/components/data-state';
 import { StateSurface, StoreStateSurface } from '@/components/state-surface';
@@ -134,7 +134,7 @@ export function DiagnosticSessionList({
   retrievedAt?: string;
 }) {
   return (
-    <Card
+    <AppCard
       className="operational-card mt-3"
       title="Recent sessions"
       icon="bi bi-clock-history"
@@ -147,6 +147,6 @@ export function DiagnosticSessionList({
         Retrieved {formatUtcTimestamp(retrievedAt)}; the session API does not report a freshness
         value. Stored sessions are snapshots and cannot be changed.
       </p>
-    </Card>
+    </AppCard>
   );
 }

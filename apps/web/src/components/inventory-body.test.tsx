@@ -9,6 +9,7 @@ import { InventoryBody } from '@/components/inventory-body';
 import { InventoryFilters } from '@/components/inventory-filters';
 import { InventoryDetailBody } from '@/components/inventory-detail-body';
 import type { InventoryDetail, InventoryList } from '@/lib/api-contracts-inventory';
+import { LINK_PERMISSIONS } from '@/lib/device-links';
 import { parseInventoryQuery } from '@/lib/inventory-view';
 import {
   DEVICE_ID,
@@ -191,7 +192,7 @@ describe('the filter form', () => {
 });
 
 describe('the asset page', () => {
-  const detailBody = (state: Parameters<typeof InventoryDetailBody>[0]['state']) => <InventoryDetailBody state={state} />;
+  const detailBody = (state: Parameters<typeof InventoryDetailBody>[0]['state']) => <InventoryDetailBody state={state} permissions={Object.values(LINK_PERMISSIONS)} />;
 
   it('shows every field with the NetBox and telemetry readings side by side', () => {
     render(detailBody(okState(inventoryDetail())));
@@ -201,6 +202,23 @@ describe('the asset page', () => {
     assert.match(rows[1].textContent ?? '', /Name.*core-sw-1.*Both agree/);
     assert.match(rows[4].textContent ?? '', /MAC address.*aa:bb:cc:00:11:22.*Discovered/);
     assert.match(rows[2].textContent ?? '', /Site.*HQ.*NetBox.*Not reported/);
+  });
+
+  it('is not a dead end: links to the device, the map, flows and IPAM', () => {
+    render(detailBody(okState(inventoryDetail())));
+    const hrefs = screen.getAllByRole('link').map((a) => a.getAttribute('href'));
+    assert.ok(hrefs.includes(`/devices/${DEVICE_ID}`));
+    assert.ok(hrefs.includes(`/network/map?focus=${DEVICE_ID}`));
+    assert.ok(hrefs.includes('/traffic/flows?source_ip=10.0.0.2'));
+    assert.ok(hrefs.includes('/ipam'));
+  });
+
+  it('hides the gated related links from a role without their permissions', () => {
+    render(<InventoryDetailBody state={okState(inventoryDetail())} permissions={[]} />);
+    const hrefs = screen.getAllByRole('link').map((a) => a.getAttribute('href'));
+    assert.ok(hrefs.includes(`/devices/${DEVICE_ID}`));
+    assert.equal(hrefs.includes('/ipam'), false);
+    assert.equal(hrefs.some((h) => h?.startsWith('/traffic/flows')), false);
   });
 
   it('says how the class was decided, and that an unknown asset has no role or type', () => {

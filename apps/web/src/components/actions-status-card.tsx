@@ -1,4 +1,4 @@
-import { Card } from '@adminlte/react';
+import { AppCard } from '@/components/app-card';
 
 import { DataFailure } from '@/components/data-state';
 import { DryRunNotice } from '@/components/action-parts';
@@ -38,7 +38,7 @@ export function ActionsStatusCard({ state }: { state: FetchState<ActionStatus> }
           proposed, approved or run; you can still read, reject and cancel.
         </div>
       ) : null}
-      <Card title="Engine" icon="bi bi-shield-check" variant="outline" theme="secondary">
+      <AppCard title="Engine" icon="bi bi-shield-check" variant="outline" theme="secondary">
         <dl className="row small mb-0">
           <dt className="col-sm-3">Kill switch</dt>
           <dd className="col-sm-9">{kill.engaged ? 'Engaged' : 'Not engaged'}</dd>
@@ -60,7 +60,7 @@ export function ActionsStatusCard({ state }: { state: FetchState<ActionStatus> }
             {status.definitions.map((d) => `${d.title} (risk ${d.risk}, ${d.approvals_required} approval${d.approvals_required === 1 ? '' : 's'})`).join('; ') || 'None'}
           </dd>
         </dl>
-      </Card>
+      </AppCard>
     </>
   );
 }

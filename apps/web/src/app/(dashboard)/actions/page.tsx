@@ -1,4 +1,4 @@
-import { AppContent } from '@adminlte/react';
+import { AppContent } from '@/components/app-content';
 
 import { ActionKillSwitchPanel } from '@/components/action-kill-switch-panel';
 import { ActionsBody, ActionsFilters } from '@/components/actions-body';
@@ -9,6 +9,8 @@ import { apiGet } from '@/lib/api';
 import { parseSessionInfo } from '@/lib/api-contracts';
 import { parseActionList, parseActionStatus } from '@/lib/api-contracts-actions';
 import { canReadActions, canUseActionKillSwitch, viewerFromSession } from '@/lib/viewer';
+
+export const metadata = { title: 'Action requests' };
 
 type Params = Record<string, string | string[] | undefined>;
 

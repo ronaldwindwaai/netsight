@@ -1,5 +1,3 @@
-import Link from 'next/link';
-
 import { LocalSignIn } from '@/components/local-signin';
 import { apiGet } from '@/lib/api';
 import { parseAuthProviders } from '@/lib/api-contracts';
@@ -32,23 +30,9 @@ function LoginSidebar() {
           <small>Network Intelligence &amp; Operations</small>
         </span>
       </div>
-      <nav className="login-sidebar__nav" aria-label="Main navigation">
-        <span className="login-sidebar__item login-sidebar__item--active">
-          <i className="bi bi-box-arrow-in-right" aria-hidden="true" />
-          Login
-        </span>
-        <Link className="login-sidebar__item" href="/overview">
-          <i className="bi bi-speedometer2" aria-hidden="true" />
-          Overview
-        </Link>
-        <Link className="login-sidebar__item" href="/devices">
-          <i className="bi bi-hdd-network" aria-hidden="true" />
-          Devices
-        </Link>
-      </nav>
       <div className="login-sidebar__footer">
-        <span>Netsight v1.0.0</span>
-        <span>Built for a more resilient connected world.</span>
+        <span>Sign in to continue.</span>
+        <span>Data access is enforced by the Netsight API.</span>
       </div>
     </aside>
   );

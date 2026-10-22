@@ -783,7 +783,7 @@ export function parseOverviewResponse(value: unknown): OverviewResponse | null {
     value.devices.by_status.some((item) => parseDeviceStatusCount(item) === null) ||
     parseFreshness(value.devices.freshness) === null ||
     !isRecord(value.sources) ||
-    !hasContractKeys(value.sources, ['librenms']) ||
+    !hasContractKeys(value.sources, ['librenms'], ['librenms', 'netbox']) ||
     !isRecord(value.sources.librenms) ||
     !hasContractKeys(value.sources.librenms, SOURCE_STATE_KEYS) ||
     typeof value.sources.librenms.configured !== 'boolean' ||
