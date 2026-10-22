@@ -151,7 +151,16 @@ _NO_STORE_ERROR_PREFIXES = (
     f"{API_PREFIX}/actions",
 )
 
-app = FastAPI(title="Netsight Platform API", version="0.1.0", lifespan=lifespan)
+# The interactive docs and the schema endpoint would be served without authentication; the contract
+# is published in contracts/openapi/netsight-api.yaml instead, so none of them are mounted.
+app = FastAPI(
+    title="Netsight Platform API",
+    version="0.1.0",
+    lifespan=lifespan,
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None,
+)
 # Registered before the correlation middleware below, so it runs inside it and its 413
 # responses carry the request's correlation id.
 app.add_middleware(BodySizeLimitMiddleware)
