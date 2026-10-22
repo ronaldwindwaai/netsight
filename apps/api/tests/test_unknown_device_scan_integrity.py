@@ -68,7 +68,9 @@ async def test_unverified_endpoints_are_raised_in_the_result_and_the_log(
 
 
 @pytest.mark.asyncio
-async def test_netbox_rows_dropped_as_malformed_make_the_comparison_unverified_not_a_finding() -> None:
+async def test_netbox_rows_dropped_as_malformed_make_the_comparison_unverified_not_a_finding() -> (
+    None
+):
     netbox = FakeNetbox(
         [asset("1", "core-sw-1", ip="10.0.0.2")],
         ip_assignments={"10.0.0.50": "pc-1"},
@@ -85,7 +87,9 @@ async def test_netbox_rows_dropped_as_malformed_make_the_comparison_unverified_n
 @pytest.mark.asyncio
 async def test_a_positive_match_still_clears_when_netbox_rows_were_dropped() -> None:
     netbox = FakeNetbox([asset("1", "core-sw-1", ip="10.0.0.2")], skipped=1)
-    librenms = FakeLibrenms([device("librenms", "7", "core-sw-1", ip="10.0.0.2", mac="aa:bb:cc:00:00:01")])
+    librenms = FakeLibrenms(
+        [device("librenms", "7", "core-sw-1", ip="10.0.0.2", mac="aa:bb:cc:00:00:01")]
+    )
     scanner, repo = make(netbox=netbox, librenms=librenms)
     result = await scanner.scan()
     assert result.unverified == 0 and findings(repo) == []
@@ -137,8 +141,12 @@ async def test_a_store_that_is_unavailable_still_fails_the_scan_loudly() -> None
 
 
 @pytest.mark.asyncio
-async def test_a_hostile_name_with_nul_and_bidi_characters_is_cleaned_before_it_reaches_the_store() -> None:
-    librenms = FakeLibrenms([device("librenms", "9", "prin\x00ter\u202e-x", ip="10.20.5.9", mac=MAC)])
+async def test_a_hostile_name_with_nul_and_bidi_characters_is_cleaned_before_it_reaches_the_store() -> (
+    None
+):
+    librenms = FakeLibrenms(
+        [device("librenms", "9", "prin\x00ter\u202e-x", ip="10.20.5.9", mac=MAC)]
+    )
     scanner, repo = make(librenms=librenms)
     result = await scanner.scan()
     assert result.created == 1
@@ -179,7 +187,9 @@ async def test_a_second_scan_while_one_runs_is_refused_with_a_retry_after() -> N
 
 
 @pytest.mark.asyncio
-async def test_a_scan_inside_the_minimum_interval_gets_the_last_result_without_scanning_again() -> None:
+async def test_a_scan_inside_the_minimum_interval_gets_the_last_result_without_scanning_again() -> (
+    None
+):
     clock = Ticker()
     guard = ScanGuard(min_interval=60.0, clock=clock)
     calls = 0
@@ -214,7 +224,9 @@ async def test_a_failed_scan_is_not_remembered_and_frees_the_guard() -> None:
 
 
 @pytest.mark.asyncio
-async def test_the_scheduler_and_the_api_share_one_guard_so_a_cycle_defers_to_a_running_scan() -> None:
+async def test_the_scheduler_and_the_api_share_one_guard_so_a_cycle_defers_to_a_running_scan() -> (
+    None
+):
     guard = ScanGuard(min_interval=0.0, clock=Ticker())
     scanner, repo = make()
     scanner._guard = guard
@@ -244,5 +256,8 @@ async def test_a_finished_scheduled_cycle_leaves_an_audit_line(
     with caplog.at_level(logging.INFO, logger="netsight_api.audit"):
         await scanner.run_cycle()
     lines = [r.getMessage() for r in caplog.records if r.name == "netsight_api.audit"]
-    assert any('"action": "unknown-device.scan.scheduled"' in line and '"outcome": "success"' in line for line in lines)
+    assert any(
+        '"action": "unknown-device.scan.scheduled"' in line and '"outcome": "success"' in line
+        for line in lines
+    )
     assert any('"created": 1' in line for line in lines)

@@ -137,7 +137,13 @@ def test_policy_create_opens_one_incident_per_alert() -> None:
 
 @pytest.mark.parametrize(
     ("alert_severity", "incident_severity"),
-    [("info", "low"), ("low", "low"), ("medium", "medium"), ("high", "high"), ("critical", "critical")],
+    [
+        ("info", "low"),
+        ("low", "low"),
+        ("medium", "medium"),
+        ("high", "high"),
+        ("critical", "critical"),
+    ],
 )
 def test_alert_severity_maps_onto_the_incident_scale(
     alert_severity: str, incident_severity: str
@@ -174,7 +180,15 @@ def test_the_evaluator_never_resolves_so_a_recovered_alert_leaves_the_incident_o
     stack = Stack.build()
     rule = stack.active_rule()
     created = ensure(stack, rule, DEVICE_A)
-    ensure(stack, rule, DEVICE_A, outcome="not-met", phase="inactive", transition="resolved", notify=False)
+    ensure(
+        stack,
+        rule,
+        DEVICE_A,
+        outcome="not-met",
+        phase="inactive",
+        transition="resolved",
+        notify=False,
+    )
     incident = stack.incidents.get_incident(created.incident_id)
     assert incident is not None and incident.state == "open" and incident.resolution is None
 
@@ -204,7 +218,10 @@ def test_group_policy_separates_groups_with_different_labels() -> None:
     stack = Stack.build()
     network = stack.active_rule(incident_policy="group", labels={"team": "network"})
     security = stack.active_rule(incident_policy="group", labels={"team": "security"})
-    assert ensure(stack, network, DEVICE_A).incident_id != ensure(stack, security, DEVICE_A).incident_id
+    assert (
+        ensure(stack, network, DEVICE_A).incident_id
+        != ensure(stack, security, DEVICE_A).incident_id
+    )
 
 
 def test_group_policy_opens_a_fresh_group_incident_after_a_human_resolves_the_old_one() -> None:
@@ -227,7 +244,9 @@ def test_concurrent_firing_in_one_process_creates_exactly_one_incident() -> None
     decision = decision_for(rule, DEVICE_A)
 
     def fire(_: int) -> str | None:
-        return svc.ensure(rule=rule, decision=decision, entity=DEVICE_A, correlation_id="c").incident_id
+        return svc.ensure(
+            rule=rule, decision=decision, entity=DEVICE_A, correlation_id="c"
+        ).incident_id
 
     with ThreadPoolExecutor(max_workers=8) as pool:
         ids = list(pool.map(fire, range(16)))
@@ -316,8 +335,12 @@ def test_store_failures_propagate_and_are_audited_as_failures(
     rule = stack.active_rule()
     svc = AlertIncidentService(BrokenIncidents(), stack.links)  # type: ignore[arg-type]
     with caplog.at_level(logging.INFO, logger="netsight_api.audit"), pytest.raises(RuntimeError):
-        svc.ensure(rule=rule, decision=decision_for(rule, DEVICE_A), entity=DEVICE_A, correlation_id="c")
-    (record,) = [json.loads(r.getMessage()) for r in caplog.records if r.name == "netsight_api.audit"]
+        svc.ensure(
+            rule=rule, decision=decision_for(rule, DEVICE_A), entity=DEVICE_A, correlation_id="c"
+        )
+    (record,) = [
+        json.loads(r.getMessage()) for r in caplog.records if r.name == "netsight_api.audit"
+    ]
     assert (record["action"], record["outcome"]) == ("incident.auto_create", "failure")
     assert record["reason"] == "RuntimeError" and "pw@db" not in caplog.text
     assert stack.links.get("alert", decision_for(rule, DEVICE_A).fingerprint) is None
@@ -344,7 +367,12 @@ def test_a_failed_timeline_note_does_not_lose_the_created_incident() -> None:
     assert effect.action == "created"
     assert stack.links.get("alert", decision_for(rule, DEVICE_A).fingerprint) == effect.incident_id
     # and the next decision does not create a duplicate
-    assert service(stack).ensure(
-        rule=rule, decision=decision_for(rule, DEVICE_A), entity=DEVICE_A, correlation_id="c"
-    ).action == "none"
+    assert (
+        service(stack)
+        .ensure(
+            rule=rule, decision=decision_for(rule, DEVICE_A), entity=DEVICE_A, correlation_id="c"
+        )
+        .action
+        == "none"
+    )
     assert T0  # (clock fixture sanity: nothing here reads the wall clock)

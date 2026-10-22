@@ -38,3 +38,4 @@ Action requests, step-up, approvals, restricted executors, verification.
 
 ## E12 — Forecasting/Optimisation
 Capacity, predictive warnings and safe recommendations.
+Design doc: `docs/12-implementation/FORECASTING.md`. Built as Step 13 (organisation traffic volume; WAN utilisation and inventory growth wait for a history source).

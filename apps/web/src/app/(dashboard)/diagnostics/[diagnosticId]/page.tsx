@@ -1,4 +1,4 @@
-import { AppContent } from '@adminlte/react';
+import { AppContent } from '@/components/app-content';
 
 import { DiagnosticSessionPage } from '@/components/diagnostic-session-page';
 import { DiagnosticsAccessDenied } from '@/components/diagnostics-access-denied';
@@ -7,6 +7,8 @@ import { parseSessionInfo } from '@/lib/api-contracts';
 import { parseDiagnosticSessionResponse } from '@/lib/api-contracts-diagnostic-session';
 import { sessionApiPath } from '@/lib/diagnostic-session-view';
 import { canUseDiagnostics, viewerFromSession } from '@/lib/viewer';
+
+export const metadata = { title: 'Diagnostic session' };
 
 /**
  * A stored diagnostic session, read-only. The identifier from the address is checked against the

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
-import { AppContent, Card } from '@adminlte/react';
+import { AppCard } from '@/components/app-card';
+import { AppContent } from '@/components/app-content';
 
 import { DataFailure } from '@/components/data-state';
 import { IncidentFiltersForm } from '@/components/incident-filters';
@@ -32,6 +33,8 @@ import {
   severityLabel,
 } from '@/lib/incident-view';
 import type { IncidentFilters, RawQuery } from '@/lib/incident-view';
+
+export const metadata = { title: 'Incidents' };
 
 function CountsStrip({ response }: { response: IncidentListResponse | IncidentSummaryListResponse }) {
   const counts = incidentCounts(response.incidents);
@@ -146,7 +149,7 @@ export default async function IncidentsPage({
 
       {mode === 'none' ? null : <IncidentFiltersForm filters={filters} showAssignee={!summary} />}
 
-      <Card
+      <AppCard
         className="operational-card"
         title="Incidents"
         icon="bi bi-exclamation-triangle"
@@ -163,7 +166,7 @@ export default async function IncidentsPage({
         ) : (
           <ListBody state={state} filters={filters} summary={summary} />
         )}
-      </Card>
+      </AppCard>
     </AppContent>
   );
 }

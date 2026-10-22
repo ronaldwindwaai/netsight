@@ -54,17 +54,13 @@ def test_validate_issuer_microsoft_allowed_tenant() -> None:
 def test_validate_issuer_microsoft_disallowed_tenant() -> None:
     settings = ProviderSettings(tenant_ids=["contoso.com"])
     with pytest.raises(OidcError):
-        _validate_issuer(
-            MICROSOFT, "https://login.microsoftonline.com/evil.com/v2.0", settings
-        )
+        _validate_issuer(MICROSOFT, "https://login.microsoftonline.com/evil.com/v2.0", settings)
 
 
 def test_validate_issuer_microsoft_wrong_cloud() -> None:
     settings = ProviderSettings(tenant_ids=["contoso.com"])
     with pytest.raises(OidcError):
-        _validate_issuer(
-            MICROSOFT, "https://login.microsoftonline.us/contoso.com/v2.0", settings
-        )
+        _validate_issuer(MICROSOFT, "https://login.microsoftonline.us/contoso.com/v2.0", settings)
 
 
 def test_validate_issuer_microsoft_missing_tenant_allowlist_is_denied() -> None:
@@ -100,9 +96,7 @@ def test_google_domain_allowlist() -> None:
 
 def test_google_identity_allowlist() -> None:
     settings = ProviderSettings(allowed_identities=["approved@example.com"])
-    _validate_google_allowlist(
-        {"sub": "1", "email": "approved@example.com"}, settings
-    )
+    _validate_google_allowlist({"sub": "1", "email": "approved@example.com"}, settings)
     with pytest.raises(OidcError):
         _validate_google_allowlist({"sub": "2", "email": "other@example.com"}, settings)
 
@@ -309,9 +303,7 @@ async def test_validate_id_token_rejects_unsupported_algorithm(
         "exp": now + 300,
         "nonce": "expected-nonce",
     }
-    token = pyjwt.encode(
-        claims, "hmac-secret", algorithm="HS256", headers={"kid": "test-key-1"}
-    )
+    token = pyjwt.encode(claims, "hmac-secret", algorithm="HS256", headers={"kid": "test-key-1"})
 
     with pytest.raises(OidcError) as excinfo:
         await validate_id_token(MICROSOFT, settings, token, "expected-nonce")

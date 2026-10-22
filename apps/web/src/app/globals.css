@@ -6,6 +6,13 @@
   --netsight-warning: #e7a11a;
   --netsight-critical: #d64545;
   --netsight-cloud: #f4f7fa;
+  /* Focus ring: well above 3:1 on white, so it clears the 3:1 non-text minimum on light surfaces. */
+  --netsight-focus: #0b5ed7;
+}
+
+/* ...and a lighter blue that is also well above 3:1 on the dark body background. */
+[data-bs-theme='dark'] {
+  --netsight-focus: #6ea8fe;
 }
 
 body {
@@ -40,8 +47,37 @@ body {
 }
 
 :focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--netsight-signal) 70%, white);
+  outline: 3px solid var(--netsight-focus);
   outline-offset: 2px;
+}
+
+/*
+ * Bootstrap removes the outline on these controls and substitutes a 25%-alpha blue box-shadow, which
+ * is under the 3:1 non-text contrast (WCAG 1.4.11 / 2.4.11) on both light and dark surfaces. Keep the
+ * solid ring above for them too.
+ */
+.btn:focus-visible,
+.btn-check:focus-visible + .btn,
+.btn-close:focus-visible,
+.page-link:focus-visible,
+.nav-link:focus-visible,
+.dropdown-item:focus-visible,
+.form-control:focus-visible,
+.form-select:focus-visible,
+.form-check-input:focus-visible {
+  outline: 3px solid var(--netsight-focus);
+  outline-offset: 2px;
+  box-shadow: none;
+}
+
+/*
+ * The ring is only 1.3:1 (light) / 1.9:1 (dark) against a filled primary button, so the 2px gap
+ * between button and ring is filled with the page background: a two-tone ring where the inner tone
+ * (body background, 4.5:1 on the button) separates the button and the outer blue (5.8:1 / 7.4:1 on
+ * the page) is the visible indicator.
+ */
+.btn-primary:focus-visible {
+  box-shadow: 0 0 0 2px var(--bs-body-bg);
 }
 
 .page-intro {
@@ -374,36 +410,6 @@ body {
   text-transform: uppercase;
 }
 
-.login-sidebar__nav {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.login-sidebar__item {
-  display: flex;
-  align-items: center;
-  gap: 0.7rem;
-  padding: 0.6rem 0.75rem;
-  border-radius: 0.5rem;
-  color: #b8c7dc;
-  font-size: 0.9rem;
-  font-weight: 500;
-  text-decoration: none;
-  transition: background 150ms ease, color 150ms ease;
-}
-
-.login-sidebar__item:hover,
-.login-sidebar__item:focus-visible {
-  background: rgb(255 255 255 / 6%);
-  color: #fff;
-}
-
-.login-sidebar__item--active {
-  background: var(--netsight-signal);
-  color: #fff;
-}
-
 .login-sidebar__footer {
   display: flex;
   flex-direction: column;
@@ -645,15 +651,6 @@ body {
   .login-sidebar__footer {
     display: none;
   }
-
-  .login-sidebar__nav {
-    flex-direction: row;
-  }
-
-  .login-sidebar__item {
-    padding: 0.45rem 0.6rem;
-    font-size: 0.8rem;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -683,5 +680,285 @@ body {
   [data-print-report] .card {
     box-shadow: none !important;
     break-inside: avoid;
+  }
+}
+
+/* ------------------------------------------------------------------
+   Mobile / PWA (E10; docs/12-implementation/MOBILE-PWA.md)
+   ------------------------------------------------------------------ */
+
+.connectivity-banner {
+  margin-bottom: 1rem;
+}
+
+.mobile-nav {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1030;
+  display: flex;
+  padding-right: env(safe-area-inset-right);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  border-top: 1px solid var(--bs-border-color);
+  background: var(--bs-body-bg);
+  box-shadow: 0 -0.25rem 1rem rgb(15 23 42 / 8%);
+}
+
+.mobile-nav__link {
+  display: flex;
+  min-width: 0;
+  min-height: 3.5rem;
+  flex: 1 1 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.1rem;
+  padding: 0.35rem 0.25rem;
+  color: var(--bs-secondary-color);
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.mobile-nav__link i {
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.mobile-nav__link.is-active {
+  color: #0a58ca;
+}
+
+@media (max-width: 991.98px) {
+  /* keep the last content clear of the fixed bottom bar and the home-indicator inset */
+  .netsight-dashboard .app-main {
+    padding-bottom: calc(4.5rem + env(safe-area-inset-bottom));
+  }
+}
+
+@media (max-width: 767.98px) {
+  .netsight-dashboard .app-content {
+    padding-right: 0.75rem;
+    padding-left: 0.75rem;
+  }
+
+  .netsight-dashboard .table-responsive {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .netsight-dashboard .card-header {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+}
+
+/* touch devices: comfortable targets (WCAG 2.2 target size, 44px) without enlarging desktop mouse UI */
+@media (pointer: coarse) {
+  .netsight-dashboard .btn,
+  .netsight-dashboard .form-control,
+  .netsight-dashboard .form-select,
+  .netsight-dashboard .dropdown-item,
+  .netsight-dashboard .nav-tabs .nav-link,
+  .netsight-dashboard .nav-pills .nav-link,
+  .netsight-dashboard .page-link {
+    min-height: 44px;
+  }
+
+  .netsight-dashboard .btn-sm,
+  .netsight-dashboard .form-control-sm,
+  .netsight-dashboard .form-select-sm {
+    min-height: 44px;
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+  }
+
+  .netsight-dashboard .form-check-input {
+    width: 1.35rem;
+    height: 1.35rem;
+  }
+
+}
+
+/* Dense tables keep their row height on tablets; only phones get padded link targets. */
+@media (pointer: coarse) and (max-width: 767.98px) {
+  .netsight-dashboard .table td > a:only-child {
+    display: inline-block;
+    padding-block: 0.65rem;
+  }
+}
+
+/* ------------------------------------------------------------------
+   Capacity forecast (Step 13): forecast is dashed and hatched, measured is solid,
+   so the difference never rests on colour alone.
+   ------------------------------------------------------------------ */
+
+.forecast-chart svg {
+  width: 100%;
+  height: auto;
+  max-height: 22rem;
+}
+
+.forecast-chart .measured-line {
+  stroke: var(--bs-body-color);
+  stroke-width: 2;
+}
+
+.forecast-chart .measured-dot {
+  fill: var(--bs-body-color);
+}
+
+.forecast-chart .forecast-line {
+  stroke: var(--bs-primary);
+  stroke-width: 2;
+}
+
+.forecast-chart .forecast-hatch-line,
+.forecast-chart .forecast-key__swatch--band {
+  stroke: var(--bs-primary);
+}
+
+.forecast-chart .forecast-band {
+  opacity: 0.55;
+}
+
+.forecast-chart .forecast-boundary {
+  stroke: var(--bs-secondary-color);
+  stroke-width: 1;
+  stroke-dasharray: 2 3;
+}
+
+.forecast-chart .forecast-limit {
+  stroke: var(--bs-danger);
+  stroke-width: 1.5;
+}
+
+.forecast-chart .forecast-grid {
+  stroke: var(--bs-border-color);
+  stroke-width: 1;
+}
+
+.forecast-chart .forecast-axis {
+  fill: var(--bs-secondary-color);
+  font-size: 11px;
+}
+
+.forecast-key {
+  margin-left: 0;
+  padding-left: 0;
+}
+
+.forecast-key__swatch {
+  display: inline-block;
+  width: 1.5rem;
+  height: 0;
+  margin-right: 0.25rem;
+  vertical-align: middle;
+  border-top: 2px solid var(--bs-body-color);
+}
+
+.forecast-key__swatch--forecast {
+  border-top: 2px dashed var(--bs-primary);
+}
+
+.forecast-key__swatch--band {
+  height: 0.7rem;
+  border-top: 0;
+  background: repeating-linear-gradient(
+    45deg,
+    var(--bs-primary),
+    var(--bs-primary) 2px,
+    transparent 2px,
+    transparent 5px
+  );
+}
+
+/* devices: sticky header inside a bounded scroll area */
+.devices-scroll {
+  max-height: 70vh;
+  overflow: auto;
+}
+
+.devices-scroll thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bs-body-bg);
+  box-shadow: inset 0 -1px 0 var(--bs-border-color);
+  white-space: nowrap;
+}
+
+/* topology: finding, match, dim, focus and active-link states (never colour alone: dash + mark) */
+.topology-node--finding {
+  stroke: var(--bs-warning);
+  stroke-dasharray: 5 3;
+}
+
+.topology-node--dim {
+  opacity: 0.35;
+}
+
+.topology-node--match {
+  stroke: var(--bs-info);
+  stroke-width: 3;
+}
+
+.topology-edge--active {
+  stroke: var(--bs-primary);
+  opacity: 1;
+}
+
+.topology-node__flag {
+  fill: var(--bs-warning-text-emphasis, var(--bs-body-color));
+  pointer-events: none;
+}
+
+.topology-node-group {
+  outline: none;
+}
+
+.topology-node-group:focus-visible .topology-node {
+  stroke: var(--bs-primary);
+  stroke-width: 3;
+}
+
+.topology-canvas svg:focus-visible {
+  outline: 2px solid var(--bs-primary);
+  outline-offset: -2px;
+}
+
+.topology-panel {
+  background: var(--bs-body-bg);
+}
+
+/* Loading skeletons: grey bars that hint at content shape; static under reduced motion. */
+.skeleton-line {
+  block-size: 1rem;
+  margin-block: 0.75rem;
+  border-radius: 0.25rem;
+  background: linear-gradient(
+    90deg,
+    var(--bs-tertiary-bg) 25%,
+    var(--bs-secondary-bg) 50%,
+    var(--bs-tertiary-bg) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes skeleton-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-line {
+    animation: none;
   }
 }

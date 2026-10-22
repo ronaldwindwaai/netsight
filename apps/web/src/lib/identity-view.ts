@@ -109,6 +109,29 @@ export function entityKindLabel(kind: EntityKind): string {
   return ENTITY_KINDS[kind];
 }
 
+/** Which entity pages the viewer may open: users:read for people, inventory:read for devices. */
+export interface EntityAccess {
+  people: boolean;
+  devices: boolean;
+}
+
+/** Deny by default: a link is offered only when the page passes the matching permission. */
+export const NO_ENTITY_ACCESS: EntityAccess = { people: false, devices: false };
+
+/**
+ * Where an entity can be read in full, or null when it has no page of its own (an account, an
+ * address) or the viewer lacks the permission for that page. The id was validated by the contract
+ * parser, and is encoded again here.
+ */
+export function entityHref(entity: EntityRef, access: EntityAccess = NO_ENTITY_ACCESS): string | null {
+  const id = encodeURIComponent(entity.id);
+  if (entity.type === 'person') return access.people ? `/users/${id}` : null;
+  if (entity.type === 'device' || entity.type === 'switch' || entity.type === 'ap') {
+    return access.devices ? `/devices/${id}` : null;
+  }
+  return null;
+}
+
 /** The entity as plain text: its label when it has one, else a typed id. Never markup. */
 export function entityText(entity: EntityRef | null): string {
   if (entity === null) return NOT_IDENTIFIED;

@@ -142,9 +142,7 @@ def test_device_list_uses_bounded_platform_pagination(monkeypatch: pytest.Monkey
     assert [item["name"] for item in body["items"]] == ["device-2"]
     assert body["freshness"]["state"] == "fresh"
     assert body["freshness"]["source"] == "librenms"
-    assert body["items"][0]["source_aliases"] == [
-        {"source": "librenms", "native_id": "2"}
-    ]
+    assert body["items"][0]["source_aliases"] == [{"source": "librenms", "native_id": "2"}]
 
 
 @pytest.mark.parametrize("query", ["page=0", "page_size=0", "page_size=101"])
@@ -321,7 +319,5 @@ def test_openapi_exposes_versioned_typed_device_routes() -> None:
     assert "/api/v1/devices/{device_id}" in schema["paths"]
     assert "/api/v1/sources/librenms/health" in schema["paths"]
     list_operation = schema["paths"]["/api/v1/devices"]["get"]
-    response_schema = list_operation["responses"]["200"]["content"]["application/json"][
-        "schema"
-    ]
+    response_schema = list_operation["responses"]["200"]["content"]["application/json"]["schema"]
     assert response_schema["$ref"].endswith("/DeviceListResponse")

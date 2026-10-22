@@ -1,0 +1,941 @@
+{
+  "copilot_evidence": {
+    "base": {
+      "id": "ev-001",
+      "source": "knowledge",
+      "kind": "document",
+      "title": "Runbook: DNS",
+      "excerpt": "Check the resolver first.",
+      "reference": "docs/08-operations/RUNBOOK.md#dns",
+      "observed_at": "2026-10-11T12:00:00Z",
+      "freshness": "fresh",
+      "instruction_like": false
+    },
+    "cases": [
+      {
+        "name": "knowledge",
+        "valid": true
+      },
+      {
+        "name": "incident",
+        "valid": true,
+        "set": {
+          "source": "incident"
+        }
+      },
+      {
+        "name": "undated stale",
+        "valid": true,
+        "set": {
+          "observed_at": null,
+          "freshness": "unknown"
+        }
+      },
+      {
+        "name": "instruction-like flagged",
+        "valid": true,
+        "set": {
+          "instruction_like": true
+        }
+      },
+      {
+        "name": "bad id",
+        "valid": false,
+        "set": {
+          "id": "ev-1"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "unknown source",
+        "valid": false,
+        "set": {
+          "source": "web"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "empty excerpt",
+        "valid": false,
+        "set": {
+          "excerpt": ""
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "excerpt too long",
+        "valid": false,
+        "set": {
+          "excerpt": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "extra key",
+        "valid": false,
+        "set": {
+          "raw": "x"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "missing flag",
+        "valid": false,
+        "delete": [
+          "instruction_like"
+        ],
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "zoneless time",
+        "valid": false,
+        "set": {
+          "observed_at": "2026-10-11T12:00:00"
+        },
+        "jsonschema_rejects": false
+      }
+    ]
+  },
+  "copilot_tool_call": {
+    "base": {
+      "tool": "search_knowledge",
+      "state": "ok",
+      "evidence_count": 1
+    },
+    "cases": [
+      {
+        "name": "ok",
+        "valid": true
+      },
+      {
+        "name": "denied",
+        "valid": true,
+        "set": {
+          "state": "denied",
+          "evidence_count": 0
+        }
+      },
+      {
+        "name": "not-connected",
+        "valid": true,
+        "set": {
+          "state": "not-connected",
+          "evidence_count": 0
+        }
+      },
+      {
+        "name": "unknown",
+        "valid": true,
+        "set": {
+          "state": "unknown",
+          "evidence_count": 0
+        }
+      },
+      {
+        "name": "denied with evidence",
+        "valid": false,
+        "set": {
+          "state": "denied"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "unknown tool",
+        "valid": false,
+        "set": {
+          "tool": "run_shell"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "write tool",
+        "valid": false,
+        "set": {
+          "tool": "propose_action"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "too many items",
+        "valid": false,
+        "set": {
+          "evidence_count": 13
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "extra key",
+        "valid": false,
+        "set": {
+          "args": "x"
+        },
+        "jsonschema_rejects": true
+      }
+    ]
+  },
+  "copilot_claim": {
+    "base": {
+      "text": "A resolver runbook exists.",
+      "evidence_ids": [
+        "ev-001"
+      ]
+    },
+    "cases": [
+      {
+        "name": "one citation",
+        "valid": true
+      },
+      {
+        "name": "two citations",
+        "valid": true,
+        "set": {
+          "evidence_ids": [
+            "ev-001",
+            "ev-002"
+          ]
+        }
+      },
+      {
+        "name": "no citation",
+        "valid": false,
+        "set": {
+          "evidence_ids": []
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "duplicate citation",
+        "valid": false,
+        "set": {
+          "evidence_ids": [
+            "ev-001",
+            "ev-001"
+          ]
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "bad citation",
+        "valid": false,
+        "set": {
+          "evidence_ids": [
+            "E1"
+          ]
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "empty text",
+        "valid": false,
+        "set": {
+          "text": ""
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "text too long",
+        "valid": false,
+        "set": {
+          "text": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "extra key",
+        "valid": false,
+        "set": {
+          "confidence": 1
+        },
+        "jsonschema_rejects": true
+      }
+    ]
+  },
+  "copilot_answer": {
+    "base": {
+      "summary": "One runbook matches.",
+      "facts": [
+        {
+          "text": "A resolver runbook exists.",
+          "evidence_ids": [
+            "ev-001"
+          ]
+        }
+      ],
+      "inferences": [
+        {
+          "text": "The resolver is the place to start.",
+          "evidence_ids": [
+            "ev-001"
+          ]
+        }
+      ],
+      "unknowns": [
+        "Current resolver health is not known."
+      ],
+      "recommendations": [
+        {
+          "text": "Read the runbook section."
+        }
+      ]
+    },
+    "cases": [
+      {
+        "name": "full",
+        "valid": true
+      },
+      {
+        "name": "only unknowns",
+        "valid": true,
+        "set": {
+          "facts": [],
+          "inferences": [],
+          "recommendations": []
+        }
+      },
+      {
+        "name": "empty summary",
+        "valid": false,
+        "set": {
+          "summary": ""
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "summary too long",
+        "valid": false,
+        "set": {
+          "summary": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "too many facts",
+        "valid": false,
+        "set": {
+          "facts": [
+            {
+              "text": "A resolver runbook exists.",
+              "evidence_ids": [
+                "ev-001"
+              ]
+            },
+            {
+              "text": "A resolver runbook exists.",
+              "evidence_ids": [
+                "ev-001"
+              ]
+            },
+            {
+              "text": "A resolver runbook exists.",
+              "evidence_ids": [
+                "ev-001"
+              ]
+            },
+            {
+              "text": "A resolver runbook exists.",
+              "evidence_ids": [
+                "ev-001"
+              ]
+            },
+            {
+              "text": "A resolver runbook exists.",
+              "evidence_ids": [
+                "ev-001"
+              ]
+            },
+            {
+              "text": "A resolver runbook exists.",
+              "evidence_ids": [
+                "ev-001"
+              ]
+            },
+            {
+              "text": "A resolver runbook exists.",
+              "evidence_ids": [
+                "ev-001"
+              ]
+            },
+            {
+              "text": "A resolver runbook exists.",
+              "evidence_ids": [
+                "ev-001"
+              ]
+            },
+            {
+              "text": "A resolver runbook exists.",
+              "evidence_ids": [
+                "ev-001"
+              ]
+            },
+            {
+              "text": "A resolver runbook exists.",
+              "evidence_ids": [
+                "ev-001"
+              ]
+            },
+            {
+              "text": "A resolver runbook exists.",
+              "evidence_ids": [
+                "ev-001"
+              ]
+            }
+          ]
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "fact without citation",
+        "valid": false,
+        "set": {
+          "facts": [
+            {
+              "text": "x",
+              "evidence_ids": []
+            }
+          ]
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "recommendation is a bare string",
+        "valid": false,
+        "set": {
+          "recommendations": [
+            "x"
+          ]
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "action key",
+        "valid": false,
+        "set": {
+          "actions": []
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "missing unknowns",
+        "valid": false,
+        "delete": [
+          "unknowns"
+        ],
+        "jsonschema_rejects": true
+      }
+    ]
+  },
+  "copilot_ask_request": {
+    "base": {
+      "question": "What changed overnight?"
+    },
+    "cases": [
+      {
+        "name": "question",
+        "valid": true
+      },
+      {
+        "name": "too short",
+        "valid": false,
+        "set": {
+          "question": "hi"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "too long",
+        "valid": false,
+        "set": {
+          "question": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "tool selection is not allowed",
+        "valid": false,
+        "set": {
+          "tools": [
+            "list_open_incidents"
+          ]
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "permission override is not allowed",
+        "valid": false,
+        "set": {
+          "role": "administrator"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "missing question",
+        "valid": false,
+        "delete": [
+          "question"
+        ],
+        "jsonschema_rejects": true
+      }
+    ]
+  },
+  "copilot_ask": {
+    "base": {
+      "state": "ok",
+      "generated_at": "2026-10-11T12:00:00Z",
+      "read_only": true,
+      "answer": {
+        "summary": "One runbook matches.",
+        "facts": [
+          {
+            "text": "A resolver runbook exists.",
+            "evidence_ids": [
+              "ev-001"
+            ]
+          }
+        ],
+        "inferences": [
+          {
+            "text": "The resolver is the place to start.",
+            "evidence_ids": [
+              "ev-001"
+            ]
+          }
+        ],
+        "unknowns": [
+          "Current resolver health is not known."
+        ],
+        "recommendations": [
+          {
+            "text": "Read the runbook section."
+          }
+        ]
+      },
+      "evidence": [
+        {
+          "id": "ev-001",
+          "source": "knowledge",
+          "kind": "document",
+          "title": "Runbook: DNS",
+          "excerpt": "Check the resolver first.",
+          "reference": "docs/08-operations/RUNBOOK.md#dns",
+          "observed_at": "2026-10-11T12:00:00Z",
+          "freshness": "fresh",
+          "instruction_like": false
+        },
+        {
+          "id": "ev-002",
+          "source": "incident",
+          "kind": "incident",
+          "title": "sw1 changed",
+          "excerpt": "Check the resolver first.",
+          "reference": "cfg-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "observed_at": "2026-10-11T12:00:00Z",
+          "freshness": "fresh",
+          "instruction_like": false
+        }
+      ],
+      "tool_calls": [
+        {
+          "tool": "search_knowledge",
+          "state": "ok",
+          "evidence_count": 1
+        },
+        {
+          "tool": "list_open_incidents",
+          "state": "ok",
+          "evidence_count": 1
+        }
+      ]
+    },
+    "cases": [
+      {
+        "name": "answered",
+        "valid": true
+      },
+      {
+        "name": "not-connected",
+        "valid": true,
+        "set": {
+          "state": "not-connected",
+          "answer": null,
+          "evidence": [],
+          "tool_calls": []
+        }
+      },
+      {
+        "name": "unknown after evidence",
+        "valid": true,
+        "set": {
+          "state": "unknown",
+          "answer": null
+        }
+      },
+      {
+        "name": "no evidence",
+        "valid": true,
+        "set": {
+          "state": "no-evidence",
+          "answer": null,
+          "evidence": [],
+          "tool_calls": [
+            {
+              "tool": "search_knowledge",
+              "state": "ok",
+              "evidence_count": 0
+            }
+          ]
+        }
+      },
+      {
+        "name": "answer without ok",
+        "valid": false,
+        "set": {
+          "state": "unknown"
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "ok without answer",
+        "valid": false,
+        "set": {
+          "answer": null
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "ok without evidence",
+        "valid": false,
+        "set": {
+          "evidence": [],
+          "tool_calls": []
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "not-connected with an answer",
+        "valid": false,
+        "set": {
+          "state": "not-connected",
+          "evidence": [],
+          "tool_calls": []
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "not-connected with tool calls",
+        "valid": false,
+        "set": {
+          "state": "not-connected",
+          "answer": null,
+          "evidence": []
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "no-evidence with evidence",
+        "valid": false,
+        "set": {
+          "state": "no-evidence",
+          "answer": null
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "a fact cites evidence outside the bundle",
+        "valid": false,
+        "set": {
+          "answer.facts.0.evidence_ids": [
+            "ev-009"
+          ]
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "duplicate evidence ids",
+        "valid": false,
+        "set": {
+          "evidence.1.id": "ev-001"
+        },
+        "jsonschema_rejects": false
+      },
+      {
+        "name": "not read-only",
+        "valid": false,
+        "set": {
+          "read_only": false
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "extra key",
+        "valid": false,
+        "set": {
+          "actions": []
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "too much evidence",
+        "valid": false,
+        "set": {
+          "evidence": [
+            {
+              "id": "ev-001",
+              "source": "knowledge",
+              "kind": "document",
+              "title": "Runbook: DNS",
+              "excerpt": "Check the resolver first.",
+              "reference": "docs/08-operations/RUNBOOK.md#dns",
+              "observed_at": "2026-10-11T12:00:00Z",
+              "freshness": "fresh",
+              "instruction_like": false
+            },
+            {
+              "id": "ev-001",
+              "source": "knowledge",
+              "kind": "document",
+              "title": "Runbook: DNS",
+              "excerpt": "Check the resolver first.",
+              "reference": "docs/08-operations/RUNBOOK.md#dns",
+              "observed_at": "2026-10-11T12:00:00Z",
+              "freshness": "fresh",
+              "instruction_like": false
+            },
+            {
+              "id": "ev-001",
+              "source": "knowledge",
+              "kind": "document",
+              "title": "Runbook: DNS",
+              "excerpt": "Check the resolver first.",
+              "reference": "docs/08-operations/RUNBOOK.md#dns",
+              "observed_at": "2026-10-11T12:00:00Z",
+              "freshness": "fresh",
+              "instruction_like": false
+            },
+            {
+              "id": "ev-001",
+              "source": "knowledge",
+              "kind": "document",
+              "title": "Runbook: DNS",
+              "excerpt": "Check the resolver first.",
+              "reference": "docs/08-operations/RUNBOOK.md#dns",
+              "observed_at": "2026-10-11T12:00:00Z",
+              "freshness": "fresh",
+              "instruction_like": false
+            },
+            {
+              "id": "ev-001",
+              "source": "knowledge",
+              "kind": "document",
+              "title": "Runbook: DNS",
+              "excerpt": "Check the resolver first.",
+              "reference": "docs/08-operations/RUNBOOK.md#dns",
+              "observed_at": "2026-10-11T12:00:00Z",
+              "freshness": "fresh",
+              "instruction_like": false
+            },
+            {
+              "id": "ev-001",
+              "source": "knowledge",
+              "kind": "document",
+              "title": "Runbook: DNS",
+              "excerpt": "Check the resolver first.",
+              "reference": "docs/08-operations/RUNBOOK.md#dns",
+              "observed_at": "2026-10-11T12:00:00Z",
+              "freshness": "fresh",
+              "instruction_like": false
+            },
+            {
+              "id": "ev-001",
+              "source": "knowledge",
+              "kind": "document",
+              "title": "Runbook: DNS",
+              "excerpt": "Check the resolver first.",
+              "reference": "docs/08-operations/RUNBOOK.md#dns",
+              "observed_at": "2026-10-11T12:00:00Z",
+              "freshness": "fresh",
+              "instruction_like": false
+            },
+            {
+              "id": "ev-001",
+              "source": "knowledge",
+              "kind": "document",
+              "title": "Runbook: DNS",
+              "excerpt": "Check the resolver first.",
+              "reference": "docs/08-operations/RUNBOOK.md#dns",
+              "observed_at": "2026-10-11T12:00:00Z",
+              "freshness": "fresh",
+              "instruction_like": false
+            },
+            {
+              "id": "ev-001",
+              "source": "knowledge",
+              "kind": "document",
+              "title": "Runbook: DNS",
+              "excerpt": "Check the resolver first.",
+              "reference": "docs/08-operations/RUNBOOK.md#dns",
+              "observed_at": "2026-10-11T12:00:00Z",
+              "freshness": "fresh",
+              "instruction_like": false
+            },
+            {
+              "id": "ev-001",
+              "source": "knowledge",
+              "kind": "document",
+              "title": "Runbook: DNS",
+              "excerpt": "Check the resolver first.",
+              "reference": "docs/08-operations/RUNBOOK.md#dns",
+              "observed_at": "2026-10-11T12:00:00Z",
+              "freshness": "fresh",
+              "instruction_like": false
+            },
+            {
+              "id": "ev-001",
+              "source": "knowledge",
+              "kind": "document",
+              "title": "Runbook: DNS",
+              "excerpt": "Check the resolver first.",
+              "reference": "docs/08-operations/RUNBOOK.md#dns",
+              "observed_at": "2026-10-11T12:00:00Z",
+              "freshness": "fresh",
+              "instruction_like": false
+            },
+            {
+              "id": "ev-001",
+              "source": "knowledge",
+              "kind": "document",
+              "title": "Runbook: DNS",
+              "excerpt": "Check the resolver first.",
+              "reference": "docs/08-operations/RUNBOOK.md#dns",
+              "observed_at": "2026-10-11T12:00:00Z",
+              "freshness": "fresh",
+              "instruction_like": false
+            },
+            {
+              "id": "ev-001",
+              "source": "knowledge",
+              "kind": "document",
+              "title": "Runbook: DNS",
+              "excerpt": "Check the resolver first.",
+              "reference": "docs/08-operations/RUNBOOK.md#dns",
+              "observed_at": "2026-10-11T12:00:00Z",
+              "freshness": "fresh",
+              "instruction_like": false
+            }
+          ]
+        },
+        "jsonschema_rejects": true
+      }
+    ]
+  },
+  "copilot_status": {
+    "base": {
+      "generated_at": "2026-10-11T12:00:00Z",
+      "read_only": true,
+      "model": {
+        "state": "ok"
+      },
+      "knowledge": {
+        "state": "ok",
+        "documents": 12,
+        "chunks": 140
+      },
+      "tools": [
+        {
+          "name": "search_knowledge",
+          "description": "Search Netsight's approved documents.",
+          "permission": "copilot:ask",
+          "allowed": true
+        },
+        {
+          "name": "list_open_incidents",
+          "description": "Open incidents.",
+          "permission": "incidents:read",
+          "allowed": false
+        }
+      ]
+    },
+    "cases": [
+      {
+        "name": "ready",
+        "valid": true
+      },
+      {
+        "name": "model not connected",
+        "valid": true,
+        "set": {
+          "model": {
+            "state": "not-connected"
+          }
+        }
+      },
+      {
+        "name": "knowledge not connected",
+        "valid": true,
+        "set": {
+          "knowledge": {
+            "state": "not-connected",
+            "documents": 0,
+            "chunks": 0
+          }
+        }
+      },
+      {
+        "name": "knowledge unknown",
+        "valid": true,
+        "set": {
+          "knowledge": {
+            "state": "unknown",
+            "documents": 0,
+            "chunks": 0
+          }
+        }
+      },
+      {
+        "name": "documents without a knowledge base",
+        "valid": false,
+        "set": {
+          "knowledge": {
+            "state": "not-connected",
+            "documents": 3,
+            "chunks": 0
+          }
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "model name leaked",
+        "valid": false,
+        "set": {
+          "model": {
+            "state": "ok",
+            "name": "x"
+          }
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "unknown tool",
+        "valid": false,
+        "set": {
+          "tools": [
+            {
+              "name": "restart_server",
+              "description": "x",
+              "permission": "copilot:ask",
+              "allowed": true
+            }
+          ]
+        },
+        "jsonschema_rejects": true
+      },
+      {
+        "name": "not read-only",
+        "valid": false,
+        "set": {
+          "read_only": false
+        },
+        "jsonschema_rejects": true
+      }
+    ]
+  }
+}

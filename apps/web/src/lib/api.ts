@@ -4,32 +4,30 @@ import { cookies } from 'next/headers';
 
 import { stateFromResponse } from '@/lib/api-response';
 import type { FetchState, ResponseParser } from '@/lib/api-response';
+import { isSafeApiPath, resolveApiBase, safeApiUrl } from '@/lib/api-url';
 
 export type { FetchFailureKind, FetchState, ResponseParser } from '@/lib/api-response';
 
-const DEFAULT_API_URL = 'http://127.0.0.1:8000';
 const API_TIMEOUT_MS = 10_000;
 const SESSION_COOKIE = 'netsight_session';
 const CSRF_HEADER = 'X-CSRF-Token';
 
-function apiUrl(path: string): URL {
-  if (!path.startsWith('/api/v1/') || path.startsWith('//')) {
+/**
+ * The single egress point to the Netsight API. The path is checked against a strict allowlist
+ * (`isSafeApiPath`) and the final URL is re-checked against the configured API origin immediately
+ * before `fetch`, so no caller-supplied value can steer the request to another host or path.
+ */
+async function apiFetch(path: string, init: RequestInit): Promise<Response> {
+  if (!isSafeApiPath(path) || !path.startsWith('/api/v1/')) {
     throw new Error('Only Netsight API v1 paths are allowed');
   }
-
-  const base = new URL(process.env.NETSIGHT_API_URL ?? DEFAULT_API_URL);
-  if (!['http:', 'https:'].includes(base.protocol) || base.username || base.password) {
-    throw new Error('NETSIGHT_API_URL must be an HTTP(S) URL without embedded credentials');
-  }
-  const isLoopback = ['127.0.0.1', '::1', '[::1]', 'localhost'].includes(base.hostname);
-  if (base.protocol !== 'https:' && !isLoopback) {
-    throw new Error('NETSIGHT_API_URL must use HTTPS unless it targets loopback');
-  }
-  const resolved = new URL(path, `${base.toString().replace(/\/$/, '')}/`);
-  if (resolved.origin !== base.origin || !resolved.pathname.startsWith('/api/v1/')) {
+  // The host comes only from the validated configuration; the allowlisted path is appended to it.
+  const origin = resolveApiBase(process.env.NETSIGHT_API_URL).origin;
+  const target = `${origin}${path}`;
+  if (safeApiUrl(path, process.env.NETSIGHT_API_URL).origin !== origin) {
     throw new Error('Only Netsight API v1 paths are allowed');
   }
-  return resolved;
+  return fetch(target, init);
 }
 
 export async function apiGet<T>(path: string, parse: ResponseParser<T>): Promise<FetchState<T>> {
@@ -37,7 +35,7 @@ export async function apiGet<T>(path: string, parse: ResponseParser<T>): Promise
 
   try {
     const session = (await cookies()).get(SESSION_COOKIE)?.value;
-    const response = await fetch(apiUrl(path), {
+    const response = await apiFetch(path, {
       cache: 'no-store',
       headers: {
         Accept: 'application/json',
@@ -74,7 +72,7 @@ export async function apiGetRaw(path: string, accept: string): Promise<RawGetRes
   const correlationId = crypto.randomUUID();
   try {
     const session = (await cookies()).get(SESSION_COOKIE)?.value;
-    const response = await fetch(apiUrl(path), {
+    const response = await apiFetch(path, {
       cache: 'no-store',
       headers: {
         Accept: accept,
@@ -95,6 +93,8 @@ export interface ApiPostOptions {
   timeoutMs?: number;
   /** HTTP verb of the state-changing call; defaults to POST (PUT for full-replacement edits). */
   method?: 'POST' | 'PUT';
+  /** Sent as the Idempotency-Key header (controlled actions: a retry returns the first result). */
+  idempotencyKey?: string;
 }
 
 /**
@@ -129,7 +129,7 @@ export async function apiPost<T, B>(
     }
     const cookieHeader = `${SESSION_COOKIE}=${encodeURIComponent(session)}`;
 
-    const csrfResponse = await fetch(apiUrl('/api/v1/auth/csrf'), {
+    const csrfResponse = await apiFetch('/api/v1/auth/csrf', {
       cache: 'no-store',
       headers: { Accept: 'application/json', Cookie: cookieHeader },
       redirect: 'error',
@@ -171,7 +171,7 @@ export async function apiPost<T, B>(
       };
     }
 
-    const response = await fetch(apiUrl(path), {
+    const response = await apiFetch(path, {
       method: options.method ?? 'POST',
       cache: 'no-store',
       headers: {
@@ -179,6 +179,7 @@ export async function apiPost<T, B>(
         'Content-Type': 'application/json',
         'X-Correlation-ID': requestCorrelationId,
         [CSRF_HEADER]: token,
+        ...(options.idempotencyKey !== undefined ? { 'Idempotency-Key': options.idempotencyKey } : {}),
         Cookie: cookieHeader,
       },
       body: JSON.stringify(body),

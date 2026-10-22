@@ -244,6 +244,63 @@ export function anomaliesPath(window: TrafficWindow): string {
   return `/api/v1/traffic/anomalies?${window.query}`;
 }
 
+/**
+ * The Flow Explorer address that drills into one row's subject, or null when the filters could not
+ * be applied (malformed text, or an address filter the viewer's role would be refused). Going through
+ * the same parser the page uses means a link can never lead to a "filter not applied" notice.
+ */
+export function flowsDrillHref(
+  window: TrafficWindow,
+  filters: FilterValues,
+  options: { detail: boolean },
+): string | null {
+  const parsed = parseExplorerFilters(filters, options);
+  if (parsed.refused.length > 0 || Object.keys(parsed.values).length === 0) return null;
+  return trafficHref('flows', window, parsed.values);
+}
+
+/** A valid instant as `YYYY-MM-DDTHH:MM:SSZ` in UTC (offsets are honoured), else null. */
+function canonicalInstant(value: string): string | null {
+  const moment = new Date(value);
+  if (Number.isNaN(moment.getTime())) return null;
+  return `${moment.toISOString().slice(0, 19)}Z`;
+}
+
+/** The Flow Explorer for exactly one anomalous hour (UTC), optionally narrowed by a filter. */
+export function hourFlowsHref(
+  start: string,
+  end: string,
+  filters: FilterValues,
+  options: { detail: boolean },
+): string | null {
+  const parsed = parseExplorerFilters(filters, options);
+  if (parsed.refused.length > 0) return null;
+  const from = canonicalInstant(start);
+  const to = canonicalInstant(end);
+  if (from === null || to === null || from >= to) return null;
+  const range = new URLSearchParams({ from, to });
+  for (const [name, value] of Object.entries(parsed.values)) range.set(name, value);
+  return `/traffic/flows?${range.toString()}`;
+}
+
+/** The Flow Explorer for the minutes either side of one instant (an event time), or null. */
+export function aroundInstantFlowsHref(
+  instant: string,
+  minutes: number,
+  filters: FilterValues,
+  options: { detail: boolean },
+): string | null {
+  const centre = new Date(instant).getTime();
+  if (Number.isNaN(centre)) return null;
+  const spread = minutes * 60_000;
+  return hourFlowsHref(
+    new Date(centre - spread).toISOString(),
+    new Date(centre + spread).toISOString(),
+    filters,
+    options,
+  );
+}
+
 export type TrafficSection = 'overview' | 'flows' | 'applications' | 'destinations' | 'anomalies';
 
 export function trafficHref(
@@ -266,6 +323,8 @@ export interface AttributionView {
   confidence: string;
   reason: string;
   device: string | null;
+  /** The canonical device id, only when the identity service named one (for an inventory link). */
+  deviceId: string | null;
   /** The canonical person id, only when a person is named (for a profile link); never a guess. */
   personId: string | null;
 }
@@ -281,7 +340,7 @@ function confidenceTextOf(value: number | null): string {
 }
 
 function unavailable(headline: string, kind: AttributionView['kind'] = 'unavailable'): AttributionView {
-  return { kind, headline, basis: null, confidence: '', reason: '', device: null, personId: null };
+  return { kind, headline, basis: null, confidence: '', reason: '', device: null, deviceId: null, personId: null };
 }
 
 export function attributionPresentation(
@@ -302,6 +361,7 @@ export function attributionPresentation(
     confidence: confidenceTextOf(attribution.confidence),
     reason,
     device,
+    deviceId: attribution.device?.id ?? null,
     personId: null,
   };
   if (attribution.reason === 'restricted') {

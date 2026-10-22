@@ -1,0 +1,110 @@
+'use client';
+
+import Link from 'next/link';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useRef } from 'react';
+
+import { usePreferences } from '@/components/use-preferences';
+
+import { PAGE_SIZES, describeRange, pageHref } from '@/lib/page-state';
+import { writePageSizeCookie } from '@/lib/preferences';
+
+interface PageControlsProps {
+  /** What the rows are, plural: "devices". */
+  readonly noun: string;
+  readonly page: number;
+  readonly pageSize: number;
+  readonly total: number;
+  /** Rows returned on this page. */
+  readonly count: number;
+  /** Accessible name of the pager landmark. */
+  readonly label: string;
+}
+
+function Step({ href, disabled, children }: { href: string; disabled: boolean; children: React.ReactNode }) {
+  if (disabled) {
+    return (
+      <span className="btn btn-outline-secondary btn-sm disabled" role="link" aria-disabled="true">
+        {children}
+      </span>
+    );
+  }
+  return (
+    <Link className="btn btn-outline-secondary btn-sm" href={href}>
+      {children}
+    </Link>
+  );
+}
+
+/**
+ * Page and page-size controls for a server-paginated list. The page and size live in the URL and
+ * every other parameter (search, filters, sort) is kept. The summary says plainly when only part of
+ * the data is loaded, because the API has no server-side filter: a search covers this page only.
+ */
+export function PageControls({ noun, page, pageSize, total, count, label }: PageControlsProps) {
+  const pathname = usePathname();
+  const params = useSearchParams();
+  const router = useRouter();
+  const { preferences, live } = usePreferences();
+  const preferredSize = preferences.pageSize;
+  const range = describeRange({ page, pageSize, total, count });
+  // Past the end, "Previous" must land on the last page that exists, not on another empty page.
+  const pastTheEnd = count === 0 && total > 0 && page > range.pages;
+  const previousPage = pastTheEnd ? range.pages : Math.max(1, page - 1);
+  const hrefFor = (nextPage: number, nextSize = pageSize) =>
+    pageHref(pathname, params, { page: nextPage, pageSize: nextSize }, preferredSize);
+
+  // The server reads the mirror cookie and normally renders the preferred size already. Only when it
+  // could not (first visit after the cookie was introduced, cookies blocked) is the size added to the
+  // address: once, keeping `page` and every filter, with replace so Back is not trapped. Any
+  // page_size already in the address, including an explicit default one, is left alone.
+  const hasSizeInUrl = params.has('page_size');
+  const replaced = useRef(false);
+  useEffect(() => {
+    // Not before the stored value is live: hydration sees the defaults, which would undo the cookie's size.
+    if (!live || replaced.current || hasSizeInUrl || preferredSize === pageSize) return;
+    replaced.current = true;
+    writePageSizeCookie(preferredSize);
+    const current = new URLSearchParams(window.location.search);
+    router.replace(pageHref(pathname, current, { page, pageSize: preferredSize }, preferredSize));
+  }, [live, hasSizeInUrl, preferredSize, pageSize, page, pathname, router]);
+
+  return (
+    <nav className="page-controls d-flex flex-wrap align-items-center justify-content-between gap-2 mt-3" aria-label={label}>
+      <p className="small text-body-secondary mb-0" role="status">
+        {range.total === 0
+          ? `No ${noun}.`
+          : count === 0
+            ? `Page ${page} is past the end: ${range.total.toLocaleString('en-GB')} ${noun} in ${range.pages} pages.`
+            : `Showing ${range.from.toLocaleString('en-GB')}–${range.to.toLocaleString('en-GB')} of ${range.total.toLocaleString('en-GB')} ${noun}.`}
+        {range.partial ? ` Search and filters only look at the ${count} loaded on this page.` : ''}
+      </p>
+      <div className="d-flex flex-wrap align-items-center gap-2">
+        <div className="btn-group btn-group-sm" role="group" aria-label={`${noun} per page`}>
+          {PAGE_SIZES.map((size) => (
+            <Link
+              aria-current={size === pageSize ? 'true' : undefined}
+              aria-label={`${size} per page`}
+              className={`btn btn-outline-secondary ${size === pageSize ? 'active' : ''}`}
+              href={hrefFor(1, size)}
+              key={size}
+            >
+              {size}
+            </Link>
+          ))}
+        </div>
+        <Step disabled={!range.hasPrevious} href={hrefFor(previousPage)}>
+          <i className="bi bi-chevron-left me-1" aria-hidden="true" />
+          Previous
+        </Step>
+        <span className="small text-body-secondary">
+          Page {page} of {range.pages}
+        </span>
+        <Step disabled={!range.hasNext} href={hrefFor(page + 1)}>
+          Next
+          <i className="bi bi-chevron-right ms-1" aria-hidden="true" />
+        </Step>
+      </div>
+    </nav>
+  );
+}

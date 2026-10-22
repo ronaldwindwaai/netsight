@@ -1,0 +1,26 @@
+/* Display preferences (Preferences page). The root layout sets data-density on <html> before paint. */
+
+.preferences-panel {
+  max-inline-size: 40rem;
+}
+
+/* Compact density: tighter data-table rows. Phones keep their padded link targets (globals.css). */
+html[data-density='compact'] .netsight-dashboard .table > :not(caption) > * > * {
+  padding-block: 0.2rem;
+}
+
+/* First-run checklist on the overview. */
+.first-run__list {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0 0 1rem;
+  padding-inline-start: 1.25rem;
+}
+
+.first-run__item {
+  padding-inline-start: 0.25rem;
+}
+
+.first-run__item code {
+  overflow-wrap: anywhere;
+}

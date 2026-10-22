@@ -3,7 +3,7 @@
  * They show numbers and nothing that names an asset, address, endpoint or person. A figure that is
  * not reported is "Not reported", never zero, and no count is shown for a state that is not ok.
  */
-import { Card } from '@adminlte/react';
+import { AppCard } from '@/components/app-card';
 
 import { DataFailure } from '@/components/data-state';
 import { SourceNotices } from '@/components/source-notices';
@@ -50,7 +50,7 @@ export function InventorySummaryCard({ state }: { state: FetchState<InventorySum
   return (
     <>
       <SourceNotices sources={data.sources} />
-      <Card title="Inventory at a glance" icon="bi bi-boxes" variant="outline" theme="primary">
+      <AppCard title="Inventory at a glance" icon="bi bi-boxes" variant="outline" theme="primary">
         <div className="row g-3">
           <Stat label="Assets" value={summary.total} />
           <Stat label="Known to NetBox" value={summary.known} />
@@ -68,7 +68,7 @@ export function InventorySummaryCard({ state }: { state: FetchState<InventorySum
           Counts only, as of {formatUtcTimestamp(data.generated_at)}. Your role does not see individual
           assets.
         </p>
-      </Card>
+      </AppCard>
     </>
   );
 }
@@ -84,7 +84,7 @@ export function IpamSummaryCard({ state }: { state: FetchState<IpamSummary> }) {
   return (
     <>
       <SourceNotices sources={data.sources} />
-      <Card title="IPAM at a glance" icon="bi bi-diagram-2" variant="outline" theme="primary">
+      <AppCard title="IPAM at a glance" icon="bi bi-diagram-2" variant="outline" theme="primary">
         <div className="row g-3">
           <Stat label="Prefixes" value={counts.prefixes} />
           <Stat label="VLANs" value={counts.vlans} />
@@ -104,7 +104,7 @@ export function IpamSummaryCard({ state }: { state: FetchState<IpamSummary> }) {
           Counts only, as of {formatUtcTimestamp(data.generated_at)}. Your role does not see individual
           prefixes or addresses.
         </p>
-      </Card>
+      </AppCard>
     </>
   );
 }
@@ -118,7 +118,7 @@ export function FindingsSummaryCard({ state }: { state: FetchState<UnknownDevice
   }
   const counts = data.counts;
   return (
-    <Card title="Unknown devices at a glance" icon="bi bi-patch-question" variant="outline" theme="primary">
+    <AppCard title="Unknown devices at a glance" icon="bi bi-patch-question" variant="outline" theme="primary">
       <div className="row g-3">
         <Stat label="Open findings" value={counts.open} />
       </div>
@@ -142,6 +142,6 @@ export function FindingsSummaryCard({ state }: { state: FetchState<UnknownDevice
         Counts only, as of {formatUtcTimestamp(data.generated_at)}. Your role does not see the devices
         themselves.
       </p>
-    </Card>
+    </AppCard>
   );
 }

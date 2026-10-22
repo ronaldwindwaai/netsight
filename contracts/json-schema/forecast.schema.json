@@ -1,0 +1,563 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ForecastResponse",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "state",
+    "generated_at",
+    "is_forecast",
+    "notice",
+    "horizon_days",
+    "history_days",
+    "history_through",
+    "series",
+    "recommendations"
+  ],
+  "properties": {
+    "state": {
+      "enum": [
+        "ok",
+        "insufficient-data",
+        "not-connected",
+        "unknown"
+      ]
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "is_forecast": {
+      "const": true
+    },
+    "notice": {
+      "const": "Forecast, not measurement. Values after the last measured day are projections from past source-reported data. They are not observations and can be wrong."
+    },
+    "horizon_days": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 30
+    },
+    "history_days": {
+      "type": "integer",
+      "minimum": 14,
+      "maximum": 120
+    },
+    "history_through": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+    },
+    "series": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 3,
+      "items": {
+        "$ref": "#/$defs/series"
+      }
+    },
+    "recommendations": {
+      "type": "array",
+      "maxItems": 8,
+      "items": {
+        "$ref": "#/$defs/recommendation"
+      }
+    }
+  },
+  "description": "GET /api/v1/forecast/capacity. Capacity forecasts from source-reported history only: a straight-line trend or a weekly repeat, a stated horizon and an approximate 95 % band. Every value after the last measured day is a forecast. A series without enough history or without a source says so and carries no projected point.",
+  "$defs": {
+    "historyPoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "day",
+        "value"
+      ],
+      "properties": {
+        "day": {
+          "type": "string",
+          "format": "date",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "value": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000000000
+        }
+      },
+      "description": "One measured day: a source-reported value."
+    },
+    "point": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "day",
+        "value",
+        "lower",
+        "upper"
+      ],
+      "properties": {
+        "day": {
+          "type": "string",
+          "format": "date",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "value": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000000000
+        },
+        "lower": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000000000
+        },
+        "upper": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000000000
+        }
+      },
+      "description": "One forecast day: a projection with an approximate 95 % band, never a measurement."
+    },
+    "method": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "why",
+        "observed_days",
+        "slope_per_day",
+        "linear_mae",
+        "seasonal_mae",
+        "band"
+      ],
+      "properties": {
+        "name": {
+          "enum": [
+            "linear-trend",
+            "seasonal-naive-weekly"
+          ]
+        },
+        "why": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 400
+        },
+        "observed_days": {
+          "type": "integer",
+          "minimum": 14,
+          "maximum": 120
+        },
+        "slope_per_day": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": -1000000000000000,
+          "maximum": 1000000000000000
+        },
+        "linear_mae": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000000000
+        },
+        "seasonal_mae": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1000000000000000
+        },
+        "band": {
+          "const": "approximate-95-percent"
+        }
+      },
+      "description": "How the numbers were made and why this method: a straight-line trend, or a weekly repeat when that was more accurate on the history. No model.",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "name": {
+                "const": "seasonal-naive-weekly"
+              }
+            },
+            "required": [
+              "name"
+            ]
+          },
+          "then": {
+            "properties": {
+              "slope_per_day": {
+                "type": "null"
+              },
+              "seasonal_mae": {
+                "type": "integer"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "slope_per_day": {
+                "type": "integer"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "threshold": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "value",
+        "basis"
+      ],
+      "properties": {
+        "value": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000000000000
+        },
+        "basis": {
+          "const": "operator-configured"
+        }
+      },
+      "description": "A limit the operator configured. Netsight never infers a limit."
+    },
+    "crossing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "point_day",
+        "upper_day"
+      ],
+      "properties": {
+        "point_day": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "format": "date",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+            }
+          ]
+        },
+        "upper_day": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "format": "date",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+            }
+          ]
+        }
+      },
+      "description": "The first forecast day the point forecast, and the first day the upper band, reaches the threshold; null when it does not within the horizon."
+    },
+    "series": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "unit",
+        "state",
+        "reason",
+        "detail",
+        "source_observed_at",
+        "history",
+        "history_missing_days",
+        "method",
+        "forecast",
+        "threshold",
+        "crossing"
+      ],
+      "properties": {
+        "id": {
+          "enum": [
+            "traffic-volume",
+            "wan-utilisation",
+            "inventory-growth"
+          ]
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "unit": {
+          "enum": [
+            "bytes-per-day",
+            "percent",
+            "devices"
+          ]
+        },
+        "state": {
+          "enum": [
+            "ok",
+            "insufficient-data",
+            "not-connected",
+            "unknown"
+          ]
+        },
+        "reason": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "enum": [
+                "no-source",
+                "no-history-source",
+                "source-unreadable",
+                "too-few-days",
+                "too-many-gaps",
+                "history-stale",
+                "horizon-too-long"
+              ]
+            }
+          ]
+        },
+        "detail": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 400
+        },
+        "source_observed_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "history": {
+          "type": "array",
+          "maxItems": 120,
+          "items": {
+            "$ref": "#/$defs/historyPoint"
+          }
+        },
+        "history_missing_days": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 120
+        },
+        "method": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/method"
+            }
+          ]
+        },
+        "forecast": {
+          "type": "array",
+          "maxItems": 30,
+          "items": {
+            "$ref": "#/$defs/point"
+          }
+        },
+        "threshold": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/threshold"
+            }
+          ]
+        },
+        "crossing": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/crossing"
+            }
+          ]
+        }
+      },
+      "description": "One forecast series. ok carries a method and forecast points; insufficient-data carries the measured days it had and the reason; not-connected and unknown carry nothing but the reason.",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "ok"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "reason": {
+                "type": "null"
+              },
+              "method": {
+                "not": {
+                  "type": "null"
+                }
+              },
+              "forecast": {
+                "minItems": 1
+              },
+              "history": {
+                "minItems": 14
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "method": {
+                "type": "null"
+              },
+              "forecast": {
+                "maxItems": 0
+              },
+              "threshold": {
+                "type": "null"
+              },
+              "crossing": {
+                "type": "null"
+              },
+              "reason": {
+                "not": {
+                  "type": "null"
+                }
+              },
+              "detail": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "not-connected"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "history": {
+                "maxItems": 0
+              },
+              "history_missing_days": {
+                "const": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "unknown"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "history": {
+                "maxItems": 0
+              },
+              "history_missing_days": {
+                "const": 0
+              }
+            }
+          }
+        }
+      ]
+    },
+    "recommendation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "series_id",
+        "title",
+        "advice",
+        "evidence",
+        "advisory",
+        "executable"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{2,63}$"
+        },
+        "kind": {
+          "enum": [
+            "capacity-review",
+            "capacity-watch",
+            "growth-no-limit",
+            "weekend-headroom",
+            "connect-history-source",
+            "collect-more-history"
+          ]
+        },
+        "series_id": {
+          "enum": [
+            "traffic-volume",
+            "wan-utilisation",
+            "inventory-growth"
+          ]
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "advice": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 5,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 400
+          }
+        },
+        "advisory": {
+          "const": true
+        },
+        "executable": {
+          "const": false
+        }
+      },
+      "description": "Advice with the evidence behind it. Never executed and never turned into an Action Request: advisory is always true and executable is always false."
+    }
+  }
+}

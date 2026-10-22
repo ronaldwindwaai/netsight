@@ -1,6 +1,7 @@
 'use client';
 
-import { AppContent, Alert, Button } from '@adminlte/react';
+import { Alert, Button } from '@adminlte/react';
+import { AppContent } from '@/components/app-content';
 
 export default function DashboardError({ reset }: { error: Error & { digest?: string }; reset: () => void }) {
   return (

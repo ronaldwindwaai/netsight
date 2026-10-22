@@ -66,14 +66,29 @@ class Permission(StrEnum):
     IPAM_READ_SUMMARY = "ipam:read-summary"
     UNKNOWN_DEVICES_READ = "unknown-devices:read"
     UNKNOWN_DEVICES_READ_SUMMARY = "unknown-devices:read-summary"
+    # Ask the read-only AI copilot (Step 10). The tools it runs are checked against the asker's own
+    # permissions one by one; this only lets a person open the conversation. Human-only.
+    COPILOT_ASK = "copilot:ask"
     # Triage of an unknown-device finding; every one is a human judgement (HUMAN_ONLY_PERMISSIONS).
     UNKNOWN_DEVICES_ACKNOWLEDGE = "unknown-devices:acknowledge"  # acknowledge, mark investigating
     UNKNOWN_DEVICES_ASSIGN = "unknown-devices:assign"
     UNKNOWN_DEVICES_COMMENT = "unknown-devices:comment"
     UNKNOWN_DEVICES_RESOLVE = "unknown-devices:resolve"  # resolved or false-positive
     UNKNOWN_DEVICES_SCAN = "unknown-devices:scan"  # compare discovered telemetry with NetBox now
+    # Controlled remote actions (Step 12). Read the requests and their history; propose an action
+    # (an AI or service principal may propose, a person always decides); propose a risk C or D
+    # action; approve (human, never the requester); run an approved request through an executor
+    # (human); engage or release the kill switch (human).
+    ACTIONS_READ = "actions:read"
     ACTIONS_PROPOSE = "actions:propose"
+    ACTIONS_PROPOSE_HIGH = "actions:propose-high"
     ACTIONS_APPROVE = "actions:approve"
+    ACTIONS_EXECUTE = "actions:execute"
+    ACTIONS_KILL_SWITCH = "actions:kill-switch"
+    # Capacity forecasts and their CSV report (Step 13): organisation-wide aggregates only, no
+    # endpoint, application or person. Everyone reads; the report is for those who plan and audit.
+    FORECAST_READ = "forecast:read"
+    FORECAST_EXPORT = "forecast:export"
     ADMIN_CONFIG = "admin:config"
     CONFIGURATION_READ = "configuration:read"
     REPORTS_READ = "reports:read"
@@ -111,6 +126,14 @@ HUMAN_ONLY_PERMISSIONS: frozenset[Permission] = frozenset(
         Permission.UNKNOWN_DEVICES_COMMENT,
         Permission.UNKNOWN_DEVICES_RESOLVE,
         Permission.UNKNOWN_DEVICES_SCAN,
+        # The copilot answers a person. A service or AI principal cannot start one: that would let
+        # one model drive another and spend the model budget without an accountable asker.
+        Permission.COPILOT_ASK,
+        # Approving, running and stopping remote actions are human decisions with step-up; a proposal
+        # may come from an AI or service principal but is never approved or run by one.
+        Permission.ACTIONS_APPROVE,
+        Permission.ACTIONS_EXECUTE,
+        Permission.ACTIONS_KILL_SWITCH,
     }
 )
 
@@ -153,6 +176,7 @@ _ALL_READ = {
     Permission.SECURITY_READ,
     Permission.REPORTS_READ,
     Permission.INTERNET_READ,
+    Permission.FORECAST_READ,
 }
 # The WAN card is an Overview widget and the matrix gives Overview to every role, so every role
 # reads the Internet surface (Technician included); the evidence export is narrower.
@@ -183,6 +207,20 @@ _INVENTORY_SUMMARY = {Permission.INVENTORY_READ_SUMMARY, Permission.IPAM_READ_SU
 _INVENTORY_ROWS = _INVENTORY_SUMMARY | {Permission.INVENTORY_READ, Permission.IPAM_READ}
 _FINDINGS_SUMMARY = {Permission.UNKNOWN_DEVICES_READ_SUMMARY}
 _FINDINGS_READ = _FINDINGS_SUMMARY | {Permission.UNKNOWN_DEVICES_READ}
+# Capacity forecast report (Step 13): not for the Technician, who has no reporting role in the matrix.
+_FORECAST_EXPORT = {Permission.FORECAST_EXPORT}
+# AI Copilot (PRD 26): every role that can read operational evidence may ask. Management holds only
+# summaries and none of the tools' data, so it is not given the conversation (human decision).
+_COPILOT = {Permission.COPILOT_ASK}
+# RBAC-MATRIX "Propose action": Admin yes, Network Engineer and Security Analyst "Scoped" (site scoping
+# does not exist, so they may propose every catalogued type), Technician "Limited" (risk A and B
+# only: no actions:propose-high), Management and Auditor no. Approval is the Administrator's alone
+# until the owner decides the "Policy" rows (it is the one role that holds every permission).
+_ACTIONS_PROPOSER = {
+    Permission.ACTIONS_READ,
+    Permission.ACTIONS_PROPOSE,
+    Permission.ACTIONS_PROPOSE_HIGH,
+}
 _FINDINGS_TRIAGE = {
     Permission.UNKNOWN_DEVICES_ACKNOWLEDGE,
     Permission.UNKNOWN_DEVICES_ASSIGN,
@@ -205,7 +243,10 @@ ROLE_PERMISSIONS: Mapping[Role, frozenset[Permission]] = {
         | _INVENTORY_ROWS
         | _FINDINGS_READ
         | _FINDINGS_TRIAGE
-        | {Permission.ACTIONS_PROPOSE, Permission.CONFIGURATION_READ}
+        | {Permission.CONFIGURATION_READ}
+        | _FORECAST_EXPORT
+        | _COPILOT
+        | _ACTIONS_PROPOSER
     ),
     Role.SECURITY_ANALYST: frozenset(
         _ALL_READ
@@ -218,7 +259,10 @@ ROLE_PERMISSIONS: Mapping[Role, frozenset[Permission]] = {
         | _INVENTORY_ROWS
         | _FINDINGS_READ
         | _FINDINGS_TRIAGE
-        | {Permission.ACTIONS_PROPOSE, Permission.CONFIGURATION_READ}
+        | {Permission.CONFIGURATION_READ}
+        | _FORECAST_EXPORT
+        | _COPILOT
+        | _ACTIONS_PROPOSER
     ),
     Role.TECHNICIAN: frozenset(
         {
@@ -230,10 +274,13 @@ ROLE_PERMISSIONS: Mapping[Role, frozenset[Permission]] = {
             Permission.INCIDENTS_WRITE_ASSIGNED,
             Permission.DIAGNOSTICS_READ,
             Permission.INTERNET_READ,
+            Permission.FORECAST_READ,
+            Permission.ACTIONS_READ,
             Permission.ACTIONS_PROPOSE,
             *_USERS_LIMITED,
             *_INVENTORY_ROWS,
             *_FINDINGS_SUMMARY,
+            *_COPILOT,
         }
     ),
     # Summary only: the full incident read is withheld (human decision 2026-10-10).
@@ -242,6 +289,7 @@ ROLE_PERMISSIONS: Mapping[Role, frozenset[Permission]] = {
         | _USERS_SUMMARY
         | _INVENTORY_SUMMARY
         | _FINDINGS_SUMMARY
+        | _FORECAST_EXPORT
         | {Permission.AUDIT_READ}
     ),
     Role.AUDITOR: frozenset(
@@ -252,6 +300,9 @@ ROLE_PERMISSIONS: Mapping[Role, frozenset[Permission]] = {
         | _INVENTORY_ROWS
         | _FINDINGS_READ
         | {Permission.AUDIT_READ, Permission.CONFIGURATION_READ}
+        | _FORECAST_EXPORT
+        | _COPILOT
+        | {Permission.ACTIONS_READ}
     ),
 }
 

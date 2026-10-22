@@ -1,4 +1,4 @@
-import { AppContent } from '@adminlte/react';
+import { AppContent } from '@/components/app-content';
 
 import { FindingsSummaryCard } from '@/components/counts-cards';
 import { Step8AccessDenied } from '@/components/step8-access-denied';
@@ -14,6 +14,8 @@ import {
   canScanForUnknownDevices,
   viewerFromSession,
 } from '@/lib/viewer';
+
+export const metadata = { title: 'Unknown devices' };
 
 type Params = Record<string, string | string[] | undefined>;
 

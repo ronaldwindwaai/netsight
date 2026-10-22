@@ -12,9 +12,12 @@
 | Internet / WAN | Full | Full | Read | Read | Summary | Read |
 | WAN evidence export | Yes | Yes | No | No | No | Yes |
 | Config history | Full | Full | Read | Read | No | Read |
-| Propose action | Yes | Scoped | Scoped | Limited | No | No |
-| Approve high risk | Policy | Policy | Policy | No | No | No |
-| Execute high risk | Policy | Policy | Policy | No | No | No |
+| AI Copilot (`copilot:ask`; Step 10) | Yes | Yes | Yes | Yes | No | Yes |
+| Propose action (`actions:propose`; risk C and D also need `actions:propose-high`; Step 12) | Yes | Scoped | Scoped | Limited (risk A and B) | No | No |
+| Read action requests (`actions:read`; Step 12) | Yes | Yes | Yes | Yes | No | Yes |
+| Approve high risk (`actions:approve`; human only, never the requester, step-up) | Yes (policy decision pending) | Policy (not granted yet) | Policy (not granted yet) | No | No | No |
+| Execute high risk (`actions:execute`; human only, step-up) | Yes (policy decision pending) | Policy (not granted yet) | Policy (not granted yet) | No | No | No |
+| Action kill switch (`actions:kill-switch`; human only) | Yes | No | No | No | No | No |
 | Integrations | Full | No | No | No | No | Read |
 | IAM/RBAC | Full | No | No | No | No | Read |
 | Audit | Full | Scoped | Scoped | Own/assigned | Summary | Full |
@@ -263,7 +266,7 @@ Fail closed: unknown roles, no identity and unknown permission names are denied.
 * **All five finding writes are in `HUMAN_ONLY_PERMISSIONS`**: no service or AI principal may acknowledge, assign, comment, resolve or scan, whatever role it carries. The reads are not human-only.
 * **Step-up on resolve.** Resolving or dismissing is the only action that closes the record and, for a false positive, suppresses later sightings of the endpoint, so it requires a recent
   multi-factor sign-in (same mechanism as incident resolution). **This is a recorded, open decision**: the alternative is no step-up for dismissal of a low-severity finding.
-* **Quarantine is not a permission.** There is no quarantine or isolate grant: a proposed quarantine is a record on the finding. Execution belongs to the action engine (Step 14), which
+* **Quarantine is not a permission.** There is no quarantine or isolate grant: a proposed quarantine is a record on the finding. Execution belongs to the action engine (Step 12; called Step 14 in earlier notes), which
   has its own approval permissions.
 * **Order of guards.** Reads: authenticate, authorise (a refusal is audited), per-identity rate limit, strict query, `no-store`. Writes: authenticate, authorise (audited), CSRF and origin, step-up (resolve only), per-identity rate limit.
   Limits per identity per minute: inventory list/detail/summary 60/120/60; IPAM 60; findings list/detail/timeline/summary 120/120/120/60; finding writes 60; scan 6.
@@ -279,3 +282,41 @@ Engineer, Security Analyst, Technician and Auditor. Management holds no permissi
 Only backup-attempt metadata and revision IDs/timestamps are exposed, with every
 read authorized, rate-limited, audited and non-cacheable. This grants no access to
 configuration bodies, author identities, raw diffs or remote write/restore actions.
+
+## AI Copilot (Step 10)
+
+The matrix has no AI Copilot row (PRD 26 names the feature, not a role split). One permission, `copilot:ask`, opens the read-only copilot: Administrator, Network Engineer, Security Analyst, Technician and Auditor hold it; **Management holds nothing** (it holds none of the data the tools read). It is in `HUMAN_ONLY_PERMISSIONS`: a service or AI principal cannot start a conversation whatever its role. `copilot:ask` grants **no data**: every tool the copilot runs is authorised separately against the asker's own permissions (`incidents:read` for incidents; knowledge search needs only `copilot:ask`; no tool reads configuration), and a denied tool is reported as a gap. There is no copilot write, execute or approval permission. Open decision: confirm this reading, and whether Management should get a summary-only copilot.
+
+## Capacity forecast (Step 13, E12)
+
+The matrix has no Forecast row (PRD 21/36 name "capacity forecast" in the monthly report list). Two permissions, both read-only and neither human-only:
+
+| Permission | Administrator | Network Engineer | Security Analyst | Technician | Management | Auditor |
+| --- | --- | --- | --- | --- | --- | --- |
+| `forecast:read` (organisation-wide daily forecast, method, advice) | Yes | Yes | Yes | Yes | Yes | Yes |
+| `forecast:export` (the capacity report as CSV) | Yes | Yes | Yes | **No** | Yes | Yes |
+
+`forecast:read` is the same rung as `traffic:read` (aggregates only; no endpoint, address, application, user or device is in any forecast response). Technician has no reporting role in the matrix, so it is not given the export. Open decision: confirm both readings.
+
+## Controlled action permissions (Step 12, E11)
+
+Six permissions, in the matrix above. Guard order, budgets and audit are in `docs/12-implementation/ACTION-ENGINE.md`.
+
+| Permission | Administrator | Network Engineer | Security Analyst | Technician | Management | Auditor |
+| --- | --- | --- | --- | --- | --- | --- |
+| `actions:read` (status, list, detail, history) | Yes | Yes | Yes | Yes | **No** | Yes |
+| `actions:propose` (risk A and B types; cancel one's own request) | Yes | Yes | Yes | Yes | **No** | **No** |
+| `actions:propose-high` (risk C and D types: `endpoint.isolate`, `switch.port.disable`) | Yes | Yes | Yes | **No** | **No** | **No** |
+| `actions:approve` (approve, reject, cancel any; human only; step-up on approve) | Yes | **No** | **No** | **No** | **No** | **No** |
+| `actions:execute` (run an approved request; human only; step-up) | Yes | **No** | **No** | **No** | **No** | **No** |
+| `actions:kill-switch` (engage; release needs step-up; human only) | Yes | **No** | **No** | **No** | **No** | **No** |
+
+* **Human-only:** `actions:approve`, `actions:execute` and `actions:kill-switch` are in `HUMAN_ONLY_PERMISSIONS`. A service or AI principal can *propose* (it is recorded as `ai` or `service`) and
+  can read; a person still has to approve and run it. This follows AGENTS.md: an AI may only act through a policy-controlled action request that a human approves.
+* **Requester != approver for every risk,** enforced in the store. Risk D (`switch.port.disable`) needs two different approvers, so with approval Administrator-only it needs two Administrators.
+* **The matrix says "Policy" for Network Engineer / Security Analyst approval and execution.** That policy is undecided; the conservative reading (not granted) is implemented. Granting
+  `actions:approve` to a role is one line in `rbac.py`; the requester rule still applies.
+* **Technician "Limited"** is read as: may propose risk A and B types (only `switch.port.enable` today), may read, may cancel their own request; no high-risk proposals.
+* **Management and Auditor** propose nothing; Auditor reads (PRD 4 scopes Auditor to actions, incidents, authentication and configuration changes); Management holds no action read (the summary
+  rung does not exist for actions).
+* **Decisions for the owner.** (1) Approver policy for Network Engineer and Security Analyst. (2) Whether Management needs an aggregate. (3) Whether a requester may ever approve risk A. (4) Site scoping.

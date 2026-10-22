@@ -1,5 +1,6 @@
 /**
- * Explicit same-origin check for browser-invoked server actions.
+ * Explicit same-origin check for browser-invoked server actions and for the export download routes
+ * (`isCrossSiteRequest` in `internet-export.ts`, which treats "no proof of same origin" as refusal).
  *
  * A server action is a public POST. Next.js rejects a cross-site origin by default, but a
  * privileged action should not rely on that alone: a later config change, or a request that
@@ -88,4 +89,9 @@ export function sameOrigin(headers: RequestHeaders, policy: OriginPolicy): boole
 /** Proxy headers are trusted only by an explicit, exact opt-in. */
 export function readTrustProxy(env: Record<string, string | undefined>): boolean {
   return env.NETSIGHT_TRUST_PROXY_HEADERS === 'true';
+}
+
+/** The origin policy for this process: proxy headers only on explicit opt-in, https in production. */
+export function originPolicyFromEnv(env: Record<string, string | undefined>): OriginPolicy {
+  return { trustProxy: readTrustProxy(env), production: env.NODE_ENV === 'production' };
 }

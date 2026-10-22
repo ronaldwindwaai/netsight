@@ -448,7 +448,7 @@
           "type": "string"
         }
       },
-      "description": "A recommendation only. No execution path exists: isolating an endpoint is owned by the action engine (Step 14) and needs step-up, a reason and human approval."
+      "description": "A recommendation only. No execution path exists: isolating an endpoint is owned by the action engine (Step 12) and needs step-up, a reason and human approval."
     },
     "finding": {
       "type": "object",

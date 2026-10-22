@@ -3,6 +3,8 @@ import test from 'node:test';
 
 import type { SessionInfo } from './api-contracts.ts';
 import {
+  canExportForecast,
+  canReadForecast,
   canChangeAnything,
   canExportInternet,
   canReadFindings,
@@ -165,4 +167,29 @@ test('finding writes count as a change anyone holding them can make', () => {
     assert.equal(canChangeAnything(viewerFromSession(session([permission]))), true, permission);
   }
   assert.equal(canChangeAnything(viewerFromSession(session(['unknown-devices:read']))), false);
+});
+
+test('the action helpers read exactly their own permission and fail closed', async () => {
+  const { canProposeHighRiskAction, canReadActions, canUseActionKillSwitch } = await import('./viewer.ts');
+  const only = (permission: string) => ({ identityId: 'u', permissions: [permission] });
+  assert.equal(canReadActions(only('actions:read')), true);
+  assert.equal(canReadActions(only('actions:approve')), false);
+  assert.equal(canProposeHighRiskAction(only('actions:propose-high')), true);
+  assert.equal(canProposeHighRiskAction(only('actions:propose')), false);
+  assert.equal(canUseActionKillSwitch(only('actions:kill-switch')), true);
+  assert.equal(canUseActionKillSwitch(only('actions:execute')), false);
+  for (const helper of [canReadActions, canProposeHighRiskAction, canUseActionKillSwitch]) {
+    assert.equal(helper(null), false);
+  }
+});
+
+test('forecast helpers follow forecast:read and forecast:export and fail closed without a viewer', () => {
+  const reader = { identityId: 'a', permissions: ['forecast:read'] };
+  const exporter = { identityId: 'b', permissions: ['forecast:read', 'forecast:export'] };
+  assert.equal(canReadForecast(reader), true);
+  assert.equal(canExportForecast(reader), false);
+  assert.equal(canExportForecast(exporter), true);
+  assert.equal(canReadForecast({ identityId: 'c', permissions: ['traffic:read'] }), false);
+  assert.equal(canReadForecast(null), false);
+  assert.equal(canExportForecast(null), false);
 });

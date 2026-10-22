@@ -3,7 +3,8 @@
  * is labelled Observed / Inferred / Unknown, and a cause is never presented as proven. All text from
  * the session is rendered as React text nodes, never as HTML.
  */
-import { Alert, Card } from '@adminlte/react';
+import { Alert } from '@adminlte/react';
+import { AppCard } from '@/components/app-card';
 
 import { FindingList } from '@/components/diagnostic-run-view';
 import type { DiagnosticRun } from '@/lib/api-contracts-diagnostic';
@@ -74,7 +75,7 @@ export function ProbableCausePanel({
   const pattern = PATTERN_TEXT[cause.pattern];
   return (
     <section aria-label="Probable cause" className="mb-3">
-      <Card
+      <AppCard
         className="operational-card"
         title="Probable cause"
         icon="bi bi-bandaid"
@@ -103,7 +104,7 @@ export function ProbableCausePanel({
         )}
         <h3 className="h6 fw-semibold text-body-secondary border-bottom pb-1">Evidence</h3>
         <EvidenceList lines={cause.evidence} />
-      </Card>
+      </AppCard>
 
       {run.contradictions.length > 0 ? (
         <div className="mt-3">
@@ -128,7 +129,7 @@ export function ProbableCausePanel({
       ) : null}
       {run.recommended_next_checks.length > 0 ? (
         <div className="mt-3">
-          <Card
+          <AppCard
             className="operational-card"
             title="Recommended next checks"
             icon="bi bi-list-check"
@@ -137,7 +138,7 @@ export function ProbableCausePanel({
             bodyClass="p-3"
           >
             <FindingList heading="Next checks" items={run.recommended_next_checks} />
-          </Card>
+          </AppCard>
         </div>
       ) : null}
     </section>

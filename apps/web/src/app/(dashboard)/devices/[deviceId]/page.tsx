@@ -1,10 +1,29 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
-import { AppContent, Card } from '@adminlte/react';
+import { AppCard } from '@/components/app-card';
+import { AppContent } from '@/components/app-content';
 
 import { DataFailure, FreshnessNotice } from '@/components/data-state';
 import { DeviceDetailTabs } from '@/components/device-detail-tabs';
 import { apiGet } from '@/lib/api';
-import { parseDeviceDetail, parseInterfaceList } from '@/lib/api-contracts';
+import { parseDeviceDetail, parseInterfaceList, parseSessionInfo } from '@/lib/api-contracts';
+
+/**
+ * Names the tab after the device when the detail call succeeds (same GET as the page, so Next
+ * memoises it within the request); any failure falls back to the generic "Device" title.
+ */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ deviceId: string }>;
+}): Promise<Metadata> {
+  const { deviceId } = await params;
+  const state = await apiGet(
+    `/api/v1/devices/${encodeURIComponent(deviceId.slice(0, 256))}`,
+    parseDeviceDetail,
+  );
+  return { title: state.kind === 'ok' ? state.data.item.name : 'Device' };
+}
 
 export default async function DeviceDetailPage({
   params,
@@ -13,13 +32,15 @@ export default async function DeviceDetailPage({
 }) {
   const { deviceId } = await params;
   const boundedDeviceId = deviceId.slice(0, 256);
-  const [state, interfaces] = await Promise.all([
+  const [state, interfaces, session] = await Promise.all([
     apiGet(`/api/v1/devices/${encodeURIComponent(boundedDeviceId)}`, parseDeviceDetail),
     apiGet(
       `/api/v1/devices/${encodeURIComponent(boundedDeviceId)}/interfaces`,
       parseInterfaceList,
     ),
+    apiGet('/api/v1/auth/session', parseSessionInfo),
   ]);
+  const permissions = session.kind === 'ok' ? session.data.permissions : null;
 
   return (
     <AppContent
@@ -45,14 +66,18 @@ export default async function DeviceDetailPage({
       ) : (
         <>
           <FreshnessNotice freshness={state.data.item.freshness} />
-          <Card
+          <AppCard
             title="Device profile"
             icon="bi bi-hdd-network"
             variant="outline"
             theme="primary"
           >
-            <DeviceDetailTabs device={state.data.item} interfaces={interfaces} />
-          </Card>
+            <DeviceDetailTabs
+              device={state.data.item}
+              interfaces={interfaces}
+              permissions={permissions}
+            />
+          </AppCard>
         </>
       )}
     </AppContent>

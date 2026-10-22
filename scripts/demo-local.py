@@ -1,7 +1,7 @@
 """Local demo environment: a throwaway account plus fixture data, on loopback only.
 
-Starts the loopback LibreNMS stub (fixture devices and ports) and the real API
-pointed at it, and provisions one local administrator account through the same
+Starts the loopback LibreNMS and Oxidized stubs (fixture devices, ports and config
+backups) and the real API pointed at them, with seeded in-memory incidents, and provisions one local administrator account through the same
 CLI an operator uses. Nothing here talks to a real monitoring system, and every
 listener binds to 127.0.0.1.
 
@@ -35,6 +35,8 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 API_DIR = REPO_ROOT / "apps" / "api"
 STUB = API_DIR / "tests" / "e2e" / "stub_librenms.py"
+OXIDIZED_STUB = API_DIR / "tests" / "e2e" / "stub_oxidized.py"
+E2E_DIR = API_DIR / "tests" / "e2e"  # holds demo_app.py: the API with seeded demo incidents
 DEMO_DIR = Path(os.environ.get("NETSIGHT_DEMO_DIR", REPO_ROOT / ".demo"))
 ACCOUNT_FILE = DEMO_DIR / "local-accounts.json"
 SECRET_FILE = DEMO_DIR / "session-secret"
@@ -42,6 +44,7 @@ SECRET_FILE = DEMO_DIR / "session-secret"
 HOST = "127.0.0.1"
 API_PORT = 8000  # the web app's default NETSIGHT_API_URL
 STUB_PORT = 8081
+OXIDIZED_PORT = 8082
 USERNAME = "demo.admin"
 
 
@@ -117,12 +120,19 @@ def main() -> int:
     env = {
         **os.environ,
         "NETSIGHT_ENV": "development",
+        # Required by tests/e2e/demo_app.py, which refuses to install its fixtures without it.
+        "NETSIGHT_DEMO": "1",
         "NETSIGHT_SESSION_SECRET": _session_secret(),
         "NETSIGHT_LOCAL_ACCOUNT_FILE": str(ACCOUNT_FILE),
-        # Plain http on loopback, so the browser must be allowed to keep the cookie.
+        # DEMO ONLY: plain http on loopback, so the browser must be allowed to keep the cookie.
+        # Never set NETSIGHT_SESSION_COOKIE_SECURE=false outside this demo.
         "NETSIGHT_SESSION_COOKIE_SECURE": "false",
         "LIBRENMS_BASE_URL": f"http://{HOST}:{STUB_PORT}",
         "LIBRENMS_TIMEZONE": "UTC",
+        # Fixture configuration backups (loopback Oxidized stub) and a volatile action store.
+        "OXIDIZED_BASE_URL": f"http://{HOST}:{OXIDIZED_PORT}",
+        # DEMO ONLY: turns the action workflow on against a throwaway store; keep off in production.
+        "NETSIGHT_ACTIONS_ENABLED": "1",
         # The adapter needs a non-empty token to count as configured; the stub never checks it.
         "LIBRENMS_TOKEN": secrets.token_urlsafe(24),
     }
@@ -134,12 +144,20 @@ def main() -> int:
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
+    oxidized = subprocess.Popen(
+        [sys.executable, str(OXIDIZED_STUB), "--port", str(OXIDIZED_PORT)],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
     api = subprocess.Popen(
         [
             sys.executable,
             "-m",
             "uvicorn",
-            "netsight_api.main:app",
+            "demo_app:build_app",
+            "--factory",
+            "--app-dir",
+            str(E2E_DIR),
             "--host",
             HOST,
             "--port",
@@ -165,14 +183,15 @@ def main() -> int:
         else:
             print(f"\nAccount '{USERNAME}' already exists (credentials were shown at creation).")
             print("Run with --reset to create a fresh one.")
-        print("\nOnly the fixture devices and ports have data. Traffic, security, NetBox and")
-        print("the other sources show 'Not connected' because nothing is wired to them.")
+        print("\nFixture data: LibreNMS devices and ports, Oxidized config backups, and seeded")
+        print("incidents (in memory; reset on restart). Actions are on, with a volatile store.")
+        print("Traffic, security, NetBox and the other sources show 'Not connected'.")
         print("Ctrl+C to stop.\n")
         api.wait()
     except KeyboardInterrupt:
         pass
     finally:
-        for process in (api, stub):
+        for process in (api, stub, oxidized):
             process.terminate()
             try:
                 process.wait(timeout=10)

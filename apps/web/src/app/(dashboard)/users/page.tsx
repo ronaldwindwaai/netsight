@@ -1,4 +1,4 @@
-import { AppContent } from '@adminlte/react';
+import { AppContent } from '@/components/app-content';
 
 import { ResolvePanel } from '@/components/resolve-panel';
 import { UsersAccessDenied } from '@/components/users-access-denied';
@@ -19,11 +19,14 @@ import {
   parsePage,
 } from '@/lib/identity-view';
 import {
+  canReadInventory,
   canReadPeople,
   canReadUsersSummary,
   canResolveIdentity,
   viewerFromSession,
 } from '@/lib/viewer';
+
+export const metadata = { title: 'Users & Identity' };
 
 type Params = {
   page?: string | string[];
@@ -47,6 +50,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
   }
 
   const browse = canReadPeople(viewer);
+  const access = { people: browse, devices: canReadInventory(viewer) };
   const resolve = canResolveIdentity(viewer);
   const attempted = params.kind !== undefined || params.value !== undefined;
   // The lookup is validated before it can reach an API path: an unusable one makes no request.
@@ -69,7 +73,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
         </p>
       </div>
 
-      {resolve ? <ResolvePanel lookup={lookup} state={resolved} /> : null}
+      {resolve ? <ResolvePanel lookup={lookup} state={resolved} access={access} /> : null}
       {summary !== null ? <UsersSummaryCard state={summary} /> : null}
       {people !== null ? (
         <UsersListBody state={people} page={page} pageSize={DEFAULT_PAGE_SIZE} />

@@ -47,14 +47,38 @@ DEVICES: dict[str, Any] = {
 }
 ALERTS: dict[str, Any] = {
     "alerts": [
-        {"id": 10, "device_id": 2, "severity": "critical", "state": 0, "name": "x",
-         "timestamp": "2026-10-10T08:59:00Z"},
-        {"id": 11, "device_id": 2, "severity": "warning", "state": 0, "name": "y",
-         "timestamp": "2026-10-10T08:59:00Z"},
-        {"id": 12, "device_id": 2, "severity": "warning", "state": 1, "name": "acked",
-         "timestamp": "2026-10-10T08:59:00Z"},
-        {"id": 13, "device_id": 1, "severity": "notice", "state": 0, "name": "z",
-         "timestamp": "2026-10-10T08:59:00Z"},
+        {
+            "id": 10,
+            "device_id": 2,
+            "severity": "critical",
+            "state": 0,
+            "name": "x",
+            "timestamp": "2026-10-10T08:59:00Z",
+        },
+        {
+            "id": 11,
+            "device_id": 2,
+            "severity": "warning",
+            "state": 0,
+            "name": "y",
+            "timestamp": "2026-10-10T08:59:00Z",
+        },
+        {
+            "id": 12,
+            "device_id": 2,
+            "severity": "warning",
+            "state": 1,
+            "name": "acked",
+            "timestamp": "2026-10-10T08:59:00Z",
+        },
+        {
+            "id": 13,
+            "device_id": 1,
+            "severity": "notice",
+            "state": 0,
+            "name": "z",
+            "timestamp": "2026-10-10T08:59:00Z",
+        },
     ]
 }
 
