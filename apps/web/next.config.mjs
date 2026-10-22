@@ -3,6 +3,11 @@ const REVALIDATE = 'public, max-age=0, must-revalidate';
 
 /** @type {import('next').NextConfig} */
 const config = {
+  // @adminlte/react renders a stock demo user menu (hidden by globals.css) whose avatar still loads
+  // from this path. Serve the Netsight mark instead of a 404 on every page.
+  async rewrites() {
+    return [{ source: '/assets/img/user2-160x160.jpg', destination: '/icons/netsight-192.png' }];
+  },
   async headers() {
     return [
       {

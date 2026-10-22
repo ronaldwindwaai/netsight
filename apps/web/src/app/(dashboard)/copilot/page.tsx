@@ -1,4 +1,4 @@
-import { AppContent } from '@adminlte/react';
+import { AppContent } from '@/components/app-content';
 
 import { CopilotBody } from '@/components/copilot-body';
 import { Step8AccessDenied } from '@/components/step8-access-denied';

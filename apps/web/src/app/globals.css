@@ -374,36 +374,6 @@ body {
   text-transform: uppercase;
 }
 
-.login-sidebar__nav {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.login-sidebar__item {
-  display: flex;
-  align-items: center;
-  gap: 0.7rem;
-  padding: 0.6rem 0.75rem;
-  border-radius: 0.5rem;
-  color: #b8c7dc;
-  font-size: 0.9rem;
-  font-weight: 500;
-  text-decoration: none;
-  transition: background 150ms ease, color 150ms ease;
-}
-
-.login-sidebar__item:hover,
-.login-sidebar__item:focus-visible {
-  background: rgb(255 255 255 / 6%);
-  color: #fff;
-}
-
-.login-sidebar__item--active {
-  background: var(--netsight-signal);
-  color: #fff;
-}
-
 .login-sidebar__footer {
   display: flex;
   flex-direction: column;
@@ -645,15 +615,6 @@ body {
   .login-sidebar__footer {
     display: none;
   }
-
-  .login-sidebar__nav {
-    flex-direction: row;
-  }
-
-  .login-sidebar__item {
-    padding: 0.45rem 0.6rem;
-    font-size: 0.8rem;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -731,7 +692,7 @@ body {
 }
 
 .mobile-nav__link.is-active {
-  color: var(--netsight-signal);
+  color: #0a58ca;
 }
 
 @media (max-width: 991.98px) {
@@ -875,4 +836,62 @@ body {
     transparent 2px,
     transparent 5px
   );
+}
+
+/* devices: sticky header inside a bounded scroll area */
+.devices-scroll {
+  max-height: 70vh;
+  overflow: auto;
+}
+
+.devices-scroll thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bs-body-bg);
+  box-shadow: inset 0 -1px 0 var(--bs-border-color);
+  white-space: nowrap;
+}
+
+/* topology: finding, match, dim, focus and active-link states (never colour alone: dash + mark) */
+.topology-node--finding {
+  stroke: var(--bs-warning);
+  stroke-dasharray: 5 3;
+}
+
+.topology-node--dim {
+  opacity: 0.35;
+}
+
+.topology-node--match {
+  stroke: var(--bs-info);
+  stroke-width: 3;
+}
+
+.topology-edge--active {
+  stroke: var(--bs-primary);
+  opacity: 1;
+}
+
+.topology-node__flag {
+  fill: var(--bs-warning-text-emphasis, var(--bs-body-color));
+  pointer-events: none;
+}
+
+.topology-node-group {
+  outline: none;
+}
+
+.topology-node-group:focus-visible .topology-node {
+  stroke: var(--bs-primary);
+  stroke-width: 3;
+}
+
+.topology-canvas svg:focus-visible {
+  outline: 2px solid var(--bs-primary);
+  outline-offset: -2px;
+}
+
+.topology-panel {
+  background: var(--bs-body-bg);
 }

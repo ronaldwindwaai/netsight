@@ -8,6 +8,7 @@
  * identified" with the reason, and an ambiguous one lists every candidate and selects none. Every
  * label (a name, a hostname) is untrusted source text and is rendered as text, never as markup.
  */
+import Link from 'next/link';
 import { Alert } from '@adminlte/react';
 
 import type {
@@ -20,10 +21,13 @@ import type {
   Basis,
 } from '@/lib/api-contracts-identity';
 import { formatUtcTimestamp } from '@/lib/format-time';
+import type { EntityAccess } from '@/lib/identity-view';
 import {
   attributionHeadline,
   basisPresentation,
   confidenceText,
+  NO_ENTITY_ACCESS,
+  entityHref,
   entityKindLabel,
   entityText,
   evidenceKindLabel,
@@ -43,12 +47,30 @@ export function BasisBadge({ basis }: { basis: Basis }) {
   );
 }
 
-export function EntityName({ entity }: { entity: EntityRef | null }) {
+function EntityLabel({ entity, access }: { entity: EntityRef; access: EntityAccess }) {
+  const href = entityHref(entity, access);
+  const text = entityText(entity);
+  return href === null ? (
+    <span className="fw-semibold">{text}</span>
+  ) : (
+    <Link className="fw-semibold" href={href}>
+      {text}
+    </Link>
+  );
+}
+
+export function EntityName({
+  entity,
+  access = NO_ENTITY_ACCESS,
+}: {
+  entity: EntityRef | null;
+  access?: EntityAccess;
+}) {
   if (entity === null) return <span className="fst-italic">{entityText(null)}</span>;
   return (
     <span>
       <span className="small text-body-secondary">{entityKindLabel(entity.type)}</span>{' '}
-      <span className="fw-semibold">{entityText(entity)}</span>
+      <EntityLabel entity={entity} access={access} />
     </span>
   );
 }
@@ -81,12 +103,18 @@ export function EvidenceList({ evidence }: { evidence: readonly EvidenceRef[] })
   );
 }
 
-function CandidateItems({ candidates }: { candidates: readonly Candidate[] }) {
+function CandidateItems({
+  candidates,
+  access,
+}: {
+  candidates: readonly Candidate[];
+  access: EntityAccess;
+}) {
   return (
     <ul className="list-unstyled ms-3 mb-1">
       {candidates.map((candidate) => (
         <li key={`${candidate.entity.type}:${candidate.entity.id}`} className="py-1">
-          <EntityName entity={candidate.entity} /> <BasisBadge basis={candidate.basis} />{' '}
+          <EntityName entity={candidate.entity} access={access} /> <BasisBadge basis={candidate.basis} />{' '}
           <span className="small text-body-secondary">
             confidence {confidenceText(candidate.confidence)}
           </span>
@@ -97,7 +125,7 @@ function CandidateItems({ candidates }: { candidates: readonly Candidate[] }) {
   );
 }
 
-function LinkItem({ link }: { link: IdentityLink }) {
+function LinkItem({ link, access }: { link: IdentityLink; access: EntityAccess }) {
   const reason = reasonText(link.reason);
   return (
     <li className="identity-link border-bottom py-2">
@@ -109,8 +137,8 @@ function LinkItem({ link }: { link: IdentityLink }) {
         </span>
       </div>
       <div className="my-1">
-        <EntityName entity={link.source} /> <i className="bi bi-arrow-right mx-1" aria-hidden="true" />
-        <EntityName entity={link.target} />
+        <EntityName entity={link.source} access={access} /> <i className="bi bi-arrow-right mx-1" aria-hidden="true" />
+        <EntityName entity={link.target} access={access} />
       </div>
       {reason.length > 0 ? <p className="small text-body-secondary mb-1">{reason}</p> : null}
       {link.ambiguous ? (
@@ -118,7 +146,7 @@ function LinkItem({ link }: { link: IdentityLink }) {
           <p className="small mb-0">
             {link.candidates.length} candidates conflict; none is selected.
           </p>
-          <CandidateItems candidates={link.candidates} />
+          <CandidateItems candidates={link.candidates} access={access} />
         </div>
       ) : null}
       <p className="small text-body-secondary mb-1">
@@ -129,7 +157,15 @@ function LinkItem({ link }: { link: IdentityLink }) {
   );
 }
 
-export function LinkList({ label, links }: { label: string; links: readonly IdentityLink[] }) {
+export function LinkList({
+  label,
+  links,
+  access = NO_ENTITY_ACCESS,
+}: {
+  label: string;
+  links: readonly IdentityLink[];
+  access?: EntityAccess;
+}) {
   if (links.length === 0) return null;
   return (
     <div role="group" aria-label={label}>
@@ -138,6 +174,7 @@ export function LinkList({ label, links }: { label: string; links: readonly Iden
           <LinkItem
             key={`${link.relation}:${link.source.id}:${link.target?.id ?? 'none'}:${index}`}
             link={link}
+            access={access}
           />
         ))}
       </ul>
@@ -146,7 +183,13 @@ export function LinkList({ label, links }: { label: string; links: readonly Iden
 }
 
 /** The answer to "who is behind this": the headline, why, and every link or candidate behind it. */
-export function AttributionPanel({ attribution }: { attribution: Attribution }) {
+export function AttributionPanel({
+  attribution,
+  access = NO_ENTITY_ACCESS,
+}: {
+  attribution: Attribution;
+  access?: EntityAccess;
+}) {
   const headline = attributionHeadline(attribution);
   return (
     <section aria-label="Who is behind it" className="identity-attribution mb-3">
@@ -155,11 +198,11 @@ export function AttributionPanel({ attribution }: { attribution: Attribution }) 
         <BasisBadge basis={attribution.basis} />
       </div>
       <p className="text-body-secondary mb-2">{headline.detail}</p>
-      <LinkList label="Identity links" links={attribution.links} />
+      <LinkList label="Identity links" links={attribution.links} access={access} />
       {attribution.ambiguous ? (
         <>
           <p className="small mb-0">Each candidate is shown with its own basis; none is selected.</p>
-          <CandidateItems candidates={attribution.candidates} />
+          <CandidateItems candidates={attribution.candidates} access={access} />
         </>
       ) : null}
     </section>

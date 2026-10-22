@@ -1,6 +1,7 @@
-import { AppContent } from '@adminlte/react';
+import { AppContent } from '@/components/app-content';
 
 import { OverviewApplicationMix, OverviewTopDestinations } from '@/components/overview-traffic-cards';
+import { RelatedViews } from '@/components/related-views';
 import { TimeRangePicker } from '@/components/time-range-picker';
 import { TrafficAccessDenied } from '@/components/traffic-access-denied';
 import { TrafficNav } from '@/components/traffic-nav';
@@ -60,6 +61,14 @@ export default async function TrafficPage({ searchParams }: { searchParams: Prom
           <OverviewApplicationMix state={applications} window={window} />
         </div>
       </div>
+
+      <RelatedViews
+        views={[
+          { label: 'Security events', href: '/security', hint: 'Detections from the connected security sources' },
+          { label: 'Internet / WAN', href: '/internet', hint: 'Link status, quality and availability' },
+          { label: 'Users & Identity', href: '/users', hint: 'Who is on the network, according to evidence' },
+        ]}
+      />
     </AppContent>
   );
 }

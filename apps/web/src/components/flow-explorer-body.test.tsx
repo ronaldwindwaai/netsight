@@ -24,8 +24,9 @@ afterEach(() => cleanup());
 function show(
   state: ReturnType<typeof okState<TrafficFlowsResponse>> | ReturnType<typeof failureState<TrafficFlowsResponse>>,
   filtered = false,
+  access = { people: true, devices: true },
 ) {
-  return render(<FlowExplorerBody state={state} filtered={filtered} />);
+  return render(<FlowExplorerBody state={state} filtered={filtered} access={access} />);
 }
 
 const text = () => document.body.textContent ?? '';
@@ -147,7 +148,30 @@ describe('the rows', () => {
     const rows = within(screen.getByRole('table', { name: /flows/i })).getAllByRole('row');
     const link = within(rows[1]).getByRole('link', { name: /Alice Example/ });
     assert.equal(link.getAttribute('href'), '/users/person-3f1c2a9e-1b2c-4d3e-8f4a-5b6c7d8e9f01');
-    assert.equal(within(rows[2]).queryAllByRole('link').length, 0);
+    const unknownRowLinks = within(rows[2]).queryAllByRole('link').map((item) => item.getAttribute('href') ?? '');
+    assert.equal(unknownRowLinks.some((href) => href.startsWith('/users/')), false);
+  });
+
+  it('without users:read or inventory:read the person and device are plain text', () => {
+    show(okState(flowsFixture({ flows: [flowFixture()] })), false, { people: false, devices: false });
+    const row = within(screen.getByRole('table', { name: /flows/i })).getAllByRole('row')[1];
+    assert.match(row.textContent ?? '', /Alice Example/);
+    assert.match(row.textContent ?? '', /PC-001/);
+    assert.equal(within(row).queryAllByRole('link').length, 0);
+  });
+
+  it('each permission gates only its own link', () => {
+    show(okState(flowsFixture({ flows: [flowFixture()] })), false, { people: true, devices: false });
+    const row = within(screen.getByRole('table', { name: /flows/i })).getAllByRole('row')[1];
+    assert.ok(within(row).getByRole('link', { name: /Alice Example/ }));
+    assert.equal(within(row).queryByRole('link', { name: 'PC-001' }), null);
+  });
+
+  it('a device named by the identity service links to its inventory page', () => {
+    show(okState(flowsFixture({ flows: [flowFixture()] })));
+    const rows = within(screen.getByRole('table', { name: /flows/i })).getAllByRole('row');
+    const link = within(rows[1]).getByRole('link', { name: 'PC-001' });
+    assert.match(link.getAttribute('href') ?? '', /^\/devices\/device-/);
   });
 
   it('an inferred person is possibly that person, never stated as fact', () => {

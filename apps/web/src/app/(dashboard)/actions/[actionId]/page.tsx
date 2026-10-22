@@ -1,4 +1,4 @@
-import { AppContent } from '@adminlte/react';
+import { AppContent } from '@/components/app-content';
 import { notFound } from 'next/navigation';
 
 import { ActionDecisionPanel } from '@/components/action-decision-panel';
@@ -40,6 +40,7 @@ export default async function ActionPage({ params }: { params: Promise<{ actionI
       <ActionDetailBody
         state={detail}
         status={statusData}
+        viewer={viewer}
         panel={
           detail.kind === 'ok' ? (
             <ActionDecisionPanel

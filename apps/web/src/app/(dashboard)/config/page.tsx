@@ -1,4 +1,4 @@
-import { AppContent } from '@adminlte/react';
+import { AppContent } from '@/components/app-content';
 import { ConfigurationNodesBody } from '@/components/configuration-read';
 import { DataFailure } from '@/components/data-state';
 import { Step8AccessDenied } from '@/components/step8-access-denied';

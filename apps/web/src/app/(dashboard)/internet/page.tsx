@@ -1,5 +1,6 @@
-import { AppContent } from '@adminlte/react';
+import { AppContent } from '@/components/app-content';
 
+import { ALERTS_VIEW, RelatedViews } from '@/components/related-views';
 import { InternetSlaPanel } from '@/components/internet-sla-panel';
 import { InternetStatusBody } from '@/components/internet-status-body';
 import { apiGet } from '@/lib/api';
@@ -44,6 +45,14 @@ export default async function InternetPage({
         months={monthOptions(now)}
         adjusted={adjusted}
         canExport={canExportInternet(viewer)}
+      />
+
+      <RelatedViews
+        views={[
+          { label: 'Traffic overview', href: '/traffic', hint: 'Top destinations and applications' },
+          ALERTS_VIEW,
+          { label: 'Diagnostics', href: '/diagnostics', hint: 'Run read-only checks to explain a problem' },
+        ]}
       />
     </AppContent>
   );

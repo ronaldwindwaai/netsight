@@ -1,4 +1,4 @@
-import { AppContent } from '@adminlte/react';
+import { AppContent } from '@/components/app-content';
 
 import { DiagnosticSessionPage } from '@/components/diagnostic-session-page';
 import { DiagnosticsAccessDenied } from '@/components/diagnostics-access-denied';

@@ -1,6 +1,7 @@
 import '@adminlte/react/css';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import './globals.css';
+import './shell.css';
 
 export const metadata = {
   title: 'Netsight',

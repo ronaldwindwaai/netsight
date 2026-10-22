@@ -22,6 +22,22 @@ const STATE_THEME: Record<AlertState, BootstrapTheme> = {
   suppressed: 'secondary',
 };
 
+const SEVERITY_ICON: Record<AlertSeverity, string> = {
+  info: 'bi-info-circle-fill',
+  low: 'bi-arrow-down-circle-fill',
+  medium: 'bi-exclamation-circle-fill',
+  high: 'bi-exclamation-triangle-fill',
+  critical: 'bi-x-octagon-fill',
+};
+
+const STATE_VIEW: Record<AlertState, { icon: string; meaning: string }> = {
+  open: { icon: 'bi-circle-fill', meaning: 'Active and nobody has taken it yet.' },
+  acknowledged: { icon: 'bi-check-circle', meaning: 'Someone has seen it; it is still active.' },
+  investigating: { icon: 'bi-search', meaning: 'Being investigated; it is still active.' },
+  resolved: { icon: 'bi-check-circle-fill', meaning: 'The source reports it as cleared.' },
+  suppressed: { icon: 'bi-bell-slash', meaning: 'Muted, for example by a maintenance window. It is not resolved.' },
+};
+
 function label(value: string): string {
   return value.replaceAll('_', ' ').replace(/^./, (first) => first.toUpperCase());
 }
@@ -40,7 +56,7 @@ const columns: TableColumn<Alert>[] = [
     header: 'Severity',
     render: (alert) => (
       <Badge theme={SEVERITY_THEME[alert.severity]} pill>
-        <i className="bi bi-exclamation-circle-fill me-1" aria-hidden="true" />
+        <i className={`bi ${SEVERITY_ICON[alert.severity]} me-1`} aria-hidden="true" />
         {label(alert.severity)}
       </Badge>
     ),
@@ -69,9 +85,13 @@ const columns: TableColumn<Alert>[] = [
     key: 'state',
     header: 'State',
     render: (alert) => (
-      <Badge theme={STATE_THEME[alert.state]} pill>
-        {label(alert.state)}
-      </Badge>
+      <div>
+        <Badge theme={STATE_THEME[alert.state]} pill>
+          <i className={`bi ${STATE_VIEW[alert.state].icon} me-1`} aria-hidden="true" />
+          {label(alert.state)}
+        </Badge>
+        <span className="visually-hidden"> {STATE_VIEW[alert.state].meaning}</span>
+      </div>
     ),
   },
   {

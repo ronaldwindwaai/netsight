@@ -1,4 +1,4 @@
-import { AppContent } from '@adminlte/react';
+import { AppContent } from '@/components/app-content';
 import { notFound } from 'next/navigation';
 
 import { Step8AccessDenied } from '@/components/step8-access-denied';
@@ -41,6 +41,7 @@ export default async function UnknownDevicePage({ params }: { params: Promise<{ 
             state={{ kind: 'forbidden', code: 'FORBIDDEN', message: '', correlationId: 'n/a', status: 403 }}
             actions={null}
             timeline={null}
+            permissions={viewer?.permissions ?? null}
           />
         ) : (
           <Step8AccessDenied surface="Unknown devices" permission="unknown-devices:read-summary" />
@@ -58,6 +59,7 @@ export default async function UnknownDevicePage({ params }: { params: Promise<{ 
       <UnknownDeviceDetailBody
         state={detail}
         timeline={timeline}
+        permissions={viewer?.permissions ?? null}
         actions={
           item === null ? null : (
             <>

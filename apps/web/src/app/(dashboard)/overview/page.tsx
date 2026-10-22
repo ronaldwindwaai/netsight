@@ -1,12 +1,17 @@
 import Link from 'next/link';
-import { AppContent, Card, InfoBox } from '@adminlte/react';
+import { Card } from '@adminlte/react';
+import { AppContent } from '@/components/app-content';
 
 import { DataFailure, FreshnessNotice } from '@/components/data-state';
+import { OverviewKpiLink } from '@/components/overview-kpi-link';
+import { OverviewIncidentsCard } from '@/components/overview-incidents-card';
 import { OverviewInternetKpi } from '@/components/overview-internet-kpi';
 import { OverviewApplicationMix, OverviewTopDestinations } from '@/components/overview-traffic-cards';
 import { apiGet } from '@/lib/api';
 import { parseOverviewResponse, parseSessionInfo } from '@/lib/api-contracts';
 import { parseInternetResponse } from '@/lib/api-contracts-internet';
+import { parseIncidentListResponse, parseIncidentSummaryListResponse } from '@/lib/api-contracts-incident-api';
+import { overviewIncidentRequest } from '@/lib/overview-incidents';
 import {
   parseTrafficApplicationsResponse,
   parseTrafficDestinationsResponse,
@@ -36,6 +41,14 @@ function UnavailableSurface({
   );
 }
 
+function fetchIncidents(permissions: readonly string[] | null) {
+  const request = overviewIncidentRequest(permissions);
+  if (request === null) return Promise.resolve(null);
+  return request.kind === 'summary'
+    ? apiGet(request.path, parseIncidentSummaryListResponse)
+    : apiGet(request.path, parseIncidentListResponse);
+}
+
 export default async function OverviewPage() {
   const [state, internet, session] = await Promise.all([
     apiGet('/api/v1/overview', parseOverviewResponse),
@@ -47,7 +60,8 @@ export default async function OverviewPage() {
   // refusal also renders as Restricted). The API enforces the same rules on its own.
   const viewer = viewerFromSession(session.kind === 'ok' ? session.data : null);
   const sessionUnread = session.kind !== 'ok';
-  const [destinations, applications] = await Promise.all([
+  const [incidents, destinations, applications] = await Promise.all([
+    fetchIncidents(session.kind === 'ok' ? session.data.permissions : null),
     sessionUnread || canReadTraffic(viewer)
       ? apiGet('/api/v1/traffic/destinations?preset=24h&limit=5', parseTrafficDestinationsResponse)
       : null,
@@ -87,41 +101,32 @@ export default async function OverviewPage() {
       ) : null}
 
       <section className="overview-kpi-grid" aria-label="Operational summary">
-        <Link
-          className={`overview-kpi-link ${health.progress === undefined ? 'overview-kpi--unknown' : ''}`}
+        <OverviewKpiLink
           href="/devices"
-          aria-label={`Network health: ${health.title}. ${health.detail}. Open device inventory.`}
-        >
-          <InfoBox
-            icon="bi-heart-pulse"
-            text="Network health"
-            title={health.title}
-            theme={health.theme}
-            progress={health.progress ?? 0}
-            progressText={health.detail}
-          />
-        </Link>
+          icon="bi-heart-pulse"
+          label="Network health"
+          value={health.title}
+          detail={health.detail}
+          theme={health.theme}
+          progress={health.progress}
+        />
         <OverviewInternetKpi state={internet} />
-        <div className="overview-kpi--unknown">
-          <InfoBox
-            icon="bi-shield-exclamation"
-            text="Security"
-            title="Not connected"
-            theme="secondary"
-            progress={0}
-            progressText="Security sources unavailable"
-          />
-        </div>
-        <div className="overview-kpi--unknown">
-          <InfoBox
-            icon="bi-people"
-            text="Users"
-            title="Not connected"
-            theme="secondary"
-            progress={0}
-            progressText="Identity telemetry unavailable"
-          />
-        </div>
+        <OverviewKpiLink
+          href="/security"
+          icon="bi-shield-exclamation"
+          label="Security"
+          value="Not summarised"
+          detail="Open security events"
+          theme="secondary"
+        />
+        <OverviewKpiLink
+          href="/users"
+          icon="bi-people"
+          label="Users"
+          value="Not summarised"
+          detail="Open users"
+          theme="secondary"
+        />
       </section>
 
       <div className="row g-3 mb-3">
@@ -133,7 +138,9 @@ export default async function OverviewPage() {
             variant="outline"
             theme="primary"
             tools={
-              <span className="badge topology-source-badge">Topology source required</span>
+              <Link className="btn btn-sm btn-outline-primary" href="/network/map">
+                Open network map
+              </Link>
             }
           >
             <UnavailableSurface
@@ -144,19 +151,7 @@ export default async function OverviewPage() {
           </Card>
         </div>
         <div className="col-xl-4 order-1 order-xl-2">
-          <Card
-            className="operational-card operational-card--primary"
-            title="Active incidents"
-            icon="bi bi-exclamation-triangle"
-            variant="outline"
-            theme="secondary"
-          >
-            <UnavailableSurface
-              icon="bi-inboxes"
-              title="Incident service not connected"
-              detail="No incident count is shown because the incident engine is not available in this slice."
-            />
-          </Card>
+          <OverviewIncidentsCard state={incidents} />
         </div>
       </div>
 

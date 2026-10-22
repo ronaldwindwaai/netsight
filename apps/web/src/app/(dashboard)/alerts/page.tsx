@@ -1,5 +1,6 @@
 import Link from 'next/link';
-import { AppContent, Card } from '@adminlte/react';
+import { Card } from '@adminlte/react';
+import { AppContent } from '@/components/app-content';
 
 import { AlertTable } from '@/components/alert-table';
 import { AlertRulesCard, MaintenanceWindowsCard } from '@/components/alerting-sections';
@@ -44,7 +45,7 @@ export default async function AlertsPage({
   const retrievedAt = formatUtcTimestamp(new Date().toISOString());
 
   return (
-    <AppContent title="Alerts" breadcrumbs={[{ label: 'Alerts' }]}>
+    <AppContent title="Alerts" breadcrumbs={[{ label: 'Overview', href: '/overview' }, { label: 'Alerts' }]}>
       <div className="page-intro">
         <p className="text-body-secondary mb-0">
           Read-only alerts mapped from LibreNMS, plus the alert rules and maintenance windows

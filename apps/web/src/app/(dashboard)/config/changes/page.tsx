@@ -1,4 +1,4 @@
-import { AppContent } from '@adminlte/react';
+import { AppContent } from '@/components/app-content';
 import Link from 'next/link';
 import { ConfigurationVersionsBody } from '@/components/configuration-read';
 import { DataFailure } from '@/components/data-state';
@@ -21,6 +21,6 @@ export default async function ConfigurationChangesPage({ searchParams }: { searc
   return <AppContent title="Change history" breadcrumbs={[{ label: 'Configuration', href: '/config' }, { label: 'Change history' }]}>
     <p><Link href="/config">Choose a configuration backup</Link></p>
     <p className="text-body-secondary">Saved revisions reported by Oxidized. Author identities and commit messages are withheld. No change is classified as a cause of an incident from timing alone.</p>
-    {state ? <ConfigurationVersionsBody state={state} nodeId={typeof id === "string" ? id : ""} /> : <StateSurface icon="bi bi-clock-history" title="Choose a device" detail="Open a device from Configuration to see its saved versions." />}
+    {state ? <ConfigurationVersionsBody state={state} nodeId={typeof id === "string" ? id : ""} permissions={session.data.permissions} /> : <StateSurface icon="bi bi-clock-history" title="Choose a device" detail="Open a device from Configuration to see its saved versions." />}
   </AppContent>;
 }

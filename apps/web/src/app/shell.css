@@ -1,0 +1,178 @@
+/* App-shell polish: page finder, sidebar group headers. Kept apart from globals.css. */
+
+/* Page finder (topbar) */
+.page-finder {
+  position: relative;
+  min-inline-size: 0;
+  max-inline-size: 22rem;
+  inline-size: 100%;
+}
+
+.page-finder__panel {
+  position: absolute;
+  inset-block-start: calc(100% + 0.25rem);
+  inset-inline: 0;
+  z-index: 1050;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--bs-border-color);
+  border-radius: 0.375rem;
+  background: var(--bs-body-bg);
+  box-shadow: 0 0.5rem 1rem rgb(0 0 0 / 15%);
+}
+
+.page-finder__list a {
+  display: block;
+  padding: 0.35rem 0.25rem;
+  border-radius: 0.25rem;
+  color: var(--bs-body-color);
+  text-decoration: none;
+}
+
+.page-finder__list a:hover,
+.page-finder__list a:focus-visible {
+  background: var(--bs-tertiary-bg);
+}
+
+@media (max-width: 575.98px) {
+  .page-finder {
+    min-inline-size: 0;
+    max-inline-size: 11rem;
+  }
+}
+
+/* Sidebar group headers: quiet, dense, clearly separate from entries. */
+.netsight-dashboard .sidebar-menu .nav-header {
+  padding-block: 0.6rem 0.25rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #c4cad0;
+}
+
+/* Top bar: the finder and the account controls sit in their own list items. */
+.app-header .navbar-nav:first-child {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+}
+
+.topbar-finder,
+.topbar-actions {
+  display: flex;
+  align-items: center;
+}
+
+.topbar-finder {
+  flex: 0 1 22rem;
+  min-inline-size: 0;
+  margin-inline-start: 0.25rem;
+}
+
+.topbar-actions {
+  gap: 0.5rem;
+  margin-inline-end: 0.5rem;
+}
+
+@media (max-width: 575.98px) {
+  .topbar-finder {
+    flex-basis: 100%;
+  }
+
+  .page-finder {
+    max-inline-size: none;
+  }
+
+  /* The finder is the mobile entry point; the library's duplicate search pill and the fullscreen
+     toggle only crowd it. @adminlte/react 0.7.0 exposes no prop to omit either (DashboardLayout
+     does not forward `search` or `fullscreen` to Topbar), so they are matched by their title
+     attributes from dist/layout/topbar.js. Re-check this selector when upgrading the library. */
+  .app-header .navbar-nav > li:has(> button[title^='Search']),
+  .app-header .navbar-nav > li:has(> button[title$='ullscreen']) {
+    display: none !important;
+  }
+}
+
+/* Light mode: Bootstrap's stock link, primary and secondary tints miss 4.5:1 on the grey page. */
+:root:not([data-bs-theme='dark']) {
+  --bs-link-color: #0a58ca;
+  --bs-link-color-rgb: 10, 88, 202;
+}
+
+:root:not([data-bs-theme='dark']) .btn-outline-primary {
+  --bs-btn-color: #0a58ca;
+  --bs-btn-border-color: #0a58ca;
+}
+
+:root:not([data-bs-theme='dark']) .btn-outline-secondary {
+  --bs-btn-color: #565e64;
+  --bs-btn-border-color: #565e64;
+}
+
+:root:not([data-bs-theme='dark']) .nav-pills .nav-link:not(.active) {
+  color: #0a58ca;
+}
+
+:root:not([data-bs-theme='dark']) .app-header .text-secondary {
+  color: #495057 !important;
+}
+
+/* Plain and sortable column headers read at one size (the sort button is a small button). */
+.devices-scroll thead th {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+/* Keyboard focus on the dark sidebar needs a ring that reads against it. */
+.app-sidebar .nav-link:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: -2px;
+  box-shadow: none;
+}
+
+/* Dark mode: Bootstrap's outline buttons keep their light-mode tints; lift them to 4.5:1 on dark surfaces. */
+[data-bs-theme='dark'] .btn-outline-primary {
+  --bs-btn-color: #6ea8fe;
+  --bs-btn-border-color: #6ea8fe;
+  --bs-btn-hover-color: #000;
+  --bs-btn-hover-bg: #6ea8fe;
+  --bs-btn-hover-border-color: #6ea8fe;
+  --bs-btn-active-color: #000;
+  --bs-btn-active-bg: #8bb9fe;
+  --bs-btn-active-border-color: #8bb9fe;
+}
+
+[data-bs-theme='dark'] .btn-outline-secondary {
+  --bs-btn-color: #adb5bd;
+  --bs-btn-border-color: #adb5bd;
+  --bs-btn-hover-color: #000;
+  --bs-btn-hover-bg: #adb5bd;
+  --bs-btn-hover-border-color: #adb5bd;
+  --bs-btn-active-color: #000;
+  --bs-btn-active-bg: #ced4da;
+  --bs-btn-active-border-color: #ced4da;
+}
+
+[data-bs-theme='dark'] .nav-pills .nav-link:not(.active),
+[data-bs-theme='dark'] .mobile-nav__link.is-active {
+  color: #6ea8fe;
+}
+
+[data-bs-theme='dark'] .app-header .text-secondary {
+  color: #ced4da !important;
+}
+
+/* Inline code inside a tinted alert inherits the alert's text colour (stock pink fails 4.5:1 there). */
+.alert code {
+  color: inherit;
+}
+
+/* The avatar initials are drawn from a data attribute, so they are not part of the button's text
+   and the visible text (the identity) is contained in its accessible name. */
+.identity-avatar::before {
+  content: attr(data-initials);
+}
+
+/* Stock inline-code pink is 4.3:1 on the light page; this is 5.5:1. */
+:root:not([data-bs-theme='dark']) code {
+  color: #b02a6f;
+}

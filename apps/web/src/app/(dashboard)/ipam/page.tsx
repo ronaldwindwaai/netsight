@@ -1,4 +1,4 @@
-import { AppContent } from '@adminlte/react';
+import { AppContent } from '@/components/app-content';
 
 import { IpamSummaryCard } from '@/components/counts-cards';
 import { IpamAddressesCard, IpamPrefixesCard, IpamVlansCard } from '@/components/ipam-body';
