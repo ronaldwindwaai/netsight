@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Card } from '@adminlte/react';
+import { AppCard } from '@/components/app-card';
 import { AppContent } from '@/components/app-content';
 
 import { ALERTS_VIEW, RelatedViews } from '@/components/related-views';
@@ -75,7 +75,7 @@ export default async function SecurityPage({
         <TimeRangePicker selected={preset} />
       </div>
 
-      <Card
+      <AppCard
         className="operational-card"
         title="Security events"
         icon="bi bi-shield-exclamation"
@@ -92,7 +92,7 @@ export default async function SecurityPage({
               : undefined
           }
         />
-      </Card>
+      </AppCard>
 
       <RelatedViews
         views={[

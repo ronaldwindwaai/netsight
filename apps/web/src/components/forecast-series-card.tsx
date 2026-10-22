@@ -1,4 +1,5 @@
-import { Badge, Card } from '@adminlte/react';
+import { Badge } from '@adminlte/react';
+import { AppCard } from '@/components/app-card';
 
 import { ForecastChart } from '@/components/forecast-chart';
 import type { ForecastSeries } from '@/lib/api-contracts-forecast';
@@ -84,7 +85,7 @@ function WithoutForecast({ series }: { series: ForecastSeries }) {
 /** One series: its state as a word and icon, the chart when there are measured days, the method. */
 export function ForecastSeriesCard({ series }: { series: ForecastSeries }) {
   return (
-    <Card
+    <AppCard
       title={series.name}
       icon="bi bi-graph-up"
       variant="outline"
@@ -100,6 +101,6 @@ export function ForecastSeriesCard({ series }: { series: ForecastSeries }) {
       ) : (
         <WithoutForecast series={series} />
       )}
-    </Card>
+    </AppCard>
   );
 }

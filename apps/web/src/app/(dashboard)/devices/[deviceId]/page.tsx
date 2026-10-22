@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Card } from '@adminlte/react';
+import { AppCard } from '@/components/app-card';
 import { AppContent } from '@/components/app-content';
 
 import { DataFailure, FreshnessNotice } from '@/components/data-state';
@@ -48,7 +48,7 @@ export default async function DeviceDetailPage({
       ) : (
         <>
           <FreshnessNotice freshness={state.data.item.freshness} />
-          <Card
+          <AppCard
             title="Device profile"
             icon="bi bi-hdd-network"
             variant="outline"
@@ -59,7 +59,7 @@ export default async function DeviceDetailPage({
               interfaces={interfaces}
               permissions={permissions}
             />
-          </Card>
+          </AppCard>
         </>
       )}
     </AppContent>

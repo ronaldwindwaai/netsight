@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { Badge, Card, Table } from '@adminlte/react';
+import { Badge, Table } from '@adminlte/react';
+import { AppCard } from '@/components/app-card';
 import type { BootstrapTheme, TableColumn } from '@adminlte/react';
 
 import type { Alert, AlertSeverity, AlertState } from '@/lib/api-contracts';
@@ -103,7 +104,7 @@ const columns: TableColumn<Alert>[] = [
 
 export function AlertTable({ alerts, total }: { alerts: Alert[]; total: number }) {
   return (
-    <Card
+    <AppCard
       title="Canonical alerts"
       icon="bi bi-bell"
       variant="outline"
@@ -121,6 +122,6 @@ export function AlertTable({ alerts, total }: { alerts: Alert[]; total: number }
         small
         striped
       />
-    </Card>
+    </AppCard>
   );
 }

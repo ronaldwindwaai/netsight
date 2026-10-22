@@ -1,4 +1,4 @@
-import { Card } from '@adminlte/react';
+import { AppCard } from '@/components/app-card';
 import { AppContent } from '@/components/app-content';
 
 import { DataFailure, FreshnessNotice } from '@/components/data-state';
@@ -83,7 +83,7 @@ function GraphEvidence({ topology, focus }: { topology: TopologyResponse; focus:
           </ul>
         </div>
       ) : null}
-      <Card title="Explicit links" icon="bi bi-diagram-3" variant="outline" theme="primary" bodyClass="p-0">
+      <AppCard title="Explicit links" icon="bi bi-diagram-3" variant="outline" theme="primary" bodyClass="p-0">
         <div className="table-responsive">
           <table className="table table-sm mb-0">
             <thead>
@@ -124,7 +124,7 @@ function GraphEvidence({ topology, focus }: { topology: TopologyResponse; focus:
             </tbody>
           </table>
         </div>
-      </Card>
+      </AppCard>
     </>
   );
 }
@@ -153,7 +153,7 @@ export default async function MapPage({
       {state.kind !== 'ok' ? <DataFailure state={state} /> : null}
       {topology ? <FreshnessNotice freshness={topology.freshness} /> : null}
 
-      <Card
+      <AppCard
         className="operational-card operational-card--primary"
         title="Topology"
         icon="bi bi-diagram-3"
@@ -186,7 +186,7 @@ export default async function MapPage({
         ) : (
           <GraphEvidence topology={topology} focus={focus} />
         )}
-      </Card>
+      </AppCard>
     </AppContent>
   );
 }

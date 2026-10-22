@@ -4,7 +4,7 @@
  * is shown as Unknown and a missing cable as "No explicit link"; nothing is drawn from inference.
  * The suspected tier is marked in text as well as colour. Device names are untrusted text nodes.
  */
-import { Card } from '@adminlte/react';
+import { AppCard } from '@/components/app-card';
 
 import { StateSurface } from '@/components/state-surface';
 import type { DiagnosticPath, DiagnosticPathHop } from '@/lib/api-contracts-diagnostic-session';
@@ -65,7 +65,7 @@ function Hop({ hop, link }: { hop: DiagnosticPathHop; link: DiagnosticPath['link
 export function PathView({ path }: { path: DiagnosticPath }) {
   return (
     <section aria-label="Network path" className="mb-3">
-      <Card
+      <AppCard
         className="operational-card"
         title="Network path"
         icon="bi bi-diagram-3"
@@ -90,7 +90,7 @@ export function PathView({ path }: { path: DiagnosticPath }) {
         ) : (
           <PathUnavailable state={path.state} />
         )}
-      </Card>
+      </AppCard>
     </section>
   );
 }

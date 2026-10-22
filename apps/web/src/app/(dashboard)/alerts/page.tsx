@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Card } from '@adminlte/react';
+import { AppCard } from '@/components/app-card';
 import { AppContent } from '@/components/app-content';
 
 import { AlertTable } from '@/components/alert-table';
@@ -61,13 +61,13 @@ export default async function AlertsPage({
         <>
           <FreshnessNotice freshness={state.data.freshness} />
           {state.data.items.length === 0 && state.data.total === 0 ? (
-            <Card className="text-center" bodyClass="py-5">
+            <AppCard className="text-center" bodyClass="py-5">
               <i className="bi bi-bell-slash fs-2 text-body-secondary" aria-hidden="true" />
               <h2 className="h5 mt-3">No active source alerts</h2>
               <p className="mb-0 text-body-secondary">
                 LibreNMS returned a valid empty alert collection.
               </p>
-            </Card>
+            </AppCard>
           ) : (
             <>
               <AlertTable alerts={state.data.items} total={state.data.total} />

@@ -1,4 +1,5 @@
-import { Alert, Card, Spinner } from '@adminlte/react';
+import { Alert, Spinner } from '@adminlte/react';
+import { AppCard } from '@/components/app-card';
 
 import type { FetchState } from '@/lib/api';
 import type { Freshness } from '@/lib/api-contracts';
@@ -147,7 +148,7 @@ export function FreshnessNotice({ freshness }: { freshness: Freshness }) {
 
 export function EmptyState({ filtered = false }: { filtered?: boolean }) {
   return (
-    <Card className="text-center" bodyClass="py-5">
+    <AppCard className="text-center" bodyClass="py-5">
       <i className="bi bi-hdd-network fs-2 text-body-secondary" aria-hidden="true" />
       <h2 className="h5 mt-3">{filtered ? 'No devices match these filters' : 'No devices found'}</h2>
       <p className="mb-0 text-body-secondary">
@@ -155,17 +156,17 @@ export function EmptyState({ filtered = false }: { filtered?: boolean }) {
           ? 'Adjust the search text or status filter.'
           : 'The source returned a valid empty device inventory.'}
       </p>
-    </Card>
+    </AppCard>
   );
 }
 
 export function LoadingState({ label = 'Loading device data' }: { label?: string }) {
   return (
-    <Card className="text-center" bodyClass="py-5">
+    <AppCard className="text-center" bodyClass="py-5">
       <Spinner theme="primary" label={label} />
       <p className="mt-3 mb-0 text-body-secondary">
         {label}…
       </p>
-    </Card>
+    </AppCard>
   );
 }

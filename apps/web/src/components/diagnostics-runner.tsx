@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { Alert, Card, Spinner } from '@adminlte/react';
+import { Alert, Spinner } from '@adminlte/react';
+import { AppCard } from '@/components/app-card';
 
 import { createDiagnosticRun, type DiagnosticActionResult } from '@/app/(dashboard)/diagnostics/actions';
 import { DataFailure } from '@/components/data-state';
@@ -183,7 +184,7 @@ export function DiagnosticsRunner({
 
   return (
     <>
-      <Card
+      <AppCard
         className="operational-card mb-3"
         title="Automated diagnostic"
         icon="bi bi-clipboard2-pulse"
@@ -260,7 +261,7 @@ export function DiagnosticsRunner({
             </div>
           </fieldset>
         </form>
-      </Card>
+      </AppCard>
 
       <p className="visually-hidden" role="status">
         {running

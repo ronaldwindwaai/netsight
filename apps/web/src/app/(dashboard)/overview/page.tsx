@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Card } from '@adminlte/react';
+import { AppCard } from '@/components/app-card';
 import { AppContent } from '@/components/app-content';
 
 import { DataFailure, FreshnessNotice } from '@/components/data-state';
@@ -9,6 +9,8 @@ import { OverviewInternetKpi } from '@/components/overview-internet-kpi';
 import { OverviewApplicationMix, OverviewTopDestinations } from '@/components/overview-traffic-cards';
 import { apiGet } from '@/lib/api';
 import { parseOverviewResponse, parseSessionInfo } from '@/lib/api-contracts';
+import { parseSecurityEventsResponse } from '@/lib/api-contracts-security';
+import { parseUsersAggregateResponse } from '@/lib/api-contracts-users';
 import { parseInternetResponse } from '@/lib/api-contracts-internet';
 import { parseIncidentListResponse, parseIncidentSummaryListResponse } from '@/lib/api-contracts-incident-api';
 import { overviewIncidentRequest } from '@/lib/overview-incidents';
@@ -17,6 +19,13 @@ import {
   parseTrafficDestinationsResponse,
 } from '@/lib/api-contracts-traffic-explorer';
 import { deviceHealthSummary, sourceProvenance } from '@/lib/overview-summary';
+import {
+  overviewSecurityRequest,
+  overviewUsersAccess,
+  overviewUsersRequest,
+  securityTile,
+  usersTile,
+} from '@/lib/overview-tiles';
 import { canReadTraffic, viewerFromSession } from '@/lib/viewer';
 
 function UnavailableSurface({
@@ -60,8 +69,14 @@ export default async function OverviewPage() {
   // refusal also renders as Restricted). The API enforces the same rules on its own.
   const viewer = viewerFromSession(session.kind === 'ok' ? session.data : null);
   const sessionUnread = session.kind !== 'ok';
-  const [incidents, destinations, applications] = await Promise.all([
-    fetchIncidents(session.kind === 'ok' ? session.data.permissions : null),
+  const permissions = session.kind === 'ok' ? session.data.permissions : null;
+  const securityPath = overviewSecurityRequest(permissions);
+  const usersPath = overviewUsersRequest(permissions);
+  const usersAccess = overviewUsersAccess(permissions);
+  const [incidents, security, users, destinations, applications] = await Promise.all([
+    fetchIncidents(permissions),
+    securityPath === null ? null : apiGet(securityPath, parseSecurityEventsResponse),
+    usersPath === null ? null : apiGet(usersPath, parseUsersAggregateResponse),
     sessionUnread || canReadTraffic(viewer)
       ? apiGet('/api/v1/traffic/destinations?preset=24h&limit=5', parseTrafficDestinationsResponse)
       : null,
@@ -112,26 +127,22 @@ export default async function OverviewPage() {
         />
         <OverviewInternetKpi state={internet} />
         <OverviewKpiLink
-          href="/security"
+          href={security === null ? undefined : '/security'}
           icon="bi-shield-exclamation"
           label="Security"
-          value="Not summarised"
-          detail="Open security events"
-          theme="secondary"
+          {...securityTile(security)}
         />
         <OverviewKpiLink
-          href="/users"
+          href={usersAccess === 'none' ? undefined : '/users'}
           icon="bi-people"
           label="Users"
-          value="Not summarised"
-          detail="Open users"
-          theme="secondary"
+          {...usersTile(usersAccess === 'per-person' ? 'per-person' : users)}
         />
       </section>
 
       <div className="row g-3 mb-3">
         <div className="col-xl-8 order-2 order-xl-1">
-          <Card
+          <AppCard
             className="operational-card operational-card--primary"
             title="Live network map"
             icon="bi bi-diagram-3"
@@ -148,7 +159,7 @@ export default async function OverviewPage() {
               title="Topology is not yet connected"
               detail="Connect and reconcile a topology source before Netsight can draw network relationships."
             />
-          </Card>
+          </AppCard>
         </div>
         <div className="col-xl-4 order-1 order-xl-2">
           <OverviewIncidentsCard state={incidents} />

@@ -3,7 +3,8 @@ import Link from 'next/link';
 import { InfoBox } from '@adminlte/react';
 
 interface OverviewKpiLinkProps {
-  href: string;
+  /** Absent when the viewer cannot open the page; the tile is then plain text, not a dead link. */
+  href?: string;
   icon: string;
   label: string;
   value: string;
@@ -18,16 +19,14 @@ interface OverviewKpiLinkProps {
  * and detail), so what is announced is exactly what is shown, including "Not summarised".
  */
 export function OverviewKpiLink({ href, icon, label, value, detail, theme, progress }: OverviewKpiLinkProps) {
+  const box = (
+    <InfoBox icon={icon} text={label} title={value} theme={theme} progress={progress ?? 0} progressText={detail} />
+  );
+  const className = `overview-kpi-link ${progress === undefined ? 'overview-kpi--unknown' : ''}`;
+  if (href === undefined) return <div className={className}>{box}</div>;
   return (
-    <Link className={`overview-kpi-link ${progress === undefined ? 'overview-kpi--unknown' : ''}`} href={href}>
-      <InfoBox
-        icon={icon}
-        text={label}
-        title={value}
-        theme={theme}
-        progress={progress ?? 0}
-        progressText={detail}
-      />
+    <Link className={className} href={href}>
+      {box}
     </Link>
   );
 }

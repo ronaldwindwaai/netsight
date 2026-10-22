@@ -3,9 +3,15 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, sep } from 'node:path';
 import test from 'node:test';
 
-// AppContent renders the one h1 of every dashboard page; the login page owns its own. Any other
-// component or page that writes an h1 would give a page two of them.
-const ALLOWED = new Set(['components/app-content.tsx', 'app/login/page.tsx']);
+// AppContent renders the one h1 of every dashboard page; the login page and the standalone pages
+// outside the shell (404, global error) own their own. Any other component or page that writes an
+// h1 would give a page two of them.
+const ALLOWED = new Set([
+  'components/app-content.tsx',
+  'app/login/page.tsx',
+  'app/not-found.tsx',
+  'app/global-error.tsx',
+]);
 
 function sourceFiles(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
