@@ -5,10 +5,12 @@
  * All endpoint values, labels, comments and actor identities are untrusted text rendered as text.
  * The workflow actions are a slot: the page passes the client panel when the viewer may act.
  */
-import { Badge, Card } from '@adminlte/react';
+import { Badge } from '@adminlte/react';
+import { AppCard } from '@/components/app-card';
 import type { ComponentProps } from 'react';
 
 import { DataFailure } from '@/components/data-state';
+import { LinkList } from '@/components/device-related-panels';
 import { StateSurface, StoreStateSurface } from '@/components/state-surface';
 import { FindingStateBadge, ProposedBadge, SeverityBadge } from '@/components/unknown-device-parts';
 import type {
@@ -19,6 +21,8 @@ import type {
   UnknownDeviceTimeline,
 } from '@/lib/api-contracts-unknown-devices';
 import type { FetchState } from '@/lib/api-response';
+import { endpointLinks } from '@/lib/device-links';
+import type { Permissions } from '@/lib/device-links';
 import { formatUtcTimestamp } from '@/lib/format-time';
 import {
   checkPresentation,
@@ -149,9 +153,9 @@ export function FindingTimeline({ state }: { state: FetchState<UnknownDeviceTime
     );
   })();
   return (
-    <Card title="Timeline" icon="bi bi-clock-history" variant="outline" theme="secondary" bodyClass="p-0">
+    <AppCard title="Timeline" icon="bi bi-clock-history" variant="outline" theme="secondary" bodyClass="p-0">
       {body}
-    </Card>
+    </AppCard>
   );
 }
 
@@ -159,14 +163,16 @@ function FindingBody({
   item,
   actions,
   timeline,
+  permissions,
 }: {
   item: UnknownDeviceFinding;
   actions: React.ReactNode;
   timeline: FetchState<UnknownDeviceTimeline> | null;
+  permissions: Permissions;
 }) {
   return (
     <>
-      <Card title="Endpoint" icon="bi bi-hdd-network" variant="outline" theme="primary">
+      <AppCard title="Endpoint" icon="bi bi-hdd-network" variant="outline" theme="primary">
         <div className="d-flex flex-wrap align-items-center gap-2 mb-2">
           <FindingStateBadge state={item.state} />
           <SeverityBadge severity={item.severity} />
@@ -188,11 +194,11 @@ function FindingBody({
           </dd>
         </dl>
         <p className="small text-body-secondary mb-0">{SEVERITY_BASIS_TEXT[item.severity_basis]}</p>
-      </Card>
+      </AppCard>
 
       <div className="row g-3">
         <div className="col-12 col-lg-7">
-          <Card title="Evidence chain" icon="bi bi-diagram-3" variant="outline" theme="primary" bodyClass="p-0">
+          <AppCard title="Evidence chain" icon="bi bi-diagram-3" variant="outline" theme="primary" bodyClass="p-0">
             <ol className="list-group list-group-flush" aria-label="Evidence chain from IP address to VLAN">
               {item.chain.map((slot) => (
                 <ChainHop key={slot.slot} slot={slot} />
@@ -202,10 +208,10 @@ function FindingBody({
               Only links a source actually observed are shown as values. A hop no connected source can see
               is Unknown, never guessed.
             </p>
-          </Card>
+          </AppCard>
         </div>
         <div className="col-12 col-lg-5">
-          <Card title="Comparison with NetBox" icon="bi bi-arrow-left-right" variant="outline" theme="secondary">
+          <AppCard title="Comparison with NetBox" icon="bi bi-arrow-left-right" variant="outline" theme="secondary">
             <ul className="list-unstyled mb-1">
               {item.comparison.checks.map((check) => {
                 const view = checkPresentation(check);
@@ -226,12 +232,16 @@ function FindingBody({
             <p className="small text-body-secondary mb-0">
               Checked {formatUtcTimestamp(item.comparison.checked_at)}. NetBox is read, never written.
             </p>
-          </Card>
+          </AppCard>
         </div>
       </div>
 
+      <AppCard title="Related views" icon="bi bi-link-45deg" variant="outline" theme="secondary">
+        <LinkList links={endpointLinks(item.endpoint, permissions)} />
+      </AppCard>
+
       {item.proposed_action !== null ? (
-        <Card title="Proposed action" icon="bi bi-shield-exclamation" variant="outline" theme="warning">
+        <AppCard title="Proposed action" icon="bi bi-shield-exclamation" variant="outline" theme="warning">
           <p className="mb-1">
             <strong>Isolate this endpoint (quarantine)</strong> <ProposedBadge />
           </p>
@@ -240,12 +250,12 @@ function FindingBody({
             This is a recommendation only. Nothing has been isolated and nothing here can isolate it: any
             execution is owned by the action engine, which needs an approver, and is not built yet.
           </p>
-        </Card>
+        </AppCard>
       ) : null}
 
-      <Card title="Workflow" icon="bi bi-list-check" variant="outline" theme="primary">
+      <AppCard title="Workflow" icon="bi bi-list-check" variant="outline" theme="primary">
         {actions}
-      </Card>
+      </AppCard>
       <FindingTimeline state={timeline} />
     </>
   );
@@ -255,10 +265,12 @@ export function UnknownDeviceDetailBody({
   state,
   actions,
   timeline,
+  permissions,
 }: {
   state: FetchState<UnknownDeviceDetail>;
   actions: React.ReactNode;
   timeline: FetchState<UnknownDeviceTimeline> | null;
+  permissions: Permissions;
 }) {
   if (state.kind !== 'ok') {
     if (state.kind === 'forbidden') {
@@ -285,5 +297,5 @@ export function UnknownDeviceDetailBody({
   if (data.state !== 'ok' || data.item === null) {
     return <StoreStateSurface state={data.state === 'unknown' ? 'unknown' : 'not-connected'} noun="the finding" store="Finding store" />;
   }
-  return <FindingBody item={data.item} actions={actions} timeline={timeline} />;
+  return <FindingBody item={data.item} actions={actions} timeline={timeline} permissions={permissions} />;
 }

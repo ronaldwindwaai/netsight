@@ -4,15 +4,18 @@
  * value shown came from. Untrusted source text is rendered as text.
  */
 import Link from 'next/link';
-import { Card } from '@adminlte/react';
+import { AppCard } from '@/components/app-card';
 
 import { DataFailure } from '@/components/data-state';
+import { LinkList } from '@/components/device-related-panels';
 import { ClassBadge, ProvenanceBadge, ReconcileBadge } from '@/components/inventory-parts';
 import { SourceLine, SourceNotices } from '@/components/source-notices';
 import { StateSurface, StoreStateSurface } from '@/components/state-surface';
 import { StatusBadge } from '@/components/status-badge';
 import type { InventoryDetail, InventoryField } from '@/lib/api-contracts-inventory';
 import type { FetchState } from '@/lib/api-response';
+import { assetLinks } from '@/lib/device-links';
+import type { Permissions } from '@/lib/device-links';
 import { formatUtcTimestamp } from '@/lib/format-time';
 import { NOT_REPORTED, classBasisText, classLabel, sourceLabel } from '@/lib/inventory-view';
 
@@ -66,7 +69,13 @@ function FieldTable({ fields }: { fields: Record<string, InventoryField> }) {
   );
 }
 
-export function InventoryDetailBody({ state }: { state: FetchState<InventoryDetail> }) {
+export function InventoryDetailBody({
+  state,
+  permissions,
+}: {
+  state: FetchState<InventoryDetail>;
+  permissions: Permissions;
+}) {
   if (state.kind !== 'ok') {
     if (state.kind === 'forbidden') {
       return (
@@ -103,7 +112,7 @@ export function InventoryDetailBody({ state }: { state: FetchState<InventoryDeta
       <SourceNotices sources={data.sources} />
       <div className="row g-3">
         <div className="col-12 col-lg-7">
-          <Card title="Fields and their provenance" icon="bi bi-journal-check" variant="outline" theme="primary" bodyClass="p-0">
+          <AppCard title="Fields and their provenance" icon="bi bi-journal-check" variant="outline" theme="primary" bodyClass="p-0">
             <FieldTable
               fields={{
                 name: item.name,
@@ -116,10 +125,10 @@ export function InventoryDetailBody({ state }: { state: FetchState<InventoryDeta
               NetBox is the authority for intended state. Where telemetry reports a different value the
               NetBox value is shown and both readings are listed.
             </p>
-          </Card>
+          </AppCard>
         </div>
         <div className="col-12 col-lg-5">
-          <Card title="Classification" icon="bi bi-tags" variant="outline" theme="secondary">
+          <AppCard title="Classification" icon="bi bi-tags" variant="outline" theme="secondary">
             <p className="mb-1">
               <ClassBadge value={item.asset_class} />{' '}
               <span className="visually-hidden">{classLabel(item.asset_class)}</span>
@@ -137,8 +146,8 @@ export function InventoryDetailBody({ state }: { state: FetchState<InventoryDeta
                 {item.observed_status === null ? NOT_REPORTED : <StatusBadge status={item.observed_status} />}
               </dd>
             </dl>
-          </Card>
-          <Card title="Reconciliation" icon="bi bi-arrow-left-right" variant="outline" theme="secondary">
+          </AppCard>
+          <AppCard title="Reconciliation" icon="bi bi-arrow-left-right" variant="outline" theme="secondary">
             <p className="mb-1">
               <ReconcileBadge status={item.reconcile.status} />
             </p>
@@ -148,8 +157,8 @@ export function InventoryDetailBody({ state }: { state: FetchState<InventoryDeta
             <p className="small text-body-secondary mb-0">
               From the same comparison as the reconciliation findings; NetBox is never changed.
             </p>
-          </Card>
-          <Card title="Where this asset is known" icon="bi bi-database" variant="outline" theme="secondary">
+          </AppCard>
+          <AppCard title="Where this asset is known" icon="bi bi-database" variant="outline" theme="secondary">
             <ul className="mb-0">
               {item.sources.map((alias) => (
                 <li key={alias.source}>
@@ -157,9 +166,14 @@ export function InventoryDetailBody({ state }: { state: FetchState<InventoryDeta
                 </li>
               ))}
             </ul>
-          </Card>
+          </AppCard>
         </div>
       </div>
+      <AppCard title="Related views" icon="bi bi-link-45deg" variant="outline" theme="secondary">
+        <div className="small">
+          <LinkList links={assetLinks({ id: item.id, ip: item.ip_address.value }, permissions)} />
+        </div>
+      </AppCard>
       <p className="mt-3">
         <Link href="/inventory">
           <i className="bi bi-arrow-left me-1" aria-hidden="true" />

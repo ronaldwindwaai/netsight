@@ -11,7 +11,13 @@ import { StateSurface } from '@/components/state-surface';
 import type { ResolveResponse } from '@/lib/api-contracts-identity';
 import type { FetchState } from '@/lib/api-response';
 import { formatUtcTimestamp } from '@/lib/format-time';
-import { entityKindLabel, stateSurface, type Lookup } from '@/lib/identity-view';
+import {
+  NO_ENTITY_ACCESS,
+  entityKindLabel,
+  stateSurface,
+  type EntityAccess,
+  type Lookup,
+} from '@/lib/identity-view';
 
 const KIND_OPTIONS = [
   { value: 'ip', label: 'IP address' },
@@ -61,7 +67,13 @@ function LookupForm({ lookup }: { lookup: Lookup | null }) {
   );
 }
 
-function Result({ state }: { state: FetchState<ResolveResponse> }) {
+function Result({
+  state,
+  access,
+}: {
+  state: FetchState<ResolveResponse>;
+  access: EntityAccess;
+}) {
   const surface = stateSurface(state);
   if (state.kind !== 'ok') {
     if (surface === 'permission') {
@@ -111,12 +123,12 @@ function Result({ state }: { state: FetchState<ResolveResponse> }) {
           state only: it may not reflect what was assigned at that time.
         </p>
       ) : null}
-      <AttributionPanel attribution={data.attribution} />
+      <AttributionPanel attribution={data.attribution} access={access} />
       <h3 className="h6">Network endpoint</h3>
       {data.endpoint.length === 0 ? (
         <p>No network links were found for this subject in the window.</p>
       ) : (
-        <LinkList label="Network endpoint" links={data.endpoint} />
+        <LinkList label="Network endpoint" links={data.endpoint} access={access} />
       )}
     </section>
   );
@@ -125,9 +137,11 @@ function Result({ state }: { state: FetchState<ResolveResponse> }) {
 export function ResolvePanel({
   lookup,
   state,
+  access = NO_ENTITY_ACCESS,
 }: {
   lookup: Lookup | null;
   state: FetchState<ResolveResponse> | null;
+  access?: EntityAccess;
 }) {
   return (
     <div className="mb-4">
@@ -146,7 +160,7 @@ export function ResolvePanel({
           </p>
         )
       ) : state === null ? null : (
-        <Result state={state} />
+        <Result state={state} access={access} />
       )}
     </div>
   );

@@ -1,4 +1,4 @@
-import { AppContent } from '@adminlte/react';
+import { AppContent } from '@/components/app-content';
 
 import { ApplicationsBody } from '@/components/applications-body';
 import { TimeRangePicker } from '@/components/time-range-picker';
@@ -14,6 +14,8 @@ import {
   resolveTrafficWindow,
 } from '@/lib/traffic-view';
 import { canReadTraffic, viewerFromSession } from '@/lib/viewer';
+
+export const metadata = { title: 'Applications' };
 
 type Params = { preset?: string | string[]; from?: string | string[]; to?: string | string[] };
 
@@ -49,7 +51,7 @@ export default async function ApplicationsPage({ searchParams }: { searchParams:
         <TimeRangePicker section="applications" window={window} maxDays={MAX_WINDOW_DAYS} />
       </div>
       <TrafficNav active="applications" window={window} />
-      <ApplicationsBody state={state} />
+      <ApplicationsBody state={state} window={window} />
     </AppContent>
   );
 }

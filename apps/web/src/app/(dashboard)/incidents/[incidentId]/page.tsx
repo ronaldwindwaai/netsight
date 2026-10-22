@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
-import { AppContent, Card } from '@adminlte/react';
+import { AppCard } from '@/components/app-card';
+import { AppContent } from '@/components/app-content';
 
 import { DataFailure } from '@/components/data-state';
 import {
@@ -8,6 +9,7 @@ import {
   IncidentSummary,
   ResolutionBlock,
 } from '@/components/incident-detail-view';
+import { IncidentRelatedLinks } from '@/components/incident-related-links';
 import { IncidentActionsPanel } from '@/components/incident-actions-panel';
 import { IncidentTimeline } from '@/components/incident-timeline';
 import { StateSurface, StoreStateSurface } from '@/components/state-surface';
@@ -32,6 +34,8 @@ import {
 } from '@/lib/incident-view';
 import type { Viewer } from '@/lib/incident-actions';
 import { viewerFromSession } from '@/lib/viewer';
+
+export const metadata = { title: 'Incident' };
 
 function TimelineBody({
   state,
@@ -103,19 +107,22 @@ function DetailBody({
   const { incident } = state.data;
   if (state.data.state !== 'ok' || incident === null) {
     return (
-      <Card className="operational-card" bodyClass="p-0">
+      <AppCard className="operational-card" bodyClass="p-0">
         <StoreStateSurface
           state={state.data.state === 'ok' ? 'unknown' : state.data.state}
           noun="this incident"
           store="Incident store"
         />
-      </Card>
+      </AppCard>
     );
   }
   return (
     <>
-      <Card className="operational-card" title="Summary" variant="outline" theme="primary">
+      <AppCard className="operational-card" title="Summary" variant="outline" theme="primary">
         <IncidentSummary incident={incident} />
+        <div className="mt-3">
+          <IncidentRelatedLinks permissions={viewer === null ? [] : viewer.permissions} />
+        </div>
         <div className="mt-3">
           <IncidentActionsPanel
             incident={{ id: incident.id, state: incident.state, assignee_id: incident.assignee_id }}
@@ -123,16 +130,16 @@ function DetailBody({
             currentPath={incidentDetailHref(incidentId, 0) ?? '/incidents'}
           />
         </div>
-      </Card>
+      </AppCard>
       {incident.resolution ? (
-        <Card className="operational-card" title="Resolution" variant="outline" theme="success">
+        <AppCard className="operational-card" title="Resolution" variant="outline" theme="success">
           <ResolutionBlock resolution={incident.resolution} />
-        </Card>
+        </AppCard>
       ) : null}
-      <Card className="operational-card" title="Evidence" variant="outline" theme="secondary">
+      <AppCard className="operational-card" title="Evidence" variant="outline" theme="secondary">
         <IncidentEvidence evidenceIds={incident.evidence_ids} />
-      </Card>
-      <Card
+      </AppCard>
+      <AppCard
         className="operational-card"
         title="Timeline"
         icon="bi bi-clock-history"
@@ -141,7 +148,7 @@ function DetailBody({
         bodyClass="p-0"
       >
         {timeline === null ? null : <TimelineBody state={timeline} incidentId={incidentId} />}
-      </Card>
+      </AppCard>
     </>
   );
 }
@@ -195,7 +202,7 @@ export default async function IncidentDetailPage({
       </div>
 
       {mode !== 'full' ? (
-        <Card className="operational-card" bodyClass="p-0">
+        <AppCard className="operational-card" bodyClass="p-0">
           <StateSurface
             icon="bi bi-shield-lock"
             title={mode === 'summary' ? 'Summary view only' : 'Permission denied'}
@@ -205,15 +212,15 @@ export default async function IncidentDetailPage({
                 : 'Your role does not include incident access. Access is enforced by the Netsight API.'
             }
           />
-        </Card>
+        </AppCard>
       ) : detail === null ? (
-        <Card className="operational-card" bodyClass="p-0">
+        <AppCard className="operational-card" bodyClass="p-0">
           <StateSurface
             icon="bi bi-question-circle"
             title="Invalid incident identifier"
             detail="The identifier in the address does not match the incident id format, so no request was made."
           />
-        </Card>
+        </AppCard>
       ) : (
         <DetailBody state={detail} timeline={timeline} incidentId={incidentId} viewer={viewer} />
       )}

@@ -1,4 +1,4 @@
-import { AppContent } from '@adminlte/react';
+import { AppContent } from '@/components/app-content';
 import { notFound } from 'next/navigation';
 
 import { InventoryDetailBody } from '@/components/inventory-detail-body';
@@ -8,6 +8,8 @@ import { parseSessionInfo } from '@/lib/api-contracts';
 import { parseInventoryDetail } from '@/lib/api-contracts-inventory';
 import { isInventoryId } from '@/lib/inventory-view';
 import { canReadInventory, canReadInventorySummary, viewerFromSession } from '@/lib/viewer';
+
+export const metadata = { title: 'Asset' };
 
 export default async function InventoryItemPage({ params }: { params: Promise<{ deviceId: string }> }) {
   const { deviceId } = await params;
@@ -28,6 +30,7 @@ export default async function InventoryItemPage({ params }: { params: Promise<{ 
         {canReadInventorySummary(viewer) ? (
           <InventoryDetailBody
             state={{ kind: 'forbidden', code: 'FORBIDDEN', message: '', correlationId: 'n/a', status: 403 }}
+            permissions={viewer?.permissions ?? null}
           />
         ) : (
           <Step8AccessDenied surface="Inventory" permission="inventory:read-summary" />
@@ -38,7 +41,7 @@ export default async function InventoryItemPage({ params }: { params: Promise<{ 
   const detail = await apiGet(`/api/v1/inventory/${encodeURIComponent(deviceId)}`, parseInventoryDetail);
   return (
     <AppContent title="Asset" breadcrumbs={crumbs}>
-      <InventoryDetailBody state={detail} />
+      <InventoryDetailBody state={detail} permissions={viewer?.permissions ?? null} />
     </AppContent>
   );
 }

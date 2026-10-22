@@ -146,6 +146,13 @@ describe('the detail', () => {
     assert.match(document.body.textContent ?? '', /executor-timeout/);
   });
 
+  it('says what happens next in a labelled note, without claiming a run', () => {
+    render(<ActionDetailBody state={ok(actionDetail())} status={actionStatus()} panel={null} viewer={null} />);
+    const note = screen.getByRole('note', { name: 'What happens next' });
+    assert.match(note.textContent ?? '', /Awaiting/);
+    assert.match(note.textContent ?? '', /does not run it/);
+  });
+
   it('a broken hash chain is a loud alert', () => {
     render(<ActionDetailBody state={ok(actionDetail(actionRequest(), { chain_intact: false }))} status={null} panel={null} />);
     assert.match(screen.getByRole('alert').textContent ?? '', /hash chain does not verify/);

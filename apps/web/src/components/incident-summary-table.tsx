@@ -1,5 +1,6 @@
 import { SeverityBadge, StateBadge } from '@/components/incident-badges';
 import type { IncidentSummary } from '@/lib/api-contracts-incident-api';
+import { RelativeTime } from '@/components/relative-time';
 import { formatUtcTimestamp } from '@/lib/format-time';
 
 /**
@@ -41,8 +42,8 @@ export function IncidentSummaryTable({ incidents }: { incidents: readonly Incide
                   <span className="small text-body-secondary">Unassigned</span>
                 )}
               </td>
-              <td className="text-nowrap">{formatUtcTimestamp(incident.created_at)}</td>
-              <td className="text-nowrap">{formatUtcTimestamp(incident.updated_at)}</td>
+              <td className="text-nowrap"><RelativeTime value={incident.created_at} /></td>
+              <td className="text-nowrap"><RelativeTime value={incident.updated_at} /></td>
               <td className="text-nowrap">
                 {incident.resolved_at === null ? (
                   <span className="small text-body-secondary">Not resolved</span>

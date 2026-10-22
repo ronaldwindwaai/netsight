@@ -1,0 +1,116 @@
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+
+import { DEFAULT_PAGE_SIZE, MAX_PAGE, PAGE_SIZES, describeRange, pageHref, pageSizeCookie, parsePageParams, parsePageSizeCookie } from './page-state.ts';
+
+describe('parsePageParams', () => {
+  it('defaults to page 1 and the default size', () => {
+    assert.deepEqual(parsePageParams({}), { page: 1, pageSize: DEFAULT_PAGE_SIZE });
+  });
+
+  it('accepts only whole positive pages and the offered sizes', () => {
+    assert.deepEqual(parsePageParams({ page: '3', page_size: '100' }), { page: 3, pageSize: 100 });
+    assert.deepEqual(parsePageParams({ page: '0', page_size: '7' }), { page: 1, pageSize: DEFAULT_PAGE_SIZE });
+    assert.deepEqual(parsePageParams({ page: '2.5' }), { page: 1, pageSize: DEFAULT_PAGE_SIZE });
+    assert.deepEqual(parsePageParams({ page: ['4', '5'] }), { page: 4, pageSize: DEFAULT_PAGE_SIZE });
+  });
+
+  it('falls back to page 1 beyond the highest page the API accepts', () => {
+    assert.equal(parsePageParams({ page: String(MAX_PAGE) }).page, MAX_PAGE);
+    assert.equal(parsePageParams({ page: String(MAX_PAGE + 1) }).page, 1);
+    assert.equal(parsePageParams({ page: '999999999' }).page, 1);
+  });
+
+  it('only offers sizes the API accepts (max 100)', () => {
+    assert.ok(PAGE_SIZES.every((size) => size >= 1 && size <= 100));
+    assert.ok(PAGE_SIZES.includes(DEFAULT_PAGE_SIZE));
+  });
+});
+
+describe('describeRange', () => {
+  it('reports a partial view and the range shown', () => {
+    assert.deepEqual(describeRange({ page: 2, pageSize: 50, total: 230, count: 50 }), {
+      from: 51, to: 100, total: 230, pages: 5, partial: true, hasPrevious: true, hasNext: true,
+    });
+  });
+
+  it('is not partial when everything fits on one page', () => {
+    const r = describeRange({ page: 1, pageSize: 50, total: 12, count: 12 });
+    assert.equal(r.partial, false);
+    assert.equal(r.hasNext, false);
+    assert.equal(r.hasPrevious, false);
+  });
+
+  it('handles an empty page past the end', () => {
+    const r = describeRange({ page: 9, pageSize: 50, total: 60, count: 0 });
+    assert.equal(r.from, 0);
+    assert.equal(r.to, 0);
+    assert.equal(r.partial, true);
+  });
+});
+
+describe('pageHref', () => {
+  it('keeps unrelated parameters and omits defaults', () => {
+    const current = new URLSearchParams('q=core&status=critical&page=3');
+    assert.equal(pageHref('/devices', current, { page: 1, pageSize: DEFAULT_PAGE_SIZE }), '/devices?q=core&status=critical');
+    assert.equal(
+      pageHref('/devices', current, { page: 2, pageSize: 100 }),
+      '/devices?q=core&status=critical&page=2&page_size=100',
+    );
+  });
+
+  it('keeps page_size explicit when a non-default size is preferred, so an explicit default size wins over it', () => {
+    const current = new URLSearchParams('q=core');
+    assert.equal(pageHref('/devices', current, { page: 1, pageSize: 100 }, 100), '/devices?q=core&page_size=100');
+    assert.equal(
+      pageHref('/devices', current, { page: 1, pageSize: DEFAULT_PAGE_SIZE }, 100),
+      `/devices?q=core&page_size=${DEFAULT_PAGE_SIZE}`,
+    );
+    assert.equal(pageHref('/devices', current, { page: 1, pageSize: 100 }, DEFAULT_PAGE_SIZE), '/devices?q=core&page_size=100');
+  });
+
+  it('returns the bare path when nothing remains', () => {
+    assert.equal(pageHref('/alerts', new URLSearchParams(), { page: 1, pageSize: DEFAULT_PAGE_SIZE }), '/alerts');
+  });
+});
+
+describe('parsePageParams with the stored preferred size', () => {
+  it('uses the preferred size when the address names none', () => {
+    assert.deepEqual(parsePageParams({ page: '3' }, 25), { page: 3, pageSize: 25 });
+  });
+
+  it('lets a page_size in the address win over the preference', () => {
+    assert.equal(parsePageParams({ page_size: '100' }, 25).pageSize, 100);
+    assert.equal(parsePageParams({ page_size: '50' }, 25).pageSize, 50);
+  });
+
+  it('ignores a preference that is not an offered size', () => {
+    assert.equal(parsePageParams({}, 7).pageSize, DEFAULT_PAGE_SIZE);
+  });
+
+  it('falls back to the built-in default, not the preference, for an invalid address size', () => {
+    assert.equal(parsePageParams({ page_size: '7' }, 25).pageSize, DEFAULT_PAGE_SIZE);
+  });
+});
+
+describe('page size cookie', () => {
+  it('reads only offered sizes', () => {
+    assert.equal(parsePageSizeCookie('25'), 25);
+    assert.equal(parsePageSizeCookie('100'), 100);
+    for (const bad of ['7', '', 'abc', '25; Path=/', '1e2', undefined]) assert.equal(parsePageSizeCookie(bad), DEFAULT_PAGE_SIZE);
+  });
+
+  it('is set for a year, lax, site-wide and holds no secret', () => {
+    const text = pageSizeCookie(25, false);
+    assert.match(text, /^netsight_page_size=25;/);
+    assert.match(text, /Path=\//);
+    assert.match(text, /SameSite=Lax/);
+    assert.match(text, /Max-Age=31536000/);
+    assert.doesNotMatch(text, /Secure/);
+    assert.match(pageSizeCookie(25, true), /; Secure/);
+  });
+
+  it('is expired for the default size', () => {
+    assert.match(pageSizeCookie(DEFAULT_PAGE_SIZE, false), /Max-Age=0/);
+  });
+});

@@ -1,4 +1,7 @@
+import Link from 'next/link';
+
 import { CohortNotice } from '@/components/cohort-notice';
+import { ExportCsvButton } from '@/components/export-csv-button';
 import { FreshnessNotice } from '@/components/data-state';
 import { StateSurface } from '@/components/state-surface';
 import { StatusWord } from '@/components/traffic-status';
@@ -8,13 +11,16 @@ import type {
   DestinationRow,
   TrafficDestinationsResponse,
 } from '@/lib/api-contracts-traffic-explorer';
+import { DESTINATION_CSV_HEADERS, destinationCsvRows } from '@/lib/traffic-csv';
 import type { FetchState } from '@/lib/api-response';
+import type { FilterValues, TrafficWindow } from '@/lib/traffic-view';
 import { formatBytes, formatShare } from '@/lib/format-bytes';
 import { formatUtcTimestamp } from '@/lib/format-time';
 import {
   NOT_REPORTED,
   UNKNOWN,
   destinationScopeText,
+  flowsDrillHref,
   policyNotice,
   reputationPresentation,
   withheldCountText,
@@ -39,21 +45,89 @@ function WithheldRow({ item, cohort }: { item: DestinationRow; cohort: CohortSta
   );
 }
 
-function Row({ item, cohort }: { item: DestinationRow; cohort: CohortStatus }) {
+/** Plain text, or a link to the Flow Explorer narrowed by one filter when that is allowed. */
+function Drill({
+  window,
+  detail,
+  filter,
+  title,
+  children,
+}: {
+  window: TrafficWindow | undefined;
+  detail: boolean;
+  filter: FilterValues;
+  title: string;
+  children: string;
+}) {
+  const href = window === undefined ? null : flowsDrillHref(window, filter, { detail });
+  if (href === null) return <>{children}</>;
+  return (
+    <Link href={href} title={title}>
+      {children}
+    </Link>
+  );
+}
+
+function Row({
+  item,
+  cohort,
+  window,
+  detail,
+}: {
+  item: DestinationRow;
+  cohort: CohortStatus;
+  window: TrafficWindow | undefined;
+  detail: boolean;
+}) {
   if (item.visibility === 'withheld' || item.bytes === null || item.last_seen === null) {
     return <WithheldRow item={item} cohort={cohort} />;
   }
   return (
     <tr>
       <td>
-        <span className="fw-semibold">{item.address}</span>
+        <span className="fw-semibold">
+          <Drill
+            window={window}
+            detail={detail}
+            filter={{ destination_ip: item.address }}
+            title="Show the flows to this destination"
+          >
+            {item.address}
+          </Drill>
+        </span>
         <span className="d-block small text-body-secondary">{item.domain ?? 'Domain not reported'}</span>
         {item.scope === 'internal' ? (
           <span className="badge text-bg-secondary">{destinationScopeText(item.scope)}</span>
         ) : null}
       </td>
-      <td>{item.asn === null ? NOT_REPORTED : `AS${item.asn}`}</td>
-      <td>{item.country ?? NOT_REPORTED}</td>
+      <td>
+        {item.asn === null ? (
+          NOT_REPORTED
+        ) : (
+          <Drill
+            window={window}
+            detail={detail}
+            filter={{ asn: String(item.asn) }}
+            title="Show the flows to this ASN"
+          >
+            {`AS${item.asn}`}
+          </Drill>
+        )}
+      </td>
+      <td>
+        {item.country === null ? (
+          NOT_REPORTED
+        ) : (
+          <Drill
+            window={window}
+            detail={detail}
+            filter={{ country: item.country }}
+            title="Show the flows to this country"
+          >
+            {item.country}
+          </Drill>
+        )}
+      </td>
       <td className="text-nowrap">
         {item.first_seen === null ? NOT_REPORTED : formatUtcTimestamp(item.first_seen)}
       </td>
@@ -77,7 +151,17 @@ function Row({ item, cohort }: { item: DestinationRow; cohort: CohortStatus }) {
  * operator allow and deny lists, never from a source guess. First seen is bounded by a stated
  * look-back and is not the destination's history.
  */
-export function DestinationsBody({ state }: { state: FetchState<TrafficDestinationsResponse> }) {
+export function DestinationsBody({
+  state,
+  window,
+  detail = false,
+}: {
+  state: FetchState<TrafficDestinationsResponse>;
+  /** When given, addresses, ASNs and countries link to the Flow Explorer for that window. */
+  window?: TrafficWindow;
+  /** Whether the viewer holds traffic:read-detail (address filters are refused without it). */
+  detail?: boolean;
+}) {
   return (
     <TrafficGate state={state} noun="destinations" permission="traffic:read">
       {(data) => {
@@ -98,6 +182,13 @@ export function DestinationsBody({ state }: { state: FetchState<TrafficDestinati
                 aria-label="Destinations"
                 className="card card-outline card-primary operational-card"
               >
+                <div className="d-flex justify-content-end p-2 border-bottom">
+                  <ExportCsvButton
+                    headers={DESTINATION_CSV_HEADERS}
+                    label="traffic-destinations"
+                    rows={destinationCsvRows(data.items)}
+                  />
+                </div>
                 <div className="table-responsive">
                   <table className="table table-sm table-striped table-hover mb-0">
                     <caption className="visually-hidden">
@@ -118,7 +209,13 @@ export function DestinationsBody({ state }: { state: FetchState<TrafficDestinati
                     </thead>
                     <tbody>
                       {data.items.map((item) => (
-                        <Row key={`${item.rank}:${item.address}`} item={item} cohort={data.cohort} />
+                        <Row
+                          key={`${item.rank}:${item.address}`}
+                          item={item}
+                          cohort={data.cohort}
+                          window={window}
+                          detail={detail}
+                        />
                       ))}
                     </tbody>
                   </table>

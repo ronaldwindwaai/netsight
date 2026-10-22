@@ -6,7 +6,8 @@
  * Names are untrusted source text rendered as text.
  */
 import Link from 'next/link';
-import { Card, Table } from '@adminlte/react';
+import { Table } from '@adminlte/react';
+import { AppCard } from '@/components/app-card';
 import type { TableColumn } from '@adminlte/react';
 
 import { DataFailure } from '@/components/data-state';
@@ -134,7 +135,7 @@ export function UsersListBody({
   return (
     <>
       <SourceNotices sources={data.sources} />
-      <Card
+      <AppCard
         title="People known to the evidence"
         icon="bi bi-people"
         variant="outline"
@@ -162,7 +163,7 @@ export function UsersListBody({
           striped
         />
         <Pager label="People pages" hrefs={pageHrefs(page, pageSize, data.total)} />
-      </Card>
+      </AppCard>
     </>
   );
 }

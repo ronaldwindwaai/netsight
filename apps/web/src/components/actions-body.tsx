@@ -5,7 +5,8 @@
  * only when its state says so, and a dry run is labelled as one.
  */
 import Link from 'next/link';
-import { Card, Table } from '@adminlte/react';
+import { Table } from '@adminlte/react';
+import { AppCard } from '@/components/app-card';
 import type { TableColumn } from '@adminlte/react';
 
 import { ActionStateBadge, RiskBadge } from '@/components/action-parts';
@@ -24,6 +25,7 @@ import {
 import { REQUEST_STATES } from '@/lib/api-contracts-actions';
 import type { ActionList, ActionRequest } from '@/lib/api-contracts-actions';
 import type { FetchState } from '@/lib/api-response';
+import { RelativeTime } from '@/components/relative-time';
 import { formatUtcTimestamp } from '@/lib/format-time';
 
 const columns: TableColumn<ActionRequest>[] = [
@@ -61,7 +63,7 @@ const columns: TableColumn<ActionRequest>[] = [
       </span>
     ),
   },
-  { key: 'created', header: 'Created', render: (item) => <span className="small">{formatUtcTimestamp(item.created_at)}</span> },
+  { key: 'created', header: 'Created', render: (item) => <RelativeTime className="small" value={item.created_at} /> },
 ];
 
 function Chip({ href, current, children }: { href: string; current: boolean; children: React.ReactNode }) {
@@ -140,7 +142,7 @@ export function ActionsBody({ state, query }: { state: FetchState<ActionList>; q
     );
   }
   return (
-    <Card
+    <AppCard
       title="Requests"
       icon="bi bi-shield-check"
       variant="outline"
@@ -154,6 +156,6 @@ export function ActionsBody({ state, query }: { state: FetchState<ActionList>; q
     >
       <Table columns={columns} data={data.items} emptyMessage="No requests" hover responsive rowKey={(item) => item.id} small striped />
       <Pager label="Action request pages" hrefs={pageHrefs(query, data.total, data.page_size)} />
-    </Card>
+    </AppCard>
   );
 }

@@ -1,4 +1,4 @@
-import { AppContent } from '@adminlte/react';
+import { AppContent } from '@/components/app-content';
 
 import { DiagnosticSessionList } from '@/components/diagnostic-session-list';
 import { DiagnosticsAccessDenied } from '@/components/diagnostics-access-denied';
@@ -8,6 +8,8 @@ import { parseSessionInfo } from '@/lib/api-contracts';
 import { parseDiagnosticSessionListResponse } from '@/lib/api-contracts-diagnostic-session';
 import { parseListOffset, sessionListPath } from '@/lib/diagnostic-session-view';
 import { canUseDiagnostics, viewerFromSession } from '@/lib/viewer';
+
+export const metadata = { title: 'Root cause analysis' };
 
 const TARGET_LIMIT = 255;
 

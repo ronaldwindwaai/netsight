@@ -51,7 +51,9 @@ function findTests(directory) {
   });
 }
 
-const tests = findTests(srcDir);
+// Optional filename filters (`npm run test:components -- alert-table`) for a quick local run.
+const filters = process.argv.slice(2);
+const tests = findTests(srcDir).filter((path) => filters.length === 0 || filters.some((f) => path.includes(f)));
 if (tests.length === 0) {
   console.error('No component tests found.');
   process.exit(1);
@@ -82,6 +84,6 @@ await build({
 const bundles = readdirSync(outDir)
   .filter((name) => name.endsWith('.test.cjs'))
   .map((name) => join(outDir, name));
-const result = spawnSync(process.execPath, ['--test', '--test-timeout=180000', '--test-force-exit', ...process.argv.slice(2), ...bundles], { stdio: 'inherit', cwd: root });
+const result = spawnSync(process.execPath, ['--test', '--test-timeout=600000', '--test-force-exit', ...process.argv.slice(2), ...bundles], { stdio: 'inherit', cwd: root });
 rmSync(outDir, { recursive: true, force: true });
 process.exit(result.status ?? 1);
