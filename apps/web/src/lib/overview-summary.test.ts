@@ -4,6 +4,7 @@ import test from 'node:test';
 import { parseOverviewResponse, type DeviceHealthSummary, type DeviceStatus } from './api-contracts.ts';
 import {
   deviceHealthSummary,
+  deviceStatusBreakdown,
   sourceProvenance,
   type OverviewFetchKind,
 } from './overview-summary.ts';
@@ -222,4 +223,25 @@ test('does not infer a LibreNMS outage from auth or API failures', () => {
     label: 'LibreNMS unknown',
     tone: 'is-caution',
   });
+});
+
+test('deviceStatusBreakdown lists every status, most urgent first, linking only the non-empty ones', () => {
+  const rows = deviceStatusBreakdown(summary(['healthy', 'healthy', 'critical', 'offline']));
+  assert.deepEqual(
+    rows.map((row) => [row.status, row.count, row.href]),
+    [
+      ['critical', 1, '/devices?status=critical'],
+      ['offline', 1, '/devices?status=offline'],
+      ['degraded', 0, null],
+      ['warning', 0, null],
+      ['unknown', 0, null],
+      ['maintenance', 0, null],
+      ['healthy', 2, '/devices?status=healthy'],
+    ],
+  );
+});
+
+test('deviceStatusBreakdown is empty when the summary is unavailable, never a row of zeros', () => {
+  assert.deepEqual(deviceStatusBreakdown(null), []);
+  assert.deepEqual(deviceStatusBreakdown(summary([])), []);
 });

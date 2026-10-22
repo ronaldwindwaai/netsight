@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import Link from 'next/link';
 import { AppCard } from '@/components/app-card';
 import { AppContent } from '@/components/app-content';
@@ -5,7 +6,7 @@ import { RetryButton } from '@/components/retry-button';
 
 import { AlertTable } from '@/components/alert-table';
 import { AlertRulesCard, MaintenanceWindowsCard } from '@/components/alerting-sections';
-import { DataFailure, FreshnessNotice } from '@/components/data-state';
+import { DataFailure, FreshnessNotice, LoadingState } from '@/components/data-state';
 import { apiGet } from '@/lib/api';
 import { parseAlertList, parseSessionInfo } from '@/lib/api-contracts';
 import { parseAlertRuleListResponse, parseMaintenanceWindowListResponse } from '@/lib/api-contracts-alert-rule-api';
@@ -74,7 +75,9 @@ export default async function AlertsPage({
             </AppCard>
           ) : (
             <>
-              <AlertTable alerts={state.data.items} total={state.data.total} />
+              <Suspense fallback={<LoadingState label="Loading alerts" />}>
+                <AlertTable alerts={state.data.items} total={state.data.total} />
+              </Suspense>
               <nav
                 className="d-flex align-items-center justify-content-between mt-3"
                 aria-label="Alert pages"

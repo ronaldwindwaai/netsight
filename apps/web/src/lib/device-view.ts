@@ -1,7 +1,8 @@
 import { DEVICE_STATUSES } from './api-contracts.ts';
 import type { Device, DeviceStatus } from './api-contracts.ts';
 
-export type DeviceSortKey = 'status' | 'name' | 'ip' | 'type' | 'site' | 'freshness';
+export const DEVICE_SORT_KEYS = ['status', 'name', 'ip', 'type', 'site', 'freshness'] as const;
+export type DeviceSortKey = (typeof DEVICE_SORT_KEYS)[number];
 export type SortDirection = 'asc' | 'desc';
 
 /** Most urgent first, so an ascending status sort puts the problems on top. */

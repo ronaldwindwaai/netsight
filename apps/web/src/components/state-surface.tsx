@@ -30,6 +30,18 @@ export function StateSurface({
   );
 }
 
+/**
+ * "the incident store" for a generic store, "NetBox" for a named product: lowercasing a product name
+ * ("the netbox is not configured") reads as a typo.
+ */
+function storePhrase(store: string): string {
+  return /\bstore$/i.test(store) ? `the ${store.toLowerCase()}` : store;
+}
+
+function capitalise(text: string): string {
+  return text.replace(/^./, (first) => first.toUpperCase());
+}
+
 export function StoreStateSurface({
   state,
   noun,
@@ -44,7 +56,7 @@ export function StoreStateSurface({
       <StateSurface
         icon="bi bi-plug"
         title={`${store} not connected`}
-        detail={`No ${noun} are shown because the ${store.toLowerCase()} is not configured. This is not the same as having none.`}
+        detail={`No ${noun} are shown because ${storePhrase(store)} is not configured. This is not the same as having none.`}
       />
     );
   }
@@ -52,7 +64,7 @@ export function StoreStateSurface({
     <StateSurface
       icon="bi bi-question-circle"
       title={`${store} state unknown`}
-      detail={`The ${store.toLowerCase()} is configured but could not be read. Nothing is estimated in place of ${noun}.`}
+      detail={`${capitalise(storePhrase(store))} is configured but could not be read. Nothing is estimated in place of ${noun}.`}
       action={<RetryButton />}
     />
   );

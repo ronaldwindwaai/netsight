@@ -57,8 +57,15 @@ describe('DataFailure retry', () => {
 });
 
 describe('EmptyState next actions', () => {
-  it('offers to clear filters when filtered', () => {
-    render(<EmptyState filtered />);
+  it('offers a clear-filters button that calls onClear', async () => {
+    let cleared = 0;
+    render(<EmptyState filtered onClear={() => (cleared += 1)} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
+    assert.equal(cleared, 1);
+  });
+
+  it('offers a clear-filters link to the given href', () => {
+    render(<EmptyState filtered clearHref="/devices" />);
     assert.equal(screen.getByRole('link', { name: 'Clear filters' }).getAttribute('href'), '/devices');
   });
 
