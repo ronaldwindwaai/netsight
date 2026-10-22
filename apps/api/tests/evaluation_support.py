@@ -10,6 +10,7 @@ from typing import Any
 
 from netsight_api.alerting.engine import Decision, Observation
 from netsight_api.alerting.grouping import alert_fingerprint, group_key
+from netsight_api.evaluation.adapter import EvaluatorIncidentAdapter
 from netsight_api.evaluation.source import ObservationBatch
 from netsight_api.schemas import (
     AlertRule,
@@ -18,7 +19,9 @@ from netsight_api.schemas import (
     MaintenanceWindowDefinition,
 )
 from netsight_api.storage import (
+    AlertIncidentLinkRepository,
     InMemoryAlertIncidentLinkRepository,
+    InMemoryAlertIncidentStore,
     InMemoryAlertRuleRepository,
     InMemoryIncidentRepository,
 )
@@ -69,19 +72,33 @@ class Stack:
     rules: InMemoryAlertRuleRepository
     incidents: InMemoryIncidentRepository
     links: InMemoryAlertIncidentLinkRepository
+    opener: InMemoryAlertIncidentStore
     clock: MutableClock = field(default_factory=MutableClock)
 
     @classmethod
     def build(cls) -> Stack:
         clock = MutableClock()
         incidents = InMemoryIncidentRepository(clock=clock)
+        links = InMemoryAlertIncidentLinkRepository(
+            incident_exists=lambda incident_id: incidents.get_incident(incident_id) is not None
+        )
         return cls(
             rules=InMemoryAlertRuleRepository(clock=clock),
             incidents=incidents,
-            links=InMemoryAlertIncidentLinkRepository(
-                incident_exists=lambda incident_id: incidents.get_incident(incident_id) is not None
-            ),
+            links=links,
+            opener=InMemoryAlertIncidentStore(incidents, links),
             clock=clock,
+        )
+
+    @property
+    def evaluator(self) -> EvaluatorIncidentAdapter:
+        """What the evaluator is given: create-and-link, append a note, read; nothing else."""
+        return EvaluatorIncidentAdapter(self.incidents, self.opener)
+
+    def evaluator_with(self, links: AlertIncidentLinkRepository) -> EvaluatorIncidentAdapter:
+        """The same stores, but the incident-and-link transaction claims through ``links``."""
+        return EvaluatorIncidentAdapter(
+            self.incidents, InMemoryAlertIncidentStore(self.incidents, links)
         )
 
     def active_rule(self, **overrides: Any) -> AlertRule:

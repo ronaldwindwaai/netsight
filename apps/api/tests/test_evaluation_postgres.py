@@ -18,6 +18,7 @@ from evaluation_support import DEVICE_A, DEVICE_B, T0, MutableClock, ScriptedSou
 from evaluation_support import definition as rule_definition
 from pg_support import PG_DSN, app_role, isolated_schema, requires_pg
 
+from netsight_api.evaluation.adapter import EvaluatorIncidentAdapter
 from netsight_api.evaluation.incidents import SERVICE_ACTOR_ID, AlertIncidentService
 from netsight_api.evaluation.notify import AlertNotifier
 from netsight_api.evaluation.runner import EvaluationRunner
@@ -38,6 +39,7 @@ from netsight_api.storage.postgres import (
     PostgresIncidentRepository,
     PostgresSettings,
 )
+from netsight_api.storage.postgres_alert_incidents import PostgresAlertIncidentStore
 from netsight_api.storage.postgres_links import PostgresAlertIncidentLinkRepository
 
 pytestmark = requires_pg
@@ -63,6 +65,12 @@ class Live:
         return PostgresAlertIncidentLinkRepository(self.app, clock=self.clock)
 
     @property
+    def evaluator(self) -> EvaluatorIncidentAdapter:
+        return EvaluatorIncidentAdapter(
+            self.incidents, PostgresAlertIncidentStore(self.app, clock=self.clock)
+        )
+
+    @property
     def attempts(self) -> PostgresDeliveryAttemptRepository:
         return PostgresDeliveryAttemptRepository(self.app)
 
@@ -84,7 +92,7 @@ class Live:
         return EvaluationRunner(
             rules=self.rules,
             source=source,
-            incidents=AlertIncidentService(self.incidents, self.links),
+            incidents=AlertIncidentService(self.evaluator, self.links),
             notifier=AlertNotifier(
                 dispatcher,
                 (RoutingRule("high", (EmailDestination("ops@example.com"),)),),
@@ -175,12 +183,12 @@ async def test_a_human_resolving_the_incident_lets_the_next_firing_open_a_new_on
     assert len(live.incidents.list_incidents(limit=50)) == 2
 
 
-def test_two_evaluators_racing_leave_one_linked_incident_and_a_marked_surplus(live: Live) -> None:
+def test_two_evaluators_racing_leave_exactly_one_incident_and_no_orphan(live: Live) -> None:
     rule = live.active_rule()
     decision = decision_for(rule, DEVICE_A, at=T0 + timedelta(seconds=1))
 
     def evaluator(_: int) -> Any:
-        service = AlertIncidentService(live.incidents, live.links)  # separate locks, one database
+        service = AlertIncidentService(live.evaluator, live.links)  # separate locks, one database
         return service.ensure(rule=rule, decision=decision, entity=DEVICE_A, correlation_id="c")
 
     with ThreadPoolExecutor(max_workers=6) as pool:
@@ -188,11 +196,7 @@ def test_two_evaluators_racing_leave_one_linked_incident_and_a_marked_surplus(li
     linked = live.links.get("alert", decision.fingerprint)
     assert linked is not None
     assert {e.incident_id for e in effects if e.incident_id} == {linked}
-    all_incidents = live.incidents.list_incidents(limit=50)
-    surplus = [i for i in all_incidents if i.id != linked]
-    for incident in surplus:  # never deleted, but marked so an operator is not misled
-        (note,) = live.incidents.list_timeline(incident.id)
-        assert note.kind == "comment" and linked in (note.message or "")
+    assert [i.id for i in live.incidents.list_incidents(limit=50)] == [linked]  # no orphans
     assert sum(1 for e in effects if e.action == "created") == 1
 
 

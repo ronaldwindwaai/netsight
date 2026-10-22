@@ -58,7 +58,7 @@ class Rig:
         self.runner = EvaluationRunner(
             rules=self.stack.rules,
             source=self.source,
-            incidents=AlertIncidentService(self.stack.incidents, self.stack.links)
+            incidents=AlertIncidentService(self.stack.evaluator, self.stack.links)
             if incidents
             else None,
             notifier=AlertNotifier(
@@ -270,7 +270,7 @@ async def test_a_restart_does_not_duplicate_the_incident() -> None:
     fresh.runner = EvaluationRunner(
         rules=rig.stack.rules,
         source=rig.source,
-        incidents=AlertIncidentService(rig.stack.incidents, rig.stack.links),
+        incidents=AlertIncidentService(rig.stack.evaluator, rig.stack.links),
         notifier=None,
         clock=rig.stack.clock,
     )
