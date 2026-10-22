@@ -4,6 +4,12 @@ Import the PostgreSQL implementation explicitly from
 ``netsight_api.storage.postgres``; nothing here opens a database connection.
 """
 
+from netsight_api.storage.alert_incidents import (
+    AlertIncidentStore,
+    InMemoryAlertIncidentStore,
+    LinkClaim,
+    OpenedIncident,
+)
 from netsight_api.storage.errors import (
     IllegalTransitionError,
     InvalidOperationError,
@@ -26,17 +32,21 @@ from netsight_api.storage.repository import AlertRuleRepository, IncidentReposit
 
 __all__ = [
     "AlertIncidentLinkRepository",
+    "AlertIncidentStore",
     "AlertRuleRepository",
     "IllegalTransitionError",
     "InMemoryAlertIncidentLinkRepository",
+    "InMemoryAlertIncidentStore",
     "InMemoryAlertRuleRepository",
     "InMemoryIncidentRepository",
     "IncidentRepository",
     "InvalidOperationError",
     "LimitExceededError",
+    "LinkClaim",
     "LinkKind",
     "NotFoundError",
     "NoteKind",
+    "OpenedIncident",
     "ScopeViolationError",
     "StaleEvidenceError",
     "StorageConfigurationError",

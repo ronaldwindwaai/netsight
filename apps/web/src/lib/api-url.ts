@@ -6,6 +6,12 @@ const REJECTED = 'Only Netsight API v1 paths are allowed';
 // characters, `#` or `@`), then an optional query of the same character set plus `?`.
 const SAFE_API_PATH = /^\/api\/v1\/[A-Za-z0-9._~!$&'()*+,;=:%/-]*(\?[A-Za-z0-9._~!$&'()*+,;=:@%/?-]*)?$/;
 
+// An encoded slash or backslash in the path is decoded by some hops (a proxy, the backend router)
+// and not by others, which is how `/api/v1/a%2f..%2fadmin` slips past a segment check. No Netsight
+// route needs one in a path (ids are opaque tokens); the query string may still carry `%2F`.
+// A `%25` (an encoded percent) is refused too: it is how `%252f` and `%252e` survive one decode.
+const ENCODED_SEPARATOR = /%(?:2f|5c|25)/i;
+
 function isDotSegment(segment: string): boolean {
   let decoded: string;
   try {
@@ -16,11 +22,11 @@ function isDotSegment(segment: string): boolean {
   return decoded === '.' || decoded === '..';
 }
 
-/** True only for a path under /api/v1/ with no traversal, no `//` and no encoded dot segments. */
+/** True only for a path under /api/v1/ with no traversal, no `//`, no encoded dot segments and no encoded slash or backslash. */
 export function isSafeApiPath(path: string): boolean {
   if (!SAFE_API_PATH.test(path)) return false;
   const pathname = path.split('?', 1)[0] ?? '';
-  if (pathname.includes('//')) return false;
+  if (pathname.includes('//') || ENCODED_SEPARATOR.test(pathname)) return false;
   return !pathname.split('/').some(isDotSegment);
 }
 

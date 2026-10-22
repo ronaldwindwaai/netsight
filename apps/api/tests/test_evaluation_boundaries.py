@@ -80,7 +80,23 @@ def test_the_pure_engine_stays_free_of_storage_and_evaluation_code() -> None:
         assert not offending, f"{path.name} is no longer pure: {offending}"
 
 
+def test_the_evaluator_is_wired_with_the_narrow_adapter_never_the_repository() -> None:
+    calls = [
+        node
+        for path in (PACKAGE / "evaluation").glob("*.py")
+        for node in ast.walk(ast.parse(path.read_text("utf-8")))
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "AlertIncidentService"
+    ]
+    assert calls, "the service is no longer built under evaluation/"
+    for call in calls:
+        first = call.args[0]
+        assert isinstance(first, ast.Call) and isinstance(first.func, ast.Name)
+        assert first.func.id == "EvaluatorIncidentAdapter"
+
+
 def test_incident_writes_by_the_service_use_only_its_service_principal() -> None:
     text = (PACKAGE / "evaluation" / "incidents.py").read_text("utf-8")
-    assert text.count("actor_id=SERVICE_ACTOR_ID") >= 3
+    assert text.count("actor_id=SERVICE_IDENTITY.id") >= 3
     assert "actor_id=identity" not in text and "PrincipalKind.HUMAN" not in text

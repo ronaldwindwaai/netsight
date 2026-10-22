@@ -315,6 +315,48 @@ def _one(conn: Connection, statement: Any, params: Sequence[object]) -> Row | No
     return conn.execute(statement, params).fetchone()
 
 
+def insert_incident_row(conn: Connection, incident_uuid: uuid.UUID, incident: Incident) -> None:
+    """Insert a new incident in the caller's transaction (also used by ``open_linked``)."""
+    conn.execute(
+        _INSERT_INCIDENT,
+        (
+            incident_uuid,
+            incident.title,
+            incident.severity,
+            incident.state,
+            incident.assignee_id,
+            incident.evidence_ids,
+            None,
+            incident.created_at,
+            incident.updated_at,
+        ),
+    )
+
+
+def insert_event_row(
+    conn: Connection,
+    event_uuid: uuid.UUID,
+    incident_uuid: uuid.UUID,
+    event: IncidentTimelineEvent,
+) -> None:
+    conn.execute(
+        _INSERT_EVENT,
+        (
+            event_uuid,
+            incident_uuid,
+            event.seq,
+            event.occurred_at,
+            event.actor_id,
+            event.kind,
+            event.state_from,
+            event.state_to,
+            event.reason,
+            event.message,
+            event.subject_id,
+        ),
+    )
+
+
 class PostgresIncidentRepository:
     def __init__(
         self,
@@ -345,20 +387,7 @@ class PostgresIncidentRepository:
             now=self._clock(),
         )
         with self._settings.session() as conn:
-            conn.execute(
-                _INSERT_INCIDENT,
-                (
-                    incident_uuid,
-                    incident.title,
-                    incident.severity,
-                    incident.state,
-                    incident.assignee_id,
-                    incident.evidence_ids,
-                    None,
-                    incident.created_at,
-                    incident.updated_at,
-                ),
-            )
+            insert_incident_row(conn, incident_uuid, incident)
         return incident
 
     def get_incident(self, incident_id: str) -> Incident | None:
@@ -505,22 +534,7 @@ class PostgresIncidentRepository:
         incident_uuid: uuid.UUID,
         event: IncidentTimelineEvent,
     ) -> None:
-        conn.execute(
-            _INSERT_EVENT,
-            (
-                event_uuid,
-                incident_uuid,
-                event.seq,
-                event.occurred_at,
-                event.actor_id,
-                event.kind,
-                event.state_from,
-                event.state_to,
-                event.reason,
-                event.message,
-                event.subject_id,
-            ),
-        )
+        insert_event_row(conn, event_uuid, incident_uuid, event)
 
     def _apply(
         self,

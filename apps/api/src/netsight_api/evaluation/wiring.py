@@ -8,11 +8,16 @@ an evaluator that cannot record incidents or deliveries must not run at all.
 
 * ``NETSIGHT_EVALUATION_INTERVAL_SECONDS``: 30 to 3600, default 60.
 * Channels: SMTP email (``smtp.py``), push gateway (``push.py``), destinations from
-  ``routing_config.py``, base URL and bounds from ``NotificationSettings``.
+  ``routing_config.py``, base URL and bounds from ``NotificationSettings``. A push gateway whose
+  host or port the webhook allow-list would refuse fails start-up (it would otherwise drop pages).
 * Exactly one evaluator may run against a database (a hard requirement, enforced by
   ``leader.py``): the scheduler runs cycles only while it holds a PostgreSQL advisory lock on a
   dedicated connection; every other process idles and retries each interval, and a process that
-  loses the lock stops evaluating and drops its in-memory engine state.
+  loses the lock stops evaluating and drops its in-memory engine state. The lock is a *session*
+  advisory lock, so ``DATABASE_URL`` must reach PostgreSQL directly or through a session-mode
+  pooler: PgBouncer in transaction (or statement) mode hands each statement to a different
+  server session, silently loses the lock and lets two evaluators run. The lease is re-verified
+  against ``pg_locks`` before every incident write and notification send, under a timeout.
 
 ``run_scheduler`` is the only loop: it runs one bounded cycle, then waits for the interval or the
 stop event, and ends when the event is set. A failing cycle is logged by type and the next one
@@ -31,6 +36,7 @@ from datetime import UTC, datetime
 from typing import Any, Final, Protocol
 
 from netsight_api.adapters.librenms import LibrenmsClient
+from netsight_api.evaluation.adapter import EvaluatorIncidentAdapter
 from netsight_api.evaluation.incidents import AlertIncidentService
 from netsight_api.evaluation.leader import LeaderLock, PostgresLeaderLock
 from netsight_api.evaluation.librenms_source import LibrenmsObservationSource
@@ -47,6 +53,7 @@ from netsight_api.notifications.routing_config import routing_rules_from_env
 from netsight_api.notifications.senders import NotificationSender
 from netsight_api.notifications.settings import NotificationSettings
 from netsight_api.notifications.smtp import SmtpEmailSender, SmtpSettings
+from netsight_api.notifications.ssrf import WebhookTargetError, parse_webhook_url
 from netsight_api.notifications.store import DurableDeliveryRecorder
 from netsight_api.storage import StorageConfigurationError
 
@@ -116,8 +123,22 @@ def _senders(
         senders["email"] = SmtpEmailSender(smtp)
     gateway = PushGatewaySettings.from_env(env)
     if gateway is not None:
+        _require_reachable(gateway, network)
         senders["push"] = PushGatewaySender(gateway, network)
     return senders
+
+
+def _require_reachable(gateway: PushGatewaySettings, network: NotificationSettings) -> None:
+    """Fail start-up when the webhook policy would refuse the gateway at send time: a host (or
+    port) missing from the allow-list otherwise drops every page silently, one failure at a time."""
+    try:
+        parse_webhook_url(gateway.url.reveal(), network)
+    except WebhookTargetError as refusal:
+        raise ValueError(
+            f"NETSIGHT_PUSH_GATEWAY_URL is refused by the webhook policy ({refusal.code}): "
+            "add its host to NETSIGHT_WEBHOOK_ALLOWED_HOSTS (and its port to "
+            "NETSIGHT_WEBHOOK_ALLOWED_PORTS if it is not 443)"
+        ) from None
 
 
 def build_evaluation_service(
@@ -198,13 +219,18 @@ def _runner(
         PostgresAlertRuleRepository,
         PostgresIncidentRepository,
     )
+    from netsight_api.storage.postgres_alert_incidents import PostgresAlertIncidentStore
     from netsight_api.storage.postgres_links import PostgresAlertIncidentLinkRepository
 
+    # The evaluator gets a three-operation adapter, never the incident repository itself.
     return EvaluationRunner(
         rules=PostgresAlertRuleRepository(database),
         source=LibrenmsObservationSource(librenms_client),
         incidents=AlertIncidentService(
-            PostgresIncidentRepository(database), PostgresAlertIncidentLinkRepository(database)
+            EvaluatorIncidentAdapter(
+                PostgresIncidentRepository(database), PostgresAlertIncidentStore(database)
+            ),
+            PostgresAlertIncidentLinkRepository(database),
         ),
         notifier=notifier,
         clock=_utc_now,

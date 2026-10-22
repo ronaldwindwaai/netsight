@@ -62,6 +62,40 @@ def test_a_killed_session_frees_the_lock_and_the_holder_notices() -> None:
         rival.release()
 
 
+def test_a_live_session_that_lost_the_advisory_lock_is_not_the_leader() -> None:
+    """The session is alive and answers, yet ``still_held`` must say no: it checks ``pg_locks``."""
+    assert PG_DSN
+    settings = PostgresSettings(dsn=PG_DSN)
+    key = secrets.randbits(62)
+    holder, rival = PostgresLeaderLock(settings, key=key), PostgresLeaderLock(settings, key=key)
+    try:
+        assert holder.try_acquire() and holder.still_held()
+        assert holder._conn is not None
+        unlocked = holder._conn.execute("SELECT pg_advisory_unlock(%s) AS ok", (key,)).fetchone()
+        assert unlocked is not None and unlocked["ok"] is True
+        assert holder.still_held() is False  # the old "SELECT 1" check would have said yes
+        assert rival.try_acquire() is True
+    finally:
+        holder.release()
+        rival.release()
+
+
+def test_the_check_matches_only_this_locks_own_key() -> None:
+    """A different advisory lock held by the same session does not make it the leader."""
+    assert PG_DSN
+    settings = PostgresSettings(dsn=PG_DSN)
+    key = secrets.randbits(62)
+    holder = PostgresLeaderLock(settings, key=key)
+    try:
+        assert holder.try_acquire()
+        assert holder._conn is not None
+        holder._conn.execute("SELECT pg_advisory_unlock(%s)", (key,))
+        holder._conn.execute("SELECT pg_advisory_lock(%s)", (key ^ 1,))  # some other key
+        assert holder.still_held() is False
+    finally:
+        holder.release()
+
+
 class Counting:
     def __init__(self) -> None:
         self.cycles = 0

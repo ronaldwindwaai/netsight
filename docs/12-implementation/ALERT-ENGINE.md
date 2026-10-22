@@ -118,10 +118,15 @@ Off by default; `NETSIGHT_EVALUATION_ENABLED=true` starts one bounded cycle ever
 `NETSIGHT_EVALUATION_INTERVAL_SECONDS` (30-3600, default 60) from the application lifespan. Enabled without
 `DATABASE_URL`, or with any invalid channel setting, the application refuses to start. **Exactly one evaluator may run per
 database - a hard requirement, enforced in code** (`leader.py`): the scheduler runs cycles only while it holds a PostgreSQL
-session-level advisory lock on a dedicated connection (TCP keepalives on); every other process idles and retries each
-interval. Before applying a cycle's effects the runner re-verifies the lock; a process that loses it (session died, database
-restart, a rival holds it) stops evaluating, applies nothing from that cycle and drops its in-memory engine state, so a later
-takeover starts clean. A lock backend failure means "not the leader" (fail closed).
+session-level advisory lock on a dedicated connection (TCP keepalives and a 30 s `tcp_user_timeout` on); every other process
+idles and retries each interval. The runner re-verifies the lock before applying a cycle **and again before every incident
+write, recovery note and notification send** (the apply phase can run for a minute); a process that loses it (session died,
+database restart, a rival holds it) stops at once, sends nothing further and drops its in-memory engine state, so a later
+takeover starts clean. The check asks the server (`pg_locks`: an advisory lock granted to this backend with the right key), not
+merely whether the session answers, and runs under a 10 s timeout, so a network partition costs seconds, not a TCP
+retransmission timeout; `release` never waits for a check in progress. A lock backend failure or timeout means "not the leader"
+(fail closed). **`DATABASE_URL` must be a direct or session-mode connection**: PgBouncer in transaction or statement mode
+multiplexes sessions and breaks session-level advisory locks (two evaluators could then run).
 
 **Observation source** (`source.py`). `ObservationSource` is a Protocol: `supports(metric)` and
 `observe(metric, now) -> ObservationBatch`. A batch is `ok` (observations), `not-connected` (source not configured) or
@@ -161,12 +166,16 @@ per alert), `group` on the group key (later alerts of the group attach with an `
 at an incident until a **human** resolves it; then a new firing opens a new one **once the alert has recovered**. The
 link records the recovery (`recovered_at`, written when the engine sees the alert resolve; a claim clears it), so a still-firing
 alert whose incident a human resolved gets no new incident - in the running process and after a restart alike. If the evaluator
-was down for the whole recovery and the re-fire, that one outage is attributed to the old resolved incident (conservative). The link is claimed by
-compare-and-set before the timeline note, so a crash never produces a duplicate on the next cycle. The leader lock prevents two
-evaluators; if they raced anyway the loser attaches to the winner, audits the surplus incident (`incident.auto_create` failure,
-`reason = CLAIM_LOST`) and leaves a "Superseded" comment on it (nothing is deleted). Claim results are checked everywhere. The writer is the service principal `service:alert-evaluator` (no roles, `PrincipalKind.SERVICE`): it can only
-create an incident, append `alert-linked`/`comment` notes and claim links, through a narrow `EvaluatorIncidents` Protocol
-(`create_incident`, `append_event`, `get_incident`) rather than the full repository. It never acknowledges, assigns, resolves,
+was down for the whole recovery and the re-fire, that one outage is attributed to the old resolved incident (conservative). The incident, its first `alert-linked`
+note and the link claim are written by one store operation (`AlertIncidentStore.open_linked`, a single PostgreSQL transaction), so
+no failure can leave an open incident without a link and the next cycle never duplicates it. The leader lock prevents two
+evaluators; if they raced anyway the loser's transaction is rolled back (no surplus incident is stored), it attaches to the winner
+and audits `incident.auto_create` failure with `reason = CLAIM_LOST` (`target` is the incident that carries the alert). Claim
+results are checked everywhere. The writer is the service principal `service:alert-evaluator` (no roles,
+`PrincipalKind.SERVICE`): it can only open an incident, append `alert-linked`/`comment` notes and read, through a narrow runtime
+adapter (`EvaluatorIncidentAdapter`: `open_linked`, `append_event`, `get_incident`) rather than the repository, and the storage
+layer independently refuses any `service:` actor for acknowledge/advance/resolve/reopen, assign, evidence and rule edit/approve/disable
+(`ScopeViolationError`). A separate database role limited to these operations is a follow-up. It never acknowledges, assigns, resolves,
 reopens or closes an incident, and never edits a rule or window (a static test enforces this). Severity maps
 `info,low -> low`, `medium`, `high`, `critical`. Audit: `incident.auto_create` / `incident.auto_attach` (success) and
 `incident.auto_create` with `reason = <error type>` (failure).

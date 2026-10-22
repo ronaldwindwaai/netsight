@@ -20,9 +20,12 @@ from netsight_api.notifications.dispatcher import DeliveryAttempt, InMemoryDeliv
 from netsight_api.notifications.store import DeliveryAttemptRepository
 from netsight_api.storage import (
     AlertIncidentLinkRepository,
+    AlertIncidentStore,
     IncidentRepository,
     InMemoryAlertIncidentLinkRepository,
+    InMemoryAlertIncidentStore,
     InMemoryIncidentRepository,
+    LinkClaim,
     NotFoundError,
 )
 
@@ -36,6 +39,7 @@ class EvalStores:
     incidents: IncidentRepository
     links: AlertIncidentLinkRepository
     attempts: DeliveryAttemptRepository
+    opener: AlertIncidentStore
 
 
 @pytest.fixture(
@@ -48,12 +52,14 @@ class EvalStores:
 def stores(request: pytest.FixtureRequest) -> Iterator[EvalStores]:
     if request.param == "memory":
         incidents = InMemoryIncidentRepository()
+        links = InMemoryAlertIncidentLinkRepository(
+            incident_exists=lambda incident_id: incidents.get_incident(incident_id) is not None
+        )
         yield EvalStores(
             incidents,
-            InMemoryAlertIncidentLinkRepository(
-                incident_exists=lambda incident_id: incidents.get_incident(incident_id) is not None
-            ),
+            links,
             InMemoryDeliveryRecorder(),
+            InMemoryAlertIncidentStore(incidents, links),
         )
         return
     from pg_support import PG_DSN
@@ -61,6 +67,7 @@ def stores(request: pytest.FixtureRequest) -> Iterator[EvalStores]:
     from netsight_api.notifications.store_postgres import PostgresDeliveryAttemptRepository
     from netsight_api.storage.migrate import apply_grants, apply_up
     from netsight_api.storage.postgres import PostgresIncidentRepository, PostgresSettings
+    from netsight_api.storage.postgres_alert_incidents import PostgresAlertIncidentStore
     from netsight_api.storage.postgres_links import PostgresAlertIncidentLinkRepository
 
     assert PG_DSN
@@ -80,6 +87,7 @@ def stores(request: pytest.FixtureRequest) -> Iterator[EvalStores]:
             PostgresIncidentRepository(runtime),
             PostgresAlertIncidentLinkRepository(runtime),
             PostgresDeliveryAttemptRepository(runtime),
+            PostgresAlertIncidentStore(runtime),
         )
 
 
@@ -100,6 +108,117 @@ def attempt(**overrides: object) -> DeliveryAttempt:
     }
     fields.update(overrides)
     return DeliveryAttempt(**fields)  # type: ignore[arg-type]
+
+
+# --- one transaction: incident + link claim + timeline note --------------------------------------
+
+SERVICE = "service:alert-evaluator"
+
+
+def open_linked(stores: EvalStores, **overrides: object) -> object:
+    fields: dict[str, object] = {
+        "title": "Device down: core-1",
+        "severity": "high",
+        "actor_id": SERVICE,
+        "primary": LinkClaim("alert", KEY_A),
+        "note": "Alert rule 'Device down' (high) fired for core-1.",
+        "note_subject": KEY_A,
+    }
+    fields.update(overrides)
+    return stores.opener.open_linked(**fields)  # type: ignore[arg-type]
+
+
+def test_open_linked_creates_the_incident_the_link_and_the_note_together(
+    stores: EvalStores,
+) -> None:
+    opened = open_linked(stores)
+    assert opened is not None
+    incident = opened.incident  # type: ignore[attr-defined]
+    assert (incident.state, incident.severity, incident.title) == (
+        "open",
+        "high",
+        "Device down: core-1",
+    )
+    assert stores.incidents.get_incident(incident.id) == incident
+    assert stores.links.get("alert", KEY_A) == incident.id
+    (event,) = stores.incidents.list_timeline(incident.id)
+    assert (event.kind, event.actor_id, event.subject_id) == ("alert-linked", SERVICE, KEY_A)
+    assert event.message is not None and "core-1" in event.message
+
+
+def test_open_linked_that_loses_the_claim_leaves_nothing_behind(stores: EvalStores) -> None:
+    rival = make_incident(stores)
+    assert stores.links.claim("alert", KEY_A, incident_id=rival, replacing=None)
+    before = len(stores.incidents.list_incidents(limit=100))
+    assert open_linked(stores) is None
+    assert len(stores.incidents.list_incidents(limit=100)) == before  # no orphan incident
+    assert stores.links.get("alert", KEY_A) == rival
+
+
+def test_open_linked_replaces_a_resolved_incident_when_the_expectation_matches(
+    stores: EvalStores,
+) -> None:
+    old = make_incident(stores)
+    stores.links.claim("alert", KEY_A, incident_id=old, replacing=None)
+    assert open_linked(stores, primary=LinkClaim("alert", KEY_A, replacing=old))
+    assert stores.links.get("alert", KEY_A) != old
+    assert open_linked(stores, primary=LinkClaim("alert", KEY_A, replacing=old)) is None
+
+
+def test_open_linked_reports_a_lost_secondary_claim_without_rolling_back(
+    stores: EvalStores,
+) -> None:
+    rival = make_incident(stores)
+    stores.links.claim("alert", KEY_B, incident_id=rival, replacing=None)
+    opened = open_linked(
+        stores,
+        primary=LinkClaim("group", KEY_A),
+        secondary=LinkClaim("alert", KEY_B),
+    )
+    assert opened is not None
+    assert opened.secondary_claimed is False  # type: ignore[attr-defined]
+    assert stores.links.get("group", KEY_A) == opened.incident.id  # type: ignore[attr-defined]
+    assert stores.links.get("alert", KEY_B) == rival
+
+
+def test_open_linked_claims_both_keys_for_a_grouped_alert(stores: EvalStores) -> None:
+    opened = open_linked(
+        stores,
+        primary=LinkClaim("group", KEY_A),
+        secondary=LinkClaim("alert", KEY_B),
+    )
+    assert opened is not None and opened.secondary_claimed is True  # type: ignore[attr-defined]
+    incident_id = opened.incident.id  # type: ignore[attr-defined]
+    assert stores.links.get("group", KEY_A) == incident_id
+    assert stores.links.get("alert", KEY_B) == incident_id
+
+
+def test_open_linked_failing_after_the_claim_leaves_no_incident_and_no_link(
+    stores: EvalStores,
+) -> None:
+    before = len(stores.incidents.list_incidents(limit=100))
+    with pytest.raises(Exception):  # noqa: B017 - an oversized note fails contract validation
+        open_linked(stores, note="x" * 5000)
+    assert len(stores.incidents.list_incidents(limit=100)) == before
+    assert stores.links.get("alert", KEY_A) is None
+
+
+def test_open_linked_validates_its_arguments_before_writing(stores: EvalStores) -> None:
+    before = len(stores.incidents.list_incidents(limit=100))
+    with pytest.raises(ValueError, match="key"):
+        open_linked(stores, primary=LinkClaim("alert", "not-a-key"))
+    with pytest.raises(ValueError, match="incident"):
+        open_linked(stores, primary=LinkClaim("alert", KEY_A, replacing="bogus"))
+    assert len(stores.incidents.list_incidents(limit=100)) == before
+
+
+def test_concurrent_open_linked_for_one_key_creates_exactly_one_incident(
+    stores: EvalStores,
+) -> None:
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        results = list(pool.map(lambda _n: open_linked(stores), range(8)))
+    assert sum(1 for r in results if r is not None) == 1
+    assert len(stores.incidents.list_incidents(limit=100)) == 1
 
 
 # --- alert -> incident links ---------------------------------------------------------------------
@@ -265,6 +384,50 @@ def test_invalid_attempts_are_refused(stores: EvalStores, overrides: dict[str, o
     with pytest.raises(ValueError):
         stores.attempts.record(attempt(**overrides))
     assert stores.attempts.recent(10) == ()
+
+
+class _SecondClaimFails(InMemoryAlertIncidentLinkRepository):
+    """After ``armed``, the second claim raises (a connection lost mid-transaction)."""
+
+    def __init__(self, incidents: InMemoryIncidentRepository) -> None:
+        super().__init__(incident_exists=lambda i: incidents.get_incident(i) is not None)
+        self.armed = False
+        self._claims_since_armed = 0
+
+    def claim(self, kind: object, key: str, *, incident_id: str, replacing: str | None) -> bool:
+        if self.armed:
+            self._claims_since_armed += 1
+            if self._claims_since_armed == 2:
+                raise RuntimeError("connection lost")
+        return super().claim(kind, key, incident_id=incident_id, replacing=replacing)  # type: ignore[arg-type]
+
+
+def test_in_memory_rollback_restores_what_the_claimed_keys_held_before() -> None:
+    """A failure after the primary claim won puts every claimed key back as it was (including
+    the recovered mark) and leaves keys that point elsewhere alone."""
+    incidents = InMemoryIncidentRepository()
+    links = _SecondClaimFails(incidents)
+    store = InMemoryAlertIncidentStore(incidents, links)
+    old = incidents.create_incident(title="old", severity="low", actor_id="u-1").id
+    bystander = incidents.create_incident(title="by", severity="low", actor_id="u-1").id
+    links.claim("group", KEY_A, incident_id=old, replacing=None)
+    links.mark_recovered("group", KEY_A)
+    links.claim("alert", KEY_B, incident_id=bystander, replacing=None)
+    before = len(incidents.list_incidents(limit=100))
+    links.armed = True
+    with pytest.raises(RuntimeError):
+        store.open_linked(
+            title="t",
+            severity="high",
+            actor_id=SERVICE,
+            primary=LinkClaim("group", KEY_A, replacing=old),
+            secondary=LinkClaim("alert", KEY_B, replacing=bystander),
+            note="n",
+            note_subject=KEY_B,
+        )
+    assert len(incidents.list_incidents(limit=100)) == before
+    assert links.get("group", KEY_A) == old and links.is_recovered("group", KEY_A) is True
+    assert links.get("alert", KEY_B) == bystander
 
 
 def test_hostile_text_is_stored_as_data(stores: EvalStores) -> None:

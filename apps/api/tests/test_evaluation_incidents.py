@@ -24,13 +24,17 @@ from netsight_api.evaluation.incidents import (
 )
 from netsight_api.rbac import PrincipalKind, is_allowed
 from netsight_api.schemas import Incident, IncidentResolutionInput
-from netsight_api.storage import InMemoryAlertIncidentLinkRepository
+from netsight_api.storage import (
+    InMemoryAlertIncidentLinkRepository,
+    InvalidOperationError,
+    ScopeViolationError,
+)
 
 BIDI = chr(0x202E)
 
 
 def service(stack: Stack) -> AlertIncidentService:
-    return AlertIncidentService(stack.incidents, stack.links)
+    return AlertIncidentService(stack.evaluator, stack.links)
 
 
 def all_incidents(stack: Stack) -> list[Incident]:
@@ -268,21 +272,18 @@ class RacingLinks(InMemoryAlertIncidentLinkRepository):
         return super().claim(kind, key, incident_id=incident_id, replacing=replacing)
 
 
-def test_losing_a_claim_race_attaches_to_the_winner_and_marks_the_orphan() -> None:
+def test_losing_a_claim_race_attaches_to_the_winner_and_leaves_no_orphan() -> None:
     stack = Stack.build()
     rule = stack.active_rule()
     winner = stack.incidents.create_incident(title="rival", severity="high", actor_id="x:rival")
     racing = RacingLinks(stack, winner.id)
-    svc = AlertIncidentService(stack.incidents, racing)
+    svc = AlertIncidentService(stack.evaluator_with(racing), racing)
     effect = svc.ensure(
         rule=rule, decision=decision_for(rule, DEVICE_A), entity=DEVICE_A, correlation_id="c"
     )
     assert effect.action == "attached" and effect.incident_id == winner.id
     assert racing.get("alert", decision_for(rule, DEVICE_A).fingerprint) == winner.id
-    orphans = [i for i in all_incidents(stack) if i.id != winner.id]
-    assert len(orphans) == 1
-    (note,) = stack.incidents.list_timeline(orphans[0].id)
-    assert note.kind == "comment" and winner.id in (note.message or "")
+    assert [i.id for i in all_incidents(stack)] == [winner.id]  # the loser's incident never lands
 
 
 # --- hostile text, audit, failures ----------------------------------------------------------------
@@ -346,33 +347,120 @@ def test_store_failures_propagate_and_are_audited_as_failures(
     assert stack.links.get("alert", decision_for(rule, DEVICE_A).fingerprint) is None
 
 
-def test_a_failed_timeline_note_does_not_lose_the_created_incident() -> None:
+class NoteFails:
+    """Every plain timeline append fails (the create transaction writes its note itself)."""
+
+    def __init__(self, inner: Any) -> None:
+        self._inner = inner
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._inner, name)
+
+    def append_event(self, *args: Any, **kwargs: Any) -> Any:
+        raise RuntimeError("note failed")
+
+
+def test_a_failed_attach_note_does_not_lose_the_link_or_duplicate_the_incident() -> None:
+    stack = Stack.build()
+    rule = stack.active_rule(incident_policy="group")
+    created = ensure(stack, rule, DEVICE_A)
+    svc = AlertIncidentService(NoteFails(stack.evaluator), stack.links)  # type: ignore[arg-type]
+    effect = svc.ensure(
+        rule=rule, decision=decision_for(rule, DEVICE_B), entity=DEVICE_B, correlation_id="c"
+    )
+    assert effect.action == "attached" and effect.incident_id == created.incident_id
+    assert stack.links.get("alert", decision_for(rule, DEVICE_B).fingerprint) == created.incident_id
+    again = ensure(stack, rule, DEVICE_B)
+    assert again.action == "none" and len(all_incidents(stack)) == 1
+    assert T0  # (clock fixture sanity: nothing here reads the wall clock)
+
+
+class FlakyClaims(InMemoryAlertIncidentLinkRepository):
+    """The first claim fails with a store error, as a dropped connection would."""
+
+    def __init__(self, stack: Stack) -> None:
+        super().__init__(incident_exists=lambda i: stack.incidents.get_incident(i) is not None)
+        self.failures_left = 1
+
+    def claim(self, kind: Any, key: str, *, incident_id: str, replacing: str | None) -> bool:
+        if self.failures_left:
+            self.failures_left -= 1
+            raise RuntimeError("connection lost mid-claim")
+        return super().claim(kind, key, incident_id=incident_id, replacing=replacing)
+
+
+def test_a_claim_that_fails_once_leaves_no_orphan_and_the_next_cycle_yields_one_incident() -> None:
     stack = Stack.build()
     rule = stack.active_rule()
-
-    class NoteFails:
-        def __init__(self, inner: Any) -> None:
-            self._inner = inner
-
-        def __getattr__(self, name: str) -> Any:
-            return getattr(self._inner, name)
-
-        def append_event(self, *args: Any, **kwargs: Any) -> Any:
-            raise RuntimeError("note failed")
-
-    svc = AlertIncidentService(NoteFails(stack.incidents), stack.links)  # type: ignore[arg-type]
-    effect = svc.ensure(
-        rule=rule, decision=decision_for(rule, DEVICE_A), entity=DEVICE_A, correlation_id="c"
-    )
+    flaky = FlakyClaims(stack)
+    svc = AlertIncidentService(stack.evaluator_with(flaky), flaky)
+    decision = decision_for(rule, DEVICE_A)
+    with pytest.raises(RuntimeError):
+        svc.ensure(rule=rule, decision=decision, entity=DEVICE_A, correlation_id="c1")
+    assert all_incidents(stack) == []  # nothing committed before the failed claim
+    effect = svc.ensure(rule=rule, decision=decision, entity=DEVICE_A, correlation_id="c2")
     assert effect.action == "created"
-    assert stack.links.get("alert", decision_for(rule, DEVICE_A).fingerprint) == effect.incident_id
-    # and the next decision does not create a duplicate
-    assert (
-        service(stack)
-        .ensure(
-            rule=rule, decision=decision_for(rule, DEVICE_A), entity=DEVICE_A, correlation_id="c"
+    (incident,) = all_incidents(stack)
+    assert flaky.get("alert", decision.fingerprint) == incident.id
+    (event,) = stack.incidents.list_timeline(incident.id)
+    assert event.kind == "alert-linked"
+    again = svc.ensure(rule=rule, decision=decision, entity=DEVICE_A, correlation_id="c3")
+    assert again.action == "none" and len(all_incidents(stack)) == 1
+
+
+# --- the evaluator's runtime adapter ---------------------------------------------------------------
+
+
+def test_the_evaluators_adapter_exposes_only_open_note_and_read() -> None:
+    adapter = Stack.build().evaluator
+    names = {name for name in dir(adapter) if not name.startswith("_")}
+    assert names == {"open_linked", "append_event", "get_incident"}
+    for forbidden in (
+        "transition_state",
+        "set_assignee",
+        "add_evidence",
+        "create_incident",
+        "list_incidents",
+        "update_rule",
+    ):
+        assert not hasattr(adapter, forbidden)
+
+
+@pytest.mark.parametrize(
+    "kind", ["action-approved", "action-executed", "action-proposed", "diagnostic", "alert-unlinked"]
+)
+def test_the_adapter_refuses_note_kinds_other_than_alert_linked_and_comment(kind: str) -> None:
+    stack = Stack.build()
+    rule = stack.active_rule()
+    incident_id = ensure(stack, rule, DEVICE_A).incident_id
+    assert incident_id is not None
+    before = len(stack.incidents.list_timeline(incident_id))
+    with pytest.raises(InvalidOperationError):
+        stack.evaluator.append_event(  # type: ignore[arg-type]
+            incident_id, kind=kind, actor_id=SERVICE_IDENTITY.id, message="x"
         )
-        .action
-        == "none"
-    )
-    assert T0  # (clock fixture sanity: nothing here reads the wall clock)
+    assert len(stack.incidents.list_timeline(incident_id)) == before
+    stack.evaluator.append_event(incident_id, kind="comment", actor_id=SERVICE_IDENTITY.id, message="ok")
+
+
+def test_the_evaluator_path_cannot_resolve_reopen_or_assign_even_by_mistake() -> None:
+    stack = Stack.build()
+    rule = stack.active_rule()
+    effect = ensure(stack, rule, DEVICE_A)
+    assert effect.incident_id is not None
+    adapter = service(stack)._incidents
+    for attempt in ("transition_state", "set_assignee", "add_evidence"):
+        with pytest.raises(AttributeError):
+            getattr(adapter, attempt)
+    # and the store itself refuses the service principal when it is reached directly
+    actor = SERVICE_IDENTITY.id
+    with pytest.raises(ScopeViolationError):
+        stack.incidents.transition_state(
+            effect.incident_id, to_state="acknowledged", actor_id=actor
+        )
+    with pytest.raises(ScopeViolationError):
+        stack.incidents.set_assignee(effect.incident_id, assignee_id="u", actor_id=actor)
+    with pytest.raises(ScopeViolationError):
+        stack.incidents.add_evidence(effect.incident_id, evidence_id="e", actor_id=actor)
+    (incident,) = all_incidents(stack)
+    assert incident.state == "open" and incident.assignee_id is None
