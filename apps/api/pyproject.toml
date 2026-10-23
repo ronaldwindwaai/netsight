@@ -24,7 +24,7 @@ dependencies = [
   "qrcode>=8,<9",
   # IANA zone database for rule schedules; slim images and Windows have no system copy, and
   # without it scheduled rules fail closed (cannot be saved, approved or evaluated).
-  "tzdata>=2024.1",
+  "tzdata>=2026.5",
 ]
 
 [project.optional-dependencies]
