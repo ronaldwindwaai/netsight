@@ -36,7 +36,10 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 API_DIR = REPO_ROOT / "apps" / "api"
 STUB = API_DIR / "tests" / "e2e" / "stub_librenms.py"
 OXIDIZED_STUB = API_DIR / "tests" / "e2e" / "stub_oxidized.py"
-E2E_DIR = API_DIR / "tests" / "e2e"  # holds demo_app.py: the API with seeded demo incidents
+NETBOX_STUB = API_DIR / "tests" / "e2e" / "stub_netbox.py"
+E2E_DIR = (
+    API_DIR / "tests" / "e2e"
+)  # holds demo_app.py: the API with seeded demo incidents
 DEMO_DIR = Path(os.environ.get("NETSIGHT_DEMO_DIR", REPO_ROOT / ".demo"))
 ACCOUNT_FILE = DEMO_DIR / "local-accounts.json"
 SECRET_FILE = DEMO_DIR / "session-secret"
@@ -45,6 +48,7 @@ HOST = "127.0.0.1"
 API_PORT = 8000  # the web app's default NETSIGHT_API_URL
 STUB_PORT = 8081
 OXIDIZED_PORT = 8082
+NETBOX_PORT = 8083
 USERNAME = "demo.admin"
 
 
@@ -84,7 +88,9 @@ def _provision(env: dict[str, str]) -> dict[str, str] | None:
         check=False,
     )
     if result.returncode != 0:
-        raise SystemExit(f"account provisioning failed ({result.returncode}); see the API logs")
+        raise SystemExit(
+            f"account provisioning failed ({result.returncode}); see the API logs"
+        )
     payload = json.loads(result.stdout)
     return {
         "username": payload["created"],
@@ -109,7 +115,9 @@ def _wait_for(url: str, timeout: float = 40.0) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("--reset", action="store_true", help="delete the demo account and secret")
+    parser.add_argument(
+        "--reset", action="store_true", help="delete the demo account and secret"
+    )
     args = parser.parse_args()
 
     if args.reset:
@@ -131,6 +139,9 @@ def main() -> int:
         "LIBRENMS_TIMEZONE": "UTC",
         # Fixture configuration backups (loopback Oxidized stub) and a volatile action store.
         "OXIDIZED_BASE_URL": f"http://{HOST}:{OXIDIZED_PORT}",
+        # Fixture NetBox (loopback stub): topology map, inventory and IPAM. The stub never checks the token.
+        "NETBOX_BASE_URL": f"http://{HOST}:{NETBOX_PORT}",
+        "NETBOX_TOKEN": secrets.token_urlsafe(24),
         # DEMO ONLY: turns the action workflow on against a throwaway store; keep off in production.
         "NETSIGHT_ACTIONS_ENABLED": "1",
         # The adapter needs a non-empty token to count as configured; the stub never checks it.
@@ -146,6 +157,11 @@ def main() -> int:
     )
     oxidized = subprocess.Popen(
         [sys.executable, str(OXIDIZED_STUB), "--port", str(OXIDIZED_PORT)],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    netbox = subprocess.Popen(
+        [sys.executable, str(NETBOX_STUB), "--port", str(NETBOX_PORT)],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
@@ -181,17 +197,23 @@ def main() -> int:
             if created["recovery_codes"]:
                 print(f"  recovery     {created['recovery_codes']}")
         else:
-            print(f"\nAccount '{USERNAME}' already exists (credentials were shown at creation).")
+            print(
+                f"\nAccount '{USERNAME}' already exists (credentials were shown at creation)."
+            )
             print("Run with --reset to create a fresh one.")
-        print("\nFixture data: LibreNMS devices and ports, Oxidized config backups, and seeded")
-        print("incidents (in memory; reset on restart). Actions are on, with a volatile store.")
-        print("Traffic, security, NetBox and the other sources show 'Not connected'.")
+        print(
+            "\nFixture data: LibreNMS devices and ports, NetBox topology/IPAM, Oxidized backups, and seeded"
+        )
+        print(
+            "incidents (in memory; reset on restart). Actions are on, with a volatile store."
+        )
+        print("Traffic, security and the other sources show 'Not connected'.")
         print("Ctrl+C to stop.\n")
         api.wait()
     except KeyboardInterrupt:
         pass
     finally:
-        for process in (api, stub, oxidized):
+        for process in (api, stub, oxidized, netbox):
             process.terminate()
             try:
                 process.wait(timeout=10)
