@@ -39,10 +39,10 @@ export default async function TrafficPage({ searchParams }: { searchParams: Prom
   }
 
   const window = resolveTrafficWindow(params, new Date(), MAX_WINDOW_DAYS);
-  const [destinations, applications] = await Promise.all([
-    apiGet(destinationsPath(window, 10), parseTrafficDestinationsResponse),
-    apiGet(applicationsPath(window, 6), parseTrafficApplicationsResponse),
-  ]);
+  // One after the other: the API admits a single heavy flow read per account at a time, so two
+  // concurrent reads would always refuse the second (429 TRAFFIC_CONCURRENCY).
+  const destinations = await apiGet(destinationsPath(window, 10), parseTrafficDestinationsResponse);
+  const applications = await apiGet(applicationsPath(window, 6), parseTrafficApplicationsResponse);
 
   return (
     <AppContent title="Traffic intelligence" breadcrumbs={crumbs}>
