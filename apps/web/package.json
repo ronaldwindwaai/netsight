@@ -4,6 +4,7 @@
   "files": [
     "src",
     "next-env.d.ts",
+    "next.config.mjs",
     "tsconfig.json",
     "public"
   ],
