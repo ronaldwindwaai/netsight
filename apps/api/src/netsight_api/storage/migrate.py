@@ -290,7 +290,7 @@ def _parser() -> argparse.ArgumentParser:
     )
     prune = commands.add_parser(
         "prune",
-        help="delete expired rows from the append-only tables (D-03, D-06); run on a schedule",
+        help="delete expired rows from the append-only tables (D-02, D-03, D-06); run on a schedule",
     )
     prune.add_argument("--dry-run", action="store_true", help="count the expired rows, delete none")
     for command in (up, status, partitions, prune):

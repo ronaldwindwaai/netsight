@@ -132,13 +132,15 @@ The owner chose "adopt the recommended default" for the decisions held back on 2
 - **Build next (audited prune by the migrator):** D-02 (findings 12 months, closed-finding timeline 24 months), D-03 (diagnostic
   sessions 12 months, free text expired at 90 days), D-06 (notification delivery attempts 90 days).
 - **Built (PR retention prune):** `python -m netsight_api.storage.migrate prune [--dry-run]`, run by the migrator on a schedule,
-  deletes delivery attempts older than 90 days (D-06) and diagnostic sessions older than 12 months (D-03). Each table is pruned
+  deletes delivery attempts older than 90 days (D-06), diagnostic sessions older than 12 months (D-03) and finished unknown-device findings with their timeline at 24 months (D-02). Each table is pruned
   in one transaction that disables, then re-enables as ENABLE ALWAYS, its append-only trigger. The count per table is printed
   (capture it in the journal). The 90-day free-text minimisation of D-03 is not built: it needs a jsonb rewrite the append-only
   UPDATE trigger forbids.
-- **D-02 conflict, needs a decision:** events reference their finding with ON DELETE RESTRICT, so findings cannot be pruned at
-  12 months while the timeline lives to 24. Options: prune a closed finding together with its timeline at 24 months, or
-  detach the timeline from the finding row at 12 months. Not built.
+- **D-02 resolved (2026-10-26, best judgement):** events reference their finding with ON DELETE RESTRICT, so a finding cannot go
+  before its timeline. `prune` therefore removes a *finished* finding (resolved or false-positive, immutable) together with its
+  timeline once it is 24 months old, the longer of the two accepted periods, so nothing is kept shorter than the owner chose.
+  A finding that a newer one names as `recurrence_of` stays until that one is pruned. Open findings are never pruned.
+  Revisit if 12 months for the finding row alone is required: that would need the timeline detached from the row.
 - **D-04** adopted in shape (cycles kept for the contract term plus dispute window, raw samples shorter, exported months never
   dropped), but the contract term is owner data, so no prune is built until it is supplied.
 - **Keep nothing / build nothing, equal to current behaviour:** D-05 (no identity history stored), D-07 (no conversations stored),
