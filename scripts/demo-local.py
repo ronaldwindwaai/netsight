@@ -31,6 +31,7 @@ import time
 import urllib.error
 import urllib.request
 from pathlib import Path
+from urllib.parse import urlsplit
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 API_DIR = REPO_ROOT / "apps" / "api"
@@ -47,8 +48,10 @@ ACCOUNT_FILE = DEMO_DIR / "local-accounts.json"
 SECRET_FILE = DEMO_DIR / "session-secret"
 
 HOST = "127.0.0.1"
-API_PORT = 8000  # the web app's default NETSIGHT_API_URL
-STUB_PORT = 8081
+API_PORT = int(
+    os.environ.get("NETSIGHT_DEMO_API_PORT", "8000")
+)  # 8000 is the web default NETSIGHT_API_URL
+STUB_PORT = int(os.environ.get("NETSIGHT_DEMO_STUB_PORT", "8081"))
 OXIDIZED_PORT = 8082
 NETBOX_PORT = 8083
 WAZUH_PORT = 8084
@@ -87,9 +90,9 @@ def _provision(env: dict[str, str]) -> dict[str, str] | None:
         [sys.executable, "-c", script],
         capture_output=True,
         text=True,
+        check=False,
         cwd=str(API_DIR),
         env=env,
-        check=False,
     )
     if result.returncode != 0:
         raise SystemExit(
@@ -115,6 +118,36 @@ def _wait_for(url: str, timeout: float = 40.0) -> None:
         except (urllib.error.URLError, OSError, TimeoutError):
             time.sleep(0.3)
     raise SystemExit(f"{url} did not become ready")
+
+
+def _prepare_postgres(env: dict[str, str]) -> dict[str, str]:
+    """Migrate and seed the throwaway PostgreSQL (scripts/demo-pg.py); returns the extra API env."""
+    owner = urlsplit(os.environ["NETSIGHT_DEMO_PG_DSN"])
+    app_password = secrets.token_urlsafe(24)
+    done = subprocess.run(
+        [sys.executable, str(E2E_DIR / "seed_demo_pg.py")],
+        cwd=str(API_DIR),
+        env={**env, "NETSIGHT_DEMO_PG_APP_PASSWORD": app_password},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if done.returncode != 0:
+        raise SystemExit("Postgres seed failed:\n" + done.stderr[-2000:])
+    link = {
+        "id": "demo-primary",
+        "name": "Head office fibre",
+        "role": "primary",
+        "isp": "Demo ISP",
+        "probe_targets": ["198.51.100.1", "198.51.100.2"],
+        "uptime_target_pct": 99.5,
+    }
+    return {
+        "DATABASE_URL": (
+            f"postgresql://netsight_demo_app:{app_password}@{owner.hostname}:{owner.port}{owner.path}"
+        ),
+        "NETSIGHT_WAN_LINKS": json.dumps([link]),
+    }
 
 
 def main() -> int:
@@ -155,6 +188,10 @@ def main() -> int:
         # The adapter needs a non-empty token to count as configured; the stub never checks it.
         "LIBRENMS_TOKEN": secrets.token_urlsafe(24),
     }
+
+    pg_dsn = os.environ.get("NETSIGHT_DEMO_PG_DSN")
+    if pg_dsn:
+        env.update(_prepare_postgres(env))
 
     created = _provision(env)
 
