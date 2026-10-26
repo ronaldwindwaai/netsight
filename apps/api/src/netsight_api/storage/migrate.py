@@ -26,6 +26,7 @@ Command line (uses the migrator/owner credential, never the application one)::
         python -m netsight_api.storage.migrate up
     DATABASE_MIGRATION_URL=... python -m netsight_api.storage.migrate status
     DATABASE_MIGRATION_URL=... python -m netsight_api.storage.migrate partitions   # monthly
+    DATABASE_MIGRATION_URL=... python -m netsight_api.storage.migrate prune [--dry-run]  # retention
 
 Exit codes: 0 success, 1 migration/database failure, 2 usage or configuration error. The
 DSN and database error text are never printed.
@@ -287,7 +288,12 @@ def _parser() -> argparse.ArgumentParser:
         default=1,
         help=f"further months to prepare, 0 to {MAX_PARTITION_MONTHS_AHEAD} (default 1)",
     )
-    for command in (up, status, partitions):
+    prune = commands.add_parser(
+        "prune",
+        help="delete expired rows from the append-only tables (D-03, D-06); run on a schedule",
+    )
+    prune.add_argument("--dry-run", action="store_true", help="count the expired rows, delete none")
+    for command in (up, status, partitions, prune):
         command.add_argument("--schema", help="schema to operate in (default: search_path)")
     return parser
 
@@ -310,6 +316,16 @@ def _run_partitions(conn: Connection, ahead: int) -> None:
     months = wan_partition_months(datetime.now(UTC), ahead)
     ensure_wan_partitions(conn, months)
     print("WAN partitions ready: " + ", ".join(f"{month:%Y-%m}" for month in months))
+
+
+def _run_prune(conn: Connection, dry_run: bool) -> None:
+    from netsight_api.storage.retention import prune
+
+    verb = "would delete" if dry_run else "deleted"
+    for result in prune(conn, dry_run=dry_run):
+        print(
+            f"prune: {verb} {result.rows} from {result.table} older than {result.cutoff:%Y-%m-%d}"
+        )
 
 
 def _run_status(conn: Connection) -> None:
@@ -364,6 +380,8 @@ def main(argv: Sequence[str] | None = None, env: Mapping[str, str] | None = None
                 _run_up(conn, role, collector_role)
             elif args.command == "partitions":
                 _run_partitions(conn, args.months_ahead)
+            elif args.command == "prune":
+                _run_prune(conn, args.dry_run)
             else:
                 _run_status(conn)
     except MigrationError as error:
