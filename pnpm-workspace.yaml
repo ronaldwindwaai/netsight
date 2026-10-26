@@ -10,7 +10,7 @@ allowBuilds:
   # esbuild (component-test bundler) ships its binary via optional platform packages.
   esbuild: false
 patchedDependencies:
-  '@next/eslint-plugin-next@16.4.0': patches/@next__eslint-plugin-next@16.4.0.patch
+  '@next/eslint-plugin-next@16.4.1': patches/@next__eslint-plugin-next@16.4.1.patch
   ecc-universal: patches/ecc-universal.patch
 
 # GHSA-ch52-4w7c-c8xp: keep OpenCode cache handling on the fixed release.
@@ -18,4 +18,10 @@ overrides:
   http-cache-semantics@<4.3.0: 4.3.0
   # Next only uses globSync(pattern, { onlyDirectories: true }); tinyglobby
   # supports this API without the vulnerable micromatch/braces dependency chain.
-  '@next/eslint-plugin-next@16.4.0>fast-glob': npm:tinyglobby@0.2.17
+  '@next/eslint-plugin-next@16.4.1>fast-glob': npm:tinyglobby@0.2.17
+  # Advisories fixed upstream; transitive copies are forced onto the patched releases.
+  zod@<4.6.6: 4.6.6
+  undici@>=8.0.0 <8.12.2: 8.12.2
+  undici@>=6.0.0 <6.29.1: 6.29.1
+  ip-address@<10.7.4: 10.7.4
+  fast-uri@<3.1.9: 3.1.9

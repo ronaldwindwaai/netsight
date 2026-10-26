@@ -100,6 +100,7 @@ from netsight_api.schemas import (
     TrafficItem,
 )
 from netsight_api.security_routes import router as security_router
+from netsight_api.storage.role_check import check_app_role_from_env
 from netsight_api.traffic_routes import router as traffic_router
 from netsight_api.unknown_device_routes import router as unknown_device_router
 from netsight_api.unknown_devices.wiring import build_scan_service, start_scan
@@ -119,6 +120,7 @@ async def lifespan(app_: FastAPI) -> AsyncIterator[None]:
     session_policy()
     configure_audit_logging()
     validate_actions_environment()  # a garbled action flag fails start-up, never opens
+    check_app_role_from_env()  # a superuser/owner runtime role would void the append-only guards
     service = build_evaluation_service(librenms_client=get_optional_librenms_client)
     # All three services are built before any starts: a bad setting fails start-up, not later.
     wan_service = build_wan_collector()
