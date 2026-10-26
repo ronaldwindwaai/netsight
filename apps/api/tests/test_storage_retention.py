@@ -28,33 +28,33 @@ def test_rules_use_the_accepted_periods() -> None:
 @requires_pg
 def test_prune_deletes_only_expired_rows_and_keeps_the_guard() -> None:
     assert PG_DSN
-    with isolated_schema() as schema:
-        with PostgresSettings(dsn=PG_DSN, schema=schema).connect() as conn:
-            migrate.apply_up(conn)
-            conn.execute(_INSERT, ("old", NOW - timedelta(days=91)))  # type: ignore[arg-type]
-            conn.execute(_INSERT, ("new", NOW - timedelta(days=89)))  # type: ignore[arg-type]
-            conn.commit()
+    with (
+        isolated_schema() as schema,
+        PostgresSettings(dsn=PG_DSN, schema=schema).connect() as conn,
+    ):
+        migrate.apply_up(conn)
+        conn.execute(_INSERT, ("old", NOW - timedelta(days=91)))  # type: ignore[arg-type]
+        conn.execute(_INSERT, ("new", NOW - timedelta(days=89)))  # type: ignore[arg-type]
+        conn.commit()
 
-            counted = retention.prune(conn, NOW, dry_run=True)
-            assert {r.table: r.rows for r in counted}["notification_delivery_attempts"] == 1
+        counted = retention.prune(conn, NOW, dry_run=True)
+        assert {r.table: r.rows for r in counted}["notification_delivery_attempts"] == 1
 
-            results = retention.prune(conn, NOW)
-            assert {r.table: r.rows for r in results} == {
-                "notification_delivery_attempts": 1,
-                "diagnostic_sessions": 0,
-            }
-            left = conn.execute(
-                "SELECT notification_id FROM notification_delivery_attempts"
-            ).fetchall()
-            assert [row["notification_id"] for row in left] == ["new"]
+        results = retention.prune(conn, NOW)
+        assert {r.table: r.rows for r in results} == {
+            "notification_delivery_attempts": 1,
+            "diagnostic_sessions": 0,
+        }
+        left = conn.execute("SELECT notification_id FROM notification_delivery_attempts").fetchall()
+        assert [row["notification_id"] for row in left] == ["new"]
 
-            # The guard is back and still fires for the owner.
-            with pytest.raises(psycopg.errors.IntegrityConstraintViolation, match="append-only"):
-                conn.execute("DELETE FROM notification_delivery_attempts")
-            conn.rollback()
-            modes = conn.execute(
-                "SELECT tgenabled FROM pg_trigger WHERE tgname IN "
-                "('notification_delivery_attempts_no_update_delete', "
-                "'diagnostic_sessions_no_update_delete')"
-            ).fetchall()
-            assert [row["tgenabled"] for row in modes] == ["A", "A"]
+        # The guard is back and still fires for the owner.
+        with pytest.raises(psycopg.errors.IntegrityConstraintViolation, match="append-only"):
+            conn.execute("DELETE FROM notification_delivery_attempts")
+        conn.rollback()
+        modes = conn.execute(
+            "SELECT tgenabled FROM pg_trigger WHERE tgname IN "
+            "('notification_delivery_attempts_no_update_delete', "
+            "'diagnostic_sessions_no_update_delete')"
+        ).fetchall()
+        assert [row["tgenabled"] for row in modes] == ["A", "A"]
