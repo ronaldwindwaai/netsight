@@ -31,6 +31,7 @@ import time
 import urllib.error
 import urllib.request
 from pathlib import Path
+from urllib.parse import urlsplit
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 API_DIR = REPO_ROOT / "apps" / "api"
@@ -121,10 +122,12 @@ def _wait_for(url: str, timeout: float = 40.0) -> None:
 
 def _prepare_postgres(env: dict[str, str]) -> dict[str, str]:
     """Migrate and seed the throwaway PostgreSQL (scripts/demo-pg.py); returns the extra API env."""
+    owner = urlsplit(os.environ["NETSIGHT_DEMO_PG_DSN"])
+    app_password = secrets.token_urlsafe(24)
     done = subprocess.run(
         [sys.executable, str(E2E_DIR / "seed_demo_pg.py")],
         cwd=str(API_DIR),
-        env=env,
+        env={**env, "NETSIGHT_DEMO_PG_APP_PASSWORD": app_password},
         capture_output=True,
         text=True,
         check=False,
@@ -140,7 +143,9 @@ def _prepare_postgres(env: dict[str, str]) -> dict[str, str]:
         "uptime_target_pct": 99.5,
     }
     return {
-        "DATABASE_URL": json.loads(done.stdout.strip().splitlines()[-1])["dsn"],
+        "DATABASE_URL": (
+            f"postgresql://netsight_demo_app:{app_password}@{owner.hostname}:{owner.port}{owner.path}"
+        ),
         "NETSIGHT_WAN_LINKS": json.dumps([link]),
     }
 

@@ -2,15 +2,14 @@
 
 Reads the owner DSN from NETSIGHT_DEMO_PG_DSN (a database you may freely change), applies the
 migrations and grants, seeds unknown-device findings and two days of WAN probe cycles when those
-tables are empty, and prints the application DSN as JSON ``{"dsn": ...}`` for scripts/demo-local.py.
+tables are empty, and sets the app role's password from NETSIGHT_DEMO_PG_APP_PASSWORD (chosen by scripts/demo-local.py,
+so nothing secret is printed here).
 Refuses to run unless NETSIGHT_DEMO=1, like demo_app.py.
 """
 
 from __future__ import annotations
 
-import json
 import os
-import secrets
 import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -93,7 +92,7 @@ def main() -> int:
     owner = PostgresSettings(dsn=owner_dsn)
     with owner.connect() as conn:
         migrate.apply_up(conn)
-    password = secrets.token_urlsafe(24)
+    password = os.environ["NETSIGHT_DEMO_PG_APP_PASSWORD"]
     with psycopg.connect(owner_dsn, autocommit=True) as admin:
         exists = admin.execute("SELECT 1 FROM pg_roles WHERE rolname = %s", (APP_ROLE,)).fetchone()
         verb = "ALTER" if exists else "CREATE"
@@ -108,10 +107,7 @@ def main() -> int:
         _seed_findings(owner)
     if _count(owner, "wan_link_cycles") == 0:
         _seed_wan(owner)
-    base = psycopg.conninfo.conninfo_to_dict(owner_dsn)
-    host, port, name = base.get("host", "127.0.0.1"), base.get("port", "5432"), base["dbname"]
-    app_dsn = f"postgresql://{APP_ROLE}:{password}@{host}:{port}/{name}"
-    print(json.dumps({"dsn": app_dsn}))
+    print("demo database ready")
     return 0
 
 
