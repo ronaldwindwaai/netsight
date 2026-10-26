@@ -10,14 +10,16 @@ import { OverviewStatusStrip } from '@/components/overview-status-strip';
 import { OverviewIncidentsCard } from '@/components/overview-incidents-card';
 import { OverviewInternetKpi } from '@/components/overview-internet-kpi';
 import { OverviewApplicationMix, OverviewTopDestinations } from '@/components/overview-traffic-cards';
+import { TopologyView } from '@/components/topology-graph';
 import { apiGet } from '@/lib/api';
-import { parseOverviewResponse, parseSessionInfo } from '@/lib/api-contracts';
+import { parseOverviewResponse, parseSessionInfo, parseTopologyResponse } from '@/lib/api-contracts';
 import { parseSecurityEventsResponse } from '@/lib/api-contracts-security';
 import { parseUsersAggregateResponse } from '@/lib/api-contracts-users';
 import { parseInternetResponse } from '@/lib/api-contracts-internet';
 import { parseIncidentListResponse, parseIncidentSummaryListResponse } from '@/lib/api-contracts-incident-api';
 import { firstRunChecklist } from '@/lib/first-run';
 import { overviewIncidentRequest } from '@/lib/overview-incidents';
+import { overviewTopology } from '@/lib/overview-topology';
 import {
   parseTrafficApplicationsResponse,
   parseTrafficDestinationsResponse,
@@ -80,17 +82,22 @@ export default async function OverviewPage() {
   const securityPath = overviewSecurityRequest(permissions);
   const usersPath = overviewUsersRequest(permissions);
   const usersAccess = overviewUsersAccess(permissions);
-  const [incidents, security, users, destinations, applications] = await Promise.all([
+  const [incidents, security, users, topologyState] = await Promise.all([
     fetchIncidents(permissions),
     securityPath === null ? null : apiGet(securityPath, parseSecurityEventsResponse),
     usersPath === null ? null : apiGet(usersPath, parseUsersAggregateResponse),
-    sessionUnread || canReadTraffic(viewer)
-      ? apiGet('/api/v1/traffic/destinations?preset=24h&limit=5', parseTrafficDestinationsResponse)
-      : null,
-    sessionUnread || canReadTraffic(viewer)
-      ? apiGet('/api/v1/traffic/applications?preset=24h&limit=6', parseTrafficApplicationsResponse)
-      : null,
+    apiGet('/api/v1/topology', parseTopologyResponse),
   ]);
+  // One after the other: the API admits a single heavy flow read per account at a time, so two
+  // concurrent reads would always refuse the second (429 TRAFFIC_CONCURRENCY).
+  const readsTraffic = sessionUnread || canReadTraffic(viewer);
+  const destinations = readsTraffic
+    ? await apiGet('/api/v1/traffic/destinations?preset=24h&limit=5', parseTrafficDestinationsResponse)
+    : null;
+  const applications = readsTraffic
+    ? await apiGet('/api/v1/traffic/applications?preset=24h&limit=6', parseTrafficApplicationsResponse)
+    : null;
+  const topologyCard = overviewTopology(topologyState);
   const overview = state.kind === 'ok' ? state.data : null;
   const firstRun = firstRunChecklist({
     devices: state,
@@ -175,11 +182,15 @@ export default async function OverviewPage() {
               </Link>
             }
           >
-            <UnavailableSurface
-              icon="bi-bezier2"
-              title="Topology is not yet connected"
-              detail="Connect and reconcile a topology source before Netsight can draw network relationships."
-            />
+            {topologyCard.kind === 'graph' ? (
+              <TopologyView topology={topologyCard.topology} focus={null} />
+            ) : (
+              <UnavailableSurface
+                icon="bi-bezier2"
+                title={topologyCard.title}
+                detail={topologyCard.detail}
+              />
+            )}
           </AppCard>
         </div>
         <div className="col-xl-4 order-1 order-xl-2">
