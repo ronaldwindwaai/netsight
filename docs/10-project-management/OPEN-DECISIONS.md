@@ -125,6 +125,21 @@ Deliberately not adopted (privacy, security or infrastructure choices): D-01 to 
 policy, D-36 model provider, D-37 push and SMTP, D-41 and D-42 cohort and audit-key policy, D-52 and D-53 executors and the
 durable store.
 
+## Accepted defaults (2026-10-26)
+
+The owner chose "adopt the recommended default" for the decisions held back on 2026-10-19. They stay revisitable.
+
+- **Build next (audited prune by the migrator):** D-02 (findings 12 months, closed-finding timeline 24 months), D-03 (diagnostic
+  sessions 12 months, free text expired at 90 days), D-06 (notification delivery attempts 90 days).
+- **D-04** adopted in shape (cycles kept for the contract term plus dispute window, raw samples shorter, exported months never
+  dropped), but the contract term is owner data, so no prune is built until it is supplied.
+- **Keep nothing / build nothing, equal to current behaviour:** D-05 (no identity history stored), D-07 (no conversations stored),
+  D-08 (decide with D-26 before any series), D-23 (Administrator-only approval and execution), D-36 (local or in-region model,
+  evidence leaves the host only by opt-in), D-37 (no push provider), D-41 (k = 5, Management sees none), D-42 (fingerprints on,
+  key from the secret store), D-52 (no live executor), D-53 (PostgreSQL, already built).
+- **D-01** (privacy/legal review) is not a default that can be adopted: it stays a precondition before any role other than
+  Administrator browses people or identity history is persisted.
+
 ## Integration notes (2026-10-19, branch `integrate/steps-9-13`)
 
 The local Configuration Intelligence (Step 9: redacted configuration text, diffs, risk findings, change timeline, `config:read`)
