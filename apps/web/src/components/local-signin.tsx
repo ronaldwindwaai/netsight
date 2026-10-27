@@ -124,7 +124,7 @@ export function LocalSignIn({ redirectTo = '/overview' }: { redirectTo?: string 
     return (
       <form className="local-signin" onSubmit={submitSecondFactor}>
         <p className="local-signin__lede">
-          Enter the 6-digit code from your authenticator app for{' '}
+          Enter the 6-digit code from your authenticator app, or a recovery code, for{' '}
           <strong>{username}</strong>.
         </p>
 
@@ -137,12 +137,11 @@ export function LocalSignIn({ redirectTo = '/overview' }: { redirectTo?: string 
             autoFocus
             className="form-control form-control-lg text-center"
             id="local-mfa-code"
-            inputMode="numeric"
-            maxLength={6}
+            autoCapitalize="characters"
+            maxLength={32}
             name="code"
             onChange={(event) => setCode(event.target.value)}
-            pattern="[0-9]{6}"
-            placeholder="000000"
+            placeholder="000000 or AAAAA-BBBBB"
             required
             value={code}
           />
