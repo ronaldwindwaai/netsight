@@ -25,6 +25,11 @@ export PATH="$HOME/.local/node/bin:$PATH"
 export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
 
 [ -d "$RELEASE" ] || { echo "release $RELEASE not found" >&2; exit 1; }
+# A repeat run for the release that is already live (a second workflow_run for one commit) is a no-op.
+if [ "$(readlink -f "$BASE/current" 2>/dev/null || true)" = "$(readlink -f "$RELEASE")" ]; then
+  echo "release $SHA is already live; nothing to do"
+  exit 0
+fi
 [ ! -e "$RUNTIME" ] && [ ! -e "$SOURCE_ARCHIVE" ] || {
   echo "release $RELEASE has already been prepared" >&2
   exit 1

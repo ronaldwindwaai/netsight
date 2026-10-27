@@ -143,6 +143,11 @@ The owner chose "adopt the recommended default" for the decisions held back on 2
   Revisit if 12 months for the finding row alone is required: that would need the timeline detached from the row.
 - **D-04** adopted in shape (cycles kept for the contract term plus dispute window, raw samples shorter, exported months never
   dropped), but the contract term is owner data, so no prune is built until it is supplied.
+- **D-04 resolved (2026-10-27, best judgement):** with no contract term supplied, WAN cycles are kept (the reversible direction:
+  data can be pruned later, not restored). Once the owner gives the number it is one more `RetentionRule` in `storage/retention.py`.
+- **D-03 free text resolved (2026-10-27, best judgement):** not built. Rewriting stored sessions would break the append-only
+  guarantee for a 90-day gain; the 12-month deletion already bounds how long free text is kept. Revisit only if the privacy
+  review (D-01) requires 90 days, which would mean a redacting write path instead of an UPDATE.
 - **Keep nothing / build nothing, equal to current behaviour:** D-05 (no identity history stored), D-07 (no conversations stored),
   D-08 (decide with D-26 before any series), D-23 (Administrator-only approval and execution), D-36 (local or in-region model,
   evidence leaves the host only by opt-in), D-37 (no push provider), D-41 (k = 5, Management sees none), D-42 (fingerprints on,
