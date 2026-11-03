@@ -1,0 +1,11 @@
+node_modules
+.next
+e2e
+**/*.test.ts
+**/*.test.tsx
+coverage
+playwright-report
+test-results
+.env*
+Dockerfile
+.dockerignore

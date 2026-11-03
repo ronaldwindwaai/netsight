@@ -1,0 +1,74 @@
+# Production-like container topology for Netsight (api + web). NOT the production deploy path:
+# production runs under systemd (infrastructure/vps). See docs/08-operations/DOCKER.md.
+#
+#   docker compose -f infrastructure/compose/docker-compose.prod-like.yml up --build
+#
+# Credentials: none live here. Each service reads an env file YOU provide outside source control
+# (copy .env.example, fill in real values, keep the file out of git). Postgres/Redis are not part
+# of this file; point DATABASE_URL / REDIS_URL in api.env at your own instances.
+#
+# Topology: the web UI only accepts a loopback or HTTPS NETSIGHT_API_URL (apps/web/src/lib/api-url.ts),
+# so web joins the api container's network namespace and reaches it on http://127.0.0.1:8000, exactly
+# as under systemd. The API stays bound to loopback and is therefore unreachable from the host or
+# the network; only the web port is published, on host loopback (put the reverse proxy in front).
+
+x-hardening: &hardening
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  restart: unless-stopped
+  init: true
+  pids_limit: 256
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "3" }
+
+services:
+  api:
+    <<: *hardening
+    image: netsight-api:local
+    build:
+      context: ../../apps/api
+      dockerfile: Dockerfile
+    env_file:
+      - ${NETSIGHT_API_ENV_FILE:?set NETSIGHT_API_ENV_FILE to your private api env file}
+    # Published here because web shares this network namespace. Loopback only.
+    ports:
+      - "127.0.0.1:${NETSIGHT_WEB_PORT:-2000}:2000"
+    tmpfs:
+      - /tmp:size=64m,mode=1777,noexec,nosuid
+    mem_limit: 768m
+    cpus: 1.0
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys,urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=3).status == 200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
+  web:
+    <<: *hardening
+    image: netsight-web:local
+    build:
+      context: ../..
+      dockerfile: apps/web/Dockerfile
+    network_mode: "service:api"
+    env_file:
+      - ${NETSIGHT_WEB_ENV_FILE:?set NETSIGHT_WEB_ENV_FILE to your private web env file}
+    environment:
+      # Loopback inside the shared namespace; overrides nothing secret.
+      NETSIGHT_API_URL: http://127.0.0.1:8000
+    tmpfs:
+      - /tmp:size=64m,mode=1777,noexec,nosuid
+      - /app/.next/cache:size=128m,uid=1000,gid=1000,mode=0700,noexec,nosuid
+    mem_limit: 512m
+    cpus: 1.0
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:2000/login').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
