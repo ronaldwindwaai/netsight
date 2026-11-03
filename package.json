@@ -17,7 +17,7 @@
     "ecc-universal": "^2.2.3"
   },
   "devDependencies": {
-    "@opencode/plugin": "2.0.27",
+    "@opencode/plugin": "2.0.32",
     "@types/node": "^24.0.0",
     "typescript": "~5.9.3"
   }
